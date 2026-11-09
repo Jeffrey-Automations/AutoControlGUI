@@ -292,3 +292,5 @@ AutoControl 读取的每一个环境变量。这里没有任何一项是必填�
 | `JE_AUTOCONTROL_PYTEST_ARTIFACTS` | `./autocontrol_screenshots` | 测试没有使用 `autocontrol_screenshot_dir` fixture 时，pytest 插件写入失败截图的目录。 |
 
 ---
+
+Report 标签页在首次打开时创建。关闭会释放控件和本地结果视图；重新打开会创建新页面并读取当前录制状态。关闭标签页不会禁用共享 recorder。

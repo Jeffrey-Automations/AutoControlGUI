@@ -102,22 +102,21 @@ def test_execute_script_slot_surfaces_autocontrol_exception(monkeypatch):
 
 # --- Finding 6: report tab, zero records -----------------------------------
 
-def test_report_gen_html_slot_surfaces_autocontrol_exception():
-    from je_auto_control.gui._report_tab import ReportTabMixin
-    from je_auto_control.utils.test_record.record_test_class import (
-        test_record_instance,
-    )
-    test_record_instance.test_record_list.clear()  # zero records -> raises
-    captured = {}
-    stub = types.SimpleNamespace(
-        report_name_input=types.SimpleNamespace(text=lambda: "rpt"),
-        report_result_text=types.SimpleNamespace(
-            setText=lambda s: captured.__setitem__("t", s),
-        ),
-    )
+def test_report_gen_html_slot_surfaces_autocontrol_exception(monkeypatch):
+    from PySide6.QtWidgets import QApplication
+    from je_auto_control.gui._report_tab import ReportTab
+    from je_auto_control.utils.test_record.record_test_class import test_record_instance
 
-    ReportTabMixin._gen_html(stub)  # must not raise AutoControlHTMLException
-    assert captured.get("t", "").startswith("Error")
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(test_record_instance, "test_record_list", [])
+    tab = ReportTab()
+    tab.report_name_input.setText("rpt")
+    try:
+        tab._gen_html()
+        assert tab.report_result_text.toPlainText().startswith("Error")
+    finally:
+        tab.deleteLater()
+        app.processEvents()
 
 
 def test_report_generate_html_report_really_raises_on_zero_records():

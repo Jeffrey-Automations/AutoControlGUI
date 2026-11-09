@@ -1,11 +1,11 @@
-"""Report-generation tab builder (extracted mixin)."""
-from typing import TYPE_CHECKING, Any, Callable
+"""Report-generation panel with independently owned controls and actions."""
 
 from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.generate_report.generate_html_report import generate_html_report
 from je_auto_control.utils.generate_report.generate_json_report import generate_json_report
@@ -13,22 +13,13 @@ from je_auto_control.utils.generate_report.generate_xml_report import generate_x
 from je_auto_control.utils.test_record.record_test_class import test_record_instance
 
 
-class ReportTabMixin:
-    """Provides the report-generation tab builder/handlers.
+class ReportTab(TranslatableMixin, QWidget):
+    """Own report inputs and reflect the process-wide recorder without owning it."""
 
-    Host widget must expose the TranslatableMixin API (``self._tr(...)``)
-    so every label/button registers for live language switching.
-    """
-
-    if TYPE_CHECKING:
-        # Declared, never defined: the widget this mixin is mixed into owns
-        # every one of these. The block is stripped at runtime, so nothing
-        # here can shadow what the host actually binds.
-        _tr: Callable[..., Any]
-
-    def _build_report_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._tr_init()
+        layout = QVBoxLayout(self)
 
         # Enable/disable recording and report generation run from the
         # Actions menu; the tab keeps only status, name input, and result.
@@ -50,12 +41,27 @@ class ReportTabMixin:
         self.report_result_text.setReadOnly(True)
         layout.addWidget(self.report_result_text)
         layout.addStretch()
-        tab.setLayout(layout)
-        return tab
+        self.sync_with_engine()
+
+    def menu_actions(self):
+        return [
+            ("enable_test_record", self._enable_test_record),
+            ("disable_test_record", self._disable_test_record),
+            ("generate_html_report", self._gen_html),
+            ("generate_json_report", self._gen_json),
+            ("generate_xml_report", self._gen_xml),
+        ]
+
+    def sync_with_engine(self):
+        self.tr_status_label.setText("ON" if test_record_instance.init_record else "OFF")
+
+    def showEvent(self, event):  # noqa: N802  # reason: Qt virtual method
+        self.sync_with_engine()
+        super().showEvent(event)
 
     def _set_test_record(self, enable: bool):
         test_record_instance.set_record_enable(enable)
-        self.tr_status_label.setText("ON" if enable else "OFF")
+        self.sync_with_engine()
 
     def _enable_test_record(self):
         self._set_test_record(True)

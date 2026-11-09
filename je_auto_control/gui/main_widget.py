@@ -12,7 +12,6 @@ from je_auto_control.gui._auto_click_tab import AutoClickTabMixin
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._image_detect_tab import ImageDetectTabMixin
 from je_auto_control.gui._record_tab import RecordTabMixin
-from je_auto_control.gui._report_tab import ReportTabMixin
 from je_auto_control.gui._screenshot_tab import ScreenshotTabMixin
 from je_auto_control.gui._script_tab import ScriptTabMixin
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
@@ -37,7 +36,7 @@ class _WorkerSignals(QObject):
 # =============================================================================
 class AutoControlGUIWidget(
     TranslatableMixin, AutoClickTabMixin, ScreenshotTabMixin,
-    ImageDetectTabMixin, RecordTabMixin, ScriptTabMixin, ReportTabMixin,
+    ImageDetectTabMixin, RecordTabMixin, ScriptTabMixin,
     QWidget,
 ):
     """Owns the QTabWidget and exposes show/hide/list APIs for the menu bar."""
@@ -131,13 +130,6 @@ class AutoControlGUIWidget(
                 ("task_stop", self._stop_script),
             )),
             "remote_desktop": (self._build_remote_desktop_tab, ()),
-            "report": (self._build_report_tab(), (
-                ("enable_test_record", self._enable_test_record),
-                ("disable_test_record", self._disable_test_record),
-                ("generate_html_report", self._gen_html),
-                ("generate_json_report", self._gen_json),
-                ("generate_xml_report", self._gen_xml),
-            )),
         }
 
     @staticmethod

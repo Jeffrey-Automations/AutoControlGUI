@@ -292,3 +292,5 @@ AutoControl 讀取的每一個環境變數。這裡沒有任何一項是必填�
 | `JE_AUTOCONTROL_PYTEST_ARTIFACTS` | `./autocontrol_screenshots` | 測試沒有使用 `autocontrol_screenshot_dir` fixture 時，pytest 外掛寫入失敗截圖的目錄。 |
 
 ---
+
+Report 分頁在首次開啟時建立。關閉會釋放控制項與本機結果畫面；重新開啟會建立新頁面並讀取目前錄製狀態。關閉分頁不會停用共用 recorder。

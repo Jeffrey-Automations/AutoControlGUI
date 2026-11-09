@@ -194,5 +194,5 @@ TAB_SPECS: Tuple[TabSpec, ...] = (
     TabSpec("usb_share", "tab_usb_share", "system", f"{_GUI}.usb_passthrough_panel", "UsbPassthroughPanel"),
     TabSpec("diagnostics", "tab_diagnostics", "system", f"{_GUI}.diagnostics_tab", "DiagnosticsTab"),
     TabSpec("config_sync", "tab_config_sync", "system", f"{_GUI}.config_sync_tab", "ConfigSyncTab"),
-    TabSpec("report", "tab_report", "system"),
+    TabSpec("report", "tab_report", "system", f"{_GUI}._report_tab", "ReportTab"),
 )

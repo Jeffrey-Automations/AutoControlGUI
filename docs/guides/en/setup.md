@@ -353,3 +353,5 @@ Every environment variable AutoControl reads. Nothing here is required: with no 
 | `JE_AUTOCONTROL_PYTEST_ARTIFACTS` | `./autocontrol_screenshots` | Directory the pytest plugin writes failure screenshots to when a test did not request the `autocontrol_screenshot_dir` fixture. |
 
 ---
+
+The Report page is created when first opened. Closing it releases its controls and local result view; reopening creates a fresh page and reads the current recording status. Closing the page does not disable the shared recorder.
