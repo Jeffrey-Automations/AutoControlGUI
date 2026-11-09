@@ -113,6 +113,7 @@ def test_report_gen_html_slot_surfaces_autocontrol_exception(monkeypatch):
     tab.report_name_input.setText("rpt")
     try:
         tab._gen_html()
+        assert settle(tab._task, "task")
         assert tab.report_result_text.toPlainText().startswith("Error")
     finally:
         tab.deleteLater()

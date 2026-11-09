@@ -25,7 +25,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,495 |
-| 程式碼總行數 | 228,352 |
+| 程式碼總行數 | 228,364 |
 | `je_auto_control/utils/` 子套件數 | 311 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1276,7 +1276,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `_image_detect_tab.py` | 117 | 影像偵測分頁 mixin。 |
 | `_script_tab.py` | 158 | 腳本執行分頁 mixin。 |
 | `_record_tab.py` | 144 | 錄製／回放分頁 mixin。 |
-| `_report_tab.py` | 94 | 報表分頁 mixin。 |
+| `_report_tab.py` | 106 | 報表分頁 mixin。 |
 | `_i18n_helpers.py` | 79 | 需要即時語言切換的分頁共用的翻譯註冊 mixin。 |
 | `_validators.py` | 29 | `int_validator()`／`double_validator()`：以 C locale 驗證的數字輸入框 validator，接受的正是 `int()`／`float()` 讀得懂的寫法（預設 locale 在法文、德文下只收小數逗號）。所有數字 `QLineEdit` 都用它。 |
 | `_screen_geometry.py` | 55 | Qt 邏輯座標與截圖用的原生像素互轉：`native_region()`、`screen_at_native()`、`logical_point()`（每個螢幕的左上角在兩者相同，螢幕內依 device pixel ratio 縮放）。區域選取與主機端標註覆蓋層都用它。 |
@@ -1351,7 +1351,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | usb_browser | `usb_browser_tab.py` | 290 | 檢視端 USB 裝置瀏覽器。 |
 | usb_share | `usb_passthrough_panel.py` + `usb_passthrough_prompt.py` | 778 | AnyDesk 風格 USB 直通面板與主機端 ACL 授權對話框。 |
 | diagnostics | `diagnostics_tab.py` | 221 | Actions 提供被動快照、背景主動診斷與停止；四語進度／重試、關閉後結果隔離；不自動取得授權。 |
-| report | `_report_tab.py` | 94 | 產生 HTML／JSON／XML 報表。 |
+| report | `_report_tab.py` | 106 | 產生 HTML／JSON／XML 報表。 |
 
 #### 診斷顯示輔助
 
@@ -1493,7 +1493,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 144 | 39,849 |
+| `gui/` | 144 | 39,861 |
 | `utils/mcp_server/` | 55 | 21,490 |
 | `utils/remote_desktop/` | 72 | 15,243 |
 | `utils/executor/` | 11 | 10,702 |
@@ -1514,7 +1514,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 997 | 101,553 |
-| **總計** | **1,483** | **227,607** |
+| **總計** | **1,483** | **227,619** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

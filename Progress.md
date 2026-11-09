@@ -522,7 +522,7 @@ D2 仍缺 helper 隔離與半開交握資源回收；D3 的錄製／全域停止
 - **Remote Desktop 與 Script Builder 仍在啟動時建立**（預設開啟），啟動時間 2.6–2.7 秒裡大半是它們與門面匯入。
 - **F1 的遺留面板釋放**：Auto Click、Screenshot、Image Detection、Record、Script 五個核心表單與 Remote Desktop 在關閉時仍保留 widget；需隨 F3 遷移直接控制項引用、執行中工作與連線生命週期，再啟用銷毀。
 - **F2 其餘**：計畫指定的 `WorkspaceShell` 介面、右側可收合詳情，以及各面板的空白／錯誤／permission states 還沒全面交付。
-- **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移。Report 已完成獨立生命週期，報表產生仍須移出 GUI 執行緒並拒絕關閉後的晚到結果。
+- **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移。
 - **F4**（啟動／記憶體基準、mixed-DPI、功能對等測試）尚未開始。
 - **F3 Windows 原生釋放驗收**：`test/unit_test/headless/test_remote_desktop_host_id.py` 的 freed-thread-state abort 尚缺 Windows 原生堆疊與獨立根因確認。
 
