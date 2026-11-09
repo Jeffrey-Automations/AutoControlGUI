@@ -1,14 +1,9 @@
-"""The counts quoted in the docs must match the tree. No Qt.
+"""Check documented counts against the implementation.
 
-CLAUDE.md requires `architecture_explore.md` and the three READMEs to be
-updated with every change, and says every count in them is measured. Nothing
-enforced it, and it drifted in practice: wiring `utils/url_canon` added three
-commands and three MCP tools while every document kept quoting the old totals.
-That was caught by hand afterwards, not by any check.
-
-A mismatch here means one of two things, and the message says which:
-the number moved and the docs were not updated, or the sentence holding the
-number was reworded and this test's pattern needs to follow it.
+Detailed counts live in architecture_explore.md and the language-specific
+usage, integration, development and installation guides under docs/guides/.
+Missing quotations fail as well as incorrect totals, so moving or rewording
+these documents requires updating the citation paths or patterns here.
 """
 import pathlib
 import re
@@ -98,22 +93,22 @@ CITATIONS: List[Tuple[str, str, str, Callable[[], int]]] = [
     ("architecture_explore.md",
      r"`test/verify/typing_contract_exempt\.txt`（只准變少，目前 \*\*(\d+)\*\* 個",
      "mypy exemptions", _typing_exemptions),
-    ("README.md", r"(\d+) `AC_\*` commands", "AC_* commands", _commands),
-    ("README.md", r"all (\d+) commands", "AC_* commands", _commands),
-    ("README.md", r"(\d+) tools for", "MCP tools", _mcp_tools),
-    ("README.md", r"(\d+) self-contained scripts", "examples", _examples),
+    ("docs/guides/en/usage.md", r"(\d+) `AC_\*` commands", "AC_* commands", _commands),
+    ("docs/guides/en/usage.md", r"all (\d+) commands", "AC_* commands", _commands),
+    ("docs/guides/en/integrations.md", r"(\d+) tools for", "MCP tools", _mcp_tools),
+    ("docs/guides/en/development.md", r"(\d+) self-contained scripts", "examples", _examples),
     ("architecture_explore.md", r"範例腳本 \| (\d+) \|", "examples", _examples),
     ("architecture_explore.md", r"`examples/` \| (\d+) 個腳本", "examples", _examples),
-    ("README/README_zh-CN.md", r"(\d+) 个自包含脚本", "examples", _examples),
-    ("README/README_zh-TW.md", r"(\d+) 個自足腳本", "examples", _examples),
-    ("README/README_zh-CN.md", r"(\d+) 个 `AC_\*` 命令",
+    ("docs/guides/zh-CN/development.md", r"(\d+) 个自包含脚本", "examples", _examples),
+    ("docs/guides/zh-TW/development.md", r"(\d+) 個自足腳本", "examples", _examples),
+    ("docs/guides/zh-CN/usage.md", r"(\d+) 个 `AC_\*` 命令",
      "AC_* commands", _commands),
-    ("README/README_zh-CN.md", r"全部 (\d+) 个命令", "AC_* commands", _commands),
-    ("README/README_zh-CN.md", r"(\d+) 个工具", "MCP tools", _mcp_tools),
-    ("README/README_zh-TW.md", r"(\d+) 個 `AC_\*` 指令",
+    ("docs/guides/zh-CN/usage.md", r"全部 (\d+) 个命令", "AC_* commands", _commands),
+    ("docs/guides/zh-CN/integrations.md", r"(\d+) 个工具", "MCP tools", _mcp_tools),
+    ("docs/guides/zh-TW/usage.md", r"(\d+) 個 `AC_\*` 指令",
      "AC_* commands", _commands),
-    ("README/README_zh-TW.md", r"全部 (\d+) 個指令", "AC_* commands", _commands),
-    ("README/README_zh-TW.md", r"(\d+) 個工具", "MCP tools", _mcp_tools),
+    ("docs/guides/zh-TW/usage.md", r"全部 (\d+) 個指令", "AC_* commands", _commands),
+    ("docs/guides/zh-TW/integrations.md", r"(\d+) 個工具", "MCP tools", _mcp_tools),
     ("CLAUDE.md", r"(\d+) `utils/` subpackages",
      "utils/ subpackages", _utils_subpackages),
     ("CLAUDE.md", r"\((\d+) headless subpackages\)",
@@ -138,7 +133,7 @@ def test_quoted_count_matches_the_tree(doc, pattern, label, measure):
         assert int(quoted.replace(",", "")) == actual, (
             f"{doc} says {quoted} {label}, the tree has {actual}. "
             f"Re-measure and update every document that quotes it "
-            f"(architecture_explore.md, README.md and both translations)."
+            f"(architecture_explore.md and the guides under docs/guides/)."
         )
 
 

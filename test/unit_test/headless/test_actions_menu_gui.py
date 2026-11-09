@@ -144,9 +144,9 @@ def test_diagnostic_run_stop_and_passive_inspection_reach_the_window_actions_men
 TAB_CITATIONS = (
     ("architecture_explore.md", r"GUI 分頁數（`main_widget` 註冊） \| (\d+)"),
     ("architecture_explore.md", r"#### (\d+) 個分頁"),
-    ("README.md", r"\((\d+) tabs\)"),
-    ("README/README_zh-CN.md", r"（(\d+) 个标签页）"),
-    ("README/README_zh-TW.md", r"（(\d+) 個分頁）"),
+    ("docs/guides/en/setup.md", r"\((\d+) tabs\)"),
+    ("docs/guides/zh-CN/setup.md", r"（(\d+) 个标签页）"),
+    ("docs/guides/zh-TW/setup.md", r"（(\d+) 個分頁）"),
 )
 
 
@@ -163,5 +163,5 @@ def test_documented_tab_count_matches_the_widget(report, doc, pattern):
     for quoted in found:
         assert int(quoted) == report["tab_count"], (
             f"{doc} says {quoted} GUI tabs, the widget builds "
-            f"{report['tab_count']}. Update all three READMEs."
+            f"{report['tab_count']}. Update the installation guides in all three languages."
         )

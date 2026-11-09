@@ -1,5 +1,221 @@
 # Progress
 
+## 維護規則：實機驗收固定置頂
+
+依使用者 2026-11-10 指示，所有實機驗收待辦固定放在本檔上方，先於一般開發規劃、重構與相依套件待辦。
+後續新增或更新原生桌面、實際瀏覽器、實體裝置、真實應用／API、跨主機與長時間驗收時，
+一律加入下方「實機驗收與必要前置工作」區，不得散放到一般開發區或在驗收區之前插入開發規劃。
+混合實作與驗收的段落保留必要前置工作及限制；新增段落應把實作待辦和實機驗收分開，互相連結。
+只有原始需求中的驗收條件與實際證據都完成，才能移除待辦；完成紀錄依既有規則寫入 `docs/updates/`。
+本次只調整文件排序，不解除任何暫緩、不啟動驗收，也不把 CI、mock 或隔離測試視為實機通過。
+
+## 實機驗收與必要前置工作
+
+以下集中列出未完成的實機驗收，以及與驗收不可分的缺口與前置實作。
+各段原有的 `TODO`／`WIP`／`BLOCKED`／`DECIDE` 狀態與暫緩條件維持有效。
+原生桌面、實際瀏覽器、Android／iOS 真機、WebRunner 原生雙向 bridge 與完整 24 小時驗收仍暫緩；
+真機與付費 API 驗收須待使用者明確恢復後執行。文件置頂不代表取得執行或付費授權。
+
+## 輸入、視窗與擷取修正：還沒在真的桌面與 Jeffrey_RPA 上驗過
+
+`TODO` — 原生桌面與正式批次升級前的行為驗收暫緩。
+
+- **正式批次升級前的桌面行為驗收**：需核對 `_gui_control.py` 對下列行為的實際依賴：
+  `write()` 大寫與 `is_shift` 在 Windows／X11 生效、`"\r\n"` 只按一次 Enter、`mouse_scroll` 預設方向改為 `scroll_up`
+  （X11／Wayland 上 `mouse_scroll(3)` 由往下變往上）、小數座標四捨五入、`focus_window` 在 Windows 沒拿到前景會丟例外、
+  `list_windows` 不再列出 DWM cloak 與零面積視窗、`post_key` 對可列印字元只送 `WM_CHAR`。
+- **混合 DPI 座標與樣板**：需實測各螢幕上的舊版座標、`screen_region`、視窗版面與樣板，
+  包含縮放不同的副螢幕、負原點與多螢幕排列；必要時重新錄製，不能以推導代替驗收。
+- **舊版存的視窗版面檔要重存**：`save_window_layout` 改存 `GetWindowRect`，舊檔還原會偏右 7 px、縮小 14×7 px。
+- **真的 Win32 行為沒有實測**：`post_key` 在真的編輯框是否只出現一個字、DWM cloak 過濾掉的是哪些視窗、
+  `MoveWindow` 對最大化視窗與另一個 DPI 的螢幕是否能原樣還原，都只用假的 `user32` 驗過。
+- **X11／Wayland**：大寫與 Shift 標點的判斷假設 `keysym_to_keycode` 把大寫字母對到小寫的 keycode，沒有對著 X server 跑過。
+
+---
+
+## Wayland 生命週期與驗收
+
+`TODO` — 下列上游行為與原生桌面互動仍需驗證。
+
+### 還沒有答案的
+
+- **`eis_device_pause()` 在 libeis 1.3.901 對 sender client 沒有送出任何東西。**
+  對兩個 live device 呼叫 pause 再 dispatch,client 端的 ei fd 4 秒內完全沒有可讀資料。
+  所以 `LibeiBackend._on_event` 的 `DEVICE_PAUSED`／`DEVICE_REMOVED` 分支**仍然沒有
+  peer 可以驅動**。`eis_verify.py` 把這件事寫成「要嘛有反應,要嘛根本沒被通知」,
+  若哪天 libeis 開始送了,client 忽略它就會當場失敗。真的合成器上會不會不一樣,未知。
+- **`ei_device_start_emulating()` 的 sequence number 沒有被送到對面。**
+  刻意送 4242 過去,server 讀回來是 0。我們這邊的計數本身符合標頭檔的約定
+  （每次呼叫至少 +1）,所以不影響正確性,只是從對面驗不到。
+- **同意對話框「長什麼樣子、真人要按多久」。** portal 這一層現在驗到的是對話框
+  *產生的東西*:准（Response 0）、拒（Response 1）、以及一直不回答。三種我們都在真的
+  bus 上跑過,三種都得在自己的時限內收斂。至於真的 mutter 對話框長什麼樣、真人猶豫
+  三十秒會不會撞到別的東西,那是 mutter 的事,CI 裡沒有人可以去按它。
+
+## macOS 的修正：CI 驗到一半，其餘要一台真的 Mac
+
+`TODO` — 要一台真的 Mac（Retina，最好接第二個螢幕）
+
+還沒驗的：
+
+- **應用程式是否把 `click_mouse(clicks=2)` 認成雙擊**：只確認了欄位的值，沒有對真的應用程式送事件。
+- **`grab_logical`**（`utils/monitor_layout/macos_frame.py`，點座標、逐螢幕擷取後拼接）完全沒在 macOS 跑過。三個假設要實機確認：
+  `screencapture -R` 接受含負值的全域點座標、Pillow 的 `scale_down=True` 給出點尺寸的影像、`CGDisplayBounds` 與 Quartz 滑鼠事件同一個座標空間。
+  每一格要為每個螢幕各開一次 `screencapture`。CI 的 runner 是 1x 單螢幕，測不到 Retina 與副螢幕。
+- **`list_windows` 在真的桌面上的成本與誤列**：沒加 AX 逾時，沒回應的 app 會拖慢列出；同一行程裡與最小化視窗同原點或同標題的螢幕外輔助視窗可能被誤列。
+
+---
+
+## 行動裝置（Android／iOS）：完全沒有在裝置上跑過
+
+`BLOCKED` — 需要 Android 模擬器或實機、iPhone 與 WebDriverAgent；這台機器連 `adb` 都沒有
+
+U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WDA 測過。`uiautomator2` 與 `facebook-wda` 沒有安裝在開發環境裡，
+方法名稱與參數是憑記憶寫的，第一次接上真的 SDK 很可能要修：
+
+- uiautomator2：`send_keys`、`drag`、空 selector 的 `gesture(...)`（捏合）、`clipboard`／`set_clipboard`、對話框按鈕的 resource id。
+- facebook-wda：`app_launch`／`app_terminate`／`app_state`、`alert.*`、`set_clipboard`、`status()`、`orientation` 的值、元素的 `pinch`、`screenshot()` 回傳 PIL 影像。
+- 旋轉方向：螢幕截圖以面板自然方向回來時，`landscape_left` 轉 270°、`landscape_right` 轉 90°，是從文件推的，沒看過。
+- Android：`input draganddrop` 是否存在、`monkey` 啟動輸出、`pidof`／`pm path` 的結束碼、`dumpsys activity activities` 的格式、`pkill -INT screenrecord` 能否收尾 MP4。
+  ADBKeyBoard 的送達無法由裝置確認，是從 IME 被選取推定的。
+- 已知限制：iOS 捏合忽略 `x`／`y`／`span`；iOS `app_state` 不會回 `not_installed`；iOS 的安裝／檔案／錄影沒有 adapter（只有 `MobileExtension` 協定與註冊點）；
+  Mobile 分頁的 probe／run 會卡住 GUI 執行緒到裝置回應或逾時。`AC_android_shell` 刻意不做成 MCP 工具，**請維護者確認**。
+- 沒有 `examples/` 的實機腳本以外的 smoke；Xcode／WDA 的建置與簽章只寫成前置條件。
+
+---
+
+## macos-15 上的 TCC 權限還沒被 gate 驗過
+
+`TODO` — 2026-11-01 把所有 macOS 方格從 `macos-14` 改成 `macos-15`（U-20261101-02），
+`test/verify/macos_verify.py` 的 `EXPECTED` 沿用 2026-08-19 在 macos-14 上的實測（螢幕錄製與輔助使用兩個
+TCC 權限都給）。`platform-smoke.yml` 的 `macos-capabilities` 只在推送到 `main` 與對 `main` 的 PR 上執行，所以下一個 dev→main
+PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 重新實測後更新 `EXPECTED` 與
+`docs/CAPABILITY_MATRIX.md`，不要直接放寬 gate。
+
+---
+
+## GUI：留下的缺口
+
+`TODO` — U-20261009-27、-28、-34、-36、-38、-40 之後還開著的
+
+- **Windows UIA 後端的執行緒模型完全沒對真的 COM 驗過**：現在每個呼叫執行緒各有一個自動化物件（`accessibility/backends/windows_automation.py`；
+  主執行緒 STA、其他執行緒進 MTA），Accessibility 分頁與 A11y Audit 已移出 GUI 執行緒。開發環境沒裝 `comtypes`，CI 也沒有同時有 `comtypes` 與桌面的 job，
+  測試全是假 COM 物件。未驗證的假設：MTA 工作執行緒上的 UIA 呼叫可用；焦點事件 callback 不需要 message pump；
+  `import comtypes` 第一次發生在已經是 MTA 的執行緒上會丟 `OSError`（憑記憶，沒處理）。`AC_wait_for_focus_change` 的原生 `Queue.get` 仍不會被 stop 叫醒。
+- **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）；`AC_parallel` 分支裡產生的值不經結果掛鉤回報，
+  只能從區塊的結果裡取得（標成 `results[0].…`）。結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
+  對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
+  `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
+- **stop 還叫不醒的**：已經進到後端的單一指令（一次影像搜尋、OCR、HTTP 請求、shell 指令）、單一手勢內的節奏 sleep、`AC_wait_for_focus_change`；
+  MCP 自己的輪詢（`ac_wait_for_image`／`ac_wait_for_pixel`）不在可停止的執行裡。非腳本的分頁工作在後端無法取消，只是結果被丟掉。
+  ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在輪詢執行緒上的指令 handler 裡呼叫 `stop()` 也會等到逾時。沒對真的 Slack workspace 跑過。
+  新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。
+- **WebRTC**：`StatsPoller.start()` 會在 GUI 執行緒上最多等 2 秒（`future.result(timeout=2.0)`，是啟動路徑，沒動）。LAN 廣播的註冊與取消已移出 GUI 執行緒，
+  但真的 zeroconf 的時間與名稱衝突行為只對假物件測過。
+- **切換主題後那幾個事件迴圈回合內**，以被暫存的頁面為 parent 的 `QMessageBox` 會相對於隱藏的暫存 widget 定位（只影響位置）。
+  系統匣路徑在 offscreen 下沒有 tray，`_on_tray_open` 是直接呼叫測的。基準（`benchmarks/gui_*.py`）CI 仍不設門檻。
+- **把 Python 建的 widget 放進分頁列在結束時崩潰**：已查明觸發條件——分頁列按鈕上接了 Python callable、又有排隊中的 `deleteLater()`、而行程經 `os._exit` 離開；
+  先把 deferred delete 沖掉就不會。機制（Qt 在行程結束時釋放那個 slot）是推論，沒有 C 堆疊可看。`_tab_close_icon.py` 沒有改回自訂按鈕。
+- **對真實 Qt 型別的型別檢查**：`test/verify/typing_extras_exempt.txt` 從 70 個模組降到 18 個（11 個 WebRTC 面板 mixin、`navigation`、`step_form_view`、
+  `triggers_tab`，與 4 個對 aiortc／av 型別的 `utils/remote_desktop` 模組），只准變少。`QImage.fromData(x, "JPEG")` 的 5 處保留 `# type: ignore[arg-type]`：
+  stub 要 bytes，實際的 binding 對 bytes 丟 `ValueError`。
+- 遠端桌面的輸入改成佇列送出後，`AC_remote_send_input` 回的 `{"sent": True}` 意思是「已排入」；`SO_SNDTIMEO` 的 POSIX 包法與經 TLS socket 的行為沒在這台機器上驗過。
+- 沒在 macOS／Linux 上看過新的關閉鈕、捲動與重設樣式；沒在真的多螢幕桌面試過視窗位置還原；PyBreeze 沒有對這一版跑過；各語系新增的字串（日文、簡體中文）沒有母語者看過。
+
+---
+
+## 這一輪修正留下的後續
+
+`TODO` — 下列整合、安全與平台驗證仍未完成。
+
+- **Intel Mac 安裝要編譯 `cryptography`**：下限拉到 50 之後 `macosx_10_9_x86_64` 沒有 wheel（探測：最新只到 48.0.1），
+  `pip install je_auto_control` 在 Intel Mac 需要 Rust 工具鏈。沒有在 Intel Mac 上實際編過。
+- **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；
+  私鑰是未加密的 PEM（0600，Windows 上沒驗權限位元），沒有通行碼選項；遷移模式開著時 HMAC 簽章會被接受。
+  強制簽章經 socket／REST／MCP 的端到端沒有跑過，覆蓋的是共用的 `read_executable_action_json` 與指令本身。
+- **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：
+  - 使用者只能用 Python 管（`UserStore.add_user/set_role/rotate_token/remove_user`），沒有 `AC_*`、CLI 或 GUI；`Capability.MANAGE_USERS` 因此沒有任何路由或工具對應。
+  - viewer 的其餘影像檔案型、mobile 與外掛唯讀工具仍需全面盤點 capability；自製工具仍依提示採預設分類。
+  - 沒對真的 client（Claude Desktop、VS Code、內建 dashboard）試過；SSE、無狀態與 `subscriptions/listen` 路徑、TLS 加 RBAC 沒有測試。
+- **MCP 路徑根目錄**（`JE_AUTOCONTROL_MCP_PATH_ROOTS`，預設關閉）管不到的參數：執行動作清單的工具、
+  有時才是路徑的參數（`ac_open_path`／`ac_plan_open`／`ac_file_association`／`ac_act_in_view` 的 `target`，`ac_launch_process`／`ac_shell` 的 `argv`／`command`）、
+  `ac_handle_file_dialog` 的 `path`、自由格式物件裡的路徑（`ac_run_suite` 的 `spec`、`ac_run_dag` 的 `definition`、`ac_assert_all` 的 `specs`）、沒標註的外掛工具。
+  檔案 symlink 的跳脫在這台機器上建不出來（只跑了目錄 junction）；POSIX 的 `:` 分隔與 `~` 沒在 Linux／macOS 跑。
+  `roots/list` 來的根目錄要另外開 `JE_AUTOCONTROL_MCP_PATH_ROOTS_FROM_CLIENT` 才算數——這是實作時定的，請維護者確認。
+- **USB passthrough**：client 仍在 `reply_timeout_s`（10 秒）放棄，即使呼叫端要的 `timeout_ms` 更長（host 接受到 60 秒）；
+  對新 host 逾時已經無害，對舊 host 正常使用就會進入「需重連」。通道層的 ERROR（passthrough 關閉、bad frame、host 沒有 session）在 session 之前送出、不帶請求編號，
+  呼叫仍是等到逾時。沒對真的舊版 host、真的 WebRTC 通道或真的 USB 裝置跑過。
+- **變數範圍**：free-threaded 原生執行緒繼承與同時存取範圍的行為尚未實測。
+- **遠端桌面的擁有者模型**：Quick Connect 沒有狀態列，它的連線被取代時視窗只是關掉；主機的 Stop 會停任何擁有者開的 host（刻意的）；
+  只用假的 viewer／host 測過，真的 viewer 被擠掉時會不會觸發 `on_error` 而多跳一個警告框，沒看過。
+- **套件閘門**：`execute_action` 會先驗完所有指令名稱才執行，所以「載入套件」與「用它的指令」寫在同一份清單裡會以 unknown command 失敗，與閘門無關（既有限制）。
+  repo 根目錄的舊範例 `AutoControl/keyword/keyword1.json` 載入 `time`，現在預設會被拒絕。
+- **`pytest --cov` 沒有重新量過**：進入點搬到 `je_auto_control_pytest` 之後，它是否還少算，未知；規則仍是 `coverage run -m pytest`。
+- **快到 750 行上限的檔案**：`utils/usb/passthrough/viewer_client.py`（748）、`gui/remote_desktop/connection_screen.py`（729）、
+  `utils/mcp_server/server.py`（734）、`utils/mcp_server/http_transport.py`（727）、`utils/agent/backends/anthropic_computer_use.py`（723）——下一次要加東西就得先拆。
+
+---
+
+## 雜項
+
+`TODO` — 小項目，各自獨立
+
+- **本機的共用 `.venv` 裝著 `je_auto_control_dev 0.0.136`**，它的 `pytest11` 進入點還是舊的重量級路徑；重裝即可，不影響 CI。
+- **free-threaded**：呼叫者身分、綁定的裝置、自愈的執行標記與 stop token 都改成只在設定它的執行緒上有效（`utils/thread_bound.py`）。
+  這台機器沒有 free-threaded 直譯器：驗證用的是模擬繼承與真的 `-X thread_inherit_context=1`（3.14.7，GIL 開著）；`free-threaded-scope` job（3.14t）是第一次真的跑。
+- **能力探測**：Windows 的鎖定工作站、session 0、低完整性與擷取失敗分支只用假資料判斷；macOS 的三個 preflight 呼叫只對假物件跑過，
+  pyobjc 的 `Quartz` 有沒有 `CGPreflightListenEventAccess` 未知（沒有的話 `recording`／`stop_shortcut` 回 `unknown`）。
+- **Windows 的版面鍵名**（`slash` 等 8 個）只在美式配置上實際呼叫過。
+- **狀態機 `on_enter` 的單一動作寫法**以前一直被拒絕、從沒執行過（已修，U-20261009-24）：依賴「它不會跑」的既有狀態機現在會跑它。
+
+---
+
+## Computer use 的預設還是 beta 的 `computer_20251124`
+
+`TODO` — 在 `claude-opus-5`（兩種形式都接受）上實測 GA toolset 後，把它設成所有模型的預設
+
+驗收入口：`utils/agent/backends/anthropic_computer_use.py` 與 `_computer_toolset.py`。
+需驗證多呼叫回覆、toolset 名稱、截圖尺寸、座標換算與 zoom；未取得真實 API 證據前，
+其他模型的預設切換仍待完成。
+
+---
+
+## Agent 的歷史壓縮還沒對真的 API 跑過
+
+`TODO` — 需要付費實機跑一次多步驟任務；離線測試只驗得到請求的形狀
+
+需驗證 `utils/agent/backends/anthropic.py`、`anthropic_computer_use.py` 的 beta／GA 路徑，
+以及 OpenAI 歷史剪裁在真實 API 上的行為：
+
+- 重開的歷史在強制 thinking 綁定的帳號（Opus 5.5／Fable 5.1）上是否被接受。
+- 模型只憑摘要能不能接著做——上限是 3，大約每 3 張截圖就壓縮一次，摘要最多列最新 60 個動作、每個截到 240 字元。
+- 真的桌面 PNG 的請求大小離 32 MB 多遠。
+- 兩個後端都沒送 `cache_control`，所以現在本來就沒有 prompt cache；要開的話是另一個請求形狀的改動。
+
+---
+
+## libei 半開交握的資源隔離尚未完成
+
+`TODO` — D2 helper 隔離；不能直接移除 `linux_wayland/libei.py::_teardown` 的半開保護。
+
+需依 D2 計畫把原生配置、portal／交握、事件送出與 teardown 放進擁有的 helper，
+補上有界 IPC、request ID、逾時與取消，以及 parent close／reap。
+半開交握失敗仍會留下 context／fd；直接重複建立 backend 可能重複累積，
+需驗證 helper 結束後資源可回收，且取消不影響其他擁有者。
+`docker/libei_verify.py` 與 `docker/eis_verify.py` 保留原生故障／成功邊界檢查；
+裝置暫停與序號回讀、真實合成器權限流程仍待對應環境驗證。
+
+---
+
+## `test_usb_acl_prompt.py` 讓 Python 3.10 的 headless 測試間歇 segfault
+
+`TODO` — `test/unit_test/headless/test_usb_acl_prompt.py::test_bridge_remember_persists_acl_rule`
+在 Python 3.10 的 Linux／macOS `coverage run -m pytest` 中仍有間歇 SIGSEGV（exit 139）紀錄。
+需在對應環境開啟 `faulthandler` 重跑並定位原生呼叫；單次重跑通過不足以證明已修復。
+2026-11-02 起不再支援 Python 3.10，CI 不再跑 3.10；同一機制（分配時觸發循環回收）在 3.11 也存在，改看 3.11 的方格。
+
+---
+
 ## Agent 電腦接管與任務自動化
 
 `WIP` — **依使用者恢復目標繼續交付；個別原生／真機／24 小時驗收仍暫緩。**
@@ -324,6 +540,153 @@ D2 仍缺 helper 隔離與半開交握資源回收；D3 的錄製／全域停止
 
 ---
 
+
+## 一般開發規劃與相依問題
+
+實機驗收新增項目請放在上方驗收區；下列規劃中的驗證條件尚不代表功能已交付。
+
+## 下一步擴充：以記憶體觀察支援 UI、作業系統與應用程式背景操控
+
+`TODO / 規劃` — 2026-11-01 使用者要求。此節只制定擴充順序，尚未實作或完成驗收；
+不解除下列既有原生／真機／24 小時驗收暫緩，也不啟動服務、改動正式環境或讀取現有應用程式記憶體。
+
+### 目標與可交付範圍
+
+讓 agent 能取得指定程式的內部狀態，結合 UI、OS 與應用程式介面完成
+「觀察 → 判斷 → 背景操作 → 獨立讀回」的完整任務。先以 Windows 為第一個實作平台，
+逐一擴充應用與操作覆蓋；「整個電腦」是覆蓋目標，不能宣稱任意程式都能靠讀記憶體直接操控。
+讀取位元組不會執行操作，也不會自動產生按鈕、文件、工作流程等語意；每種程式仍需已知資料格式或正式介面。
+
+將三種資料來源明確分開：OS 公開查詢取得程序／視窗／服務資訊；UIA、DOM、應用程式 API
+取得語意狀態；跨行程記憶體讀取補足前兩者沒有提供的特定欄位。現有
+`utils/agent_memory/agent_memory.py` 是 SQLite 任務經驗記憶，不是行程記憶體讀取器。
+
+全程背景是硬條件：不切換前景、不移動使用者滑鼠、不注入桌面鍵盤／滑鼠事件；
+UIA 僅作必要唯讀觀測，不以 Invoke、SetValue、選單或焦點切換代替背景操作。
+瀏覽器沿用 WebRunner 的專用持久登入設定檔、螢幕外瀏覽器與 DOM 操作。
+沒有符合條件的命令介面時回報不支援，保留缺口；不自動退回桌面輸入。
+
+### 現有架構與擴充位置
+
+下表的程式路徑均相對於 `je_auto_control/`；新模組名稱為提案，尚不存在。
+
+| 責任 | 現況／預計接點 | 擴充內容 |
+| --- | --- | --- |
+| 任務與資源所有權 | `utils/agent_runtime/target_config.py`、`target_factory.py`、`native_target.py` | 沿用 profile、工具範圍、helper 與取消生命週期；新增受管觀察／背景操作能力，不另建繞過 policy 的總控入口。 |
+| UI 觀察 | `utils/agent_runtime/targets.py`、`utils/accessibility/` | 現有 DesktopTarget 以指定前景應用為範圍；新增明確 PID／視窗身分的唯讀觀察，不直接放寬現有前景輸入檢查。 |
+| 瀏覽器 | `utils/agent_runtime/browser_target.py`、`browser_commands.py` | 沿用受管 WebRunner session、來源限制與 DOM 驗證，不以掃描瀏覽器記憶體取代。 |
+| 記憶體觀察 | 新增 `utils/process_memory/` | 擁有唯讀行程 handle、區段查詢、受限讀取與版本化解碼；原始位址及 bytes 不流入 agent 公開工具。 |
+| OS／應用背景命令 | 在 `utils/agent_runtime/` 接入專用 adapter | 使用正式 API、受限 CLI、IPC／COM 等支援介面；每個動作列明資源範圍、背景副作用與完成條件。 |
+| 能力診斷 | `wrapper/capabilities.py` 與 runtime profile | 現有 capability 主要為 input／capture；擴充時保留「能力存在不等於已授權」語意，按平台／程式／操作分別回報。 |
+
+執行資料流：既有 runtime 檢查任務與 profile → adapter 讀取受限狀態 → 產生有來源及版本的觀察
+→ runtime 再驗目標與命令範圍 → 背景命令 → 重新取得完成證據。
+記憶體 reader 只擁有讀取資源，既有 runtime 仍是任務、操作 journal 與取消的唯一擁有者。
+
+### 呼叫方式與介面草圖
+
+以下是待實作的契約草圖，不是現在可呼叫的 API。應用呼叫者只指定目標、欄位及目的；
+位址、版本配置與 OS handle 留在 adapter 內部。
+
+```python
+view = await target.observe(StateQuery(fields=("document_id", "job_status")))
+receipt = await target.perform(
+    BackgroundCommand("export_document", document_id=view.fields["document_id"]),
+    expected=view.ref,
+)
+proof = await target.verify(receipt, CompletionQuery("export_file_matches"))
+```
+
+另外兩個使用情境：OS adapter 讀取指定服務狀態後執行該服務支援的管理操作，並重新查詢；
+browser adapter 從受管頁面取得欄位、透過 DOM 提交，再驗證新回應或產物。
+兩者都不必知道記憶體位址，也不能只靠命令回傳成功判定完成。
+
+- `TargetIdentity`：主機／登入 session、PID、程序建立時間、執行檔身分與架構；視窗／文件／瀏覽器
+  context 另帶各自身分。PID 或 HWND 相同不能單獨證明還是同一目標。
+- `ObservationRef`／`Observation`：目標、adapter 與 schema 版本、觀察序號、擷取起訖時間、
+  來源、欄位、完整度／截斷及一致性結果。過期、部分讀取、未知與權限拒絕不能表示成空值或正常狀態。
+- `MemoryProbe`：profile 中登記的 probe ID、版本化 schema、欄位清單、位元組／區段／時間上限；
+  內部 `read(probe, identity, deadline, cancellation) -> ProbeResult`，沒有寫入或任意執行介面。
+- `observe(query) -> Observation | ObservationFailure`：僅回傳有界、經欄位白名單篩選的語意資料。
+  `perform(command, expected) -> Receipt | Refused | EffectUnknown`：操作前重驗身分與必要狀態；
+  不能原子比較並執行的介面必須揭露競態，不能把舊快照當作鎖。
+- `verify(receipt, query) -> Verified | NotSatisfied | Unknown`：以新讀取、服務回應或產物驗證；
+  `EffectUnknown` 先查明結果，不盲目重送。reader 的觀察不授予任何操作權限。
+
+### 實作順序與各階段完成條件
+
+1. **M0：能力盤點與範圍契約。** 先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
+   讀取來源、執行介面、權限、是否全背景、支援版本、驗證方式與不支援原因。
+   第一個目標採自有 fixture 程序，之後選一個提供正式背景介面的應用；不能先承諾任意軟體。
+   完成條件：profile、上述結果型別及禁用桌面輸入的路由規則具體可審閱，既有桌面路徑不被暗中改寫。
+2. **M1：Windows 唯讀記憶體 reader。** 實作明確型別的原生呼叫、handle 所有權、
+   `VirtualQueryEx` 區段檢查及 `ReadProcessMemory` 有界讀取；僅取得必要的查詢／讀取權限。
+   限定已選程序和已知欄位，不做全機掃描或任意位址的 MCP 工具。處理 32／64 位架構、ASLR、
+   guard／不可讀頁、短讀、讀取期間程序退出或區段變更；未知架構／版本回報不支援。
+   完成條件：fixture 公布的已知 buffer 能精確讀回；非法範圍、PID 重用、權限拒絕、逾時／取消
+   都有可區分結果，handle 與 helper 可確認回收。原生 fixture 驗收仍受既有暫緩約束。
+3. **M2：版本化語意解碼。** 每個 probe 綁定程式版本／模組識別與資料結構，不保存跨重啟絕對位址。
+   用目標提供的序號／快照協定驗一致性；無此機制時只能標示 best-effort，重複讀到同值不代表原子快照。
+   把 probe、UIA 唯讀及 DOM 結果整理為上述 Observation，保留來源衝突與部分缺失。
+   完成條件：版本變更、錯誤長度／指標、混合世代及未知欄位被拒絕；解碼器不能把錯誤 bytes 當成成功狀態。
+4. **M3：接入受管 runtime 與診斷。** 將讀取能力接到 profile、helper、取消、稽核與既有工具註冊；
+   先在已支援 target 下附加 reader，只有不同資源所有權確實需要時才新增 target kind。
+   每次讀取有上限，原始記憶體不寫入 AgentMemory、一般日誌或模型上下文；只輸出允許的語意欄位。
+   完成條件：撤權、過期觀察、目標重啟、helper 崩潰、並行 session 不串資料；所有公開入口使用相同契約，
+   關閉功能後既有任務仍可運作。
+5. **M4：UI／OS／應用背景操作。** UI 先完成必要唯讀結構／欄位觀察；網頁操作用既有 DOM。
+   OS 從指定程序／檔案／服務的正式管理介面開始；應用從讀文件、設定指定欄位、儲存／匯出等
+   可確認全背景的 API／IPC 操作開始。各動作沿用 runtime policy，不透過任意 shell 或記憶體寫入繞過。
+   完成條件：每類各有一條「讀狀態 → 操作 → 獨立驗證」流程，重試不重複副作用；
+   即使 API 呼叫成功，仍須另驗未改變使用者前景／焦點／滑鼠及未注入桌面輸入。
+   不符背景條件的操作維持不支援，不能只因名稱叫 API／COM 就列為已支援。
+6. **M5：跨應用任務閉環。** 接回既有四條工作流程：查詢／下載／歸檔、CSV／Excel 填表、
+   跨應用欄位轉移、工作區準備。先完成來源讀取、轉換、目的地操作、產物比對的窄流程；
+   工作區準備中會搶前景或排列使用者視窗的部分維持停用。
+   完成條件：目標在觀察後被使用者修改、未知對話框、取消發生於提交期間、回覆遺失與重啟，
+   均能保留已完成效果並明確區分失敗／待確認；任務結束與背景不干擾各有證據。
+7. **M6：擴充平台與交付。** Windows 的垂直流程通過後，再盤點 macOS／Linux 的合法讀取來源、
+   權限與應用介面，按能力回報 supported／unsupported／unverified；不把 Windows 的實作當成跨平台保證。
+   完成支援矩陣、操作文件、資源限額與長時間 handle／記憶體成長觀測、停用及版本回復方案；
+   真機／24 小時驗收解除暫緩前，這些欄位保持未驗證。
+
+**第一個可交付增量：M0 契約＋M1 reader 與自有 fixture 的驗證設計。**
+先完成 headless 解碼／政策測試與原生驗收腳本，原生執行另依既有暫緩安排；
+不先整合所有應用、不更動正式服務。速度與記憶體預算先量測再訂門檻，不能預填改善比例。
+
+### 驗收矩陣與已知邊界
+
+| 面向 | 必須保留的證據 |
+| --- | --- |
+| 正確性 | 自有 fixture 的期望值、實際讀回、版本及身分；過期／部分讀取明確失敗；實際效果另有讀回。 |
+| 全背景 | 實際 DOM／API 完成證據，另列前景視窗／焦點／滑鼠／輸入事件觀測；前後座標相同不足以排除期間干擾。 |
+| 故障與生命週期 | 退出、重啟、撤權、取消、區段變更、逾時與 helper 崩潰；關閉完成須驗資源退場，未知狀態不重送操作。 |
+| 資料範圍 | 只解碼 profile 指定欄位；不擷取密碼、登入 token 或跨應用資料；錯誤與紀錄不得帶出 raw bytes。 |
+| 覆蓋 | 每個 OS／程式版本／操作獨立記錄已實作、已測、尚未驗收及不支援；不可由一個 fixture 推論整台電腦。 |
+
+讀取受 OS 權限與程序保護限制；不把需要管理權限當成預設提升理由，也不納入核心驅動、
+任意記憶體寫入、DLL 注入或繞過保護的通用控制方案。UI 語意缺失、程式私有結構改版及純影像介面
+都可能留下覆蓋缺口；需增加正式應用 adapter 或維持不支援。
+
+設計取捨：比較「記憶體 reader 統一解碼所有程式」與「受管語意 adapter 搭配限定記憶體 probe」。
+採後者，讓呼叫者不必了解指標、版本及原生 handle，並沿用既有操作所有權；採納前者的
+嚴格身分、版本化解碼與資源限額。接受逐程式接合成本，換取可驗證的背景行為與失敗邊界。
+不另建全機狀態資料庫、第二套任務排程器或通用 UIA 操作入口。實作若改變上述結果契約，
+須同步更新此節，不以新行為反推原規劃已完成。
+
+本次規劃核對：兩個候選均收斂到限定 reader 與獨立背景操作；另經獨立交叉審閱，未發現需修正的重大問題。
+文件差異檢查通過，原有進度段落保留；此結果只驗證規劃文件，不代表功能或原生驗收通過。
+
+技術依據（2026-11-01 核對）：Microsoft 的
+[ReadProcessMemory](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-readprocessmemory)、
+[VirtualQueryEx](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualqueryex)
+與 [Process Security and Access Rights](https://learn.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights)
+分別定義讀取、區段查詢及程序權限；
+[UI Automation Control Patterns](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-controlpatternsoverview)
+說明 UI 語意介面。這些 API 的存在不代表目標程式已支援、已授權或已通過本專案背景驗收。
+
+---
+
 ## 750 行上限的既有豁免清單
 
 `CLAUDE.md` §Size and complexity limits 規定:超標檔案只能列在這裡,列不進來的就是缺陷。
@@ -374,206 +737,6 @@ pip install --dry-run --only-binary=:all: --platform win_arm64 --python-version 
 它只影響 wheel 相容性標籤，所以拿本機做 `--dry-run` **驗不到標記的效果**（兩個
 套件依舊會被要求）。能驗的是兩件事：直接評估 marker（上面那支測試在做的），
 以及 `windows-11-arm` 那一格自己綠。
-
-## Wayland 生命週期與驗收
-
-`TODO` — 下列上游行為與原生桌面互動仍需驗證。
-
-### 還沒有答案的
-
-- **`eis_device_pause()` 在 libeis 1.3.901 對 sender client 沒有送出任何東西。**
-  對兩個 live device 呼叫 pause 再 dispatch,client 端的 ei fd 4 秒內完全沒有可讀資料。
-  所以 `LibeiBackend._on_event` 的 `DEVICE_PAUSED`／`DEVICE_REMOVED` 分支**仍然沒有
-  peer 可以驅動**。`eis_verify.py` 把這件事寫成「要嘛有反應,要嘛根本沒被通知」,
-  若哪天 libeis 開始送了,client 忽略它就會當場失敗。真的合成器上會不會不一樣,未知。
-- **`ei_device_start_emulating()` 的 sequence number 沒有被送到對面。**
-  刻意送 4242 過去,server 讀回來是 0。我們這邊的計數本身符合標頭檔的約定
-  （每次呼叫至少 +1）,所以不影響正確性,只是從對面驗不到。
-- **同意對話框「長什麼樣子、真人要按多久」。** portal 這一層現在驗到的是對話框
-  *產生的東西*:准（Response 0）、拒（Response 1）、以及一直不回答。三種我們都在真的
-  bus 上跑過,三種都得在自己的時限內收斂。至於真的 mutter 對話框長什麼樣、真人猶豫
-  三十秒會不會撞到別的東西,那是 mutter 的事,CI 裡沒有人可以去按它。
-
-## 輸入、視窗與擷取修正：還沒在真的桌面與 Jeffrey_RPA 上驗過
-
-`TODO` — 原生桌面與正式批次升級前的行為驗收暫緩。
-
-- **正式批次升級前的桌面行為驗收**：需核對 `_gui_control.py` 對下列行為的實際依賴：
-  `write()` 大寫與 `is_shift` 在 Windows／X11 生效、`"\r\n"` 只按一次 Enter、`mouse_scroll` 預設方向改為 `scroll_up`
-  （X11／Wayland 上 `mouse_scroll(3)` 由往下變往上）、小數座標四捨五入、`focus_window` 在 Windows 沒拿到前景會丟例外、
-  `list_windows` 不再列出 DWM cloak 與零面積視窗、`post_key` 對可列印字元只送 `WM_CHAR`。
-- **混合 DPI 座標與樣板**：需實測各螢幕上的舊版座標、`screen_region`、視窗版面與樣板，
-  包含縮放不同的副螢幕、負原點與多螢幕排列；必要時重新錄製，不能以推導代替驗收。
-- **舊版存的視窗版面檔要重存**：`save_window_layout` 改存 `GetWindowRect`，舊檔還原會偏右 7 px、縮小 14×7 px。
-- **真的 Win32 行為沒有實測**：`post_key` 在真的編輯框是否只出現一個字、DWM cloak 過濾掉的是哪些視窗、
-  `MoveWindow` 對最大化視窗與另一個 DPI 的螢幕是否能原樣還原，都只用假的 `user32` 驗過。
-- **X11／Wayland**：大寫與 Shift 標點的判斷假設 `keysym_to_keycode` 把大寫字母對到小寫的 keycode，沒有對著 X server 跑過。
-
----
-
-## macOS 的修正：CI 驗到一半，其餘要一台真的 Mac
-
-`TODO` — 要一台真的 Mac（Retina，最好接第二個螢幕）
-
-還沒驗的：
-
-- **應用程式是否把 `click_mouse(clicks=2)` 認成雙擊**：只確認了欄位的值，沒有對真的應用程式送事件。
-- **`grab_logical`**（`utils/monitor_layout/macos_frame.py`，點座標、逐螢幕擷取後拼接）完全沒在 macOS 跑過。三個假設要實機確認：
-  `screencapture -R` 接受含負值的全域點座標、Pillow 的 `scale_down=True` 給出點尺寸的影像、`CGDisplayBounds` 與 Quartz 滑鼠事件同一個座標空間。
-  每一格要為每個螢幕各開一次 `screencapture`。CI 的 runner 是 1x 單螢幕，測不到 Retina 與副螢幕。
-- **`list_windows` 在真的桌面上的成本與誤列**：沒加 AX 逾時，沒回應的 app 會拖慢列出；同一行程裡與最小化視窗同原點或同標題的螢幕外輔助視窗可能被誤列。
-
----
-
-## 這一輪修正留下的後續
-
-`TODO` — 下列整合、安全與平台驗證仍未完成。
-
-- **Intel Mac 安裝要編譯 `cryptography`**：下限拉到 50 之後 `macosx_10_9_x86_64` 沒有 wheel（探測：最新只到 48.0.1），
-  `pip install je_auto_control` 在 Intel Mac 需要 Rust 工具鏈。沒有在 Intel Mac 上實際編過。
-- **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；
-  私鑰是未加密的 PEM（0600，Windows 上沒驗權限位元），沒有通行碼選項；遷移模式開著時 HMAC 簽章會被接受。
-  強制簽章經 socket／REST／MCP 的端到端沒有跑過，覆蓋的是共用的 `read_executable_action_json` 與指令本身。
-- **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：
-  - 使用者只能用 Python 管（`UserStore.add_user/set_role/rotate_token/remove_user`），沒有 `AC_*`、CLI 或 GUI；`Capability.MANAGE_USERS` 因此沒有任何路由或工具對應。
-  - viewer 的其餘影像檔案型、mobile 與外掛唯讀工具仍需全面盤點 capability；自製工具仍依提示採預設分類。
-  - 沒對真的 client（Claude Desktop、VS Code、內建 dashboard）試過；SSE、無狀態與 `subscriptions/listen` 路徑、TLS 加 RBAC 沒有測試。
-- **MCP 路徑根目錄**（`JE_AUTOCONTROL_MCP_PATH_ROOTS`，預設關閉）管不到的參數：執行動作清單的工具、
-  有時才是路徑的參數（`ac_open_path`／`ac_plan_open`／`ac_file_association`／`ac_act_in_view` 的 `target`，`ac_launch_process`／`ac_shell` 的 `argv`／`command`）、
-  `ac_handle_file_dialog` 的 `path`、自由格式物件裡的路徑（`ac_run_suite` 的 `spec`、`ac_run_dag` 的 `definition`、`ac_assert_all` 的 `specs`）、沒標註的外掛工具。
-  檔案 symlink 的跳脫在這台機器上建不出來（只跑了目錄 junction）；POSIX 的 `:` 分隔與 `~` 沒在 Linux／macOS 跑。
-  `roots/list` 來的根目錄要另外開 `JE_AUTOCONTROL_MCP_PATH_ROOTS_FROM_CLIENT` 才算數——這是實作時定的，請維護者確認。
-- **USB passthrough**：client 仍在 `reply_timeout_s`（10 秒）放棄，即使呼叫端要的 `timeout_ms` 更長（host 接受到 60 秒）；
-  對新 host 逾時已經無害，對舊 host 正常使用就會進入「需重連」。通道層的 ERROR（passthrough 關閉、bad frame、host 沒有 session）在 session 之前送出、不帶請求編號，
-  呼叫仍是等到逾時。沒對真的舊版 host、真的 WebRTC 通道或真的 USB 裝置跑過。
-- **變數範圍**：free-threaded 原生執行緒繼承與同時存取範圍的行為尚未實測。
-- **遠端桌面的擁有者模型**：Quick Connect 沒有狀態列，它的連線被取代時視窗只是關掉；主機的 Stop 會停任何擁有者開的 host（刻意的）；
-  只用假的 viewer／host 測過，真的 viewer 被擠掉時會不會觸發 `on_error` 而多跳一個警告框，沒看過。
-- **套件閘門**：`execute_action` 會先驗完所有指令名稱才執行，所以「載入套件」與「用它的指令」寫在同一份清單裡會以 unknown command 失敗，與閘門無關（既有限制）。
-  repo 根目錄的舊範例 `AutoControl/keyword/keyword1.json` 載入 `time`，現在預設會被拒絕。
-- **`pytest --cov` 沒有重新量過**：進入點搬到 `je_auto_control_pytest` 之後，它是否還少算，未知；規則仍是 `coverage run -m pytest`。
-- **快到 750 行上限的檔案**：`utils/usb/passthrough/viewer_client.py`（748）、`gui/remote_desktop/connection_screen.py`（729）、
-  `utils/mcp_server/server.py`（734）、`utils/mcp_server/http_transport.py`（727）、`utils/agent/backends/anthropic_computer_use.py`（723）——下一次要加東西就得先拆。
-
----
-
-## 行動裝置（Android／iOS）：完全沒有在裝置上跑過
-
-`BLOCKED` — 需要 Android 模擬器或實機、iPhone 與 WebDriverAgent；這台機器連 `adb` 都沒有
-
-U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WDA 測過。`uiautomator2` 與 `facebook-wda` 沒有安裝在開發環境裡，
-方法名稱與參數是憑記憶寫的，第一次接上真的 SDK 很可能要修：
-
-- uiautomator2：`send_keys`、`drag`、空 selector 的 `gesture(...)`（捏合）、`clipboard`／`set_clipboard`、對話框按鈕的 resource id。
-- facebook-wda：`app_launch`／`app_terminate`／`app_state`、`alert.*`、`set_clipboard`、`status()`、`orientation` 的值、元素的 `pinch`、`screenshot()` 回傳 PIL 影像。
-- 旋轉方向：螢幕截圖以面板自然方向回來時，`landscape_left` 轉 270°、`landscape_right` 轉 90°，是從文件推的，沒看過。
-- Android：`input draganddrop` 是否存在、`monkey` 啟動輸出、`pidof`／`pm path` 的結束碼、`dumpsys activity activities` 的格式、`pkill -INT screenrecord` 能否收尾 MP4。
-  ADBKeyBoard 的送達無法由裝置確認，是從 IME 被選取推定的。
-- 已知限制：iOS 捏合忽略 `x`／`y`／`span`；iOS `app_state` 不會回 `not_installed`；iOS 的安裝／檔案／錄影沒有 adapter（只有 `MobileExtension` 協定與註冊點）；
-  Mobile 分頁的 probe／run 會卡住 GUI 執行緒到裝置回應或逾時。`AC_android_shell` 刻意不做成 MCP 工具，**請維護者確認**。
-- 沒有 `examples/` 的實機腳本以外的 smoke；Xcode／WDA 的建置與簽章只寫成前置條件。
-
----
-
-## GUI：留下的缺口
-
-`TODO` — U-20261009-27、-28、-34、-36、-38、-40 之後還開著的
-
-- **Windows UIA 後端的執行緒模型完全沒對真的 COM 驗過**：現在每個呼叫執行緒各有一個自動化物件（`accessibility/backends/windows_automation.py`；
-  主執行緒 STA、其他執行緒進 MTA），Accessibility 分頁與 A11y Audit 已移出 GUI 執行緒。開發環境沒裝 `comtypes`，CI 也沒有同時有 `comtypes` 與桌面的 job，
-  測試全是假 COM 物件。未驗證的假設：MTA 工作執行緒上的 UIA 呼叫可用；焦點事件 callback 不需要 message pump；
-  `import comtypes` 第一次發生在已經是 MTA 的執行緒上會丟 `OSError`（憑記憶，沒處理）。`AC_wait_for_focus_change` 的原生 `Queue.get` 仍不會被 stop 叫醒。
-- **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）；`AC_parallel` 分支裡產生的值不經結果掛鉤回報，
-  只能從區塊的結果裡取得（標成 `results[0].…`）。結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
-  對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
-  `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
-- **stop 還叫不醒的**：已經進到後端的單一指令（一次影像搜尋、OCR、HTTP 請求、shell 指令）、單一手勢內的節奏 sleep、`AC_wait_for_focus_change`；
-  MCP 自己的輪詢（`ac_wait_for_image`／`ac_wait_for_pixel`）不在可停止的執行裡。非腳本的分頁工作在後端無法取消，只是結果被丟掉。
-  ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在輪詢執行緒上的指令 handler 裡呼叫 `stop()` 也會等到逾時。沒對真的 Slack workspace 跑過。
-  新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。
-- **WebRTC**：`StatsPoller.start()` 會在 GUI 執行緒上最多等 2 秒（`future.result(timeout=2.0)`，是啟動路徑，沒動）。LAN 廣播的註冊與取消已移出 GUI 執行緒，
-  但真的 zeroconf 的時間與名稱衝突行為只對假物件測過。
-- **切換主題後那幾個事件迴圈回合內**，以被暫存的頁面為 parent 的 `QMessageBox` 會相對於隱藏的暫存 widget 定位（只影響位置）。
-  系統匣路徑在 offscreen 下沒有 tray，`_on_tray_open` 是直接呼叫測的。基準（`benchmarks/gui_*.py`）CI 仍不設門檻。
-- **把 Python 建的 widget 放進分頁列在結束時崩潰**：已查明觸發條件——分頁列按鈕上接了 Python callable、又有排隊中的 `deleteLater()`、而行程經 `os._exit` 離開；
-  先把 deferred delete 沖掉就不會。機制（Qt 在行程結束時釋放那個 slot）是推論，沒有 C 堆疊可看。`_tab_close_icon.py` 沒有改回自訂按鈕。
-- **對真實 Qt 型別的型別檢查**：`test/verify/typing_extras_exempt.txt` 從 70 個模組降到 18 個（11 個 WebRTC 面板 mixin、`navigation`、`step_form_view`、
-  `triggers_tab`，與 4 個對 aiortc／av 型別的 `utils/remote_desktop` 模組），只准變少。`QImage.fromData(x, "JPEG")` 的 5 處保留 `# type: ignore[arg-type]`：
-  stub 要 bytes，實際的 binding 對 bytes 丟 `ValueError`。
-- 遠端桌面的輸入改成佇列送出後，`AC_remote_send_input` 回的 `{"sent": True}` 意思是「已排入」；`SO_SNDTIMEO` 的 POSIX 包法與經 TLS socket 的行為沒在這台機器上驗過。
-- 沒在 macOS／Linux 上看過新的關閉鈕、捲動與重設樣式；沒在真的多螢幕桌面試過視窗位置還原；PyBreeze 沒有對這一版跑過；各語系新增的字串（日文、簡體中文）沒有母語者看過。
-
----
-
-## 雜項
-
-`TODO` — 小項目，各自獨立
-
-- **本機的共用 `.venv` 裝著 `je_auto_control_dev 0.0.136`**，它的 `pytest11` 進入點還是舊的重量級路徑；重裝即可，不影響 CI。
-- **free-threaded**：呼叫者身分、綁定的裝置、自愈的執行標記與 stop token 都改成只在設定它的執行緒上有效（`utils/thread_bound.py`）。
-  這台機器沒有 free-threaded 直譯器：驗證用的是模擬繼承與真的 `-X thread_inherit_context=1`（3.14.7，GIL 開著）；`free-threaded-scope` job（3.14t）是第一次真的跑。
-- **能力探測**：Windows 的鎖定工作站、session 0、低完整性與擷取失敗分支只用假資料判斷；macOS 的三個 preflight 呼叫只對假物件跑過，
-  pyobjc 的 `Quartz` 有沒有 `CGPreflightListenEventAccess` 未知（沒有的話 `recording`／`stop_shortcut` 回 `unknown`）。
-- **Windows 的版面鍵名**（`slash` 等 8 個）只在美式配置上實際呼叫過。
-- **狀態機 `on_enter` 的單一動作寫法**以前一直被拒絕、從沒執行過（已修，U-20261009-24）：依賴「它不會跑」的既有狀態機現在會跑它。
-
----
-
-## Computer use 的預設還是 beta 的 `computer_20251124`
-
-`TODO` — 在 `claude-opus-5`（兩種形式都接受）上實測 GA toolset 後，把它設成所有模型的預設
-
-驗收入口：`utils/agent/backends/anthropic_computer_use.py` 與 `_computer_toolset.py`。
-需驗證多呼叫回覆、toolset 名稱、截圖尺寸、座標換算與 zoom；未取得真實 API 證據前，
-其他模型的預設切換仍待完成。
-
----
-
-## libei 半開交握的資源隔離尚未完成
-
-`TODO` — D2 helper 隔離；不能直接移除 `linux_wayland/libei.py::_teardown` 的半開保護。
-
-需依 D2 計畫把原生配置、portal／交握、事件送出與 teardown 放進擁有的 helper，
-補上有界 IPC、request ID、逾時與取消，以及 parent close／reap。
-半開交握失敗仍會留下 context／fd；直接重複建立 backend 可能重複累積，
-需驗證 helper 結束後資源可回收，且取消不影響其他擁有者。
-`docker/libei_verify.py` 與 `docker/eis_verify.py` 保留原生故障／成功邊界檢查；
-裝置暫停與序號回讀、真實合成器權限流程仍待對應環境驗證。
-
----
-
-## Agent 的歷史壓縮還沒對真的 API 跑過
-
-`TODO` — 需要付費實機跑一次多步驟任務；離線測試只驗得到請求的形狀
-
-需驗證 `utils/agent/backends/anthropic.py`、`anthropic_computer_use.py` 的 beta／GA 路徑，
-以及 OpenAI 歷史剪裁在真實 API 上的行為：
-
-- 重開的歷史在強制 thinking 綁定的帳號（Opus 5.5／Fable 5.1）上是否被接受。
-- 模型只憑摘要能不能接著做——上限是 3，大約每 3 張截圖就壓縮一次，摘要最多列最新 60 個動作、每個截到 240 字元。
-- 真的桌面 PNG 的請求大小離 32 MB 多遠。
-- 兩個後端都沒送 `cache_control`，所以現在本來就沒有 prompt cache；要開的話是另一個請求形狀的改動。
-
----
-
-## `test_usb_acl_prompt.py` 讓 Python 3.10 的 headless 測試間歇 segfault
-
-`TODO` — `test/unit_test/headless/test_usb_acl_prompt.py::test_bridge_remember_persists_acl_rule`
-在 Python 3.10 的 Linux／macOS `coverage run -m pytest` 中仍有間歇 SIGSEGV（exit 139）紀錄。
-需在對應環境開啟 `faulthandler` 重跑並定位原生呼叫；單次重跑通過不足以證明已修復。
-2026-11-02 起不再支援 Python 3.10，CI 不再跑 3.10；同一機制（分配時觸發循環回收）在 3.11 也存在，改看 3.11 的方格。
-
----
-
-## macos-15 上的 TCC 權限還沒被 gate 驗過
-
-`TODO` — 2026-11-01 把所有 macOS 方格從 `macos-14` 改成 `macos-15`（U-20261101-02），
-`test/verify/macos_verify.py` 的 `EXPECTED` 沿用 2026-08-19 在 macos-14 上的實測（螢幕錄製與輔助使用兩個
-TCC 權限都給）。`platform-smoke.yml` 的 `macos-capabilities` 只在推送到 `main` 與對 `main` 的 PR 上執行，所以下一個 dev→main
-PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 重新實測後更新 `EXPECTED` 與
-`docs/CAPABILITY_MATRIX.md`，不要直接放寬 gate。
-
----
 
 ## minimatch 11 在 VS Code 擴充套件
 
