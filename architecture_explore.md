@@ -25,7 +25,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,495 |
-| 程式碼總行數 | 228,273 |
+| 程式碼總行數 | 228,280 |
 | `je_auto_control/utils/` 子套件數 | 311 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -455,12 +455,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.7 無障礙樹與原生控制項
 
-> 16 個套件、約 4,852 行。
+> 16 個套件、約 4,859 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a11y_audit/` | 362 | 以無障礙樹 + OCR 進行無障礙與 i18n 稽核 |
-| `utils/accessibility/` | 3,317 | 跨平台無障礙樹定位與錄製；Windows UIA／macOS AX／null 三後端。支援限定視窗（換搜尋起點，不是過濾）、逐節點可中斷走訪、`IUIAutomation2` 連線逾時、名稱子字串比對與排序、`control_get_state` 一次讀完值／勾選／選取／數值（密碼欄位不回內容） |
+| `utils/accessibility/` | 3,324 | 跨平台無障礙樹定位與錄製；Windows UIA／macOS AX／null 三後端。支援限定視窗（換搜尋起點，不是過濾）、逐節點可中斷走訪、`IUIAutomation2` 連線逾時、名稱子字串比對與排序、`control_get_state` 一次讀完值／勾選／選取／數值（密碼欄位不回內容） |
 | `utils/ax_events/` | 35 | 反應式 UIA 事件等待（focus-changed） |
 | `utils/ax_props/` | 44 | 讀取豐富 UIA 屬性（enabled／offscreen／help／status／快捷鍵） |
 | `utils/ax_text/` | 102 | 透過 UIA TextPattern 取得原生文字（讀取／尋找／選取／屬性） |
@@ -1499,7 +1499,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `utils/executor/` | 11 | 10,702 |
 | `utils/usb/` | 20 | 5,060 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,167 |
-| `utils/accessibility/` | 16 | 3,317 |
+| `utils/accessibility/` | 16 | 3,324 |
 | `wrapper/` | 25 | 5,992 |
 | `windows/` | 24 | 2,265 |
 | `utils/rest_api/` | 8 | 2,226 |
@@ -1514,7 +1514,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 997 | 101,486 |
-| **總計** | **1,483** | **227,528** |
+| **總計** | **1,483** | **227,535** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

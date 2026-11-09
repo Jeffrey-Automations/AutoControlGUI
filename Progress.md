@@ -107,7 +107,6 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
   `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
 - **stop 還叫不醒的**：已經進到後端的單一指令（一次影像搜尋、OCR、HTTP 請求、shell 指令）、單一手勢內的節奏 sleep；
-  `AC_wait_for_focus_change` 的取消 token 路徑已接合，未綁定 token 的舊 stop 路徑仍待核對。
   MCP 自己的輪詢（`ac_wait_for_image`／`ac_wait_for_pixel`）不在可停止的執行裡。非腳本的分頁工作在後端無法取消，只是結果被丟掉。
   ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在輪詢執行緒上的指令 handler 裡呼叫 `stop()` 也會等到逾時。沒對真的 Slack workspace 跑過。
   新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。

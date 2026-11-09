@@ -781,3 +781,30 @@ def test_focus_queue_timeout_does_not_restart_deadline(monkeypatch):
     moments = iter([10.0, 10.0, 11.0])
     monkeypatch.setattr(windows_events.time, "monotonic", lambda: next(moments))
     assert windows_events.wait_for_event(queue.Queue(), 0) is None
+
+
+@pytest.mark.parametrize("shield", [False, True])
+def test_focus_wait_observes_stop_and_releases_handler(backend, monkeypatch, shield):
+    from contextlib import nullcontext
+    import queue
+    from je_auto_control.utils.executor.run_control import (
+        StopToken, ExecutionStopped, bound_stop_token, shielded,
+    )
+
+    token = StopToken("focus-wait")
+    polls = []
+
+    def stop_during_wait(events, *, timeout):
+        polls.append(timeout)
+        assert len(polls) <= 2, "focus wait kept polling after stop"
+        token.stop("stop focus wait")
+        raise queue.Empty
+
+    monkeypatch.setattr(backend, "_make_focus_handler", lambda sink: object())
+    monkeypatch.setattr(queue.Queue, "get", stop_during_wait)
+    with bound_stop_token(token), shielded() if shield else nullcontext():
+        with pytest.raises(ExecutionStopped, match="stop focus wait"):
+            backend.wait_for_focus_change(timeout=float("inf"))
+    assert len(polls) == (2 if shield else 1)
+    assert all(interval is not None and 0 < interval <= 0.1 for interval in polls)
+    assert backend._automation.focus_handlers == []

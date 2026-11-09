@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261110-02 | 2026-11-10 | Executor stop reaches focus-event waits | #done #accessibility | [2026-11](2026-11.md) |
 | U-20261110-01 | 2026-11-10 | Cooperative cancellation for Windows focus waits | #done #accessibility | [2026-11](2026-11.md) |
 | U-20261103-01 | 2026-11-03 | Hold the collector off around the presence reader's timed windows | #incident #agent #ci #test | [2026-11](2026-11.md) |
 | U-20261102-03 | 2026-11-02 | Require Python 3.11; stop supporting 3.10 | #migration #deps #ci | [2026-11](2026-11.md) |
@@ -609,7 +610,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | File | Period | Entries |
 |---|---|---:|
-| [2026-11.md](2026-11.md) | 2026-11 | 22 |
+| [2026-11.md](2026-11.md) | 2026-11 | 23 |
 | [2026-10-f.md](2026-10-f.md) | 2026-10 | 5 |
 | [2026-10-e.md](2026-10-e.md) | 2026-10 | 91 |
 | [2026-10-d.md](2026-10-d.md) | 2026-10 | 15 |

@@ -215,4 +215,4 @@ under a relative name are written below that directory.
 
 ---
 
-Windows focus-event waits honor a bound cooperative cancellation token and release their event subscription on exit. Native COM acceptance remains pending.
+Windows focus-event waits honor a bound cooperative cancellation token or an executor stop token and release their event subscription on exit. Native COM acceptance remains pending.

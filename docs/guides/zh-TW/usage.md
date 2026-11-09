@@ -202,4 +202,4 @@ je_auto_control version
 
 ---
 
-Windows 焦點事件等待支援已綁定的協作取消 token，離開等待時解除事件訂閱；真實 COM 驗收仍待執行。
+Windows 焦點事件等待支援已綁定的協作取消 token 與 executor stop token，離開等待時解除事件訂閱；真實 COM 驗收仍待執行。

@@ -45,3 +45,7 @@ focus-event subscription in the calling thread. Polling uses the original
 monotonic deadline; it does not extend the timeout. Unscoped waits retain their
 existing timeout behavior. Native COM acceptance remains pending in
 ``Progress.md``.
+
+Executor stop tokens are checked at the same queue boundaries. A stopped run
+raises ``ExecutionStopped``; a shielded cleanup wait ignores the first stop
+request and exits on the second, following the executor's cleanup rules.

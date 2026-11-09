@@ -202,4 +202,4 @@ je_auto_control version
 
 ---
 
-Windows 焦点事件等待支持已绑定的协作取消 token，退出等待时解除事件订阅；真实 COM 验收仍待执行。
+Windows 焦点事件等待支持已绑定的协作取消 token 与 executor stop token，退出等待时解除事件订阅；真实 COM 验收仍待执行。
