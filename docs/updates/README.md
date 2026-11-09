@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261110-04 | 2026-11-10 | Reconcile USB wait and channel-error progress | #done #usb | [2026-11](2026-11.md) |
 | U-20261110-03 | 2026-11-10 | GUI task cancellation reaches headless waits | #done #gui | [2026-11](2026-11.md) |
 | U-20261110-02 | 2026-11-10 | Executor stop reaches focus-event waits | #done #accessibility | [2026-11](2026-11.md) |
 | U-20261110-01 | 2026-11-10 | Cooperative cancellation for Windows focus waits | #done #accessibility | [2026-11](2026-11.md) |
@@ -611,7 +612,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | File | Period | Entries |
 |---|---|---:|
-| [2026-11.md](2026-11.md) | 2026-11 | 24 |
+| [2026-11.md](2026-11.md) | 2026-11 | 25 |
 | [2026-10-f.md](2026-10-f.md) | 2026-10 | 5 |
 | [2026-10-e.md](2026-10-e.md) | 2026-10 | 91 |
 | [2026-10-d.md](2026-10-d.md) | 2026-10 | 15 |
