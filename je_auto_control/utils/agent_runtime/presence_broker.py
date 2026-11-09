@@ -18,6 +18,7 @@ from je_auto_control.utils.agent_runtime.presence_platform import (
 )
 from je_auto_control.utils.agent_runtime.presence_worker import SourceProcess
 from je_auto_control.utils.agent_runtime.parent_watch import start_parent_watch
+from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
 
 
 @dataclass
@@ -27,6 +28,7 @@ class _Binding:
     owner: Any = None
     generation: str | None = None
     expected: str | None = None
+    endpoint: Any = None
     sequence: int = 1
     closed: bool = False
 
@@ -74,7 +76,8 @@ class PresenceBroker:
         self._binding.expected = _ready(started)
         if self._binding.expected is not None and 'endpoint' in started:
             # Only this owned launch may name the endpoint; the channel then pins its listener.
-            self._pipe.use(started['endpoint'])
+            self._binding.endpoint = endpoint_from_wire(started['endpoint'])
+            self._pipe.use(endpoint_to_wire(self._binding.endpoint))
         if self._binding.expected is None:
             self._binding.owner.close()
             self._binding.owner = None
@@ -94,7 +97,10 @@ class PresenceBroker:
                     self._binding.generation = generation
                 if not _available(self.request('inspect', {})):
                     return {'ready': False, 'status': 'busy'}
-                return {'ready': True, 'generation': self._binding.generation}
+                result: dict[str, Any] = {'ready': True, 'generation': self._binding.generation}
+                if self._binding.endpoint is not None:
+                    result['endpoint'] = endpoint_to_wire(self._binding.endpoint)
+                return result
             except AgentControlBusy:
                 return {'ready': False, 'status': 'busy'}
             except BaseException:

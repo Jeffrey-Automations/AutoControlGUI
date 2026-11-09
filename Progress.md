@@ -331,8 +331,11 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      5 類呼叫者已改經 `owned_channel` 取得 channel：
      Linux 若有主機安裝的 root 擁有綁定檔，只能經服務啟動清單中完全相符的 argv，不退回本機程序。
      已決定（2026-10-29）：Linux 無綁定時繼續以本機 channel 執行 helper，runtime status 回報
-     not_configured。presence broker 目前只有 Windows 版本，nested grant 待 Linux presence 來源
-     存在後接合。parent_watch、輸入 journal／lease 與本機 pipe 執行緒退場仍須接合。
+     not_configured。Linux presence 已有私有 socket 傳輸及 owned-launch endpoint 經 broker／pool／host
+     傳入 helper 的路徑；標準桌面准入仍限 Windows，Linux seat／真人活動與 nested grant 的完整接合仍待完成。
+     Linux-only socket 端到端測試尚未本機執行：既有 WSL validation distro 的 ext4.vhdx 遺失，
+     啟動回報 Wsl/Service/CreateInstance/MountDisk/HCS/ERROR_PATH_NOT_FOUND；不以 Windows IPC 或 mock 通過代替。
+     parent_watch、輸入 journal／lease 與本機 pipe 執行緒退場仍須接合。
      owner 服務原始碼依 2026-10-29 決定已進入 `native/owner_service/`（src、manifest 範本、build.sh、
      tests 與兩個驗收執行器，不進 wheel），每個 client 帳號的 lease 配額已實作。
      現況：經四十一輪獨立審查（處理紀錄見 docs/updates/2026-10-e.md，U-20261029-23 起），第二十三輪

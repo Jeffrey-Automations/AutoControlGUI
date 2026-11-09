@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261110-07 | 2026-11-10 | Carry owned Linux presence endpoints into helpers | #done #agent | [2026-11](2026-11.md) |
 | U-20261110-06 | 2026-11-10 | Give the Report page independent ownership | #done #gui | [2026-11](2026-11.md) |
 | U-20261110-05 | 2026-11-10 | Verify existing RBAC administration delivery | #done #rbac | [2026-11](2026-11.md) |
 | U-20261110-04 | 2026-11-10 | Reconcile USB wait and channel-error progress | #done #usb | [2026-11](2026-11.md) |
@@ -614,7 +615,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | File | Period | Entries |
 |---|---|---:|
-| [2026-11.md](2026-11.md) | 2026-11 | 27 |
+| [2026-11.md](2026-11.md) | 2026-11 | 28 |
 | [2026-10-f.md](2026-10-f.md) | 2026-10 | 5 |
 | [2026-10-e.md](2026-10-e.md) | 2026-10 | 91 |
 | [2026-10-d.md](2026-10-d.md) | 2026-10 | 15 |

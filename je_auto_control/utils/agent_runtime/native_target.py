@@ -209,6 +209,9 @@ class NativeDesktopTarget:
             channel = self._ensure()
             deadline = time.monotonic() + spec.budget.action_seconds
             payload['presence'] = self._presence.bind(context, channel, spec.budget.action_seconds)
+            endpoint = self._presence.endpoint()
+            if endpoint is not None:
+                payload['presence_endpoint'] = endpoint
         result = self._request("configure", payload, deadline=deadline)
         return bool(result["ready"]), str(result.get("reason", ""))
 

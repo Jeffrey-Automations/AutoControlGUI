@@ -15,6 +15,7 @@ from je_auto_control.utils.agent_runtime.owned_channel_factory import owned_chan
 from je_auto_control.utils.agent_runtime.presence_frames import (
     identifier, presence_body, unsigned, validate_response,
 )
+from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
 
 
 @dataclass(eq=False)
@@ -43,6 +44,7 @@ class _Grant:
 class _Owner:
     channel: Any = None
     generation: str | None = None
+    endpoint: Any = None
     thread: threading.Thread | None = None
     stop: threading.Event = field(default_factory=threading.Event)
     retired: threading.Event = field(default_factory=threading.Event)
@@ -81,6 +83,10 @@ class PresenceReference:
     def acquire(self, check: Callable[[], None], timeout: float) -> dict:
         """Wait within this caller's budget; cancellation abandons only this caller's grant."""
         return self._pool.acquire_reference(self._owner, check, timeout)
+
+    def endpoint(self, binding: dict) -> dict | None:
+        """Snapshot launch metadata for this reference's exact live grant, without discovery."""
+        return self._pool.endpoint_reference(self._owner, binding)
 
     def release(self, binding: dict) -> None:
         """Schedule negative-only retirement of a token issued to this exact reference."""
@@ -198,6 +204,19 @@ class PresencePool:
                 ticket.accepted.set()
                 return dict(value.binding)
 
+    def endpoint_reference(self, owner: _Reference, binding: dict) -> dict | None:
+        """Check ownership and copy the pinned endpoint atomically with reference/grant retirement."""
+        binding = presence_body('check', binding)
+        with self._mutex:
+            self._check_owner()
+            grant = owner.tokens.get(binding['lease_id'])
+            if (owner not in self._references or owner.closed.is_set() or grant is None
+                    or grant.binding != binding or grant.released.is_set()
+                    or not grant.ticket.accepted.is_set()):
+                raise AgentTaskError('presence endpoint requires this reference live grant')
+            endpoint = self._owner.endpoint
+            return endpoint_to_wire(endpoint) if endpoint is not None else None
+
     def release_reference(self, owner: _Reference, binding: dict) -> None:
         """Mark only a recorded owned grant; the I/O owner performs its negative release."""
         binding = presence_body('release', binding)
@@ -248,9 +267,13 @@ class PresencePool:
             value = self._owner.channel.request('bootstrap', {}, timeout=15, check=self._check_owner)
             if value == {'ready': False, 'status': 'busy'} and value['ready'] is False:
                 raise AgentControlBusy('shared presence source is not ready')
-            if not isinstance(value, dict) or set(value) != {'ready', 'generation'} or value['ready'] is not True:
+            if (not isinstance(value, dict)
+                    or set(value) not in ({'ready', 'generation'}, {'ready', 'generation', 'endpoint'})
+                    or value['ready'] is not True):
                 raise AgentTaskError('shared presence bootstrap is invalid')
+            endpoint = endpoint_from_wire(value['endpoint']) if 'endpoint' in value else None
             self._owner.generation = identifier(value['generation'])
+            self._owner.endpoint = endpoint
 
     def _rpc(self, operation: str, body: dict) -> dict:
         self._check_owner()

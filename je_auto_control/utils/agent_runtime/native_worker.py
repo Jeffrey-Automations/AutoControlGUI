@@ -22,6 +22,7 @@ from je_auto_control.wrapper._input_observer import input_observer
 from je_auto_control.utils.agent_runtime.context import TaskOperation, operation_scope
 from je_auto_control.utils.agent_runtime.presence_frames import presence_body
 from je_auto_control.utils.agent_runtime.presence_reader import PresenceReader
+from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
 
 _LIMIT = 1_100_000
 
@@ -42,6 +43,7 @@ class NativeWorker:
         self._control_event = threading.Event()
         self._sink_lock = threading.Lock()
         self._presence_binding: dict | None = None
+        self._presence_endpoint: Any = None
         self._notice_stop = threading.Event()
         self._notice_thread: threading.Thread | None = None
 
@@ -203,7 +205,10 @@ class NativeWorker:
 
     def _check_presence_pin(self, spec: AgentTaskSpec, owner: AuthorizationContext | None, payload: dict) -> None:
         if self._presence_binding is not None and (spec != self._spec or owner != self._owner
-                                                  or payload.get('presence') != self._presence_binding):
+                                                  or payload.get('presence') != self._presence_binding
+                                                  or payload.get('presence_endpoint') != (
+                                                      endpoint_to_wire(self._presence_endpoint)
+                                                      if self._presence_endpoint is not None else None)):
             raise AgentTaskError('configured desktop presence cannot change capability or owner scope')
 
     def _configure_presence(self, payload: dict) -> None:
@@ -211,7 +216,10 @@ class NativeWorker:
             binding = payload.get('presence')
             if not isinstance(binding, dict):
                 raise AgentTaskError('standard desktop worker requires a host presence binding')
+            endpoint = (endpoint_from_wire(payload['presence_endpoint'])
+                        if 'presence_endpoint' in payload else None)
             self._presence_binding = presence_body('check', binding)
+            self._presence_endpoint = endpoint
 
     def _requires_presence(self) -> bool:
         return (not self._custom_target and self._spec is not None and self._spec.target != 'local-files'
@@ -264,7 +272,9 @@ class NativeWorker:
         if self._activity is None:
             if self._presence_binding is None:
                 raise AgentTaskError('standard desktop worker has no host presence binding')
-            self._activity = PresenceReader(self._presence_binding, self._control_event.set)
+            options = ({'endpoint': endpoint_to_wire(self._presence_endpoint)}
+                       if self._presence_endpoint is not None else {})
+            self._activity = PresenceReader(self._presence_binding, self._control_event.set, **options)
             self._notice_thread = threading.Thread(target=self._physical_takeover,
                                                    name='AgentPresenceNotice', daemon=True)
             try:
