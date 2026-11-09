@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261110-10 | 2026-11-10 | Forward nested owner grants to presence sources | #done #agent | [2026-11](2026-11.md) |
 | U-20261110-09 | 2026-11-10 | Bound internal semantic process-memory observations | #snapshot #agent | [2026-11](2026-11.md) |
 | U-20261110-08 | 2026-11-10 | Generate reports without blocking the GUI | #done #gui | [2026-11](2026-11.md) |
 | U-20261110-07 | 2026-11-10 | Carry owned Linux presence endpoints into helpers | #done #agent | [2026-11](2026-11.md) |
@@ -617,7 +618,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | File | Period | Entries |
 |---|---|---:|
-| [2026-11.md](2026-11.md) | 2026-11 | 30 |
+| [2026-11.md](2026-11.md) | 2026-11 | 31 |
 | [2026-10-f.md](2026-10-f.md) | 2026-10 | 5 |
 | [2026-10-e.md](2026-10-e.md) | 2026-10 | 91 |
 | [2026-10-d.md](2026-10-d.md) | 2026-10 | 15 |

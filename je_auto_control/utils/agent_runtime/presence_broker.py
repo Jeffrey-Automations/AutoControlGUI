@@ -3,11 +3,14 @@ from __future__ import annotations
 
 from contextlib import ExitStack
 from dataclasses import dataclass
+from functools import partial
 import sys
 import threading
 from typing import Any, Callable
 
 from je_auto_control.utils.agent_runtime.errors import AgentControlBusy, AgentTaskError
+from je_auto_control.utils.agent_runtime import owner_service_nested
+from je_auto_control.utils.agent_runtime.owned_channel_factory import owned_channel
 from je_auto_control.utils.agent_runtime.presence_frames import (
     decode_frame, encode_frame, identifier, presence_body, validate_response,
 )
@@ -169,7 +172,10 @@ def run(source: Any, sink: Any, broker: PresenceBroker | None = None) -> None:
 def main() -> None:
     """Run only as the fixed hidden helper of a host-owned presence pool."""
     start_parent_watch()
-    run(sys.stdin.buffer, sys.stdout.buffer)
+    grant = owner_service_nested.read_nested_bootstrap() if sys.platform.startswith('linux') else None
+    # Only the inherited, immutable grant may authorize source child leases.
+    launch = partial(SourceProcess, channel_factory=partial(owned_channel, nested=grant))
+    run(sys.stdin.buffer, sys.stdout.buffer, PresenceBroker(launch=launch))
 
 
 if __name__ == '__main__':

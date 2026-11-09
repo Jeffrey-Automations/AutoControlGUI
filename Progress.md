@@ -280,7 +280,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
    - macOS、X11：真人活動來源已實作（`presence_quartz.py`、`presence_x11.py`，U-20261101-06），
      由 `presence_platform.py` 依平台選用並由既有來源迴圈與 60 秒閒置狀態機執行；仍缺：
      macOS 的 presence transport（Linux 的 worker／broker／server 已改經 `presence_pipe_linux.py`，
-     U-20261101-13；presence_reader 仍只有 Windows pipe）、觀察目標身分、
+     U-20261101-13；reader 已接可信 Linux endpoint，原生執行未驗證）、觀察目標身分、
      視窗範圍輸入、自有 helper 隔離與非 Windows 對話框／未儲存 gate，以及以真實實體輸入
      驗證「實體／注入」判定的原生驗收（CI 只能證明注入事件不被誤計）。
      Wayland：一般 client 看不到全域輸入，也無法區分 libei／uinput 注入與真人，目前沒有可信來源；
@@ -299,7 +299,9 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      正式繫結仍須核實取消發生於 native spawn 期間的所有權、失敗清理、群組與逸出後代退場，
      並補受支援版本／架構驗證；隔離原型與直接子程序驗收不等於正式 helper 已接合，安裝前仍須比對。
      不得把原始逾時改稱 registry 死鎖，也不得放寬原始 10 秒期限或改動跳過政策。
-     presence_worker 仍須接合 Linux source／pipe／security，處理真正登入、seat、鎖定與活動來源；
+     presence_worker 已接平台 source／pipe／security；broker 已把 inherited nested grant
+     傳給每個 source 的 owned channel。仍須建立可信登入／seat 權限與來源環境，
+     並驗證真正登入、鎖定與實體活動來源；服務的空白環境不提供 DISPLAY／XDG_SESSION_ID。
      已安裝固定模組的未支援回覆及正常 EOF 退場不能證明實體來源或完整後代退場。
      不得替換空白 initializer 或偽裝 Wayland session 取代完整應用驗證。
      獨立 owner 核心仍須完成每筆記錄的啟動、取消、句柄發布、執行緒回收與服務端持續所有權；
