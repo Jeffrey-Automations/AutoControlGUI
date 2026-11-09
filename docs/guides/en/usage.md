@@ -214,3 +214,5 @@ sets `TEST_PIONEER_ARTIFACT_DIR`, the HTML, JSON and XML reports asked for
 under a relative name are written below that directory.
 
 ---
+
+Windows focus-event waits honor a bound cooperative cancellation token and release their event subscription on exit. Native COM acceptance remains pending.

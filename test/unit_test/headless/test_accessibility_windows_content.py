@@ -731,3 +731,53 @@ def test_a_uia_module_without_the_event_interface_has_no_handler(backend,
     assert backend._make_focus_handler(None) is None
 
 
+
+
+def test_focus_wait_cancellation_releases_subscription(backend, monkeypatch):
+    from concurrent.futures import CancelledError
+    from je_auto_control.utils.exception.cancellation import CancellationToken, cancellation_scope
+    import queue
+
+    token = CancellationToken(1)
+    automation = backend._automation
+    real_get = queue.Queue.get
+
+    def cancel_during_wait(events, *args, **kwargs):
+        token.cancel()
+        return real_get(events, block=False)
+
+    monkeypatch.setattr(backend, "_make_focus_handler", lambda sink: object())
+    monkeypatch.setattr(queue.Queue, "get", cancel_during_wait)
+    with cancellation_scope(token), pytest.raises(CancelledError):
+        backend.wait_for_focus_change(timeout=float("inf"))
+    assert automation.focus_handlers == []
+
+
+def test_scoped_focus_wait_uses_bounded_queue_polls(monkeypatch):
+    from concurrent.futures import CancelledError
+    from je_auto_control.utils.exception.cancellation import CancellationToken, cancellation_scope
+    from je_auto_control.utils.accessibility.backends.windows_events import wait_for_event
+    import queue
+
+    token = CancellationToken(2)
+    intervals = []
+
+    class Events:
+        def get(self, *, timeout):
+            intervals.append(timeout)
+            token.cancel()
+            raise queue.Empty
+
+    with cancellation_scope(token), pytest.raises(CancelledError):
+        wait_for_event(Events(), float("inf"))
+    assert len(intervals) == 1
+    assert 0 < intervals[0] <= 0.1
+
+
+def test_focus_queue_timeout_does_not_restart_deadline(monkeypatch):
+    from je_auto_control.utils.accessibility.backends import windows_events
+    import queue
+
+    moments = iter([10.0, 10.0, 11.0])
+    monkeypatch.setattr(windows_events.time, "monotonic", lambda: next(moments))
+    assert windows_events.wait_for_event(queue.Queue(), 0) is None

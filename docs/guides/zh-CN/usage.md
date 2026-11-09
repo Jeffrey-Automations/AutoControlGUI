@@ -201,3 +201,5 @@ je_auto_control version
 `run` 只要有任何动作失败就以 1 退出（仍会跑完整份脚本），CI 步骤会随之失败。旧版 `python -m je_auto_control -e file.json` 入口仍然可用，它的 `-e`、`-d` 与 `--execute_str` 标志也同样在有动作失败时以 1 退出。由 [TestPioneer](https://github.com/Integration-Automation/TestPioneer) 启动时（它会设置 `TEST_PIONEER_ARTIFACT_DIR`），以相对名称要求的 HTML、JSON、XML 报告会写到该目录底下。
 
 ---
+
+Windows 焦点事件等待支持已绑定的协作取消 token，退出等待时解除事件订阅；真实 COM 验收仍待执行。

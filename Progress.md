@@ -101,12 +101,13 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 - **Windows UIA 後端的執行緒模型完全沒對真的 COM 驗過**：現在每個呼叫執行緒各有一個自動化物件（`accessibility/backends/windows_automation.py`；
   主執行緒 STA、其他執行緒進 MTA），Accessibility 分頁與 A11y Audit 已移出 GUI 執行緒。開發環境沒裝 `comtypes`，CI 也沒有同時有 `comtypes` 與桌面的 job，
   測試全是假 COM 物件。未驗證的假設：MTA 工作執行緒上的 UIA 呼叫可用；焦點事件 callback 不需要 message pump；
-  `import comtypes` 第一次發生在已經是 MTA 的執行緒上會丟 `OSError`（憑記憶，沒處理）。`AC_wait_for_focus_change` 的原生 `Queue.get` 仍不會被 stop 叫醒。
+  `import comtypes` 第一次發生在已經是 MTA 的執行緒上會丟 `OSError`（憑記憶，沒處理）。焦點等待的 cooperative cancellation 已有 headless 回歸測試；真實 COM 訂閱／解除與停止行為仍待原生驗收。
 - **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）；`AC_parallel` 分支裡產生的值不經結果掛鉤回報，
   只能從區塊的結果裡取得（標成 `results[0].…`）。結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
   `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
-- **stop 還叫不醒的**：已經進到後端的單一指令（一次影像搜尋、OCR、HTTP 請求、shell 指令）、單一手勢內的節奏 sleep、`AC_wait_for_focus_change`；
+- **stop 還叫不醒的**：已經進到後端的單一指令（一次影像搜尋、OCR、HTTP 請求、shell 指令）、單一手勢內的節奏 sleep；
+  `AC_wait_for_focus_change` 的取消 token 路徑已接合，未綁定 token 的舊 stop 路徑仍待核對。
   MCP 自己的輪詢（`ac_wait_for_image`／`ac_wait_for_pixel`）不在可停止的執行裡。非腳本的分頁工作在後端無法取消，只是結果被丟掉。
   ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在輪詢執行緒上的指令 handler 裡呼叫 `stop()` 也會等到逾時。沒對真的 Slack workspace 跑過。
   新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。

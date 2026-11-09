@@ -35,3 +35,13 @@ Executor commands
 ``AC_wait_for_focus_change`` (``timeout``) returns ``{changed, element}``. It is
 exposed as the read-only ``ac_wait_for_focus_change`` MCP tool and as a Script
 Builder command under **Native UI**.
+
+Cooperative cancellation
+------------------------
+
+On Windows, a wait inside a bound cancellation scope checks its token between
+bounded queue reads. Cancellation raises ``CancelledError`` and removes the
+focus-event subscription in the calling thread. Polling uses the original
+monotonic deadline; it does not extend the timeout. Unscoped waits retain their
+existing timeout behavior. Native COM acceptance remains pending in
+``Progress.md``.
