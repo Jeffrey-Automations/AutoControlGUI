@@ -411,6 +411,8 @@ module = [
     "je_auto_control.utils.mcp_server.disclosure",
     "je_auto_control.utils.mcp_server.discovery",
     "je_auto_control.utils.monitor_layout.macos_frame",
+    "je_auto_control.utils.process_memory",
+    "je_auto_control.utils.process_memory.*",
     "je_auto_control.utils.ocr.tesseract_setup",
     "je_auto_control.utils.path_guard.policy",
     "je_auto_control.utils.rbac.__main__",

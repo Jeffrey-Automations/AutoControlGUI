@@ -11,7 +11,7 @@ CI 以 `python scripts/generate_facade_exports.py --check` 檢查一致性。六
 > 擷取每個模組的 docstring 與頂層公開名稱；統計數字取自實際檔案，非估算。
 > 指令數與公開 API 數以 `executor.known_commands()` 與 `je_auto_control.__all__` 在工作樹上實測取得。
 >
-> **掃描時間**：2026-10-29　**版本**：`pyproject.toml` version `0.0.228`　**分支**：`feat/agent-task-runtime`
+> **掃描時間**：2026-11-10　**版本**：`pyproject.toml` version `1.2.0`　**分支**：`dev`
 
 ---
 
@@ -24,9 +24,9 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,495 |
-| 程式碼總行數 | 228,364 |
-| `je_auto_control/utils/` 子套件數 | 311 |
+| Python 模組總數（含周邊子專案） | 1,498 |
+| 程式碼總行數 | 228,786 |
+| `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
 | GUI 分頁數（`main_widget` 註冊） | 51 |
@@ -60,7 +60,7 @@ USB/IP 協定、Prometheus 指標），以維持這條輕相依基線。
 └───────────────────────────────┬──────────────────────────────────────────┘
                                 │
 ┌───────────────────────────────▼──────────────────────────────────────────┐
-│  能力層 utils/（311 個子套件，全部無 Qt 相依）                             │
+│  能力層 utils/（313 個子套件，全部無 Qt 相依）                             │
 │  影像辨識 │ OCR │ 無障礙樹 │ 定位自癒 │ AI/Agent │ 遠端桌面 │ USB         │
 │  報表觀測 │ 資料 │ 安全 │ 韌性 │ 系統整合 │ 排程觸發 │ 網路協定           │
 └───────────────────────────────┬──────────────────────────────────────────┘
@@ -278,7 +278,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `ios/input.py` | 83 | iOS 觸控與按鍵原語。 |
 | `ios/screen.py` | 85 | iOS 裝置螢幕擷取與尺寸。 |
 
-### 5.4 能力層 `utils/`（312 個子套件）
+### 5.4 能力層 `utils/`（313 個子套件）
 
 以下依主題分組。每個子套件都是獨立可匯入的無頭模組，不含任何 Qt 相依。
 
@@ -317,7 +317,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.2 框架基礎設施
 
-> 14 個套件、約 3,796 行。
+> 15 個套件、約 4,218 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -333,6 +333,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/package_manager/` | 193 | 動態載入套件並把 executor 注入其中；載入前先過套件閘門（允許清單加上只能從 Python 呼叫的開關，工作區 X-12） |
 | `utils/path_guard/` | 267 | 命令列及伺服器的路徑邊界、客戶端根目錄隔離與受管任務來源政策紀錄 |
 | `utils/platform_id/` | 62 | 作業系統家族的單一判定點。`sys.platform` 原本在一百多處跟字面清單比對，而那些清單都沒有 BSD；`is_x11_unix()` 問的是「這是不是 X11 unix」，這才是守衛一直想問的問題 |
+| `utils/process_memory/` | 422 | 內部受審 probe 的有界語意觀察、身分重驗與失敗 handle 回收；原生 provider 與 runtime 整合待完成 |
 | `utils/shell_process/` | 279 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
 | `utils/start_exe/` | 36 | 啟動另一個執行檔行程 |
 
@@ -1513,8 +1514,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 981 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 997 | 101,553 |
-| **總計** | **1,483** | **227,619** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,000 | 101,975 |
+| **總計** | **1,486** | **228,041** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

@@ -18,6 +18,15 @@
 
 ## 輸入、視窗與擷取修正：還沒在真的桌面與 Jeffrey_RPA 上驗過
 
+### 行程記憶體自有 fixture 原生驗收
+
+`TODO` — 原生執行仍暫緩。須先完成 Windows provider、自有 fixture 與受管權限整合，
+再驗證 ASLR、32／64 位配置、跨區段／guard／不可讀頁、程序退出、PID 重用、權限拒絕、
+取消及 handle 回收。以 fixture 的已知狀態比對語意結果，獨立觀測前景、焦點、滑鼠與輸入事件。
+目前 injected-provider 測試不算原生通過；設計見 [記憶體觀察契約](docs/process_memory_contract.md)。
+
+### 桌面行為驗收
+
 `TODO` — 原生桌面與正式批次升級前的行為驗收暫緩。
 
 - **正式批次升級前的桌面行為驗收**：需核對 `_gui_control.py` 對下列行為的實際依賴：
@@ -615,6 +624,12 @@ browser adapter 從受管頁面取得欄位、透過 DOM 提交，再驗證新�
   `EffectUnknown` 先查明結果，不盲目重送。reader 的觀察不授予任何操作權限。
 
 ### 實作順序與各階段完成條件
+
+`WIP` — 內部 `utils/process_memory/` 已有不可變身分／probe、區段與位元組預算、
+序號一致性檢查、語意欄位白名單及失敗 handle 保留重試。契約與 fixture 協定見
+[process_memory_contract.md](docs/process_memory_contract.md)。M0／M1 尚未完成，
+仍缺 typed Windows provider、可信 ASLR resolver、自有 fixture 程序、runtime grant／helper
+生命週期及公開入口；M2 也仍缺實際應用版本 adapter。原生驗收固定列於本檔上方。
 
 1. **M0：能力盤點與範圍契約。** 先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
    讀取來源、執行介面、權限、是否全背景、支援版本、驗證方式與不支援原因。
