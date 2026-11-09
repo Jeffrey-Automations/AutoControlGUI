@@ -357,3 +357,5 @@ Every environment variable AutoControl reads. Nothing here is required: with no 
 The Report page is created when first opened. Closing it releases its controls and local result view; reopening creates a fresh page and reads the current recording status. Closing the page does not disable the shared recorder.
 
 Report generation runs in the background and shows a running status. A page accepts one generation at a time and captures the name when you start it. Closing drops late results; an already-running file write may still finish.
+
+The Screenshot page is also created on first open and released on close. Screen-size queries, captures and pixel reads run in the background with a running status and one operation at a time. Inputs are captured when the operation starts. Closing discards late results; a capture already in progress may still write its file. Hiding preserves the page. Region picking and file browsing remain explicit interactive actions.

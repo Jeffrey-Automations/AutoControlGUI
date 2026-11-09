@@ -109,10 +109,19 @@ def test_screenshot_shows_a_bad_region(qapp, monkeypatch):
         raise AutoControlScreenException("bad region")
 
     monkeypatch.setattr(tab, "screenshot", bad_region)
-    fake = types.SimpleNamespace(ss_path_input=QLineEdit(), ss_region_input=QLineEdit("100,100,50,50"),
-                                 ss_result_text=QTextEdit())
-    tab.ScreenshotTabMixin._take_screenshot(fake)
-    assert "bad region" in fake.ss_result_text.toPlainText()
+    monkeypatch.setattr(tab, "screen_size", lambda: (800, 600))
+    monkeypatch.setattr(tab, "get_pixel", lambda x, y: (0, 0, 0))
+    monkeypatch.setattr(tab, "open_region_selector", lambda parent: None)
+    monkeypatch.setattr(tab.QFileDialog, "getSaveFileName", lambda *args: ("", ""))
+    page = tab.ScreenshotTab()
+    page.ss_region_input.setText("100,100,50,50")
+    try:
+        page._take_screenshot()
+        from headless._qt_settle import pump_until
+        assert pump_until(lambda: not page._task.running)
+        assert "bad region" in page.ss_result_text.toPlainText()
+    finally:
+        page.deleteLater()
 
 
 def test_the_manual_script_shows_an_unknown_command(qapp):

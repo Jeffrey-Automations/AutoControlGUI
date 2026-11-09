@@ -12,7 +12,6 @@ from je_auto_control.gui._auto_click_tab import AutoClickTabMixin
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._image_detect_tab import ImageDetectTabMixin
 from je_auto_control.gui._record_tab import RecordTabMixin
-from je_auto_control.gui._screenshot_tab import ScreenshotTabMixin
 from je_auto_control.gui._script_tab import ScriptTabMixin
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.tab_registry import (
@@ -35,7 +34,7 @@ class _WorkerSignals(QObject):
 # Main Widget
 # =============================================================================
 class AutoControlGUIWidget(
-    TranslatableMixin, AutoClickTabMixin, ScreenshotTabMixin,
+    TranslatableMixin, AutoClickTabMixin,
     ImageDetectTabMixin, RecordTabMixin, ScriptTabMixin,
     QWidget,
 ):
@@ -98,13 +97,6 @@ class AutoControlGUIWidget(
                 ("hotkey_send", self._send_hotkey),
                 ("write_send", self._send_write),
                 ("scroll_send", self._send_scroll),
-            )),
-            "screenshot": (self._build_screenshot_tab(), (
-                ("take_screenshot", self._take_screenshot),
-                ("browse", self._browse_ss_path),
-                ("pick_region", self._pick_ss_region),
-                ("get_screen_size", self._get_screen_size),
-                ("get_pixel_label", self._get_pixel_color),
             )),
             "image_detect": (self._build_image_detect_tab(), (
                 ("browse", self._browse_img),
@@ -357,7 +349,7 @@ class AutoControlGUIWidget(
         capture = getattr(self, "script_history_controls", None)
         if capture is not None:
             capture.retranslate()
-        for name in ("_auto_click_retranslate", "_screenshot_retranslate", "_record_retranslate"):
+        for name in ("_auto_click_retranslate", "_record_retranslate"):
             if hasattr(self, name):
                 getattr(self, name)()
 

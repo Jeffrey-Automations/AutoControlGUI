@@ -142,7 +142,7 @@ _GUI = "je_auto_control.gui"
 # Desktop, which needs an optional extra and falls back to a placeholder).
 TAB_SPECS: Tuple[TabSpec, ...] = (
     TabSpec("auto_click", "tab_auto_click", "core"),
-    TabSpec("screenshot", "tab_screenshot", "core"),
+    TabSpec("screenshot", "tab_screenshot", "core", f"{_GUI}._screenshot_tab", "ScreenshotTab"),
     TabSpec("image_detect", "tab_image_detect", "core"),
     TabSpec("record", "tab_record", "core", default_visible=True),
     TabSpec("script_builder", "tab_script_builder", "core",

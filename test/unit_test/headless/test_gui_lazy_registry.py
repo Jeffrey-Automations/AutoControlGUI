@@ -17,7 +17,7 @@ from je_auto_control.gui.tab_registry import TAB_SPECS, TabEntry, lazy_factory
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 # Built by the main widget itself: its mixin tabs, and Remote Desktop's placeholder fallback.
-OWN_TABS = {"auto_click", "screenshot", "image_detect", "record", "script", "remote_desktop"}
+OWN_TABS = {"auto_click", "image_detect", "record", "script", "remote_desktop"}
 OPEN_AT_START = ["record", "script_builder", "remote_desktop"]
 
 
