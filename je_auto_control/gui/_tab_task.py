@@ -16,8 +16,8 @@ tab shares on top of :mod:`je_auto_control.gui.tab_task_controller`:
   it never waits for the worker, so a script that drives this GUI cannot
   deadlock it -- and the run's end arrives as an ``ExecutionStopped`` error
   once the worker has really unwound, which is when the tab is free again.
-  Other work is cancelled through its handle: it runs to its end unobserved
-  and its result is dropped.
+  Other work binds a headless cancellation scope. Cooperative backends stop
+  at their next checkpoint; late results from noncooperative work are dropped.
 
 The object keeps no reference to its tab beyond Qt parentage, and the work it
 is given must not hold a widget (the controller refuses it): read what the
@@ -29,6 +29,9 @@ from typing import Any, Callable, Optional
 from PySide6.QtCore import QObject, Signal
 
 from je_auto_control.gui.tab_task_controller import CancellationToken, TaskHandle, task_controller
+from je_auto_control.utils.exception.cancellation import (
+    CancellationToken as CoreCancellationToken, cancellation_scope,
+)
 from je_auto_control.utils.executor.run_control import (
     ExecutionStopped, StopToken, stop_execution, stoppable_run,
 )
@@ -104,9 +107,13 @@ class TabTask(QObject):
         self.finished.emit()
 
 
-def _call_plain(work: Callable[[], Any], _token: CancellationToken) -> Any:
-    """Worker thread: work that takes neither a timeout nor a cancel signal."""
-    return work()
+def _call_plain(work: Callable[[], Any], token: CancellationToken) -> Any:
+    """Worker thread: bind handle cancellation for cooperative headless work."""
+    core_token = CoreCancellationToken(task_id=id(token))
+    token.on_cancel(core_token.cancel)
+    with cancellation_scope(core_token):
+        core_token.checkpoint()
+        return work()
 
 
 def _call_stoppable(stop: StopToken, work: Callable[[], Any], token: CancellationToken) -> Any:

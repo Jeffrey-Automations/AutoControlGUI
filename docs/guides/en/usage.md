@@ -216,3 +216,5 @@ under a relative name are written below that directory.
 ---
 
 Windows focus-event waits honor a bound cooperative cancellation token or an executor stop token and release their event subscription on exit. Native COM acceptance remains pending.
+
+Ordinary GUI tab tasks pass cancellation to cooperative headless operations. Stop, timeout and closing the owner cancel those operations; late results from backends that do not check cancellation are discarded. Script tasks retain executor stop and cleanup-shield rules.

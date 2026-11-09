@@ -10,7 +10,7 @@ from je_auto_control.utils.exception.cancellation import (
 from je_auto_control.utils.executor.run_control import checkpoint, current_stop_token
 
 
-def wait_for_event(events: queue.Queue, timeout: float) -> Optional[Dict[str, Any]]:
+def wait_for_event(events: queue.Queue[Dict[str, Any]], timeout: float) -> Optional[Dict[str, Any]]:
     """Wait for one event while honoring the calling task's cancellation scope."""
     deadline = time.monotonic() + timeout
     while True:

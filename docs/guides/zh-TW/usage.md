@@ -203,3 +203,5 @@ je_auto_control version
 ---
 
 Windows 焦點事件等待支援已綁定的協作取消 token 與 executor stop token，離開等待時解除事件訂閱；真實 COM 驗收仍待執行。
+
+一般 GUI 分頁工作會把取消訊號傳給支援協作取消的核心操作。停止、逾時或關閉擁有者會取消操作；未檢查取消訊號的後端，其晚到結果會被丟棄。腳本工作仍使用 executor 的停止與清理保護規則。
