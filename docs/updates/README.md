@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261111-10 | 2026-11-11 | Isolate default EI input in an owned helper | #done #wayland | [2026-11](2026-11.md) |
 | U-20261111-09 | 2026-11-11 | Split MCP executor adapters along strict domain boundaries | #done #mcp | [2026-11](2026-11.md) |
 | U-20261111-08 | 2026-11-11 | Reconcile conditional MCP path checks with current evidence | #snapshot #mcp | [2026-11](2026-11.md) |
 | U-20261111-07 | 2026-11-11 | Release core panels while retaining shared recorder ownership | #done #gui | [2026-11](2026-11.md) |

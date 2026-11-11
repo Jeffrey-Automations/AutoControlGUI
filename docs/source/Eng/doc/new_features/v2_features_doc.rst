@@ -520,6 +520,15 @@ Override::
 Wayland libei native backend
 ----------------------------
 
+NORMAL's default EI sender now owns a fixed helper process for libei and portal
+calls. The direct ``LibeiBackend`` API remains in-process. Batches are bounded to
+128 events and 16 KiB; deadlines include client queue time. Uncertain replies
+and cancellation retire the helper without replay or provider fallback. Failed
+close retains ownership for explicit retry. Emission acknowledgements and process
+retirement do not prove application delivery or compositor input release; native
+acceptance remains pending.
+
+
 ctypes binding to ``libei.so.*`` that bypasses the CLI shims for
 microsecond-latency input. Opt-in via
 ``JE_AUTOCONTROL_WAYLAND_INPUT_BACKEND=libei|cli|auto``; the

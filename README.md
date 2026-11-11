@@ -43,6 +43,8 @@ Auto Click, Record and Script Executor own their controls and background tasks. 
 
 Windows, macOS, X11 and Wayland use different backends. Available features depend on system permissions and optional dependencies; Windows ARM64 has additional limitations. See the installation guide before choosing a deployment target.
 
+Wayland NORMAL input runs libei and portal calls in an owned helper process. Timeouts, cancellation and uncertain replies retire that helper without replay or automatic provider fallback. The direct `LibeiBackend` API remains in-process. Helper retirement is not proof that a compositor released input; native acceptance remains pending.
+
 Managed agent tasks and cross-host transfers include experimental features. See the implementation notes and project progress before relying on them in production.
 
 ## Documentation

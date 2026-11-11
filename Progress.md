@@ -203,14 +203,14 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 
 ---
 
-## libei 半開交握的資源隔離尚未完成
+## libei 半開交握的原生資源回收尚待驗證
 
-`TODO` — D2 helper 隔離；不能直接移除 `linux_wayland/libei.py::_teardown` 的半開保護。
+`TODO` — D2 預設輸入路徑已有具有限 IPC／期限／取消的獨立 EI helper；仍需原生驗收，
+不能直接移除 `linux_wayland/libei.py::_teardown` 的半開保護。
 
-需依 D2 計畫把原生配置、portal／交握、事件送出與 teardown 放進擁有的 helper，
-補上有界 IPC、request ID、逾時與取消，以及 parent close／reap。
-半開交握失敗仍會留下 context／fd；直接重複建立 backend 可能重複累積，
-需驗證 helper 結束後資源可回收，且取消不影響其他擁有者。
+直接使用 `LibeiBackend` 的路徑仍在呼叫程序內；半開交握失敗仍可能留下 context／fd。
+須在支援的原生環境驗證預設 helper 結束後的 context／fd 回收、原生按鍵釋放與其他擁有者不受影響。
+合成子程序的退出、ACK 與 cleanup 回覆不等於合成器已釋放輸入，也不能解除未知輸入結果。
 `docker/libei_verify.py` 與 `docker/eis_verify.py` 保留原生故障／成功邊界檢查；
 裝置暫停與序號回讀、真實合成器權限流程仍待對應環境驗證。
 
@@ -529,7 +529,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
 `WIP` — 改版仍缺以下內容；原生平台與正式環境驗收缺口另列於後。
 計畫 D1 仍缺 portal session 關閉／恢復、compositor 重啟的狀態與原生驗收、
 擷取結果與擁有者 context 的接合，以及原生 session 的重試／取消／停止控制。
-D2 仍缺 helper 隔離與半開交握資源回收；D3 的錄製／全域停止／Windows 原生崩潰證據仍缺，詳見計畫與下方生命週期待辦。
+D2 仍缺原生半開交握資源回收與合成器釋放證據；D3 的錄製／全域停止／Windows 原生崩潰證據仍缺，詳見計畫與下方生命週期待辦。
 計畫 E 已有裝置 context、輸入／畫面、應用生命週期與共用命令入口；
 仍缺真實 SDK 契約核對、iOS 擴充 adapter 與裝置驗收，不能以 fake backend 測試結案。
 H 已有三平台型別 gate 與縮減中的真實相依型別豁免；仍缺嚴格型別深化、完整範例／文件及最終固定來源總驗收。

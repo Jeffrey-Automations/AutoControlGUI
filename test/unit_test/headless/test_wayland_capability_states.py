@@ -1,4 +1,6 @@
 """Passive capability snapshots separate prerequisites, observed authority and XWayland scope."""
+from je_auto_control.linux_wayland import ei_default
+
 import importlib
 import json
 import sys
@@ -26,8 +28,8 @@ def context(api, *, env=None, tools=(), **kwargs):
 
 
 def test_cancel_does_not_fallback_silently(api, monkeypatch):
-    monkeypatch.setattr(libei, '_BLOCKED_PROBE', InputFailure('needs_permission', 'portal', 'private detail'))
-    monkeypatch.setattr(libei, '_DEFAULT_BACKEND', None)
+    monkeypatch.setattr(ei_default, '_BLOCKED_PROBE', InputFailure('needs_permission', 'portal', 'private detail'))
+    monkeypatch.setattr(ei_default, '_DEFAULT_BACKEND', None)
     monkeypatch.setattr(api.sys, 'platform', 'linux')
     monkeypatch.setitem(api.os.environ, 'XDG_SESSION_TYPE', 'wayland')
     monkeypatch.setattr(api.shutil, 'which', lambda _name: '/controlled/executable')
@@ -42,8 +44,8 @@ def test_revoked_session_cannot_send(api, monkeypatch):
     writes = []
     backend = libei.LibeiBackend(symbols=SimpleNamespace(ei_device_keyboard_key=lambda *_args: writes.append(True)))
     backend._ei, backend._revoked = 1, True
-    monkeypatch.setattr(libei, '_DEFAULT_BACKEND', backend)
-    monkeypatch.setattr(libei, '_BLOCKED_PROBE', None)
+    monkeypatch.setattr(ei_default, '_DEFAULT_BACKEND', backend)
+    monkeypatch.setattr(ei_default, '_BLOCKED_PROBE', None)
     monkeypatch.setattr(api.sys, 'platform', 'linux')
     monkeypatch.setitem(api.os.environ, 'XDG_SESSION_TYPE', 'wayland')
     with pytest.raises(libei.LibeiUnavailable):
@@ -146,9 +148,9 @@ def test_context_rejects_mismatched_observation_and_status_shape(api):
 def test_current_context_does_not_load_native_libraries_connect_or_execute_tools(api, monkeypatch):
     def forbidden(*_args, **_kwargs):
         pytest.fail('passive probing attempted a native library/session/tool operation')
-    monkeypatch.setattr(libei, '_DEFAULT_BACKEND', None)
-    monkeypatch.setattr(libei, '_BLOCKED_PROBE', None)
-    monkeypatch.setattr(libei, '_PROBE_FAILED', False)
+    monkeypatch.setattr(ei_default, '_DEFAULT_BACKEND', None)
+    monkeypatch.setattr(ei_default, '_BLOCKED_PROBE', None)
+    monkeypatch.setattr(ei_default, '_PROBE_FAILED', False)
     monkeypatch.setattr(libei, 'bind', forbidden)
     monkeypatch.setattr(libei, 'get_default_backend', forbidden)
     monkeypatch.setattr(libei, 'connected_backend', forbidden)
@@ -164,8 +166,8 @@ def test_existing_sender_busy_on_another_thread_is_observed_without_waiting(api,
     backend = libei.LibeiBackend(symbols=SimpleNamespace())
     attempts = []
     backend._lock = SimpleNamespace(acquire=lambda *, blocking: attempts.append(blocking) or False)
-    monkeypatch.setattr(libei, '_DEFAULT_BACKEND', backend)
-    monkeypatch.setattr(libei, '_BLOCKED_PROBE', None)
+    monkeypatch.setattr(ei_default, '_DEFAULT_BACKEND', backend)
+    monkeypatch.setattr(ei_default, '_BLOCKED_PROBE', None)
     monkeypatch.setattr(api.sys, 'platform', 'linux')
     monkeypatch.setitem(api.os.environ, 'XDG_SESSION_TYPE', 'wayland')
     snapshot = api.probe_capabilities(api.BackendContext.current())
@@ -189,8 +191,8 @@ def test_existing_ready_or_paused_devices_are_read_without_pumping_the_protocol(
     backend._devices = {capability: 8 for capability in libei._WANTED_CAPS}
     backend._emulating = {8: not paused}
     monkeypatch.setattr(backend, '_pump', forbidden)
-    monkeypatch.setattr(libei, '_DEFAULT_BACKEND', backend)
-    monkeypatch.setattr(libei, '_BLOCKED_PROBE', None)
+    monkeypatch.setattr(ei_default, '_DEFAULT_BACKEND', backend)
+    monkeypatch.setattr(ei_default, '_BLOCKED_PROBE', None)
     monkeypatch.setattr(api.sys, 'platform', 'linux')
     monkeypatch.setitem(api.os.environ, 'XDG_SESSION_TYPE', 'wayland')
     snapshot = api.probe_capabilities(api.BackendContext.current())
@@ -210,8 +212,8 @@ def test_cached_native_readiness_covers_all_requested_event_families(api, monkey
         backend._emulating[backend._devices[libei.EI_DEVICE_CAP_BUTTON]] = False
     else:
         del backend._devices[libei.EI_DEVICE_CAP_POINTER_ABSOLUTE]
-    monkeypatch.setattr(libei, '_DEFAULT_BACKEND', backend)
-    monkeypatch.setattr(libei, '_BLOCKED_PROBE', None)
+    monkeypatch.setattr(ei_default, '_DEFAULT_BACKEND', backend)
+    monkeypatch.setattr(ei_default, '_BLOCKED_PROBE', None)
     monkeypatch.setitem(api.os.environ, 'XDG_SESSION_TYPE', 'wayland')
     snapshot = api.probe_capabilities(api.BackendContext.current())
     assert snapshot.input.state == expected
@@ -221,9 +223,9 @@ def test_cached_native_readiness_covers_all_requested_event_families(api, monkey
 @pytest.mark.parametrize('choice,backend,state', [('auto', 'ydotool', 'unverified'),
                                                 ('libei', 'libei', 'needs_dependency')])
 def test_only_observed_optional_absence_allows_automatic_cli_diagnostics(api, monkeypatch, choice, backend, state):
-    monkeypatch.setattr(libei, '_DEFAULT_BACKEND', None)
-    monkeypatch.setattr(libei, '_BLOCKED_PROBE', None)
-    monkeypatch.setattr(libei, '_PROBE_FAILED', True)
+    monkeypatch.setattr(ei_default, '_DEFAULT_BACKEND', None)
+    monkeypatch.setattr(ei_default, '_BLOCKED_PROBE', None)
+    monkeypatch.setattr(ei_default, '_PROBE_FAILED', True)
     monkeypatch.setattr(api.sys, 'platform', 'linux')
     monkeypatch.setitem(api.os.environ, 'XDG_SESSION_TYPE', 'wayland')
     monkeypatch.setitem(api.os.environ, 'JE_AUTOCONTROL_WAYLAND_INPUT_BACKEND', choice)

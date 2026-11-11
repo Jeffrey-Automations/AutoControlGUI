@@ -1,5 +1,12 @@
 # AutoControl Architecture
 
+Wayland default EI input uses a bounded domain protocol over the existing owned
+helper channel. Native allocation, portal consent, emission and teardown stay in
+that child. Reply validation and emission acknowledgement share the request lock;
+uncertain outcomes retire the owner without replay. Passive cache inspection does
+not acquire consent. Raw LibeiBackend remains in-process, including its half-open
+teardown guard; process retirement does not establish compositor input release.
+
 MCP executor adapters are grouped by accessibility, automation, data, desktop,
 mobile and vision. Factories bind the same tool schemas to these strict modules;
 each adapter imports its executor function only when called.

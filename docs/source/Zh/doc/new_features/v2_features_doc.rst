@@ -453,6 +453,15 @@ Wayland CLI backend
 Wayland libei native backend
 ----------------------------
 
+NORMAL's default EI sender now owns a fixed helper process for libei and portal
+calls. The direct ``LibeiBackend`` API remains in-process. Batches are bounded to
+128 events and 16 KiB; deadlines include client queue time. Uncertain replies
+and cancellation retire the helper without replay or provider fallback. Failed
+close retains ownership for explicit retry. Emission acknowledgements and process
+retirement do not prove application delivery or compositor input release; native
+acceptance remains pending.
+
+
 對 ``libei.so.*`` 的 ctypes 綁定，繞過 CLI shim 取得微秒級延遲。
 以 ``JE_AUTOCONTROL_WAYLAND_INPUT_BACKEND=libei|cli|auto`` 啟用；
 ``auto`` （預設）只在選用原生後端缺席時改用 CLI。portal 拒絕／逾時、
