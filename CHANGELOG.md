@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Each MCP `tools/call` now runs as a stoppable executor run (`mcp-…`). `notifications/cancelled`
+  stops it: an action list from `ac_execute_actions` halts before its next action and
+  `ac_wait_for_image` / `ac_wait_for_pixel` wake mid-poll, answered `-32800` as before for a
+  cancelled call. `ac_stop_execution()` without a `run_id` (and any other `stop_execution()`
+  caller) now also stops MCP calls in progress, reported as an `ExecutionStopped` tool error,
+  and `ac_list_executions` lists them, excluding its own call.
+
 - WebRTC peers retain media constructor and disable failures, expose cached slot outcomes,
   observe actual receiver/task completion, and guard deferred media operations against
   peer replacement. GUI caretaker and Diagnostics integration remain pending.

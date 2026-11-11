@@ -116,11 +116,10 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
   `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
 - **stop 還叫不醒的**：已經進到後端的單一指令（一次影像搜尋、OCR、HTTP 請求、shell 指令）、單一手勢內的節奏 sleep；
-  MCP 自己的輪詢（`ac_wait_for_image`／`ac_wait_for_pixel`）不在可停止的執行裡。非腳本分頁已傳遞協作取消；尚未檢查 token 的後端呼叫仍只能丟棄晚到結果，須逐一接合。
+  非腳本分頁已傳遞協作取消；尚未檢查 token 的後端呼叫仍只能丟棄晚到結果，須逐一接合。
   ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在輪詢執行緒上的指令 handler 裡呼叫 `stop()` 也會等到逾時。沒對真的 Slack workspace 跑過。
   新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。
-- **WebRTC**：`StatsPoller.start()` 會在 GUI 執行緒上最多等 2 秒（`future.result(timeout=2.0)`，是啟動路徑，沒動）。LAN 廣播的註冊與取消已移出 GUI 執行緒，
-  但真的 zeroconf 的時間與名稱衝突行為只對假物件測過。
+- **WebRTC**：LAN 廣播的註冊與取消已移出 GUI 執行緒，但真的 zeroconf 的時間與名稱衝突行為只對假物件測過。
 - **切換主題後那幾個事件迴圈回合內**，以被暫存的頁面為 parent 的 `QMessageBox` 會相對於隱藏的暫存 widget 定位（只影響位置）。
   系統匣路徑在 offscreen 下沒有 tray，`_on_tray_open` 是直接呼叫測的。基準（`benchmarks/gui_*.py`）CI 仍不設門檻。
 - **把 Python 建的 widget 放進分頁列在結束時崩潰**：已查明觸發條件——分頁列按鈕上接了 Python callable、又有排隊中的 `deleteLater()`、而行程經 `os._exit` 離開；

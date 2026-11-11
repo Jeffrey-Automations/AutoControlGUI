@@ -75,6 +75,8 @@ WebRTC host/viewer 的 `stop()` 最多等待三秒完成軟體清理。`PeerStop
 
 MCP 唯讀標記不授予 viewer 存取權。已審查的即時畫面與呼叫者資料運算使用 `read_screen`；檔案、裝置資料及未知工具需要 `read_data`。別名共用標準名稱的權限，較強的明確設定優先。提供影像來源、從環境變數讀取設定欄位或規劃開啟本機檔案時需要 `read_data`。Anchor locator 的 accessibility／OCR 允許觀測即時畫面，影像範本需要 `read_data`，VLM 請求需要 `drive_input`。唯讀呼叫拒絕擷取產物及 VLM 分支，目錄排除可自選 ADB 執行檔的工具。MCP CI annotations 只回傳格式化文字，不寫入 stdout。未審查的 plugin 與 WebRunner 初始化工具不列入唯讀目錄，等待相依版本的個別審查。
 
+MCP 的 `tools/call` 以可停止的執行進行，列為 `mcp-…`。`notifications/cancelled` 會停掉它：`ac_execute_actions` 的動作清單在下一個動作前停下，`ac_wait_for_image`／`ac_wait_for_pixel` 在輪詢中途醒來；該次呼叫以 `-32800` 回覆。`ac_stop_execution` 與其他停止請求以同樣方式結束它，回報為工具錯誤。已經進到後端的單一指令仍會先跑完。
+
 REST 主機資料讀取與對應 MCP 權限一致：排程、遠端 session、USB passthrough 狀態、loopback／remote 裝置清單及診斷需要 `read_data`。對應已註冊的狀態指令、`AC_probe_capabilities` 與 `AC_diagnose` 會在執行提供者之前檢查權限。唯讀標記不授予 viewer 存取權；operator／admin 仍可使用。USB 列舉／事件、保留的 inspector 統計與程序 metrics 也需要 `read_data`；`AC_list_usb_devices`、`AC_usb_recent_events`、`AC_inspector_recent`、`AC_inspector_summary` 同樣檢查此權限。Dashboard 各面板分別顯示缺少的權限並清除舊資料；session 重新整理成功後也會清除先前的錯誤狀態。未列入權限表格的 executor 指令仍屬另一項審查範圍。
 
 主機唯讀模式對外部提供的目錄及後續註冊套用相同限制，接收請求及重新核對身分後的呼叫都檢查混合用途參數。MCP 設定的失敗截圖需要可寫入的工具及重新核對後具輸入操作權限的呼叫者；唯讀呼叫與 viewer 不會觸發截圖。這不表示所有相依套件或診斷讀取均無初始化副作用。

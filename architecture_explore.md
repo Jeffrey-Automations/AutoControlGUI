@@ -11,7 +11,7 @@ CI 以 `python scripts/generate_facade_exports.py --check` 檢查一致性。六
 > 擷取每個模組的 docstring 與頂層公開名稱；統計數字取自實際檔案，非估算。
 > 指令數與公開 API 數以 `executor.known_commands()` 與 `je_auto_control.__all__` 在工作樹上實測取得。
 >
-> **掃描時間**：2026-11-11　**版本**：`pyproject.toml` version `1.2.0`　**分支**：`dev`
+> **掃描時間**：2026-11-12　**版本**：`pyproject.toml` version `1.2.0`　**分支**：`dev`
 
 ---
 
@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,525 |
-| 程式碼總行數 | 233,257 |
+| Python 模組總數（含周邊子專案） | 1,526 |
+| 程式碼總行數 | 233,339 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -516,7 +516,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 52,801 行。
+> 14 個套件、約 52,883 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -530,7 +530,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cua_action/` | 204 | 標準化 computer-use 動作結構（Anthropic／OpenAI → `AC_*`） |
 | `utils/llm/` | 369 | 自然語言 → action list 規劃器 + Anthropic／null 後端；規劃執行隔離頂層變數並沿用巢狀範圍 |
 | `utils/mcp_registry/` | 97 | MCP registry `server.json` 資訊清單產生（可被發現） |
-| `utils/mcp_server/` | 22,084 | **無頭 MCP 伺服器**（預設註冊 820 個工具＝801 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
+| `utils/mcp_server/` | 22,166 | **無頭 MCP 伺服器**（預設註冊 820 個工具＝801 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
 | `utils/tool_use_schema/` | 191 | 把 `AC_*` 指令匯出成 Claude／OpenAI 的 tool-use schema |
 | `utils/trajectory_eval/` | 132 | agent 軌跡評估：依評分規準為一次執行打分 |
 | `utils/vision/` | 660 | VLM 元素定位器（依描述找元素）+ Anthropic／OpenAI／null 後端 |
@@ -756,7 +756,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `mouse_aliases.py` | 39 | 單鍵點擊別名（`AC_click_left` 等），executor 與 callback executor 共用。 |
 | `flags.py` | 19 | 旗標讀取 `as_bool`：依拼法（`"true"`／`"yes"`／`"on"`／`"1"`）而非 Python 真值判斷，所以 JSON、CLI、MCP 傳來的 `"false"` 是關；所有 adapter 與流程指令共用。 |
 
-#### `utils/mcp_server/`（22,084 行，820 個工具）— 最大子系統
+#### `utils/mcp_server/`（22,166 行，820 個工具）— 最大子系統
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -764,9 +764,9 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `tools/_handlers.py` | 547 | 把 MCP 工具呼叫橋接到 AutoControl 無頭 API 的 adapter；主題模組拆完之後這裡留的是資料／文字／HTTP 那一類與 WebRunner 橋接。 |
 | `tools/_handlers_qa.py` | 619 | 同一種 adapter，QA 主題：斷言 DSL、資料驅動、SQL／PDF／郵件／HTTP 步驟、codegen、視覺回歸、狀態機、flaky 偵測與隔離、suite runner、無障礙稽核、裝置矩陣、媒體斷言。從 `_handlers.py` 依主題拆出的第一塊（750 行上限）；兩者互不引用。 |
 | `tools/_handlers_input.py` | 221 | 同一種 adapter，輸入主題：滑鼠、鍵盤、虛擬手把（ViGEm）。 |
-| `tools/_handlers_screen.py` | 344 | 同一種 adapter，螢幕主題：擷取、像素、影像與文字搜尋、螢幕錄影。 |
+| `tools/_handlers_screen.py` | 349 | 同一種 adapter，螢幕主題：擷取、像素、影像與文字搜尋、螢幕錄影。 |
 | `tools/_handlers_system.py` | 592 | 同一種 adapter，桌面工作階段：視窗（狀態操作依正規化的後端成敗回覆）、行程與 shell、開檔、閒置與睡眠、音量、鎖定、輸入法狀態、欄位驗證與重試、色彩對比、變更排序、元件分類、剪貼簿。 |
-| `tools/_handlers_runs.py` | 122 | 同一種 adapter，執行主題：executor、執行歷史、錄製、動作檔。 |
+| `tools/_handlers_runs.py` | 124 | 同一種 adapter，執行主題：executor、執行歷史、錄製、動作檔。 |
 | `tools/_template_candidates.py` | 91 | 五個候選樣板工具，含縮圖、固定樣本驗證、路徑根目錄與取消。 |
 | `tools/_healing_source.py` | 41 | 原始步驟唯讀查閱工具，含進度、取消與目前路徑政策。 |
 | `tools/_healing_run.py` | 39 | 明確自癒操作與操作後驗證工具，保留受控失敗狀態。 |
@@ -795,6 +795,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `_http_stateless.py` | 185 | MCP 2026-07-28 在 Streamable HTTP 上的規則：`MCP-Protocol-Version`／`Mcp-Method`／`Mcp-Name` 必須與 body 相符（`=?base64?…?=` 先解碼），不符是 400＋`HeaderMismatch`；版本與中繼資料錯誤 400、未知方法 404。純函式，由 `http_transport.py` 回覆。 |
 | `http_sessions.py` | 301 | MCP 的 HTTP 傳輸用的 session 身分:`Mcp-Session-Id` 註冊表,以及每個 session 那條常駐的 server→client SSE 串流。 |
 | `_call_authority.py` | 31 | Bind anonymous MCP sessions to operator authority across direct and nested tool calls. |
+| `_call_run.py` | 58 | 每次帶伺服器上下文的工具呼叫都是一個可停止的 executor 執行（`mcp-…`）；`notifications/cancelled` 停掉它並回 `OperationCancelledError`。 |
 | `_origin_policies.py` | 114 | Connection-local roots and live task ceilings retire with their owning MCP authority. |
 | `_client_requests.py` | 278 | 伺服器主動送出的請求：`roots/list`／`elicitation/create`／`sampling/createMessage`,對應表與回應路由,以及破壞性工具的確認交握。只屬於握手時代：無狀態請求裡送出會丟例外。 |
 | `_stateless.py` | 267 | MCP 2026-07-28 無狀態版本，與以 `initialize` 握手的版本並存：逐請求的 `_meta`（版本、client 能力、`logLevel`）、`server/discover`、結果的 `resultType`／`serverInfo`／快取提示、`-32020`～`-32022` 錯誤碼，以及兩個時代逐請求分派的 mixin。 |
@@ -805,13 +806,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `prompts.py` | 220 | MCP prompt 目錄。 |
 | `fake_backend.py` | 187 | CI／無頭測試用的記憶體內假後端。 |
 | `plugin_watcher.py` | 169 | 檔案變更時熱重載外掛工具的背景 watcher。 |
-| `tools/_base.py` | 229 | 工具註冊表的共用型別與輔助；JSON 相容的 MCPToolResult 分離受控失敗旗標與資料。 |
+| `tools/_base.py` | 234 | 工具註冊表的共用型別與輔助；JSON 相容的 MCPToolResult 分離受控失敗旗標與資料。 |
 | `tools/_readonly.py` | 32 | Read-only registry variants with enforced argument restrictions. 預設／外部／動態目錄共用篩選及呼叫限制。 |
 | `tools/_validation.py` | 124 | MCP 工具用到的 JSON Schema 子集驗證器。 |
 | `tools/plugin_tools.py` | 147 | 把外掛載入的 `AC_*` callable 包成 `MCPTool`。 |
 | `log_bridge.py` | 118 | 把 Python logging 記錄橋接成 MCP `notifications/message`；2026-07-28 的請求只收到自己設了 `logLevel` 時產生的記錄。 |
 | `audit.py` | 127 | MCP 工具呼叫稽核記錄。 |
-| `context.py` | 69 | 傳給 opt-in 工具處理器的每次呼叫上下文，含取消、進度與伺服器路徑政策。 |
+| `context.py` | 81 | 傳給 opt-in 工具處理器的每次呼叫上下文，含取消（同時停掉該次呼叫的 `StopToken`）、進度與伺服器路徑政策。 |
 | `rate_limit.py` | 48 | 工具呼叫的 token bucket 限流。 |
 | `__main__.py` | 126 | `je_auto_control_mcp` console script 進入點。 |
 
@@ -1532,7 +1533,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
 | `gui/` | 150 | 40,579 |
-| `utils/mcp_server/` | 61 | 22,084 |
+| `utils/mcp_server/` | 62 | 22,166 |
 | `utils/remote_desktop/` | 77 | 16,709 |
 | `utils/executor/` | 11 | 10,702 |
 | `utils/usb/` | 20 | 5,060 |
@@ -1552,7 +1553,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,046 |
-| **總計** | **1,513** | **232,512** |
+| **總計** | **1,514** | **232,594** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

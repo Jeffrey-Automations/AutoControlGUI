@@ -509,7 +509,7 @@ class MCPServer(StatelessDispatchMixin, SubscriptionMixin, ClientRequestMixin,
         with self._calls_lock:
             ctx = self._active_calls.get(call_key)
         if ctx is not None:
-            ctx.cancelled_event.set()
+            ctx.cancel()   # also stops the executor run the call executes as
             autocontrol_logger.info(
                 "MCP cancel signalled for call %r", request_id,
             )
