@@ -84,3 +84,5 @@ REST 主机数据读取与对应 MCP 权限一致：调度、远程 session、US
 媒体 producer 关闭会报告待完成或不确定的清理结果，并保留原始资源。音频与录影不会通过不安全的 close／flush 重播宣称成功；LAN close 可明确重试。应用程序 caretaker 与 GUI 整合仍待完成。详见[清理契约](../docs/media_retirement_contract.md)。
 
 HostBrowser 也会拒绝晚到发布，并保留未完成的线程与关闭所有权；对话框整合仍待完成。
+
+MultiViewerHost 可返回含原始 session 清理对象的 offer，延后清理不会停止替换后的连接或画面来源；GUI 接入仍待完成。

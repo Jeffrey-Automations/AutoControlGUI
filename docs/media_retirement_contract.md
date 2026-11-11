@@ -44,6 +44,16 @@ original interruption and attaches the browser owner when cleanup also fails.
 
 ## Wrappers and current limits
 
+MultiViewerHost offers `create_owned_session_offer()` for asynchronous delivery.
+The result contains `session_id`, `sdp`, and a `retirement` receipt retaining the
+original peer and shared screen source. Use `session_retirement(session_id)` to
+capture an existing session before queuing cleanup. Calling the receipt's `stop()`
+retries only that generation. A reused ID or replacement source is unaffected;
+other sessions retain their shared source. The legacy `create_session_offer()`
+still returns its two-item tuple, and `stop_session(id)` targets the current ID.
+GUI disconnect and discarded-offer paths still need to adopt these receipts.
+This does not resolve all partial peer-constructor or source-subscription failures.
+
 Mic wrappers retain children when child stop fails. Opus track ending also rejects queued PCM and wakes a waiting receive operation. Opus receiver cancellation retains the exact task until actual completion is observed; cancellation requested is not completion. Repeated stop can observe a completed task. Direct TCP host cleanup continues socket/client teardown after an audio failure and retains the original capture for later observation.
 
 These producer contracts do not complete application shutdown. The application caretaker, original-authority Diagnostics retries, GUI success reporting, HostBrowser dialog ownership, and all peer replacement/discard paths still require integration. In particular, a GUI must not display a recording as saved just because `has_output` is true. Existing consumer paths that swallow errors or drop references are not made durable by this producer unit. Native media/network acceptance remains pending. Validation for this unit uses injected resources and event-loop tasks only.

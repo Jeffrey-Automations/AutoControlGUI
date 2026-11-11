@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Bind delayed MultiViewer session retirement to its original peer and screen source.
+  Owned offers preserve cleanup identity before delivery; existing tuple APIs remain compatible.
+
 - Retain unfinished HostBrowser cleanup, reject late publications, and observe the
   original browser thread without replaying cancellation. One-shot browsing preserves
   interruption identity and retained cleanup ownership. Dialog integration remains pending.

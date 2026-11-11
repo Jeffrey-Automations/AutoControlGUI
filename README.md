@@ -84,3 +84,5 @@ Internal Windows process-memory preparation can now measure a selected process i
 Media producer shutdown now reports pending or uncertain cleanup and retains original resources. Audio and recorder failures are never turned into success by unsafe close or flush replay. LAN close supports explicit retry; application caretaker and GUI integration remain pending. See [the retirement contract](docs/media_retirement_contract.md).
 
 HostBrowser also rejects late publications and retains unfinished thread/close ownership; dialog integration remains pending.
+
+MultiViewerHost can return an owned offer or capture an original-session retirement receipt, so delayed cleanup cannot stop a replacement peer or screen source. GUI adoption remains pending.

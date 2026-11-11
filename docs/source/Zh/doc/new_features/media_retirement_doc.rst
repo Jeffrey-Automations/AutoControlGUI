@@ -13,5 +13,10 @@ HostBrowser 拒絕晚到發布，保留已進入的回呼，並在一次取消�
 Zeroconf close 可重試；建構取得資源失敗仍維持不確定。單次瀏覽中斷時，若清理也失敗，
 會保留原始中斷訊號並附上資源 owner。
 
+MultiViewerHost 的 ``create_owned_session_offer()`` 回傳 SDP 與原始 session 清理物件。
+排入背景工作前，可用 ``session_retirement(id)`` 取得既有連線的清理物件；
+即使 ID 重用，重試也不會停止新的連線或畫面來源。既有 tuple API 保持相容。
+GUI 斷線與丟棄 offer 路徑仍須接入此所有權。
+
 此 producer 單元尚未完成應用程式 caretaker、GUI 儲存成功提示、peer 替換及丟棄路徑，
 以及 HostBrowser 對話框所有權整合。原生驗收仍待完成；本單元使用注入的資源驗證。

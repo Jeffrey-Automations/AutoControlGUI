@@ -123,6 +123,63 @@ def _host(**kwargs) -> MultiViewerHost:
     return MultiViewerHost(**kwargs)
 
 
+def test_retirement_receipt_never_stops_reused_session_id(monkeypatch):
+    monkeypatch.setattr(mv.secrets, "token_hex", lambda _: "reused")
+    coordinator = _host()
+    original = coordinator.create_owned_session_offer()
+    receipt = coordinator.session_retirement(original.session_id)
+    original.retirement.stop()
+    replacement = coordinator.create_owned_session_offer()
+    replacement_peer = _FakeHost.instances[-1]
+    replacement_track = coordinator.screen_track()
+    receipt.stop()
+    assert not replacement_peer.stopped
+    assert not replacement_track.stopped
+    assert coordinator.session_count() == 1
+    replacement.retirement.stop()
+
+
+def test_old_receipt_cannot_retry_replacement_source_failure(monkeypatch):
+    coordinator = _host()
+    original = coordinator.create_owned_session_offer()
+    original.retirement.stop()
+    replacement = coordinator.create_owned_session_offer()
+    source_calls = []
+
+    def fail_close():
+        source_calls.append("close")
+        raise OSError("new source cleanup failed")
+
+    monkeypatch.setattr(coordinator.screen_track(), "stop", fail_close)
+    with pytest.raises(OSError):
+        replacement.retirement.stop()
+    assert coordinator.session_count() == 0
+    original.retirement.stop()
+    assert source_calls == ["close"]
+    with pytest.raises(OSError):
+        replacement.retirement.stop()
+    assert source_calls == ["close", "close"]
+
+
+def test_receipt_retries_original_peer_without_stopping_other_sessions():
+    coordinator = _host()
+    first = coordinator.create_owned_session_offer()
+    peer = _FakeHost.instances[-1]
+    second = coordinator.create_owned_session_offer()
+    other = _FakeHost.instances[-1]
+    track = coordinator.screen_track()
+    peer.raise_on.add("stop")
+    with pytest.raises(RuntimeError):
+        first.retirement.stop()
+    assert coordinator.session_count() == 2
+    peer.raise_on.clear()
+    first.retirement.stop()
+    assert coordinator.session_count() == 1
+    assert not other.stopped and not track.stopped
+    second.retirement.stop()
+    assert track.stopped
+
+
 # --- construction -------------------------------------------------------------
 
 def test_a_host_without_a_token_is_refused():

@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261111-31 | 2026-11-11 | Bind delayed session retirement to original resources | #done #remote | [2026-11-b](2026-11-b.md) |
 | U-20261111-30 | 2026-11-11 | Retain LAN browser cleanup and interruption ownership | #done #remote | [2026-11-b](2026-11-b.md) |
 | U-20261111-29 | 2026-11-11 | Protect remaining REST operational records and restore dashboard status | #done #security | [2026-11-b](2026-11-b.md) |
 | U-20261111-28 | 2026-11-11 | Preserve media producer retirement outcomes and original resources | #done #remote | [2026-11-b](2026-11-b.md) |
@@ -649,7 +650,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | File | Period | Entries |
 |---|---|---:|
-| [2026-11-b.md](2026-11-b.md) | 2026-11 | 19 |
+| [2026-11-b.md](2026-11-b.md) | 2026-11 | 20 |
 | [2026-11.md](2026-11.md) | 2026-11 | 43 |
 | [2026-10-f.md](2026-10-f.md) | 2026-10 | 5 |
 | [2026-10-e.md](2026-10-e.md) | 2026-10 | 91 |
