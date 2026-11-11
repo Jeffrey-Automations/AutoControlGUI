@@ -8,6 +8,11 @@ Remote media adapters validate PyAV video contexts and streams before assigning
 video properties, and close failed recording containers. ScreenVideoTrack uses a
 separate frame-clock helper so aiortc can retain its integer timestamp field.
 
+Auto Click, Record and Script are lazy independent widgets owning their background
+tasks and menu actions. Closing cancels page work and releases controls; the shared
+recorder survives the Record view. Reopening reads retained recorder state without
+probing native hook health. Ctrl+4 still delegates to the global stop path.
+
 Image Detection is a lazy independent widget. It owns its inputs and mouse-button
 selection, captures immutable worker arguments and runs matching through TabTask.
 Close cancels work and discards late results; reopen creates fresh controls.

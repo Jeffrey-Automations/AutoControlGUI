@@ -145,9 +145,11 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 - **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：
   - viewer 的其餘影像檔案型、mobile 與外掛唯讀工具仍需全面盤點 capability；自製工具仍依提示採預設分類。
   - 沒對真的 client（Claude Desktop、VS Code、內建 dashboard）試過；SSE、無狀態與 `subscriptions/listen` 路徑、TLS 加 RBAC 沒有測試。
-- **MCP 路徑根目錄**（`JE_AUTOCONTROL_MCP_PATH_ROOTS`，預設關閉）管不到的參數：執行動作清單的工具、
-  有時才是路徑的參數（`ac_open_path`／`ac_plan_open`／`ac_file_association`／`ac_act_in_view` 的 `target`，`ac_launch_process`／`ac_shell` 的 `argv`／`command`）、
-  `ac_handle_file_dialog` 的 `path`、自由格式物件裡的路徑（`ac_run_suite` 的 `spec`、`ac_run_dag` 的 `definition`、`ac_assert_all` 的 `specs`）、沒標註的外掛工具。
+- **MCP 路徑根目錄**（`JE_AUTOCONTROL_MCP_PATH_ROOTS`，預設關閉）：`path-or-other` 已檢查
+  `ac_open_path`／`ac_plan_open`／`ac_file_association`／`ac_act_in_view` 的 `target` 與 `ac_handle_file_dialog` 的 `path`，
+  限於可辨識的絕對路徑、已存在的相對路徑及 `file:` URL；保留原字串，不代表能限制應用程式自行解讀的路徑或尚不存在的相對路徑。
+  仍管不到執行動作清單的工具、`ac_launch_process`／`ac_shell` 的 `argv`／`command`、
+  自由格式物件裡的路徑（`ac_run_suite` 的 `spec`、`ac_run_dag` 的 `definition`、`ac_assert_all` 的 `specs`）與沒標註的外掛工具。
   檔案 symlink 的跳脫在這台機器上建不出來（只跑了目錄 junction）；POSIX 的 `:` 分隔與 `~` 沒在 Linux／macOS 跑。
   `roots/list` 來的根目錄要另外開 `JE_AUTOCONTROL_MCP_PATH_ROOTS_FROM_CLIENT` 才算數——這是實作時定的，請維護者確認。
 - **USB passthrough 實機驗收**：仍須對真的舊版 host、WebRTC 通道與 USB 裝置驗證長時間 transfer、
@@ -534,7 +536,7 @@ H 已有三平台型別 gate 與縮減中的真實相依型別豁免；仍缺嚴
 F 還缺：
 
 - **Remote Desktop 與 Script Builder 仍在啟動時建立**（預設開啟），啟動時間 2.6–2.7 秒裡大半是它們與門面匯入。
-- **F1 的遺留面板釋放**：Auto Click、Record、Script 三個核心表單與 Remote Desktop 在關閉時仍保留 widget；需隨 F3 遷移直接控制項引用、執行中工作與連線生命週期，再啟用銷毀。
+- **F1 的遺留面板釋放**：Remote Desktop 在關閉時仍保留 widget；需隨 F3 遷移直接控制項引用、執行中工作與連線生命週期，再啟用銷毀。
 - **F2 其餘**：計畫指定的 `WorkspaceShell` 介面、右側可收合詳情，以及各面板的空白／錯誤／permission states 還沒全面交付。
 - **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移。
 - **F4** 已有 `benchmarks/gui_startup.py` 與 `gui_workloads.py`，仍缺完整啟動／記憶體基準對照、mixed-DPI 與功能對等驗收。

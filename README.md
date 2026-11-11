@@ -39,6 +39,8 @@ The Image Detection page runs matching in the background and owns its mouse-butt
 Its Actions menu can stop a pending search; closing the page discards late results and reopening resets its inputs.
 Cancellation prevents later move/click steps, but cannot interrupt a native call already in progress.
 
+Auto Click, Record and Script Executor own their controls and background tasks. Closing them stops local work; reopening creates fresh inputs. The shared recorder continues after its page closes, and a reopened page reads backend status (unknown when unsupported). This status does not verify native hook health. Ctrl+4 still stops scripts and auto-clicking.
+
 Windows, macOS, X11 and Wayland use different backends. Available features depend on system permissions and optional dependencies; Windows ARM64 has additional limitations. See the installation guide before choosing a deployment target.
 
 Managed agent tasks and cross-host transfers include experimental features. See the implementation notes and project progress before relying on them in production.

@@ -62,7 +62,6 @@ def test_builder_run_slot_surfaces_autocontrol_exception(monkeypatch):
 # --- Finding 6: main_widget record / script slots --------------------------
 
 def test_playback_record_slot_surfaces_autocontrol_exception(monkeypatch):
-    import je_auto_control.gui.main_widget as mw
     import je_auto_control.gui._record_tab as rt
     warned = {}
     monkeypatch.setattr(rt.QMessageBox, "warning",
@@ -72,7 +71,6 @@ def test_playback_record_slot_surfaces_autocontrol_exception(monkeypatch):
         _raiser(AutoControlExecuteActionException("boom")),
     )
     from headless._tab_hosts import RecordHost
-    assert mw.AutoControlGUIWidget._playback_record is RecordHost._playback_record
     _app()
     host = RecordHost([["AC_ok"]])
     host._playback_record()  # must not raise
@@ -81,7 +79,6 @@ def test_playback_record_slot_surfaces_autocontrol_exception(monkeypatch):
 
 
 def test_execute_script_slot_surfaces_autocontrol_exception(monkeypatch):
-    import je_auto_control.gui.main_widget as mw
     import je_auto_control.gui._script_tab as st
     captured = {}
     monkeypatch.setattr(st, "read_executable_action_json", lambda _p: [["AC_ok"]])
@@ -90,7 +87,6 @@ def test_execute_script_slot_surfaces_autocontrol_exception(monkeypatch):
         _raiser(AutoControlExecuteActionException("boom")),
     )
     from headless._tab_hosts import ScriptHost
-    assert mw.AutoControlGUIWidget._execute_script is ScriptHost._execute_script
     _app()
     host = ScriptHost()
     host.script_path_input.setText("some.json")
@@ -142,18 +138,15 @@ def test_do_click_stops_timer_on_backend_exception(monkeypatch):
         ac, "click_mouse",
         _raiser(AutoControlMouseException("no backend")),
     )
-    stops = {"n": 0}
-    stub = types.SimpleNamespace(
-        click_type_combo=types.SimpleNamespace(currentIndex=lambda: 0),
-        mouse_radio=types.SimpleNamespace(isChecked=lambda: True),
-        mouse_button_combo=types.SimpleNamespace(currentText=lambda: "mouse_left"),
-        cursor_x_input=types.SimpleNamespace(text=lambda: "0"),
-        cursor_y_input=types.SimpleNamespace(text=lambda: "0"),
-        timer=types.SimpleNamespace(stop=lambda: stops.__setitem__("n", stops["n"] + 1)),
-    )
-
-    ac.AutoClickTabMixin._do_click(stub)  # must not raise
-    assert stops["n"] == 1  # the failing auto-click QTimer was stopped
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    panel = ac.AutoClickTab()
+    panel.timer.start(60000)
+    panel._do_click()
+    assert settle(panel._task, "task")
+    assert not panel.timer.isActive()
+    panel.deleteLater()
+    app.processEvents()
 
 
 # --- Finding 10: suite load-file tolerates a bad file ----------------------

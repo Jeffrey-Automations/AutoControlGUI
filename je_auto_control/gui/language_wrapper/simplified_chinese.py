@@ -650,6 +650,7 @@ simplified_chinese_word_dict = {
     "save_record": "保存为 JSON",
     "load_record": "载入 JSON",
     "record_status": "状态:",
+    "record_unknown": "未知",
     "record_idle": "闲置",
     "record_recording": "录制中...",
     "record_list_label": "已录制动作:",

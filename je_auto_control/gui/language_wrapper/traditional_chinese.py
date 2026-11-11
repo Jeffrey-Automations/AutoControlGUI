@@ -657,6 +657,7 @@ traditional_chinese_word_dict = {
     "save_record": "儲存為 JSON",
     "load_record": "載入 JSON",
     "record_status": "狀態：",
+    "record_unknown": "未知",
     "record_idle": "閒置",
     "record_recording": "錄製中...",
     "record_list_label": "已錄製動作：",

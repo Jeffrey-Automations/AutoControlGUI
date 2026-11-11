@@ -15,6 +15,7 @@ if not is_x11_unix():
 
 from je_auto_control.linux_with_x11.listener.x11_linux_listener import (
     x11_linux_record,
+    x11_linux_is_recording,
     x11_linux_stop_record,
 )
 
@@ -41,6 +42,11 @@ class X11LinuxRecorder:
     def __init__(self):
         self.record_queue: Queue | None = None
         self.result_queue: Queue | None = None
+
+    @property
+    def is_recording(self) -> bool:
+        """Report cached listener capture state; this does not test native health."""
+        return x11_linux_is_recording()
 
     def record(self) -> None:
         """

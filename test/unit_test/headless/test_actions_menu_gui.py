@@ -70,7 +70,10 @@ for entry in widget._tab_entries:
 record_entry = next(e for e in widget._tab_entries if e.key == "record")
 widget.tabs.setCurrentWidget(record_entry.widget)
 report["record_menu_matches"] = (
-    widget.current_tab_menu_actions() == list(record_entry.actions)
+    widget.current_tab_menu_actions() == entry_actions(record_entry)
+    and [key for key, _ in widget.current_tab_menu_actions()] == [
+        "start_record", "stop_record", "playback", "stop_playback", "save_record", "load_record",
+    ]
 )
 
 widget.show_tab("variables")

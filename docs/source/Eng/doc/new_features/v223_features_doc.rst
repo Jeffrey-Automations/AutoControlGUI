@@ -9,15 +9,10 @@ rebuilds for the active tab.
 The Actions menu
 ----------------
 
-Two ways a tab surfaces its commands:
-
-* **Registry actions** — legacy core tabs (Auto Click, Record and Script Executor)
-  declare ``(label_key, handler)`` pairs when
-  they are registered in ``gui/main_widget.py``.
-* **The** ``menu_actions()`` **hook** — independent tabs, including Screenshot,
-  Image Detection and Report, expose a
-  ``menu_actions()`` method returning the same ``[(label_key, handler), ...]``
-  shape; the menu bar queries the active tab and renders whatever it returns.
+Independent tabs, including Auto Click, Record, Script Executor, Screenshot,
+Image Detection and Report, expose ``menu_actions()`` returning
+``[(label_key, handler), ...]``. The menu bar queries the active page and
+renders its commands. Registry-supplied actions remain supported for embedders.
 
 46 of 48 registered tabs surface their commands this way. **Script Builder**
 and **Remote Desktop** intentionally keep their interactive panel layouts, and
@@ -175,3 +170,18 @@ that closes over the tab.
 
 This is a GUI-internal API (it imports ``PySide6``) and is not re-exported by
 the package facade; the headless functions a tab calls stay usable without it.
+
+Core panel ownership
+--------------------
+
+Auto Click owns its timer and snapshots each background input request. Pending
+work does not accumulate across timer ticks. Closing cancels future ticks and
+checks cancellation between double-click inputs; an entered native call may finish.
+Script Executor owns its editor, file/directory settings and cancellable runs.
+Opening a script from elsewhere routes through the registered Script page.
+
+Record owns playback, loaded data and background start/stop/file operations.
+Closing stops page-owned work but does not stop the shared recorder. Reopening
+reads existing backend capture state; unsupported/custom backends show unknown.
+The read-only state does not prove hook health or native input acceptance.
+Hiding preserves page state; closing and reopening creates a fresh page.

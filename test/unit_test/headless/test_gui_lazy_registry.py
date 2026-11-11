@@ -16,8 +16,8 @@ import pytest
 from je_auto_control.gui.tab_registry import TAB_SPECS, TabEntry, lazy_factory
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-# Built by the main widget itself: its mixin tabs, and Remote Desktop's placeholder fallback.
-OWN_TABS = {"auto_click", "record", "script", "remote_desktop"}
+# Remote Desktop retains the main widget's optional-dependency fallback.
+OWN_TABS = {"remote_desktop"}
 OPEN_AT_START = ["record", "script_builder", "remote_desktop"]
 
 
@@ -90,6 +90,8 @@ report = {
     "open_at_start": [row["key"] for row in widget.list_registered_tabs() if row["visible"]],
     "variables_imported_at_start": "je_auto_control.gui.variables_tab" in sys.modules,
     "presence_imported_at_start": "je_auto_control.gui.presence_tab" in sys.modules,
+    "auto_click_imported_at_start": "je_auto_control.gui._auto_click_tab" in sys.modules,
+    "script_imported_at_start": "je_auto_control.gui._script_tab" in sys.modules,
     "image_detect_imported_at_start": "je_auto_control.gui._image_detect_tab" in sys.modules,
 }
 widget.list_registered_tabs()
@@ -140,6 +142,8 @@ def test_only_the_start_tabs_and_the_widgets_own_forms_are_built(report):
     assert not report["variables_imported_at_start"]
     assert not report["presence_imported_at_start"]
     assert not report["image_detect_imported_at_start"]
+    assert not report["auto_click_imported_at_start"]
+    assert not report["script_imported_at_start"]
 
 
 def test_listing_translating_and_hiding_build_nothing(report):

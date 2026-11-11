@@ -99,6 +99,14 @@ class InputRecorder:
         self.result_queue: Optional[Queue] = None
         self._kinds: Tuple[str, ...] = ALL_KINDS
 
+    @property
+    def is_recording(self) -> Optional[bool]:
+        """Cached hook state, or unknown for a custom hook without status support."""
+        if self.hook is None:
+            return False
+        state = getattr(self.hook, "is_recording", None)
+        return state if isinstance(state, bool) else None
+
     def new_hook(self) -> Any:
         """Return a fresh, unstarted platform hook. Backends override this."""
         raise NotImplementedError

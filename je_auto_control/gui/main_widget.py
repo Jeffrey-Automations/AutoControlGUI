@@ -1,24 +1,19 @@
 """Workspace widget: owns the tab bar and the registry of every tab it can open."""
-import json
 from typing import Any, Dict, List, Optional
 
-from PySide6.QtCore import QTimer, Signal, QObject
+from PySide6.QtCore import Signal, QObject
 from PySide6.QtGui import QKeyEvent, Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel,
 )
 
-from je_auto_control.gui._auto_click_tab import AutoClickTabMixin
+from je_auto_control.gui._tab_task import stop_all_script_runs
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._record_tab import RecordTabMixin
-from je_auto_control.gui._script_tab import ScriptTabMixin
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.tab_registry import (
     TAB_SPECS, MenuActions, TabEntry, TabRegistry, WidgetFactory, lazy_factory,
 )
 from je_auto_control.gui.workspace import ScrollableTabs
-from je_auto_control.utils.exception.exceptions import AutoControlException
-from je_auto_control.utils.json.json_file import read_action_json
 
 # Kept under its old name: tests and embedders read ``_tab_entries`` rows as this.
 _TabEntry = TabEntry
@@ -33,8 +28,7 @@ class _WorkerSignals(QObject):
 # Main Widget
 # =============================================================================
 class AutoControlGUIWidget(
-    TranslatableMixin, AutoClickTabMixin,
-    RecordTabMixin, ScriptTabMixin,
+    TranslatableMixin,
     QWidget,
 ):
     """Owns the QTabWidget and exposes show/hide/list APIs for the menu bar."""
@@ -76,45 +70,10 @@ class AutoControlGUIWidget(
 
         self.tabs.currentChanged.connect(self._on_current_tab_changed)
 
-        self.timer = QTimer()
-        self.repeat_count = 0
-        self.repeat_max = 0
-        self._record_data = []
 
     def _own_tab_builders(self) -> Dict[str, Any]:
-        """Tabs this widget builds itself: ``key -> (builder, menu actions)``.
-
-        The mixin tabs are built now, not on first open: their builders create
-        attributes other slots read (``script_path_input``, the record status
-        label), and they are plain forms with nothing running behind them.
-        """
-        return {
-            "auto_click": (self._build_auto_click_tab(), (
-                ("start", self._start_auto_click),
-                ("stop", self._stop_auto_click),
-                ("get_position", self._get_mouse_pos),
-                ("hotkey_send", self._send_hotkey),
-                ("write_send", self._send_write),
-                ("scroll_send", self._send_scroll),
-            )),
-            "record": (self._build_record_tab(), (
-                ("start_record", self._start_record),
-                ("stop_record", self._stop_record),
-                ("playback", self._playback_record),
-                ("stop_playback", self._stop_playback),
-                ("save_record", self._save_record),
-                ("load_record", self._load_record),
-            )),
-            "script": (self._build_script_tab(), (
-                ("load_script", self._browse_script),
-                ("execute_script", self._execute_script),
-                ("menu_choose_script_dir", self._browse_script_dir),
-                ("execute_dir", self._execute_dir),
-                ("execute_editor_script", self._execute_manual_script),
-                ("task_stop", self._stop_script),
-            )),
-            "remote_desktop": (self._build_remote_desktop_tab, ()),
-        }
+        """Remote Desktop keeps its existing optional-dependency fallback."""
+        return {"remote_desktop": (self._build_remote_desktop_tab, ())}
 
     @staticmethod
     def _build_remote_desktop_tab() -> QWidget:
@@ -298,7 +257,7 @@ class AutoControlGUIWidget(
                 return
 
     def close_tab(self, key: str) -> None:
-        """Release a feature; keep legacy forms and Remote Desktop reusable.
+        """Release a feature; keep Remote Desktop reusable.
 
         Unlike ``hide_tab``, closing a feature discards its local UI state and
         schedules cleanup of subscriptions and timers. Reopening rebuilds it.
@@ -325,7 +284,7 @@ class AutoControlGUIWidget(
                 self.tabs.setTabText(
                     index, language_wrapper.translate(entry.title_key, entry.title_key),
                 )
-        self._retranslate_core_tabs()
+        TranslatableMixin.retranslate(self)
         # Child class tabs get their own retranslate if they implement one.
         for entry in self._built_entries():
             callback = getattr(entry.widget, "retranslate", None)
@@ -335,34 +294,22 @@ class AutoControlGUIWidget(
                 except (RuntimeError, AttributeError):
                     continue
 
-    def _retranslate_core_tabs(self) -> None:
-        """Relabel retained core forms and their optional manual capture controls."""
-        TranslatableMixin.retranslate(self)
-        capture = getattr(self, "script_history_controls", None)
-        if capture is not None:
-            capture.retranslate()
-        for name in ("_auto_click_retranslate", "_record_retranslate"):
-            if hasattr(self, name):
-                getattr(self, name)()
-
     def open_script_file(self, path: str) -> None:
         """Load a JSON script into the Script Executor tab and focus it."""
-        entry = self._find_entry("script")
-        if entry is not None and not self._is_open(entry):
-            self.show_tab("script")
-        self.script_path_input.setText(path)
-        try:
-            data = read_action_json(path)
-            self.script_editor.setText(json.dumps(data, indent=2, ensure_ascii=False))
-        except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
-            self.script_result_text.setText(f"Error loading: {error}")
-            return
-        if entry is not None:
-            self.tabs.setCurrentWidget(entry.widget)
+        if self.activate_tab("script"):
+            entry = self._find_entry("script")
+            if entry is not None:
+                entry.widget.load_script(path)
 
     # =========================================================================
     # Global keyboard shortcut: Ctrl+4 to stop
     # =========================================================================
+    def _stop_auto_click(self) -> None:
+        entry = self._find_entry("auto_click")
+        if entry is not None and entry.built:
+            entry.widget.dispose()
+        stop_all_script_runs()
+
     def keyPressEvent(self, event: QKeyEvent):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_4:
             self._stop_auto_click()

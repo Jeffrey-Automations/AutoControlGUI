@@ -138,17 +138,17 @@ _GUI = "je_auto_control.gui"
 
 # Registration order: it is the order of the View > Tabs menu, of the
 # navigation panel inside each category, and of the tab bar. A spec without a
-# module is one the main widget builds itself (its mixin tabs, and Remote
-# Desktop, which needs an optional extra and falls back to a placeholder).
+# module is built by the main widget: Remote Desktop needs an optional extra
+# and falls back to a placeholder.
 TAB_SPECS: Tuple[TabSpec, ...] = (
-    TabSpec("auto_click", "tab_auto_click", "core"),
+    TabSpec("auto_click", "tab_auto_click", "core", f"{_GUI}._auto_click_tab", "AutoClickTab"),
     TabSpec("screenshot", "tab_screenshot", "core", f"{_GUI}._screenshot_tab", "ScreenshotTab"),
     TabSpec("image_detect", "tab_image_detect", "core", f"{_GUI}._image_detect_tab", "ImageDetectionTab"),
-    TabSpec("record", "tab_record", "core", default_visible=True),
+    TabSpec("record", "tab_record", "core", f"{_GUI}._record_tab", "RecordTab", default_visible=True),
     TabSpec("script_builder", "tab_script_builder", "core",
             f"{_GUI}.script_builder", "ScriptBuilderTab", default_visible=True),
     TabSpec("flow_editor", "tab_flow_editor", "editing", f"{_GUI}.flow_editor", "FlowEditorTab"),
-    TabSpec("script", "tab_script", "editing"),
+    TabSpec("script", "tab_script", "editing", f"{_GUI}._script_tab", "ScriptTab"),
     TabSpec("recording_editor", "tab_recording_editor", "editing",
             f"{_GUI}.recording_editor_tab", "RecordingEditorTab"),
     TabSpec("variables", "tab_variables", "editing", f"{_GUI}.variables_tab", "VariablesTab"),

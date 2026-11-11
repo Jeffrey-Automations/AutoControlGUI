@@ -24,10 +24,11 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, QObject, Signal  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
-    QApplication, QComboBox, QDialog, QLineEdit, QTabWidget, QTableWidget, QTableWidgetItem,
-    QTextEdit, QWidget,
+    QApplication, QComboBox, QDialog, QTabWidget, QTableWidget, QTableWidgetItem,
+    QWidget,
 )
 
+from headless._qt_settle import settle  # noqa: E402
 from je_auto_control.utils.exception.exceptions import (  # noqa: E402
     AutoControlActionException, AutoControlScreenException, ImageNotFoundException,
 )
@@ -79,11 +80,17 @@ def test_open_script_shows_a_malformed_file(qapp, tmp_path):
     from je_auto_control.gui.main_widget import AutoControlGUIWidget
     bad = tmp_path / "bad.json"
     bad.write_text("[[", encoding="utf-8")
+    from je_auto_control.gui._script_tab import ScriptTab
+    panel = ScriptTab()
+    opened = []
     fake = types.SimpleNamespace(
-        _find_entry=lambda key: None, script_path_input=QLineEdit(),
-        script_editor=QTextEdit(), script_result_text=QTextEdit())
+        activate_tab=lambda key: opened.append(key) or True,
+        _find_entry=lambda key: types.SimpleNamespace(widget=panel))
     AutoControlGUIWidget.open_script_file(fake, str(bad))
-    assert fake.script_result_text.toPlainText().startswith("Error loading")
+    assert opened == ["script"]
+    assert settle(panel._loads, "task")
+    assert panel.script_result_text.toPlainText().startswith("Error loading")
+    panel.deleteLater()
 
 
 def test_image_detection_shows_no_match(qapp, monkeypatch):

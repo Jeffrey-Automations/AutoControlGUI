@@ -213,3 +213,17 @@ def test_wiring():
     assert "ac_record_stop_timeline" in {t.name for t in build_default_tool_registry()}
     assert hasattr(ac, "stop_record_timeline")
     assert "stop_record_timeline" in ac.__all__
+
+
+def test_hook_status_reads_retained_state_without_native_probe():
+    from je_auto_control.windows.record.win32_input_hook import Win32InputHook
+    hook = Win32InputHook()
+    assert hook.is_recording is False
+    hook._hooks = [object(), object()]
+    hook._thread_id = 1
+    assert hook.is_recording is True
+    hook.error = "failed"
+    assert hook.is_recording is False
+    hook.error = None
+    hook._hooks.clear()
+    assert hook.is_recording is False

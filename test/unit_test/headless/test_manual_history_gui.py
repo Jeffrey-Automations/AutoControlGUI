@@ -11,7 +11,7 @@ from headless._qt_settle import settle
 
 import je_auto_control as ac
 from je_auto_control.gui.manual_run_controls import ManualRunControls
-from je_auto_control.gui._script_tab import ScriptTabMixin
+from je_auto_control.gui._script_tab import ScriptTab
 from je_auto_control.gui.script_builder.builder_tab import ScriptBuilderTab
 from je_auto_control.gui.script_builder.step_model import action_to_step
 from je_auto_control.utils.run_history import manual as manual_module
@@ -59,7 +59,7 @@ def test_editor_capture_preserves_result_and_links_opted_in_owner(app, store, tm
     editor.setPlainText(json.dumps([["AC_set_var", {"name": "x", "value": 1}]]))
     host = _host(output, script_editor=editor, script_history_controls=controls)
     try:
-        ScriptTabMixin._execute_manual_script(host)
+        ScriptTab._execute_manual_script(host)
         assert json.loads(output.toPlainText())
         assert len(ac.read_events(journal)) == 2
         rows = store.list_runs()
@@ -81,7 +81,7 @@ def test_file_execution_records_its_source_path(app, store, tmp_path):
     source, output = QLineEdit(str(script)), QTextEdit()
     host = _host(output, script_path_input=source, script_history_controls=controls)
     try:
-        ScriptTabMixin._execute_script(host)
+        ScriptTab._execute_script(host)
         assert store.list_runs()[0].script_path == str(script)
         assert json.loads(output.toPlainText())
     finally:
@@ -137,7 +137,7 @@ def test_directory_execution_records_one_batch_and_all_snapshots(app, store, tmp
     source, output = QLineEdit(str(directory)), QTextEdit()
     host = _host(output, script_dir_input=source, script_history_controls=controls)
     try:
-        ScriptTabMixin._execute_dir(host)
+        ScriptTab._execute_dir(host)
         assert len(json.loads(output.toPlainText())) == 2
         assert len(store.list_runs()) == 1
         assert len(ac.read_events(journal)) == 4

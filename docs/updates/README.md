@@ -58,6 +58,8 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261111-08 | 2026-11-11 | Reconcile conditional MCP path checks with current evidence | #snapshot #mcp | [2026-11](2026-11.md) |
+| U-20261111-07 | 2026-11-11 | Release core panels while retaining shared recorder ownership | #done #gui | [2026-11](2026-11.md) |
 | U-20261111-06 | 2026-11-11 | Check navigation and editor widgets against real Qt types | #done #typing | [2026-11](2026-11.md) |
 | U-20261111-05 | 2026-11-11 | Reconcile mobile and modernization progress with current evidence | #snapshot #progress | [2026-11](2026-11.md) |
 | U-20261111-04 | 2026-11-11 | Validate media types and restore package complexity checks | #done #typing | [2026-11](2026-11.md) |

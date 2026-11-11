@@ -159,7 +159,7 @@ def test_ctrl_4_stops_every_running_script(script):
 
 
 def test_the_auto_click_stop_also_stops_scripts(script):
-    from je_auto_control.gui._auto_click_tab import AutoClickTabMixin
+    from je_auto_control.gui._auto_click_tab import AutoClickTab
     owner = QWidget()
     runs = TabTask(owner)
     errors = []
@@ -167,10 +167,8 @@ def test_the_auto_click_stop_also_stops_scripts(script):
     assert runs.start_script(lambda: executor.execute_action(_LONG))
     assert script.entered.wait(_WAIT)
 
-    class _Host:
-        timer = QTimer()
-
-    AutoClickTabMixin._stop_auto_click(_Host())
+    panel = AutoClickTab()
+    panel._stop_auto_click()
     assert settle(runs, "task")
     assert errors
     assert was_stopped(errors[0])

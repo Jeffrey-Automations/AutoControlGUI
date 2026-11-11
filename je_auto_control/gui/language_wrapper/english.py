@@ -789,6 +789,7 @@ english_word_dict = {
     "save_record": "Save to JSON",
     "load_record": "Load JSON",
     "record_status": "Status:",
+    "record_unknown": "Unknown",
     "record_idle": "Idle",
     "record_recording": "Recording...",
     "record_list_label": "Recorded Actions:",

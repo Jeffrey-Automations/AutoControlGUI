@@ -241,3 +241,10 @@ def x11_linux_stop_record() -> Queue:
     """Stop queue insertion; stopping before first use acquires no resources."""
     with _listener_lock:
         return Queue() if _LISTENER is None else _LISTENER.stop_record()
+
+
+def x11_linux_is_recording() -> bool:
+    """Inspect existing listener state without starting a listener or native query."""
+    listener = _LISTENER
+    return (listener is not None and not listener.closed.is_set()
+            and listener.failure is None and listener.handler.record_flag)

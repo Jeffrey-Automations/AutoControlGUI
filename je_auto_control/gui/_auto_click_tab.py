@@ -1,4 +1,9 @@
-from typing import TYPE_CHECKING, Any, Callable, Optional
+"""Independent auto-click controls with owned timer and cancellable background input."""
+from dataclasses import dataclass
+from functools import partial
+from typing import Callable, Optional
+
+from PySide6.QtCore import QTimer
 
 from PySide6.QtWidgets import (
     QWidget, QLineEdit, QComboBox, QVBoxLayout, QLabel,
@@ -6,8 +11,10 @@ from PySide6.QtWidgets import (
     QGroupBox,
 )
 
-from je_auto_control.gui._qt_typed import as_widget
-from je_auto_control.gui._tab_task import stop_all_script_runs
+from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
+from je_auto_control.gui._tab_task import TabTask, stop_all_script_runs
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.gui._validators import int_validator
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.wrapper.auto_control_keyboard import (
@@ -19,26 +26,39 @@ from je_auto_control.wrapper.auto_control_mouse import (
 )
 
 
-class AutoClickTabMixin:
-    """
-    Mixin that provides the auto-click tab UI and handlers.
-    Requires the host widget to expose `self.timer`, `self.repeat_count`,
-    `self.repeat_max` attributes, and the ``TranslatableMixin`` helpers
-    (``self._tr(...)``) set up by its __init__.
-    """
+@dataclass(frozen=True)
+class _Click:
+    mouse: bool
+    key: str
+    x: int
+    y: int
+    count: int
 
-    if TYPE_CHECKING:
-        # Declared, never defined: the widget this mixin is mixed into owns
-        # every one of these. The block is stripped at runtime, so nothing
-        # here can shadow what the host actually binds.
-        _tr: Callable[..., Any]
-        _translate: Callable[[str], str]
-        timer: Any
 
-    def _build_auto_click_tab(self) -> QWidget:
-        tab = QWidget()
-        outer = QVBoxLayout()
+def _click(request: _Click) -> None:
+    for _ in range(request.count):
+        cancellation_checkpoint()
+        if request.mouse:
+            click_mouse(request.key, request.x, request.y)
+        else:
+            type_keyboard(request.key)
 
+
+class AutoClickTab(TranslatableMixin, QWidget):
+    """Own the timer, input snapshots and worker for this auto-click page."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._tr_init()
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._timer_tick)
+        self.repeat_count = 0
+        self.repeat_max = 0
+        self._task = TabTask(self)
+        self._task.result.connect(self._on_result)
+        self._task.error.connect(self._on_error)
+        self._task.finished.connect(self._refresh_status)
+        outer = QVBoxLayout(self)
         click_group = self._tr(QGroupBox(), "tab_auto_click")
         grid = QGridLayout()
         row = 0
@@ -47,7 +67,7 @@ class AutoClickTabMixin:
         self.mouse_radio = self._tr(QRadioButton(), "mouse_radio")
         self.keyboard_radio = self._tr(QRadioButton(), "keyboard_radio")
         self.mouse_radio.setChecked(True)
-        self._input_group = QButtonGroup()
+        self._input_group = QButtonGroup(self)
         self._input_group.addButton(self.mouse_radio)
         self._input_group.addButton(self.keyboard_radio)
         h = QHBoxLayout()
@@ -103,7 +123,7 @@ class AutoClickTabMixin:
         self.repeat_count_times = self._tr(QRadioButton(), "repeat_radio")
         self.repeat_count_input = self._tr(QLineEdit(), "times")
         self.repeat_count_input.setValidator(int_validator(1, 999999999))
-        rg = QButtonGroup(tab)
+        rg = QButtonGroup(self)
         rg.addButton(self.repeat_until_stopped)
         rg.addButton(self.repeat_count_times)
         self.repeat_until_stopped.setChecked(True)
@@ -159,16 +179,19 @@ class AutoClickTabMixin:
         scroll_group.setLayout(sc_layout)
         outer.addWidget(scroll_group)
 
+        self.status_label = QLabel()
+        outer.addWidget(self.status_label)
+        self._refresh_status()
         outer.addStretch()
 
         self.mouse_radio.toggled.connect(self._update_click_mode)
         self._update_click_mode()
 
-        tab.setLayout(outer)
-        return tab
 
-    def _auto_click_retranslate(self) -> None:
+    def retranslate(self) -> None:
         """Re-translate composite labels and combo items that ``_tr`` can't own."""
+        super().retranslate()
+        self._refresh_status()
         if hasattr(self, "click_type_combo") and hasattr(self, "_click_type_keys"):
             current_index = self.click_type_combo.currentIndex()
             self.click_type_combo.clear()
@@ -193,12 +216,12 @@ class AutoClickTabMixin:
         try:
             interval = int(self.interval_input.text())
         except ValueError:
-            QMessageBox.warning(as_widget(self), "Warning", "Interval must be a number")
+            QMessageBox.warning(self, "Warning", "Interval must be a number")
             return
         # The validator's bottom of 1 is a hint only: "0" set a 0 ms timer,
         # which clicked on every event-loop pass (18,579 clicks in 0.5 s).
         if interval < 1:
-            QMessageBox.warning(as_widget(self), "Warning", "Interval must be at least 1 ms")
+            QMessageBox.warning(self, "Warning", "Interval must be at least 1 ms")
             return
         self.repeat_count = 0
         try:
@@ -206,19 +229,17 @@ class AutoClickTabMixin:
         except ValueError:
             self.repeat_max = 0
         self.timer.setInterval(interval)
-        try:
-            self.timer.timeout.disconnect(self._timer_tick)
-        except RuntimeError:
-            pass
-        self.timer.timeout.connect(self._timer_tick)
         self.timer.start()
+        self._refresh_status()
 
     def _stop_auto_click(self):
         """Stop the auto-clicker and ask every running script to stop (Ctrl+4)."""
-        self.timer.stop()
+        self.dispose()
         stop_all_script_runs()
 
-    def _timer_tick(self):
+    def _timer_tick(self) -> None:
+        if self._task.running:
+            return
         if self.repeat_until_stopped.isChecked():
             self._do_click()
         elif self.repeat_count_times.isChecked():
@@ -228,68 +249,78 @@ class AutoClickTabMixin:
             else:
                 self.repeat_count = 0
                 self.timer.stop()
+                self._refresh_status()
 
-    def _do_click(self):
+    def _do_click(self) -> None:
+        if self._task.running:
+            return
         try:
-            is_double = self.click_type_combo.currentIndex() == 1
-            if self.mouse_radio.isChecked():
-                btn = self.mouse_button_combo.currentText()
-                x = int(self.cursor_x_input.text() or "0")
-                y = int(self.cursor_y_input.text() or "0")
-                click_mouse(btn, x, y)
-                if is_double:
-                    click_mouse(btn, x, y)
-            else:
-                key = self.keyboard_button_combo.currentText()
-                type_keyboard(key)
-                if is_double:
-                    type_keyboard(key)
+            mouse = self.mouse_radio.isChecked()
+            key = self.mouse_button_combo.currentText() if mouse else self.keyboard_button_combo.currentText()
+            request = _Click(mouse, key, int(self.cursor_x_input.text() or "0"),
+                             int(self.cursor_y_input.text() or "0"),
+                             2 if self.click_type_combo.currentIndex() == 1 else 1)
+            self._start_work(partial(_click, request))
         except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
-            # AutoControlMouseException / AutoControlCantFindKeyException from a
-            # throwing backend must land here — otherwise timer.stop() is
-            # skipped and the auto-click QTimer fires the failing action forever.
-            self.timer.stop()
-            QMessageBox.warning(as_widget(self), "Error", str(error))
+            self._on_error(error)
 
-    def _get_mouse_pos(self):
-        try:
-            position = get_mouse_position()
-            if position is None:
-                # GetCursorPos fails on a locked or secure desktop; the
-                # backend reports that as None rather than raising.
-                raise AutoControlException(
-                    "the OS did not report a cursor position",
-                )
-            x, y = position
-            self._pos_label_suffix = f" ({x}, {y})"
-            self.pos_label.setText(
-                self._translate("current_position") + self._pos_label_suffix,
-            )
-            self.cursor_x_input.setText(str(x))
-            self.cursor_y_input.setText(str(y))
-        except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
-            QMessageBox.warning(as_widget(self), "Error", str(error))
+    def _on_error(self, error: object) -> None:
+        self.timer.stop()
+        self._refresh_status()
+        QMessageBox.warning(self, "Error", str(error))
 
-    def _send_hotkey(self):
-        try:
-            keys = [k.strip() for k in self.hotkey_input.text().split(",") if k.strip()]
-            if keys:
-                hotkey(keys)
-        except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
-            QMessageBox.warning(as_widget(self), "Error", str(error))
+    def _get_mouse_pos(self) -> None:
+        self._start_work(get_mouse_position, tag="position")
 
-    def _send_write(self):
-        try:
-            text = self.write_input.text()
-            if text:
-                write(text)
-        except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
-            QMessageBox.warning(as_widget(self), "Error", str(error))
+    def _on_result(self, result: object) -> None:
+        if self._task.tag != "position":
+            return
+        if not isinstance(result, tuple) or len(result) != 2:
+            self._on_error(AutoControlException("the OS did not report a cursor position"))
+            return
+        x, y = result
+        self._pos_label_suffix = f" ({x}, {y})"
+        self.pos_label.setText(self._translate("current_position") + self._pos_label_suffix)
+        self.cursor_x_input.setText(str(x))
+        self.cursor_y_input.setText(str(y))
 
-    def _send_scroll(self):
+    def _send_hotkey(self) -> None:
+        keys = [key.strip() for key in self.hotkey_input.text().split(",") if key.strip()]
+        if keys:
+            self._start_work(partial(hotkey, keys))
+
+    def _send_write(self) -> None:
+        text = self.write_input.text()
+        if text:
+            self._start_work(partial(write, text))
+
+    def _send_scroll(self) -> None:
         try:
-            val = int(self.scroll_value_input.text() or "3")
+            value = int(self.scroll_value_input.text() or "3")
             direction = self.scroll_dir_combo.currentText() if self.scroll_dir_combo else "scroll_up"
-            mouse_scroll(val, scroll_direction=direction)
-        except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
-            QMessageBox.warning(as_widget(self), "Error", str(error))
+            self._start_work(partial(mouse_scroll, value, scroll_direction=direction))
+        except (ValueError, TypeError) as error:
+            self._on_error(error)
+
+    def _start_work(self, work: Callable[[], object], *, tag: str = "") -> None:
+        self._task.start(work, tag=tag)
+        self._refresh_status()
+
+    def _refresh_status(self) -> None:
+        key = "task_running" if self.timer.isActive() or self._task.running else "task_stopped"
+        self.status_label.setText(self._translate(key))
+
+    def _translate(self, key: str) -> str:
+        return language_wrapper.translate(key, key)
+
+    def menu_actions(self) -> list[tuple[str, Callable[[], object]]]:
+        """Expose owned input controls through the workspace Actions menu."""
+        return [("start", self._start_auto_click), ("stop", self._stop_auto_click),
+                ("get_position", self._get_mouse_pos), ("hotkey_send", self._send_hotkey),
+                ("write_send", self._send_write), ("scroll_send", self._send_scroll)]
+
+    def dispose(self) -> None:
+        """Stop this page's timer and pending work without stopping other pages."""
+        self.timer.stop()
+        self._task.stop()
+        self._refresh_status()

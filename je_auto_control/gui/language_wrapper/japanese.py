@@ -683,6 +683,7 @@ japanese_word_dict = {
     "save_record": "JSON 保存",
     "load_record": "JSON 読込",
     "record_status": "状態:",
+    "record_unknown": "不明",
     "record_idle": "待機",
     "record_recording": "記録中...",
     "record_list_label": "記録済みアクション:",

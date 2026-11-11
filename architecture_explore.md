@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,500 |
-| 程式碼總行數 | 229,192 |
+| 程式碼總行數 | 229,250 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -202,7 +202,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.3 平台後端
 
-#### Windows（`windows/`，24 檔／2,265 行）
+#### Windows（`windows/`，24 檔／2,270 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -211,7 +211,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `core/utils/win32_keypress_check.py` | 21 | `GetAsyncKeyState` 按鍵狀態查詢。 |
 | `mouse/win32_ctype_mouse_control.py` | 220 | 滑鼠事件產生（含多螢幕絕對座標換算）。 |
 | `keyboard/win32_ctype_keyboard_control.py` | 98 | 鍵盤事件產生。 |
-| `record/win32_input_hook.py` | 253 | 單一一組低階鍵鼠 hook（`WH_KEYBOARD_LL`／`WH_MOUSE_LL`）＋訊息迴圈，產生帶時間戳的事件時間軸；停止時以 `PostThreadMessageW(WM_QUIT)` 收掉執行緒，不會每錄一次就漏一條。 |
+| `record/win32_input_hook.py` | 258 | 單一一組低階鍵鼠 hook（`WH_KEYBOARD_LL`／`WH_MOUSE_LL`）＋訊息迴圈，產生帶時間戳的事件時間軸；停止時以 `PostThreadMessageW(WM_QUIT)` 收掉執行緒，不會每錄一次就漏一條。 |
 | `record/win32_record.py` | 41 | 把 `win32_input_hook` 的時間軸轉成 action list（含按鍵放開、滾輪與間隔）；整形本體與 macOS 共用 `utils/input_macro/recorder_base.py`。 |
 | `screen/win32_screen.py` | 171 | 螢幕尺寸與像素讀取。**每支 Win32 函式都明寫 argtypes/restype**（HDC 是指標寬度，走預設的 c_int 會截斷，錯誤會沉默地擴散到 GetPixel／ReleaseDC），並持有自己的 user32／gdi32 handle。import 時呼叫 `SetProcessDPIAware()`——**行程層級且不可還原**，實體↔邏輯座標換算請走 `utils/monitor_layout`。 |
 | `window/windows_window_manage.py` | 473 | 視窗列舉／聚焦／關閉／最小化／幾何／所屬行程 PID／投遞式輸入（`auto_control_window` 的實作）。**每支 Win32 函式都明寫 argtypes/restype**，並持有自己的 user32 handle，避免把原型外溢到別的模組；hwnd 一律是 int。 |
@@ -220,7 +220,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `interception/keyboard.py` | 70 | 經 Interception 驅動的鍵盤輸入（繞過部分反自動化偵測）。 |
 | `interception/mouse.py` | 160 | 經 Interception 驅動的滑鼠輸入。 |
 
-#### macOS（`osx/`，17 檔／981 行）
+#### macOS（`osx/`，17 檔／988 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -228,12 +228,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `mouse/osx_mouse.py` | 193 | Quartz `CGEvent` 滑鼠事件。 |
 | `keyboard/osx_keyboard.py` | 144 | Quartz 鍵盤事件。 |
 | `keyboard/osx_keyboard_check.py` | 24 | 按鍵狀態查詢。 |
-| `listener/osx_listener.py` | 261 | 專屬執行緒上的 listen-only `CGEventTap`＋自己的 `CFRunLoopRunInMode` 切片；不在 import 時建 `NSApplication`，也不用會卡住呼叫緒的 `AppHelper.runEventLoop()`。修飾鍵由 `flagsChanged` 的旗標還原成 press／release，座標取 `CGEventGetLocation`（左上原點，與重播送出的座標同一空間）。 |
+| `listener/osx_listener.py` | 268 | 專屬執行緒上的 listen-only `CGEventTap`＋自己的 `CFRunLoopRunInMode` 切片；不在 import 時建 `NSApplication`，也不用會卡住呼叫緒的 `AppHelper.runEventLoop()`。修飾鍵由 `flagsChanged` 的旗標還原成 press／release，座標取 `CGEventGetLocation`（左上原點，與重播送出的座標同一空間）。 |
 | `record/osx_record.py` | 41 | 錄製。捕捉後的整形（舊版按下事件 Queue、時間軸、只錄滑鼠／只錄鍵盤）走共用的 `utils/input_macro/recorder_base.py`。 |
 | `screen/osx_screen.py` | 143 | 螢幕擷取與尺寸（含 Retina 座標處理）。 |
 | `pid/pid_control.py` | 53 | 以 PID 操作應用程式。 |
 
-#### Linux X11（`linux_with_x11/`，19 檔／1,369 行）
+#### Linux X11（`linux_with_x11/`，19 檔／1,382 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -241,8 +241,8 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `core/utils/x11_linux_vk.py` | 231 | Resolve X11 key symbols on explicit table or legacy constant access. |
 | `mouse/x11_linux_mouse_control.py` | 163 | XTest 滑鼠事件。 |
 | `keyboard/x11_linux_keyboard_control.py` | 101 | XTest 鍵盤事件。 |
-| `listener/x11_linux_listener.py` | 243 | Acquire and own an independent X11 RECORD connection on first observation. |
-| `record/x11_linux_record.py` | 78 | 錄製。 |
+| `listener/x11_linux_listener.py` | 250 | Acquire and own an independent X11 RECORD connection on first observation. |
+| `record/x11_linux_record.py` | 84 | 錄製。 |
 | `screen/x11_linux_screen.py` | 67 | 螢幕尺寸與擷取。 |
 | `uinput/_device.py` | 246 | `/dev/uinput` 封裝（核心層輸入，選用）。 |
 | `uinput/keyboard.py` | 44 | uinput 鍵盤後端，介面與 X11 版一致。 |
@@ -288,7 +288,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 19,488 行。
+> 25 個套件、約 19,496 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -302,7 +302,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/action_journal/` | 856 | 結構化動作日誌：schema v1、寫入前遮罩、跨行程排序／尾端復原、executor 明確 scope 擷取與本機 parallel／DAG parent 傳遞；門面、AC／MCP、Script Builder 與 CLI 擷取／有界查閱；observer／路徑政策隨巢狀根與 workers 保留，Run History 查閱與手動 history 關聯共用相同來源。 |
 | `utils/executor/` | 10,702 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
 | `utils/flow_debugger/` | 166 | action list 的單步除錯器與追蹤器 |
-| `utils/input_macro/` | 469 | 定時輸入事件：錄製結果的整形（`timeline`／`InputRecorder`，Windows 與 macOS 共用）、重播與宣告式輸入序列 DSL |
+| `utils/input_macro/` | 477 | 定時輸入事件：錄製結果的整形（`timeline`／`InputRecorder`，Windows 與 macOS 共用）、重播與宣告式輸入序列 DSL |
 | `utils/json/` | 99 | action JSON 檔讀寫與正規化格式化（`fmt --check` 的後端） |
 | `utils/json_store/` | 281 | JSON 字典檔持久化的共用小工具（內部管線） |
 | `utils/loop_guard/` | 158 | 機械式卡死迴圈偵測（agent loop 用） |
@@ -1266,7 +1266,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `gui/__init__.py` | 25 | `start_autocontrol_gui()`：**唯一**會延遲匯入 PySide6 的地方，維持頂層套件 Qt-free。 |
 | `main_window.py` | 442 | `QMainWindow`：選單列（File／Actions／View／…）、左側導覽面板 dock（`Ctrl+K` 搜尋、`Ctrl+B` 收合）、即時語言切換、字級預設、深色／淺色主題（`theme.py` 的 token，不再用 qt-material）。分頁分為 core／editing／detection／automation／system 五類。 |
-| `main_widget.py` | 370 | 工作區：擁有 `QTabWidget`，依 `tab_registry.TAB_SPECS` 註冊 49 個分頁，並暴露 show/hide/close/activate/list API 給選單列與導覽面板。只有預設開啟的三個分頁與自己的 mixin 表單在啟動時建立，其餘第一次開啟才匯入模組、建立 widget。核心分頁在 `_own_tab_builders` 宣告 `(label_key, handler)` 動作對。 |
+| `main_widget.py` | 317 | 工作區：擁有 `QTabWidget`，依 `tab_registry.TAB_SPECS` 註冊 49 個分頁，並暴露 show/hide/close/activate/list API 給選單列與導覽面板。只有預設開啟的三個分頁與保留的 Remote Desktop 表單在啟動時建立，其餘第一次開啟才匯入模組、建立 widget。核心分頁在 `_own_tab_builders` 宣告 `(label_key, handler)` 動作對。 |
 | `tab_registry.py` | 198 | 分頁表：每個分頁一筆 `TabSpec`（鍵、標題鍵、分類、模組與類別名），`TabEntry` 在第一次存取 `widget` 時才呼叫 factory。`TabRegistry.open/close` 快取或釋放 factory 面板，保留 metadata 與既有表單；不匯入 Qt。 |
 | `navigation.py` | 203 | `NavigationPanel`：搜尋框 + 依分類的功能樹，列出每個已註冊分頁（開啟中的以粗體標示），只回報被選的鍵，開啟分頁仍由視窗負責。 |
 | `theme.py` | 183 | 設計 token（`ThemeTokens`：顏色、圓角、間距、字族）、深色與淺色兩組值、由 token 產生的樣式表與對應的 `QPalette`；不載入圖檔或字型檔。 |
@@ -1275,11 +1275,11 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `agent_transfer_view.py` | 166 | Explicit transfer requests and consent preparation with revision-bound background observations. |
 | `config_sync_worker.py` | 131 | Run explicit workspace requests with immutable inputs, live authority and cooperative cancellation. |
 | `config_sync_tab.py` | 413 | Lazy Actions-menu workspace synchronization, causal review and explicit live preference application. |
-| `_auto_click_tab.py` | 295 | 自動點擊分頁的 mixin 建構器。 |
+| `_auto_click_tab.py` | 326 | 獨立自動點擊分頁；快照工作參數，以 TabTask 執行與取消。 |
 | `_screenshot_tab.py` | 179 | 獨立延遲建立的截圖／像素分頁；背景讀取、輸入快照與關閉後結果丟棄。 |
 | `_image_detect_tab.py` | 159 | 獨立影像偵測分頁，擁有輸入、背景工作與關閉生命週期。 |
-| `_script_tab.py` | 158 | 腳本執行分頁 mixin。 |
-| `_record_tab.py` | 144 | 錄製／回放分頁 mixin。 |
+| `_script_tab.py` | 183 | 獨立腳本執行分頁；背景載入與執行，關閉取消並釋放控制項。 |
+| `_record_tab.py` | 162 | 獨立錄製／回放檢視；背景工作與共享錄製器狀態，關閉檢視不停止錄製器。 |
 | `_report_tab.py` | 106 | 報表分頁 mixin。 |
 | `_i18n_helpers.py` | 79 | 需要即時語言切換的分頁共用的翻譯註冊 mixin。 |
 | `_validators.py` | 29 | `int_validator()`／`double_validator()`：以 C locale 驗證的數字輸入框 validator，接受的正是 `int()`／`float()` 讀得懂的寫法（預設 locale 在法文、德文下只收小數逗號）。所有數字 `QLineEdit` 都用它。 |
@@ -1295,24 +1295,24 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `journal_browser.py` | 250 | Run History 與 Self-Healing 共用的唯讀日誌檢視：來源連結／路徑／run／step 篩選、有界快照表與明細，舊結果以 request ID 隔離。 |
 | `journal_browser_worker.py` | 85 | 背景查閱與逐筆取消；帶入 context 並在開檔前重查 deferred 擁有者，以 queued counts 回報進度。 |
 | `manual_run_controls.py` | 72 | 手動執行的 history 勾選與獨立 journal 路徑；以共用無頭 scope 包住既有 GUI 執行，不改結果與變數。 |
-| `language_wrapper/` | 7,935 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
+| `language_wrapper/` | 7,939 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
 | `selector/` | 216 | 拖曳選取螢幕區域的半透明全螢幕覆蓋層與樣板裁切工具（互動式，但都有對應的程式化 API）。 |
 
 > **分頁指令一律走 Actions 選單**：分頁本身只放輸入、表格與結果檢視，指令由視窗層選單暴露。
-> 核心分頁在 `main_widget.py` 的 `_own_tab_builders` 宣告動作；功能分頁實作 `menu_actions()`（目前 41 個檔案有此 hook）。
+> 核心與功能分頁實作 `menu_actions()`（目前 57 個檔案有此 hook）；Remote Desktop 由 `main_widget.py` 的 `_own_tab_builders` 保留選用相依套件後備檢視。
 > `test/unit_test/headless/test_actions_menu_gui.py` 會守住這個契約——沒有動作宣告的新分頁會讓 CI 失敗。
 
 #### 51 個分頁
 
 | 分頁 | 模組 | 行數 | 職責 |
 | --- | --- | ---: | --- |
-| auto_click | `_auto_click_tab.py` | 295 | 自動點擊：座標、間隔、熱鍵、`write`、捲動。 |
+| auto_click | `_auto_click_tab.py` | 326 | 自動點擊：座標、間隔、熱鍵、`write`、捲動。 |
 | screenshot | `_screenshot_tab.py` | 179 | 截圖、選區、螢幕尺寸、取像素色。 |
 | image_detect | `_image_detect_tab.py` | 159 | 樣板裁切、定位、定位全部、定位並點擊。 |
-| record | `_record_tab.py` | 144 | 錄製／停止／回放／存檔／載入。 |
+| record | `_record_tab.py` | 162 | 錄製／停止／回放／存檔／載入。 |
 | script_builder | `script_builder/` | 6,909 | **視覺化腳本編輯器**：`command_schema.py`（5,549 行 `AC_*` 參數綱要）、`step_model.py`（步驟模型與 AC JSON 序列化）、`step_list_view.py`（含巢狀 body 的樹狀檢視）、`step_form_view.py`（綱要驅動表單）、`builder_tab.py`（含日誌候選預覽與明確匯入，保留來源）。 |
 | flow_editor | `flow_editor/` | 490 | 節點式流程圖檢視：`layout.py`（純 Python 佈局演算法，可單測）、`scene.py`（Qt 場景繪製）、`tab.py`。 |
-| script | `_script_tab.py` | 158 | 載入／執行單檔或整個目錄、內建編輯器執行。 |
+| script | `_script_tab.py` | 183 | 載入／執行單檔或整個目錄、內建編輯器執行。 |
 | recording_editor | `recording_editor_tab.py` | 262 | 裁切、過濾、重新縮放錄製內容；Actions 提供背景日誌候選審閱。 |
 | variables | `variables_tab.py` | 169 | 檢視、灌入、清除 executor 執行期作用域。 |
 | secrets | `secrets_tab.py` | 187 | 解鎖保險庫並管理 `${secrets.NAME}`。 |
@@ -1406,7 +1406,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `scripts/dev_release.py` | 只用標準函式庫的發佈輔助腳本 | dev 通道（PyPI 的 `je_auto_control_dev`）的版本與比對：`prepare` 把 `dev.toml` 寫成 `pyproject.toml`，版本取 PyPI 最新一版加一個 patch（`dev.toml` 的版本只是下限，不回寫 repo）；`changed dist` 把建好的 wheel 跟 PyPI 最新一版逐檔比對，內容沒變就不上傳。只給 `dev.yml` 的 `publish-dev` job 與拋棄式的 checkout 用，因為 `prepare` 會蓋掉 `pyproject.toml`。 |
 | `docs/` | Sphinx（`API`／`Eng`／`Zh`／`getting_started`） | Read the Docs 文件。 |
 | `architecture_diagram/` | drawio + png | 既有的架構圖原始檔。 |
-| `test/` | `unit_test/headless`（主要）、`unit_test/flow_control`、`integrated_test`、`gui_test`、`manual_test`、`verify`、`test_source` | 1,172 個 `test_*.py`／11,385 個測試函式。**注意**：`test/unit_test/` 下的 `*_test.py` 是會真的驅動滑鼠鍵盤的手動示範腳本，因此 `pyproject.toml` 把 `python_files` 釘成 `test_*.py`。`unit_test/headless/conftest.py` 有一個 autouse fixture，每個測試結束都沖掉 Qt 排隊中的 `deleteLater()`——不沖會讓殘留的 widget 在後面某個不相干的測試裡被銷毀，曾經整個直譯器 `__fastfail`。`test_doc_counts.py` 守住文件引用的指令／工具／子套件／範例數,`test_doc_line_counts.py` 守住所有行數（`--fix` 可一次重新產生）。 `verify/macos_verify.py` 是在真的 `macos-14` runner 上量測 TCC 到底允許什麼的探針（macOS 是唯一沒有容器可用的支援平台），不被 pytest 收集。 |
+| `test/` | `unit_test/headless`（主要）、`unit_test/flow_control`、`integrated_test`、`gui_test`、`manual_test`、`verify`、`test_source` | 1,174 個 `test_*.py`／11,393 個測試函式。**注意**：`test/unit_test/` 下的 `*_test.py` 是會真的驅動滑鼠鍵盤的手動示範腳本，因此 `pyproject.toml` 把 `python_files` 釘成 `test_*.py`。`unit_test/headless/conftest.py` 有一個 autouse fixture，每個測試結束都沖掉 Qt 排隊中的 `deleteLater()`——不沖會讓殘留的 widget 在後面某個不相干的測試裡被銷毀，曾經整個直譯器 `__fastfail`。`test_doc_counts.py` 守住文件引用的指令／工具／子套件／範例數,`test_doc_line_counts.py` 守住所有行數（`--fix` 可一次重新產生）。 `verify/macos_verify.py` 是在真的 `macos-14` runner 上量測 TCC 到底允許什麼的探針（macOS 是唯一沒有容器可用的支援平台），不被 pytest 收集。 |
 
 ---
 
@@ -1497,7 +1497,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 144 | 39,946 |
+| `gui/` | 144 | 39,971 |
 | `utils/mcp_server/` | 55 | 21,490 |
 | `utils/remote_desktop/` | 72 | 15,252 |
 | `utils/executor/` | 11 | 10,702 |
@@ -1505,20 +1505,20 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,167 |
 | `utils/accessibility/` | 16 | 3,324 |
 | `wrapper/` | 25 | 5,996 |
-| `windows/` | 24 | 2,265 |
+| `windows/` | 24 | 2,270 |
 | `utils/rest_api/` | 8 | 2,226 |
 | `utils/agent/` | 13 | 2,253 |
-| `linux_with_x11/` | 19 | 1,369 |
+| `linux_with_x11/` | 19 | 1,382 |
 | `linux_wayland/` | 20 | 3,844 |
 | `utils/triggers/` | 4 | 1,401 |
 | `utils/ocr/` | 10 | 1,382 |
 | `utils/usbip/` | 5 | 1,008 |
 | `utils/assertion/` | 3 | 888 |
-| `osx/` | 17 | 981 |
+| `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,002 | 102,283 |
-| **總計** | **1,488** | **228,447** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,002 | 102,291 |
+| **總計** | **1,488** | **228,505** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
