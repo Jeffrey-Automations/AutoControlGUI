@@ -46,6 +46,13 @@ The internal Windows provider owns read/query handles and measures native proces
 facts before asking an explicit reviewed attestor for application identity. Its
 bindings are tested through injected calls; trusted attestation and native acceptance
 remain separate requirements.
+WindowsImageObserver separately owns a query/synchronize process handle and an
+image-file handle opened with read-only sharing. It measures file ID, size and
+SHA-256 from that same handle under caller byte/deadline/checkpoint limits, checking
+process and file metadata between chunks. Successful observations retain leases
+until close; failed cleanup remains owned for explicit retry. Shared native facts
+live in windows_facts.py. ObservedImageFile describes the file opened from the
+reported image path, not loaded code or a trusted fixture launch.
 
 The package facade resolves each public export from its existing source module. Concrete typing
 declarations generate runtime binding tables, checked by

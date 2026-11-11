@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Add internal bounded Windows image-file measurements with retained read-only leases
+  and retryable cleanup. These observations do not grant loaded-code or fixture attestation.
+
 - Add an injectable WorkspaceShell and collapsible execution details under View.
   Diagnostics publishes progress and outcomes; existing embedded-widget imports,
   constructors and tab visibility/close behavior remain supported.

@@ -45,8 +45,8 @@ class NativeFunction(Protocol):
     def __call__(self, *arguments: object) -> int: ...
 
 
-class Kernel(Protocol):
-    """Only process identity, liveness, memory queries and handle release are exposed."""
+class ProcessKernel(Protocol):
+    """Process identity, liveness and handle acquisition/release calls."""
 
     OpenProcess: NativeFunction
     CloseHandle: NativeFunction
@@ -55,11 +55,16 @@ class Kernel(Protocol):
     ProcessIdToSessionId: NativeFunction
     IsWow64Process2: NativeFunction
     WaitForSingleObject: NativeFunction
+
+
+class Kernel(ProcessKernel, Protocol):
+    """Process facts plus bounded memory query/read calls."""
+
     VirtualQueryEx: NativeFunction
     ReadProcessMemory: NativeFunction
 
 
-def bind(kernel: Kernel) -> None:
+def bind_process(kernel: ProcessKernel) -> None:
     """Install fixed-width DWORD/BOOL and pointer-sized address/length signatures."""
     signatures: tuple[tuple[NativeFunction, list[object], object], ...] = (
         (kernel.OpenProcess, [U32, BOOL, U32], PTR),
@@ -69,12 +74,21 @@ def bind(kernel: Kernel) -> None:
         (kernel.ProcessIdToSessionId, [U32, ctypes.POINTER(U32)], BOOL),
         (kernel.IsWow64Process2, [PTR, ctypes.POINTER(U16), ctypes.POINTER(U16)], BOOL),
         (kernel.WaitForSingleObject, [PTR, U32], U32),
-        (kernel.VirtualQueryEx, [PTR, PTR, PTR, SIZE], SIZE),
-        (kernel.ReadProcessMemory, [PTR, PTR, PTR, SIZE, ctypes.POINTER(SIZE)], BOOL),
     )
     for function, arguments, result in signatures:
         function.argtypes = arguments
         function.restype = result
+
+
+def bind(kernel: Kernel) -> None:
+    """Bind process facts and memory calls without changing shared DLL prototypes."""
+    bind_process(kernel)
+    signatures: tuple[tuple[NativeFunction, list[object], object], ...] = (
+        (kernel.VirtualQueryEx, [PTR, PTR, PTR, SIZE], SIZE),
+        (kernel.ReadProcessMemory, [PTR, PTR, PTR, SIZE, ctypes.POINTER(SIZE)], BOOL),
+    )
+    for function, arguments, result in signatures:
+        function.argtypes, function.restype = arguments, result
 
 
 def load() -> tuple[Kernel, Callable[[], int]]:

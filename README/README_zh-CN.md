@@ -72,3 +72,5 @@ Wayland NORMAL 输入通过受管理的子进程执行 libei 与 portal 调用�
 MCP 只读标记不授予 viewer 访问权限。已审查的实时画面与调用者数据运算使用 `read_screen`；文件、设备数据及未知工具需要 `read_data`。别名共用标准名称的权限，较强的明确设置优先。提供图像来源、从环境变量读取配置字段或规划打开本地文件时需要 `read_data`。Anchor locator 的 accessibility／OCR 允许观察实时画面，图像模板需要 `read_data`，VLM 请求需要 `drive_input`。只读调用拒绝捕获产物及 VLM 分支，目录排除可自选 ADB 可执行文件的工具。MCP CI annotations 只返回格式化文本，不写入 stdout。未经审查的 plugin 与 WebRunner 初始化工具不列入只读目录，等待依赖版本的单独审查。
 
 主机只读模式对外部提供的目录及后续注册应用相同限制，接收请求及重新核对身份后的调用都检查混合用途参数。MCP 配置的失败截图需要可写入的工具及重新核对后具输入操作权限的调用者；只读调用与 viewer 不会触发截图。这不表示所有依赖包或诊断读取均无初始化副作用。
+
+内部 Windows 进程内存准备工作新增映像文件测量，通过保留的只读 handle 执行有界哈希并保留失败清理供重试。这只是观察到的文件证据，不是已加载代码或 fixture 的身份证明；原生验收及公开内存工具仍未提供。详见[契约](../docs/process_memory_contract.md)。

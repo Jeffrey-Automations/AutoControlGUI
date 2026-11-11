@@ -18,7 +18,7 @@ CI 以 `python scripts/generate_facade_exports.py --check` 檢查一致性。六
 ## 1. 專案定位與規模
 
 `test/fixtures/process_memory_fixture.py` 由子程序持有固定 payload 與 sequence 緩衝區，
-以有界管線提供已知語意狀態及更新。bootstrap 僅自報資訊，原生身分核對與記憶體讀回仍待實作。
+以有界管線提供已知語意狀態及更新。bootstrap 僅自報資訊，原生身分綁定與實際讀回驗收仍未完成。
 
 `je_auto_control` 是一套跨平台 GUI 自動化框架，涵蓋 Windows（Win32 API）、macOS（pyobjc/Quartz）、
 Linux X11（python-Xlib）與 Linux Wayland（libei / ydotool），並延伸到 Android（ADB / uiautomator2）與
@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,517 |
-| 程式碼總行數 | 231,497 |
+| Python 模組總數（含周邊子專案） | 1,520 |
+| 程式碼總行數 | 231,839 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -324,7 +324,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.2 框架基礎設施
 
-> 15 個套件、約 4,517 行。
+> 15 個套件、約 4,859 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -340,7 +340,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/package_manager/` | 193 | 動態載入套件並把 executor 注入其中；載入前先過套件閘門（允許清單加上只能從 Python 呼叫的開關，工作區 X-12） |
 | `utils/path_guard/` | 267 | 命令列及伺服器的路徑邊界、客戶端根目錄隔離與受管任務來源政策紀錄 |
 | `utils/platform_id/` | 62 | 作業系統家族的單一判定點。`sys.platform` 原本在一百多處跟字面清單比對，而那些清單都沒有 BSD；`is_x11_unix()` 問的是「這是不是 X11 unix」，這才是守衛一直想問的問題 |
-| `utils/process_memory/` | 721 | 內部受審 probe 的有界語意觀察、typed Windows provider 與失敗 handle 回收；可信應用身分與 runtime 整合待完成 |
+| `utils/process_memory/` | 1,063 | 內部受審 probe 的有界語意觀察、typed Windows provider、獨立映像檔觀測與失敗 handle 回收；檔案證據不等於載入程式碼身分，可信啟動及 runtime 整合待完成 |
 | `utils/shell_process/` | 279 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
 | `utils/start_exe/` | 36 | 啟動另一個執行檔行程 |
 
@@ -730,6 +730,19 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 ### 5.4.17 大型子系統的檔案級剖析
 
 上表以子套件為單位；以下把行數最大的幾個子系統展開到檔案層。
+
+#### `utils/process_memory/`（1,063 行／8 檔）
+
+| 檔案 | 行數 | 職責 |
+| --- | ---: | --- |
+| `__init__.py` | 1 | Internal reviewed process observations; no native provider or public command registration. |
+| `models.py` | 181 | Closed identities, reviewed probes and safe semantic observation results. |
+| `reader.py` | 253 | Adapter-owned semantic observations with bounded reads and retained cleanup ownership. |
+| `windows.py` | 162 | Owned Windows read handles with measured native facts and reviewed application attestation. |
+| `windows_facts.py` | 55 | Measure native birth, session and architecture through a retained process handle. |
+| `windows_image.py` | 246 | Observe an image file while retaining its process and deny-write/delete file leases. |
+| `windows_image_native.py` | 62 | Typed process-image filename and read-only file acquisition calls. |
+| `windows_native.py` | 103 | Typed Win32 query/read bindings and caller-sized memory information layouts. |
 
 #### `utils/executor/`（10,702 行）— 執行核心
 
@@ -1422,7 +1435,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `scripts/dev_release.py` | 只用標準函式庫的發佈輔助腳本 | dev 通道（PyPI 的 `je_auto_control_dev`）的版本與比對：`prepare` 把 `dev.toml` 寫成 `pyproject.toml`，版本取 PyPI 最新一版加一個 patch（`dev.toml` 的版本只是下限，不回寫 repo）；`changed dist` 把建好的 wheel 跟 PyPI 最新一版逐檔比對，內容沒變就不上傳。只給 `dev.yml` 的 `publish-dev` job 與拋棄式的 checkout 用，因為 `prepare` 會蓋掉 `pyproject.toml`。 |
 | `docs/` | Sphinx（`API`／`Eng`／`Zh`／`getting_started`） | Read the Docs 文件。 |
 | `architecture_diagram/` | drawio + png | 既有的架構圖原始檔。 |
-| `test/` | `unit_test/headless`（主要）、`unit_test/flow_control`、`integrated_test`、`gui_test`、`manual_test`、`verify`、`test_source` | 1,182 個 `test_*.py`／11,482 個測試函式。**注意**：`test/unit_test/` 下的 `*_test.py` 是會真的驅動滑鼠鍵盤的手動示範腳本，因此 `pyproject.toml` 把 `python_files` 釘成 `test_*.py`。`unit_test/headless/conftest.py` 有一個 autouse fixture，每個測試結束都沖掉 Qt 排隊中的 `deleteLater()`——不沖會讓殘留的 widget 在後面某個不相干的測試裡被銷毀，曾經整個直譯器 `__fastfail`。`test_doc_counts.py` 守住文件引用的指令／工具／子套件／範例數,`test_doc_line_counts.py` 守住所有行數（`--fix` 可一次重新產生）。 `verify/macos_verify.py` 是在真的 `macos-14` runner 上量測 TCC 到底允許什麼的探針（macOS 是唯一沒有容器可用的支援平台），不被 pytest 收集。 |
+| `test/` | `unit_test/headless`（主要）、`unit_test/flow_control`、`integrated_test`、`gui_test`、`manual_test`、`verify`、`test_source` | 1,183 個 `test_*.py`／11,503 個測試函式。**注意**：`test/unit_test/` 下的 `*_test.py` 是會真的驅動滑鼠鍵盤的手動示範腳本，因此 `pyproject.toml` 把 `python_files` 釘成 `test_*.py`。`unit_test/headless/conftest.py` 有一個 autouse fixture，每個測試結束都沖掉 Qt 排隊中的 `deleteLater()`——不沖會讓殘留的 widget 在後面某個不相干的測試裡被銷毀，曾經整個直譯器 `__fastfail`。`test_doc_counts.py` 守住文件引用的指令／工具／子套件／範例數,`test_doc_line_counts.py` 守住所有行數（`--fix` 可一次重新產生）。 `verify/macos_verify.py` 是在真的 `macos-14` runner 上量測 TCC 到底允許什麼的探針（macOS 是唯一沒有容器可用的支援平台），不被 pytest 收集。 |
 
 ---
 
@@ -1533,8 +1546,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,003 | 102,694 |
-| **總計** | **1,505** | **230,752** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,036 |
+| **總計** | **1,508** | **231,094** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

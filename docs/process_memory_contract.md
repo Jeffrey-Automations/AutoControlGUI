@@ -68,6 +68,49 @@ and measures facts again after attestation. A path string, fixture nonce, self-r
 digest or a callback that merely echoes an expected identity is not an attestation.
 The production attestor and trusted fixture bootstrap matching remain unimplemented.
 
+### Observed image-file evidence
+
+`windows_image.py` adds a separate one-shot `WindowsImageObserver`. It acquires
+only a query/synchronize process handle, measures birth/session/architecture from
+that retained relationship, and queries its current image filename. The file is
+opened with `GENERIC_READ`, `OPEN_EXISTING` and only `FILE_SHARE_READ`; a successful
+lease excludes ordinary write/delete opens and conflicting writable mappings.
+File type, volume plus 128-bit file ID, timestamps, attributes and size are measured
+from that same file handle. SHA-256 is computed from its actual bytes. Native facts,
+image filename and file metadata are rechecked around the bounded read sequence.
+
+The caller must provide a byte ceiling, timeout and live checkpoint. The finite
+artifact ceiling is 64 MiB and the read buffer is at most 64 KiB; these are resource
+bounds, not measured performance targets. Checkpoints run between acquisition
+phases and file chunks, not every individual metadata syscall, and cannot interrupt
+a blocked native call. The observer is not an authorization service. Native ABI
+errors become closed failure reasons; checkpoint and cancellation exceptions
+propagate unchanged.
+
+A successful `observe` returns `ObservedImageFile`, with private identity and digest
+fields omitted from representations. It retains both leases until explicit `close`.
+Failure/cancellation retires the observer and attempts cleanup. Failed handles stay
+owned, `pending_cleanup` remains true, and `close` retries only those handles. The
+caller must retain the observer until cleanup succeeds. An observer cannot be
+reused for another acquisition, including after retirement.
+
+This is current image-file evidence, **not loaded-image or launch attestation**.
+The queried pathname could refer to different current backing bytes from those
+originally loaded. It does not prove Python fixture source or imported runtime
+code. No `ProcessIdentity` is minted from this evidence, no expected identity/digest
+is accepted as a measurement, and no public tool is added. Owned launch/source
+delivery, loaded-image binding, trusted runtime dependencies, fixture attestor and
+per-launch resolver remain unimplemented. Injected tests exercise the actual
+acquisition code with fake native buffers; native acceptance remains paused.
+
+The ABI and file semantics follow Microsoft's
+[QueryFullProcessImageNameW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-queryfullprocessimagenamew),
+[CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew),
+[GetFileInformationByHandleEx](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex)
+and [FILE_ID_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info)
+contracts. Image-name length validation uses Windows UTF-16 code units, including
+non-BMP and unpaired-surrogate filenames, rather than Python code-point counts.
+
 Each native read is limited to 1 MiB and one committed, readable, unguarded region.
 The semantic reader splits reviewed ranges at region boundaries under its smaller
 per-probe budget. Failed or short reads publish no bytes; post-read region and native

@@ -2,28 +2,16 @@
 from __future__ import annotations
 
 import ctypes
-from dataclasses import dataclass, field
 import threading
 from typing import Callable, NoReturn
 
 from .models import FailureReason, MemoryObservationError, MemoryRegion, ProcessIdentity
-from .windows_native import FileTime, Kernel, MemoryInfo32, MemoryInfo64, SIZE, U16, U32, bind, load
+from .windows_native import Kernel, MemoryInfo32, MemoryInfo64, SIZE, bind, load
+from .windows_facts import NativeProcessFacts as NativeProcessFacts, measure_process
 
 _ACCESS = 0x00100000 | 0x0400 | 0x0010
-_ARCHITECTURES = {0x014C: ("x86", 32), 0x8664: ("x64", 64), 0xAA64: ("arm64", 64)}
 _READABLE = frozenset({0x02, 0x04, 0x08, 0x20, 0x40, 0x80})
 _MAX_READ = 1 << 20
-
-
-@dataclass(frozen=True)
-class NativeProcessFacts:
-    """Measured retained-process facts for a host-reviewed application attestor."""
-
-    pid: int = field(repr=False)
-    birth: int = field(repr=False)
-    session_id: int = field(repr=False)
-    architecture: str
-    pointer_bits: int
 
 
 Attestor = Callable[[NativeProcessFacts], ProcessIdentity]
@@ -64,31 +52,8 @@ class WindowsProcessHandle:
         if self._kernel.WaitForSingleObject(handle, 0) != 258:
             _fail(FailureReason.TARGET_CHANGED)
 
-    def _architecture(self, handle: int) -> tuple[str, int]:
-        process_machine, native_machine = U16(), U16()
-        if not self._kernel.IsWow64Process2(handle, ctypes.byref(process_machine), ctypes.byref(native_machine)):
-            self._error(FailureReason.UNSUPPORTED)
-        architecture = _ARCHITECTURES.get(process_machine.value or native_machine.value)
-        if architecture is None or architecture[1] > self._caller_bits:
-            _fail(FailureReason.UNSUPPORTED)
-        return architecture
-
     def _facts(self) -> NativeProcessFacts:
-        handle = self._owned()
-        self._alive(handle)
-        pid = self._kernel.GetProcessId(handle)
-        times = [FileTime() for _ in range(4)]
-        if not pid or not self._kernel.GetProcessTimes(handle, *[ctypes.byref(item) for item in times]):
-            self._error(FailureReason.TARGET_CHANGED)
-        session = U32()
-        if not self._kernel.ProcessIdToSessionId(pid, ctypes.byref(session)):
-            self._error(FailureReason.TARGET_CHANGED)
-        architecture = self._architecture(handle)
-        birth = times[0].low | (times[0].high << 32)
-        if not birth:
-            _fail(FailureReason.TARGET_CHANGED)
-        self._alive(handle)
-        return NativeProcessFacts(pid, birth, session.value, *architecture)
+        return measure_process(self._kernel, self._owned(), self._last_error, self._caller_bits)
 
     def identity(self) -> ProcessIdentity:
         """Measure native facts, then ask the reviewed owner to attest application identity."""

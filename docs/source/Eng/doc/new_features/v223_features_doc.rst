@@ -213,3 +213,13 @@ including direct registry closes. ``AutoControlGUIWidget(parent)`` keeps its imp
 path, default features and show/hide/list APIs. Hiding retains a page; closing an
 owned page rebuilds it on reopening. A registry outliving its shell forgets pages
 when Qt destroys them.
+
+Internal Windows image-file observations
+--------------------------------------------------------------------------------
+
+The internal process-memory foundation can measure the selected process's current
+image file using retained query/read-only leases, bounded hashing and retryable
+cleanup. Native process facts and file metadata are rechecked. This produces
+observed file evidence, not loaded-code, fixture or launch attestation. No public
+memory command is added. Native acceptance and runtime authorization integration
+remain pending; injected tests do not establish those guarantees.
