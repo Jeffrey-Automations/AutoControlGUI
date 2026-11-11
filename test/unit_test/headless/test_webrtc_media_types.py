@@ -11,6 +11,9 @@ from aiortc.codecs.h264 import H264Encoder  # noqa: E402  # reason: optional med
 from je_auto_control.utils.remote_desktop import (  # noqa: E402  # reason: optional media dependencies
     hw_codec, session_recorder,
 )
+from je_auto_control.utils.remote_desktop.media_retirement import (  # noqa: E402  # reason: optional media dependencies
+    Completion, MediaRetirementError,
+)
 from je_auto_control.utils.remote_desktop.webrtc_transport import (  # noqa: E402  # reason: optional media dependencies
     ScreenVideoTrack,
 )
@@ -43,8 +46,12 @@ def test_recording_releases_container_when_video_stream_cannot_be_created(monkey
     recorder.write_frame(av.VideoFrame(64, 64))
     assert closed == [True]
     assert not recorder.is_active and not recorder.has_output
-    recorder.stop()
+    # The setup failure stays recorded, so stop reports an uncertain
+    # finalization instead of a clean one (docs/media_retirement_contract.md).
+    with pytest.raises(MediaRetirementError):
+        recorder.stop()
     assert closed == [True]
+    assert recorder.retirement_status.finalization is Completion.UNCERTAIN
 
 
 def test_h264_patch_encodes_and_restores_the_original_method(monkeypatch):
