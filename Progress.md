@@ -165,7 +165,8 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 
 `TODO` — 小項目，各自獨立
 
-- **本機的共用 `.venv` 裝著 `je_auto_control_dev 0.0.136`**，它的 `pytest11` 進入點還是舊的重量級路徑；重裝即可，不影響 CI。
+- **本機共用 `.venv` 落後 `pyproject.toml` 一個釘選**（U-20261112-01 之後）：pillow 12.3.0（要求 `==13.0.0`）、
+  PySide6 6.11.2（`[gui]` 要求 6.12.0）。共用環境的升級需要使用者同意，沒有動；不影響 CI。
 - **free-threaded**：呼叫者身分、綁定的裝置、自愈的執行標記與 stop token 都改成只在設定它的執行緒上有效（`utils/thread_bound.py`）。
   這台機器沒有 free-threaded 直譯器：驗證用的是模擬繼承與真的 `-X thread_inherit_context=1`（3.14.7，GIL 開著）；`free-threaded-scope` job（3.14t）是第一次真的跑。
 - **能力探測**：Windows 的鎖定工作站、session 0、低完整性與擷取失敗分支只用假資料判斷；macOS 的三個 preflight 呼叫只對假物件跑過，
