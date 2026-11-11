@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261111-21 | 2026-11-11 | Verify integrated types, HTML and distribution source bytes | #snapshot #verification | [2026-11-b](2026-11-b.md) |
 | U-20261111-20 | 2026-11-11 | Enforce reviewed MCP capabilities at every invocation | #done #security | [2026-11-b](2026-11-b.md) |
 | U-20261111-19 | 2026-11-11 | Add an injectable workspace and live execution details | #done #gui | [2026-11-b](2026-11-b.md) |
 | U-20261111-18 | 2026-11-11 | Release remote pages without retaining callback owners | #done #gui | [2026-11-b](2026-11-b.md) |
@@ -639,7 +640,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | File | Period | Entries |
 |---|---|---:|
-| [2026-11-b.md](2026-11-b.md) | 2026-11 | 9 |
+| [2026-11-b.md](2026-11-b.md) | 2026-11 | 10 |
 | [2026-11.md](2026-11.md) | 2026-11 | 43 |
 | [2026-10-f.md](2026-10-f.md) | 2026-10 | 5 |
 | [2026-10-e.md](2026-10-e.md) | 2026-10 | 91 |
