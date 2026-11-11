@@ -5,6 +5,8 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _ViewerPanelPart
+
 import functools
 import os
 from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Tuple
@@ -22,14 +24,14 @@ from je_auto_control.gui.remote_desktop._helpers import (
     _t,
 )
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
-from je_auto_control.gui.remote_desktop.webrtc_panel_common import _PanelPart, start_panel_task
+from je_auto_control.gui.remote_desktop.webrtc_panel_common import start_panel_task
 from je_auto_control.gui.tab_task_controller import CancellationToken
 
 if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
     from je_auto_control.utils.remote_desktop.file_sync import FolderSyncEngine
 
 
-class _ViewerFilesMixin(_PanelPart):
+class _ViewerFilesMixin(_ViewerPanelPart):
     """Methods of ``_WebRTCViewerPanel``; the module docstring says which group."""
 
     # State this group owns; the panel's __init__ sets the starting values.

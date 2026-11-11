@@ -125,8 +125,7 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
   系統匣路徑在 offscreen 下沒有 tray，`_on_tray_open` 是直接呼叫測的。基準（`benchmarks/gui_*.py`）CI 仍不設門檻。
 - **把 Python 建的 widget 放進分頁列在結束時崩潰**：已查明觸發條件——分頁列按鈕上接了 Python callable、又有排隊中的 `deleteLater()`、而行程經 `os._exit` 離開；
   先把 deferred delete 沖掉就不會。機制（Qt 在行程結束時釋放那個 slot）是推論，沒有 C 堆疊可看。`_tab_close_icon.py` 沒有改回自訂按鈕。
-- **對真實 Qt 型別的型別檢查**：`test/verify/typing_extras_exempt.txt` 從 70 個模組降到 11 個 WebRTC 面板 mixin，
-  只准變少。`QImage.fromData(x, "JPEG")` 的 5 處保留 `# type: ignore[arg-type]`：
+- **Qt binding 與 stub 的差異**：`QImage.fromData(x, "JPEG")` 的 5 處仍保留 `# type: ignore[arg-type]`：
   stub 要 bytes，實際的 binding 對 bytes 丟 `ValueError`。
 - 遠端桌面的輸入改成佇列送出後，`AC_remote_send_input` 回的 `{"sent": True}` 意思是「已排入」；`SO_SNDTIMEO` 的 POSIX 包法與經 TLS socket 的行為沒在這台機器上驗過。
 - 沒在 macOS／Linux 上看過新的關閉鈕、捲動與重設樣式；沒在真的多螢幕桌面試過視窗位置還原；PyBreeze 沒有對這一版跑過；各語系新增的字串（日文、簡體中文）沒有母語者看過。
@@ -532,7 +531,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
 D2 仍缺原生半開交握資源回收與合成器釋放證據；D3 的錄製／全域停止／Windows 原生崩潰證據仍缺，詳見計畫與下方生命週期待辦。
 計畫 E 已有裝置 context、輸入／畫面、應用生命週期與共用命令入口；
 仍缺真實 SDK 契約核對、iOS 擴充 adapter 與裝置驗收，不能以 fake backend 測試結案。
-H 已有三平台型別 gate 與縮減中的真實相依型別豁免；仍缺嚴格型別深化、完整範例／文件及最終固定來源總驗收。
+H 已有三平台型別 gate 與真實相依型別檢查；仍缺嚴格型別深化、完整範例／文件及最終固定來源總驗收。
 F 還缺：
 
 - **Remote Desktop 與 Script Builder 仍在啟動時建立**（預設開啟），啟動時間 2.6–2.7 秒裡大半是它們與門面匯入。

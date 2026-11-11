@@ -1,5 +1,9 @@
 # AutoControl Architecture
 
+WebRTC host and viewer mixins share concrete typed state and slot contracts.
+Initialization remains in the composed panels. STUN/TURN controls use a common
+contract; the host supplies a separate optional hardware-codec owner.
+
 Wayland default EI input uses a bounded domain protocol over the existing owned
 helper channel. Native allocation, portal consent, emission and teardown stay in
 that child. Reply validation and emission acknowledgement share the request lock;

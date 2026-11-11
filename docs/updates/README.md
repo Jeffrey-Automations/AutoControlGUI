@@ -58,6 +58,8 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261111-13 | 2026-11-11 | Validate integrated implementation and package artifacts | #snapshot #verification | [2026-11-b](2026-11-b.md) |
+| U-20261111-12 | 2026-11-11 | Remove remaining WebRTC Qt typing exemptions | #done #typing | [2026-11-b](2026-11-b.md) |
 | U-20261111-11 | 2026-11-11 | Enroll EI helpers in the strict typing gate | #done #typing | [2026-11](2026-11.md) |
 | U-20261111-10 | 2026-11-11 | Isolate default EI input in an owned helper | #done #wayland | [2026-11](2026-11.md) |
 | U-20261111-09 | 2026-11-11 | Split MCP executor adapters along strict domain boundaries | #done #mcp | [2026-11](2026-11.md) |
@@ -630,7 +632,8 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | File | Period | Entries |
 |---|---|---:|
-| [2026-11.md](2026-11.md) | 2026-11 | 32 |
+| [2026-11-b.md](2026-11-b.md) | 2026-11 | 2 |
+| [2026-11.md](2026-11.md) | 2026-11 | 43 |
 | [2026-10-f.md](2026-10-f.md) | 2026-10 | 5 |
 | [2026-10-e.md](2026-10-e.md) | 2026-10 | 91 |
 | [2026-10-d.md](2026-10-d.md) | 2026-10 | 15 |

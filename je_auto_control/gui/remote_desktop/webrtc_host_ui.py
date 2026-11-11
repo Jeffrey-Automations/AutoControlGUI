@@ -5,6 +5,8 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
+
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -26,12 +28,11 @@ from je_auto_control.gui.remote_desktop.webrtc_workers import (
     generate_host_id,
 )
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
-    _PanelPart,
     _DEFAULT_FPS, _DEFAULT_SIGNALING_URL, _QUALITY_DOT_STYLE,
 )
 
 
-class _HostUiMixin(_PanelPart):
+class _HostUiMixin(_HostPanelPart):
     """Methods of ``_WebRTCHostPanel``; the module docstring says which group."""
 
     def _build_ui(self) -> None:
@@ -39,7 +40,7 @@ class _HostUiMixin(_PanelPart):
         layout.addWidget(self._build_signaling_group())
         layout.addWidget(self._build_config_group())
         layout.addWidget(self._build_manual_group())
-        layout.addWidget(build_advanced_group(self, include_hw_codec=True))
+        layout.addWidget(build_advanced_group(self, hardware_codec=self))
         layout.addWidget(build_trusted_group(self))
         self._status_label = QLabel(_t("rd_webrtc_status_idle"))
         layout.addWidget(self._status_label)

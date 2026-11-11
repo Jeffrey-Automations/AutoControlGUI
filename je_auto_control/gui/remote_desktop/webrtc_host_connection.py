@@ -5,6 +5,8 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
+
 import functools
 import threading
 from typing import TYPE_CHECKING, Optional, Tuple
@@ -30,7 +32,6 @@ if TYPE_CHECKING:  # the facade types optional members as possibly None
 else:
     from je_auto_control.utils.remote_desktop import MultiViewerHost
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
-    _PanelPart,
     _read_webrtc_config,
     start_panel_task,
 )
@@ -78,7 +79,7 @@ def _advertise_failed(error: object) -> None:
     autocontrol_logger.debug("lan advertise: %r", error)
 
 
-class _HostConnectionMixin(_PanelPart):
+class _HostConnectionMixin(_HostPanelPart):
     """Methods of ``_WebRTCHostPanel``; the module docstring says which group."""
 
     # State this group owns; the panel's __init__ sets the starting values.

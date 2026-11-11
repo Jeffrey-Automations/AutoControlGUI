@@ -5,6 +5,8 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _ViewerPanelPart
+
 from typing import Optional
 
 
@@ -31,12 +33,11 @@ from je_auto_control.utils.remote_desktop.webrtc_transport import (
     fps_for_preset,
 )
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
-    _PanelPart,
     _QUALITY_DOT_STYLE, _av_frame_to_qimage,
 )
 
 
-class _ViewerMediaMixin(_PanelPart):
+class _ViewerMediaMixin(_ViewerPanelPart):
     """Methods of ``_WebRTCViewerPanel``; the module docstring says which group."""
 
     # State this group owns; the panel's __init__ sets the starting values.

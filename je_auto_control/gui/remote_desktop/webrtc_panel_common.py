@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QLabel, QLineEdit, QWidget
 
 from je_auto_control.gui.remote_desktop._webrtc_types import AvFrameT, WebRTCConfigT
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
@@ -78,6 +78,16 @@ class _PanelPart(TranslatableMixin, QWidget):
 
     # Set by each panel's __init__: shutdowns of sessions the panel let go of.
     _stops: StopQueue
+    _status_label: QLabel
+    _signals: _PanelSignals
+    _stun_edit: QLineEdit
+    _turn_edit: QLineEdit
+    _turn_user_edit: QLineEdit
+    _turn_cred_edit: QLineEdit
+    _server_edit: QLineEdit
+    _host_id_edit: QLineEdit
+    _secret_edit: QLineEdit
+    _token_edit: QLineEdit
 
     def _show_idle(self) -> None:
         """Show "idle" -- or "stopping" while a session this panel let go of is still closing."""
@@ -138,7 +148,7 @@ def _read_region(panel: QWidget) -> Optional[Tuple[int, ...]]:
     return tuple(parts) if len(parts) == 4 else None
 
 
-def _read_webrtc_config(panel: QWidget) -> WebRTCConfigT:
+def _read_webrtc_config(panel: _PanelPart) -> WebRTCConfigT:
     """Build a WebRTCConfig from the advanced group + monitor/fps fields."""
     from je_auto_control.utils.remote_desktop.webrtc_transport import (
         _DEFAULT_STUN_SERVERS,

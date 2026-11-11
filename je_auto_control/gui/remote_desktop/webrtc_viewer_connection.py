@@ -5,6 +5,8 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _ViewerPanelPart
+
 import functools
 from typing import TYPE_CHECKING, Callable, Optional
 
@@ -31,7 +33,6 @@ if TYPE_CHECKING:  # the facade types optional members as possibly None
 else:
     from je_auto_control.utils.remote_desktop import WebRTCDesktopViewer
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
-    _PanelPart,
     _read_webrtc_config,
 )
 
@@ -45,7 +46,7 @@ def _process_offer(viewer: WebRTCDesktopViewerT, offer_sdp: str, expected_dtls: 
     return viewer.process_offer(offer_sdp, expected_dtls_fingerprint=expected_dtls)
 
 
-class _ViewerConnectionMixin(_PanelPart):
+class _ViewerConnectionMixin(_ViewerPanelPart):
     """Methods of ``_WebRTCViewerPanel``; the module docstring says which group."""
 
     # State this group owns; the panel's __init__ sets the starting values.

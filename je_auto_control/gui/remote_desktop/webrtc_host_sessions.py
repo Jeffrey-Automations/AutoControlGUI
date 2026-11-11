@@ -5,8 +5,10 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
+
 import functools
-from typing import Callable, Dict, Optional
+from typing import Callable, Mapping, Optional
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import (
@@ -24,7 +26,6 @@ from je_auto_control.utils.remote_desktop.webrtc_inspector import (
 from je_auto_control.utils.remote_desktop.webrtc_stats import (
     StatsPoller, StatsSnapshot,
 )
-from je_auto_control.gui.remote_desktop.webrtc_panel_common import _PanelPart
 
 
 def _stop_session(host: MultiViewerHostT, sid: str) -> None:
@@ -35,7 +36,7 @@ def _stop_session(host: MultiViewerHostT, sid: str) -> None:
         autocontrol_logger.warning("disconnect session: %r", error)
 
 
-class _HostSessionsMixin(_PanelPart):
+class _HostSessionsMixin(_HostPanelPart):
     """Methods of ``_WebRTCHostPanel``; the module docstring says which group."""
 
     def _on_session_count(self, count: int) -> None:
@@ -199,7 +200,7 @@ class _HostSessionsMixin(_PanelPart):
         )
         self._dispatch_session_menu(chosen, actions, sid, viewer_id)
 
-    def _dispatch_session_menu(self, chosen: object, actions: Dict[str, object],
+    def _dispatch_session_menu(self, chosen: object, actions: Mapping[str, object],
                                sid: str, viewer_id: str) -> None:
         """Run the action chosen from the sessions context menu."""
         if chosen is actions["disconnect"]:
