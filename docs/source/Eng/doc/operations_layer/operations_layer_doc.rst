@@ -242,13 +242,14 @@ rotated token or a changed role applies to the next request.
    * - ``read_screen``
      - viewer, operator, admin
      - ``GET /screenshot``, ``/mouse_position``, ``/screen_size``, ``/windows``,
-       ``/commands``, ``/inspector/recent``, ``/inspector/summary``,
-       ``/usb/devices``, ``/usb/events``, ``/metrics``, ``/openapi.json``
+       ``/commands``, ``/openapi.json``
    * - ``read_data``
      - operator, admin
      - ``GET /history``, ``/usb/acl``, ``/jobs``, ``/sessions``,
        ``/usb/passthrough/status``, ``/usb/loopback/devices``,
-       ``/usb/remote/devices``, ``/diagnose``; matching MCP host-data reads
+       ``/usb/remote/devices``, ``/diagnose``, ``/usb/devices``, ``/usb/events``,
+       ``/inspector/recent``, ``/inspector/summary``, ``/metrics``;
+       matching MCP host-data reads
    * - ``drive_input``
      - operator, admin
      - ``POST /execute``, ``/execute_file``, ``/usb/loopback/open``,
@@ -281,6 +282,15 @@ routes now match the MCP tools reading the same sources. ``/diagnose`` also requ
 A viewer receives 403 before a provider runs; operator/admin and shared-token
 servers without a user store retain their existing access.
 
+USB enumeration returns device identity metadata, including serial and bus location;
+USB events retain add/remove records. Inspector endpoints return process-wide numeric
+WebRTC history and summaries, not a caller-scoped stream. Metrics expose aggregate
+request/authentication counters, audit-row count, active-session/job counts and uptime.
+These five REST reads require ``read_data``. Metrics checks authorization on its
+special text-response path before querying audit, registry or scheduler providers.
+``AC_list_usb_devices``, ``AC_usb_recent_events``, ``AC_inspector_recent`` and
+``AC_inspector_summary`` enforce the same data requirement before provider dispatch.
+
 The registered commands ``AC_probe_capabilities``, ``AC_diagnose``,
 ``AC_remote_host_status``, ``AC_remote_viewer_status``, ``AC_usb_passthrough_status``,
 ``AC_usb_loopback_list`` and ``AC_usb_remote_list`` enforce the same data authority.
@@ -290,8 +300,9 @@ calls outside an authorization scope retain their existing behavior. This audit 
 not classify all unlisted executor commands: those still rely on their entry surface.
 
 Dashboard panels retain their functionality and independently display missing
-capabilities. Diagnostics and sessions require ``read_data``; audit requires
+capabilities. Diagnostics, sessions, inspector and USB panels require ``read_data``; audit requires
 ``read_audit``. Refused panels clear their rows while other panels keep refreshing.
+A successful session refresh clears any previous error status.
 The source-pairing regression continues to reject REST/MCP policy disagreements.
 
 Being allowed to ``POST /execute`` is being allowed to run actions, not every

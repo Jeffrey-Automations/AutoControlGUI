@@ -52,3 +52,25 @@ def test_host_data_requires_data_authority_before_executor_or_mcp_handler(comman
         reply = json.loads(server.handle_line(json.dumps(request)))
         assert not reply["result"]["isError"]
     assert calls == [name, name, name]
+
+
+@pytest.mark.parametrize("command", ["AC_list_usb_devices", "AC_usb_recent_events",
+                                     "AC_inspector_recent", "AC_inspector_summary"])
+@pytest.mark.parametrize("strict", [False, True])
+def test_device_and_telemetry_commands_refuse_viewer_before_provider(command, strict, monkeypatch):
+    calls = []
+    monkeypatch.setitem(ac.executor.event_dict, command, lambda: calls.append(command))
+    assert capability_for_command(command) == Capability.READ_DATA
+    with authorization_scope(AuthorizationContext("viewer", Role.VIEWER)):
+        if strict:
+            with pytest.raises(AuthorizationError) as denied:
+                ac.execute_action([[command]], raise_on_error=True)
+            assert denied.value.capability == Capability.READ_DATA
+        else:
+            result = ac.execute_action([[command]])
+            assert any("read_data" in str(value) for value in result.values())
+    assert calls == []
+    for role in (Role.OPERATOR, Role.ADMIN):
+        with authorization_scope(AuthorizationContext(role, role)):
+            ac.execute_action([[command]], raise_on_error=True)
+    assert calls == [command, command]

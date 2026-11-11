@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Require `read_data` for USB enumeration/events, retained inspector statistics and
+  process metrics over REST, and for the four matching registered AC reads.
+  Viewer denial happens before providers or metrics child queries execute;
+  operator/admin and legacy shared-token access remain supported. Session dashboard
+  refresh also clears a prior error after access is restored.
+
 - Retain original audio, recording and LAN advertisement cleanup outcomes. Reject unsafe
   flush/close replay and report pending work or uncertain finalization through typed
   errors. Application caretaker and GUI integration remain pending.

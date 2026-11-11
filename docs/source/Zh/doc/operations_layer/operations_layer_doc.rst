@@ -211,13 +211,13 @@ token 控制項。Python 伺服器的 ``token`` 屬性仍保留設定的共用 t
    * - ``read_screen``
      - viewer、operator、admin
      - ``GET /screenshot``、``/mouse_position``、``/screen_size``、``/windows``、
-       ``/commands``、``/inspector/recent``、``/inspector/summary``、
-       ``/usb/devices``、``/usb/events``、``/metrics``、``/openapi.json``
+       ``/commands``、``/openapi.json``
    * - ``read_data``
      - operator、admin
      - ``GET /history``、``/usb/acl``、``/jobs``、``/sessions``、
        ``/usb/passthrough/status``、``/usb/loopback/devices``、
-       ``/usb/remote/devices``、``/diagnose``，及對應的 MCP 主機資料讀取
+       ``/usb/remote/devices``、``/diagnose``、``/usb/devices``、``/usb/events``、
+       ``/inspector/recent``、``/inspector/summary``、``/metrics``，及對應 MCP 主機資料讀取
    * - ``drive_input``
      - operator、admin
      - ``POST /execute``、``/execute_file``、``/usb/loopback/open``、
@@ -247,6 +247,13 @@ token 控制項。Python 伺服器的 ``token`` 屬性仍保留設定的共用 t
 ``read_data``：檢查會讀取主機環境，並可能主動擷取畫面。viewer 在提供者執行前
 收到 403；operator／admin 及未使用使用者存放檔的共用 token 伺服器維持原存取權。
 
+USB 列舉回傳裝置身分中繼資料，包括序號與 bus location；事件保留新增／移除紀錄。
+Inspector 端點回傳整個程序的 WebRTC 數值歷史與摘要，不依呼叫者區分。Metrics 回傳
+請求／驗證計數、稽核筆數、連線／排程數量及執行時間。這五個 REST 讀取需要
+``read_data``；metrics 的特殊文字回應入口會在查詢稽核、registry、scheduler 前檢查。
+``AC_list_usb_devices``、``AC_usb_recent_events``、``AC_inspector_recent`` 與
+``AC_inspector_summary`` 也會在執行提供者之前檢查相同資料權限。
+
 已註冊的 ``AC_probe_capabilities``、``AC_diagnose``、``AC_remote_host_status``、
 ``AC_remote_viewer_status``、``AC_usb_passthrough_status``、``AC_usb_loopback_list``
 與 ``AC_usb_remote_list`` 也要求相同資料權限。被動能力探測仍讀取環境／PATH 與
@@ -254,8 +261,9 @@ token 控制項。Python 伺服器的 ``token`` 屬性仍保留設定的共用 t
 直接呼叫維持原行為。本次審查沒有涵蓋所有未列入表格的 executor 指令；那些指令
 仍依賴接收請求入口的權限。
 
-Dashboard 保留功能，各面板分別顯示缺少的權限。診斷與 session 需要 ``read_data``，
-稽核需要 ``read_audit``；被拒面板清除舊資料，其他面板持續更新。來源配對測試仍會
+Dashboard 保留功能，各面板分別顯示缺少的權限。診斷、session、inspector 與 USB 面板需要 ``read_data``，
+稽核需要 ``read_audit``；被拒面板清除舊資料，其他面板持續更新。
+session 重新整理成功後會清除先前的錯誤狀態。來源配對測試仍會
 拒絕 REST 與 MCP 的權限不一致。
 
 可以 ``POST /execute`` 代表可以執行動作，不代表可以執行每一個指令。替動作檔簽章

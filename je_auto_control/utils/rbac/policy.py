@@ -50,7 +50,7 @@ REST_ROUTE_CAPABILITIES: Dict[Tuple[str, str], str] = {
     ("GET", "/agent/task"): _DRIVE,
     ("POST", "/agent/shutdown"): _HOSTS,
     ("POST", "/agent/recover_target"): _HOSTS,
-    ("GET", "/metrics"): _READ,
+    ("GET", "/metrics"): _DATA,
     ("GET", "/jobs"): _DATA,
     ("GET", "/history"): _DATA,  # run history, as ac_list_run_history
     ("GET", "/screenshot"): _READ,
@@ -59,10 +59,10 @@ REST_ROUTE_CAPABILITIES: Dict[Tuple[str, str], str] = {
     ("GET", "/windows"): _READ,
     ("GET", "/sessions"): _DATA,
     ("GET", "/commands"): _READ,
-    ("GET", "/inspector/recent"): _READ,
-    ("GET", "/inspector/summary"): _READ,
-    ("GET", "/usb/devices"): _READ,
-    ("GET", "/usb/events"): _READ,
+    ("GET", "/inspector/recent"): _DATA,
+    ("GET", "/inspector/summary"): _DATA,
+    ("GET", "/usb/devices"): _DATA,
+    ("GET", "/usb/events"): _DATA,
     ("GET", "/usb/passthrough/status"): _DATA,
     ("GET", "/usb/acl"): _DATA,  # the stored ACL, as ac_usb_acl_list
     ("GET", "/usb/loopback/devices"): _DATA,
@@ -89,8 +89,8 @@ REST_ROUTE_CAPABILITIES.update({("POST", f"/agent/{operation}"): _DRIVE
                                                   "transfer", "transfer/peer")})
 
 #: The routes that need ``read_data``: the ones returning records or
-#: configuration the host keeps, by the rule :data:`DATA_TOOLS` states. Each
-#: has an MCP tool reading the same thing, and the two must agree.
+#: configuration the host keeps, by the rule :data:`DATA_TOOLS` states. Where
+#: an MCP tool reads the same source, the requirements must agree.
 DATA_ROUTES = frozenset(
     route for route, needed in REST_ROUTE_CAPABILITIES.items() if needed == _DATA)
 
@@ -108,6 +108,10 @@ COMMAND_CAPABILITIES: Dict[str, str] = {
     "AC_usb_passthrough_status": _DATA,
     "AC_usb_loopback_list": _DATA,
     "AC_usb_remote_list": _DATA,
+    "AC_list_usb_devices": _DATA,
+    "AC_usb_recent_events": _DATA,
+    "AC_inspector_recent": _DATA,
+    "AC_inspector_summary": _DATA,
     "AC_mcp_tool_search": _READ,
     "AC_mcp_tool_schema": _READ,
     "AC_history_capture": _DRIVE,
