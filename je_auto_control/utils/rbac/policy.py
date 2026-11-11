@@ -5,8 +5,9 @@ Three surfaces, one rule each:
 * **REST routes** are listed one by one. A route missing from the list needs
   ``manage_hosts``, so a route added without a decision is admin-only rather
   than open. A ``GET`` route that returns records or configuration the host
-  keeps needs ``read_data`` like the MCP tool reading the same thing; one
-  that observes live state needs ``read_screen``.
+  keeps needs ``read_data`` like the MCP tool reading the same thing. Reviewed
+  desktop observations may use ``read_screen``. Live host records and
+  device status still need data authority.
 * **MCP tools** default to ``read_data`` for a read-only annotation and
   ``drive_input`` otherwise. Only reviewed screen/caller-data tools grant
   ``read_screen``. Named overrides separate non-mutating sensitive
@@ -15,8 +16,8 @@ Three surfaces, one rule each:
   protect administration of the host itself.
 * **``AC_*`` commands** reach the executor through anything that runs an
   action list (``POST /execute``, ``ac_execute_actions``, an action file).
-  Being allowed to run actions is ``drive_input``; the commands named here
-  need more, and are checked both where the list is submitted and again by
+  Running submitted actions requires ``drive_input``; the commands named here
+  have explicit requirements, checked where the list is submitted and again by
   the executor, which is what covers a list read from a file.
 
 The roles are not a sandbox. An operator drives the real keyboard and can
@@ -50,23 +51,23 @@ REST_ROUTE_CAPABILITIES: Dict[Tuple[str, str], str] = {
     ("POST", "/agent/shutdown"): _HOSTS,
     ("POST", "/agent/recover_target"): _HOSTS,
     ("GET", "/metrics"): _READ,
-    ("GET", "/jobs"): _READ,
+    ("GET", "/jobs"): _DATA,
     ("GET", "/history"): _DATA,  # run history, as ac_list_run_history
     ("GET", "/screenshot"): _READ,
     ("GET", "/mouse_position"): _READ,
     ("GET", "/screen_size"): _READ,
     ("GET", "/windows"): _READ,
-    ("GET", "/sessions"): _READ,
+    ("GET", "/sessions"): _DATA,
     ("GET", "/commands"): _READ,
     ("GET", "/inspector/recent"): _READ,
     ("GET", "/inspector/summary"): _READ,
     ("GET", "/usb/devices"): _READ,
     ("GET", "/usb/events"): _READ,
-    ("GET", "/usb/passthrough/status"): _READ,
+    ("GET", "/usb/passthrough/status"): _DATA,
     ("GET", "/usb/acl"): _DATA,  # the stored ACL, as ac_usb_acl_list
-    ("GET", "/usb/loopback/devices"): _READ,
-    ("GET", "/usb/remote/devices"): _READ,
-    ("GET", "/diagnose"): _READ,
+    ("GET", "/usb/loopback/devices"): _DATA,
+    ("GET", "/usb/remote/devices"): _DATA,
+    ("GET", "/diagnose"): _DATA,
     ("GET", "/openapi.json"): _READ,
     ("GET", "/audit/list"): _AUDIT,
     ("GET", "/audit/verify"): _AUDIT,
@@ -93,15 +94,20 @@ REST_ROUTE_CAPABILITIES.update({("POST", f"/agent/{operation}"): _DRIVE
 DATA_ROUTES = frozenset(
     route for route, needed in REST_ROUTE_CAPABILITIES.items() if needed == _DATA)
 
-#: Commands that need more than ``drive_input``. Every other command is
-#: covered by the capability of the surface that submitted the action list.
+#: Explicit command requirements, including audited host-data reads. Unlisted
+#: commands still rely on the capability of the surface submitting the action list.
 COMMAND_CAPABILITIES: Dict[str, str] = {
     "AC_agent_target": _HOSTS,
     "AC_agent_target_recover": _HOSTS,
     "AC_agent_runtime_stop": _HOSTS,
     "AC_agent_runtime_start": _HOSTS,
-    "AC_probe_capabilities": _READ,
-    "AC_diagnose": _READ,
+    "AC_probe_capabilities": _DATA,
+    "AC_diagnose": _DATA,
+    "AC_remote_host_status": _DATA,
+    "AC_remote_viewer_status": _DATA,
+    "AC_usb_passthrough_status": _DATA,
+    "AC_usb_loopback_list": _DATA,
+    "AC_usb_remote_list": _DATA,
     "AC_mcp_tool_search": _READ,
     "AC_mcp_tool_schema": _READ,
     "AC_history_capture": _DRIVE,

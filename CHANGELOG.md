@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Align audited REST host-data routes and registered status/diagnostic commands with
+  MCP `read_data` authority. Viewer requests are refused before providers execute;
+  operator/admin diagnostics and cancellation remain supported. Dashboard panels
+  report the missing capability without widening viewer access.
+
 - WebRTC stop now reports pending or failed software cleanup, retains failed resources,
   and blocks peer replacement until cleanup succeeds. Retrying a pending stop reuses
   the original future. Multi-viewer teardown retains failed sessions and their capture

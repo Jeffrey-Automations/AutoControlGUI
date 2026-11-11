@@ -7,7 +7,7 @@ read-only tool are paired when their handlers read the same source in the
 package, found by parsing both.
 
 Nothing here touches the screen, the mouse, the run-history database or the
-USB ACL file: the two routes that would are replaced by recorders.
+USB ACL file: tested host-data route handlers are replaced by recorders.
 """
 import ast
 import inspect
@@ -39,23 +39,23 @@ _AUDIT, _HOSTS = Capability.READ_AUDIT, Capability.MANAGE_HOSTS
 #: The whole table, written out: a change to any route has to be made here too.
 _EXPECTED_ROUTES = {
     ("GET", "/metrics"): _READ,
-    ("GET", "/jobs"): _READ,
+    ("GET", "/jobs"): _DATA,
     ("GET", "/history"): _DATA,
     ("GET", "/screenshot"): _READ,
     ("GET", "/mouse_position"): _READ,
     ("GET", "/screen_size"): _READ,
     ("GET", "/windows"): _READ,
-    ("GET", "/sessions"): _READ,
+    ("GET", "/sessions"): _DATA,
     ("GET", "/commands"): _READ,
     ("GET", "/inspector/recent"): _READ,
     ("GET", "/inspector/summary"): _READ,
     ("GET", "/usb/devices"): _READ,
     ("GET", "/usb/events"): _READ,
-    ("GET", "/usb/passthrough/status"): _READ,
+    ("GET", "/usb/passthrough/status"): _DATA,
     ("GET", "/usb/acl"): _DATA,
-    ("GET", "/usb/loopback/devices"): _READ,
-    ("GET", "/usb/remote/devices"): _READ,
-    ("GET", "/diagnose"): _READ,
+    ("GET", "/usb/loopback/devices"): _DATA,
+    ("GET", "/usb/remote/devices"): _DATA,
+    ("GET", "/diagnose"): _DATA,
     ("GET", "/openapi.json"): _READ,
     ("GET", "/audit/list"): _AUDIT,
     ("GET", "/audit/verify"): _AUDIT,
@@ -97,6 +97,9 @@ _EXPECTED_ROUTES = {
     ("POST", "/agent/trigger"): _DRIVE,
 }
 
+_DATA_PATHS = ("/history", "/usb/acl", "/jobs", "/sessions", "/usb/passthrough/status",
+               "/usb/loopback/devices", "/usb/remote/devices", "/diagnose")
+
 
 @pytest.fixture(autouse=True)
 def _no_ambient_rbac(monkeypatch):
@@ -136,11 +139,8 @@ def rest(monkeypatch):
             return 200, payload
         return handle
 
-    monkeypatch.setitem(rest_server._GET_ROUTES, "/history",
-                        recorder("/history", {"runs": [{"id": 7}]}))
-    monkeypatch.setitem(rest_server._GET_ROUTES, "/usb/acl",
-                        recorder("/usb/acl", {"default": "deny", "rules": []}))
-    monkeypatch.setitem(rest_server._GET_ROUTES, "/jobs", recorder("/jobs", {"jobs": []}))
+    for path in _DATA_PATHS:
+        monkeypatch.setitem(rest_server._GET_ROUTES, path, recorder(path, {"controlled": True}))
     started = []
 
     def start(**kwargs):
@@ -186,7 +186,7 @@ def _wait_for_refusal(server, timeout_s: float = 5.0) -> bool:
 
 # --- what a role may read -----------------------------------------------------
 
-@pytest.mark.parametrize("path", ["/history", "/usb/acl"])
+@pytest.mark.parametrize("path", _DATA_PATHS)
 def test_a_viewer_is_refused_a_stored_record_route(rest, users, path):
     server = rest(user_store=users)
     status, body = _get(server, path, users.tokens[Role.VIEWER])
@@ -198,7 +198,7 @@ def test_a_viewer_is_refused_a_stored_record_route(rest, users, path):
 
 
 @pytest.mark.parametrize("role", [Role.OPERATOR, Role.ADMIN])
-@pytest.mark.parametrize("path", ["/history", "/usb/acl"])
+@pytest.mark.parametrize("path", _DATA_PATHS)
 def test_an_operator_and_an_admin_still_read_them(rest, users, role, path):
     server = rest(user_store=users)
     status, _body = _get(server, path, users.tokens[role])
@@ -209,7 +209,6 @@ def test_an_operator_and_an_admin_still_read_them(rest, users, role, path):
 def test_a_viewer_keeps_the_routes_that_observe_live_state(rest, users):
     server = rest(user_store=users)
     viewer = users.tokens[Role.VIEWER]
-    assert _get(server, "/jobs", viewer)[0] == 200
     assert _get(server, "/commands", viewer)[0] == 200
     assert _get(server, "/openapi.json", viewer)[0] == 200
 
@@ -235,7 +234,7 @@ def test_openapi_publishes_the_capability_of_the_data_routes():
     paths = build_openapi_spec()["paths"]
     assert paths["/history"]["get"]["x-required-capability"] == Capability.READ_DATA
     assert paths["/usb/acl"]["get"]["x-required-capability"] == Capability.READ_DATA
-    assert paths["/jobs"]["get"]["x-required-capability"] == Capability.READ_SCREEN
+    assert paths["/jobs"]["get"]["x-required-capability"] == Capability.READ_DATA
 
 
 # --- the same data needs the same capability on both surfaces -------------------
@@ -377,18 +376,17 @@ def _dashboard_script() -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_the_dashboard_calls_no_route_that_needs_read_data():
-    """The page is read with whatever token is pasted in, a viewer's included."""
+def test_dashboard_panels_keep_their_endpoint_capability_including_data_refusals():
+    """An operator dashboard does not grant a viewer its restricted panel data."""
     fetched = {match.split("?")[0]
-               for match in re.findall(r'fetchJson\("([^"]+)"\)', _dashboard_script())}
-    assert fetched, "the script no longer fetches with a literal path this test can read"
-    for path in fetched:
-        assert ("GET", path) in REST_ROUTE_CAPABILITIES, path
-    assert not {("GET", path) for path in fetched} & DATA_ROUTES
-    needs = {path: capability_for_route("GET", path) for path in fetched}
-    assert needs["/audit/list"] == Capability.READ_AUDIT, "the one panel a viewer is refused"
-    assert {needed for path, needed in needs.items() if path != "/audit/list"} == {
-        Capability.READ_SCREEN}
+               for match in re.findall(r'fetchJson\("([^\"]+)"\)', _dashboard_script())}
+    assert {path: capability_for_route("GET", path) for path in fetched} == {
+        "/diagnose": Capability.READ_DATA,
+        "/sessions": Capability.READ_DATA,
+        "/inspector/summary": Capability.READ_SCREEN,
+        "/usb/devices": Capability.READ_SCREEN,
+        "/audit/list": Capability.READ_AUDIT,
+    }
 
 
 def test_the_dashboard_names_the_missing_capability_on_a_403():

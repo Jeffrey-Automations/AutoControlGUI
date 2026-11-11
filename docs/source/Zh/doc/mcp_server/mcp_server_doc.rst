@@ -344,9 +344,10 @@ Bearer token 也可從 ``JE_AUTOCONTROL_MCP_TOKEN`` 環境變數讀取。
   以及連線裝置的剪貼簿（``ac_android_get_clipboard``、
   ``ac_ios_get_clipboard``）。這些以前是 ``read_screen``，所以\ **viewer 的 token
   現在不能呼叫它們**\ ；``operator`` 與 ``admin`` 不受影響。
-- REST API 依同一條規則：``GET /history`` 與 ``GET /usb/acl`` 和
-  ``ac_list_run_history``、``ac_usb_acl_list`` 一樣需要 ``read_data``，所以 viewer 的
-  token 在那裡也讀不到執行歷史與 USB ACL（見維運章節的 REST 表格）。
+- 已審查的 REST 路由依相同來源權限：歷史、USB ACL、排程、session、USB passthrough
+  狀態及 loopback／remote 清單需要 ``read_data``。診斷與被動後端中繼資料也需要
+  資料權限。對應已註冊的 AC 狀態／診斷指令會在執行提供者前檢查；唯讀標記不授予
+  viewer 存取權。端點表格與指令審查範圍見維運章節。
 - resource 適用同一條規則。\ ``autocontrol://history``\ （最近 100 筆執行歷史）與
   ``autocontrol://files/`` 底下的動作檔需要 ``read_data``\ ；\ ``autocontrol://commands``
   與即時畫面需要 ``read_screen``\ 。\ ``resources/list`` 只列出呼叫者讀得到的，

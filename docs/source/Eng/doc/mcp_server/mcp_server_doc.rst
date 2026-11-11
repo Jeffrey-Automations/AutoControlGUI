@@ -363,10 +363,12 @@ bearer token and uses the same operator ceiling for its live tool sessions.
   caller with drive authority; readonly calls and viewers never trigger them. This does
   not promise that every dependency or diagnostic read has no initialization side
   effects.
-- The REST API follows the same rule: ``GET /history`` and ``GET /usb/acl``
-  need ``read_data`` like ``ac_list_run_history`` and ``ac_usb_acl_list``, so
-  a viewer token reads neither the run history nor the USB ACL there either
-  (see the REST table in the operations chapter).
+- The audited REST routes follow the same source policy: history, USB ACL, jobs,
+  sessions, USB passthrough status and loopback/remote inventories require
+  ``read_data``. Diagnostics and passive backend metadata also require data
+  authority. The corresponding registered AC status/diagnostic commands enforce
+  it before providers run; readonly descriptions do not grant viewer access.
+  See the endpoint table and command scope in the operations chapter.
 - Resources follow the same rule. ``autocontrol://history`` (the last 100
   run-history rows) and the action files under ``autocontrol://files/`` need
   ``read_data``; ``autocontrol://commands`` and the live screen feed need

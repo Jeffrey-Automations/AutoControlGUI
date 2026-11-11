@@ -73,6 +73,8 @@ WebRTC host/viewer 的 `stop()` 最多等待三秒完成軟體清理。`PeerStop
 
 MCP 唯讀標記不授予 viewer 存取權。已審查的即時畫面與呼叫者資料運算使用 `read_screen`；檔案、裝置資料及未知工具需要 `read_data`。別名共用標準名稱的權限，較強的明確設定優先。提供影像來源、從環境變數讀取設定欄位或規劃開啟本機檔案時需要 `read_data`。Anchor locator 的 accessibility／OCR 允許觀測即時畫面，影像範本需要 `read_data`，VLM 請求需要 `drive_input`。唯讀呼叫拒絕擷取產物及 VLM 分支，目錄排除可自選 ADB 執行檔的工具。MCP CI annotations 只回傳格式化文字，不寫入 stdout。未審查的 plugin 與 WebRunner 初始化工具不列入唯讀目錄，等待相依版本的個別審查。
 
+REST 主機資料讀取與對應 MCP 權限一致：排程、遠端 session、USB passthrough 狀態、loopback／remote 裝置清單及診斷需要 `read_data`。對應已註冊的狀態指令、`AC_probe_capabilities` 與 `AC_diagnose` 會在執行提供者之前檢查權限。唯讀標記不授予 viewer 存取權；operator／admin 仍可使用。Dashboard 各面板分別顯示缺少的權限。
+
 主機唯讀模式對外部提供的目錄及後續註冊套用相同限制，接收請求及重新核對身分後的呼叫都檢查混合用途參數。MCP 設定的失敗截圖需要可寫入的工具及重新核對後具輸入操作權限的呼叫者；唯讀呼叫與 viewer 不會觸發截圖。這不表示所有相依套件或診斷讀取均無初始化副作用。
 
 內部 Windows 行程記憶體準備工作新增映像檔量測，透過保留的唯讀 handle 執行有界雜湊並保留失敗清理供重試。這只是觀測到的檔案證據，不是已載入程式碼或 fixture 的身分證明；原生驗收及公開記憶體工具仍未提供。詳見[契約](../docs/process_memory_contract.md)。
