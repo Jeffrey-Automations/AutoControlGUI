@@ -46,6 +46,15 @@ def _positive(value: int, ceiling: int) -> None:
         raise MemoryObservationError(FailureReason.UNSUPPORTED)
 
 
+def _identifiers(values: tuple[str, ...]) -> tuple[str, ...]:
+    values = tuple(values)
+    if not values or len(values) > 64 or len(set(values)) != len(values):
+        raise MemoryObservationError(FailureReason.UNSUPPORTED)
+    for value in values:
+        _identifier(value)
+    return values
+
+
 @dataclass(frozen=True)
 class ProcessIdentity:
     """Identity measured from the retained process, not from a reusable PID alone."""
@@ -119,12 +128,7 @@ class ReviewedProbe:
         for value in (self.probe_id, self.schema_version, self.executable):
             _identifier(value)
         for name in ("versions", "architectures", "fields"):
-            values = tuple(getattr(self, name))
-            if not values or len(values) > 64 or len(set(values)) != len(values):
-                raise MemoryObservationError(FailureReason.UNSUPPORTED)
-            for value in values:
-                _identifier(value)
-            object.__setattr__(self, name, values)
+            object.__setattr__(self, name, _identifiers(getattr(self, name)))
         _positive(self.max_bytes, 1 << 20)
         _positive(self.max_regions, 1024)
         _positive(self.max_value_bytes, 65536)

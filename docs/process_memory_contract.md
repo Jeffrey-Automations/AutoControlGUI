@@ -1,9 +1,10 @@
 # Reviewed process-memory observations
 
 This is the internal M0/M1 foundation for the background-operation plan in
-[Progress.md](../Progress.md). It supplies a testable semantic observation path.
-It does not supply a Windows native provider, runtime authorization wiring, a
-public memory command, an application adapter or completed native acceptance.
+[Progress.md](../Progress.md). It supplies a semantic reader and typed Windows
+read/query calls tested through injected native functions. It does not supply
+trusted executable attestation, runtime authorization wiring, a public memory
+command, an application adapter or completed native acceptance.
 
 ## Ownership and scope
 
@@ -28,10 +29,10 @@ process. Existing desktop foreground and input-presence gates are unchanged.
 
 | Operation | Source and scope | Background requirement | Evidence and present state |
 |---|---|---|---|
-| Process/session identity | OS process handle, creation time, executable identity and architecture | Read/query rights only; no privilege escalation | Provider contract defined; native implementation and acceptance pending |
+| Process/session identity | Retained OS handle, creation time, session and architecture; reviewed application attestor | Read/query/synchronize rights only; no privilege escalation | Typed calls and injected tests implemented; executable attestation and native acceptance pending |
 | UI state | UIA read-only element properties for an explicitly selected application | No Invoke, SetValue or focus change | Existing UIA implementation; new background adapter integration pending |
 | Browser state | Existing WebRunner managed DOM session and reviewed origins | Dedicated managed browser; no desktop input fallback | Existing browser path; this reader adds no browser access |
-| Fixture semantic state | Reviewed schema resolved for the retained fixture process identity | Bounded `VirtualQueryEx` / `ReadProcessMemory` provider; no writes | Injected-provider semantic and failure tests implemented; native provider pending |
+| Fixture semantic state | Reviewed schema resolved for the retained fixture process identity | Bounded `VirtualQueryEx` / `ReadProcessMemory` provider; no writes | Typed provider and injected-call tests implemented; trusted resolver and native acceptance pending |
 | Application command | Each application's official API, CLI or IPC with scoped resources | Must independently prove no foreground/focus/mouse/input interference | Application selection and command adapter pending |
 | OS service operation | Specific approved service's management interface | Explicit service scope and independent status readback | Adapter and policy integration pending |
 | Completed background task | Fresh state or artifact verification under current runtime authority | Observation does not grant execution rights or replace a completion receipt | End-to-end M4/M5 integration pending |
@@ -42,6 +43,47 @@ process. Existing desktop foreground and input-presence gates are unchanged.
 identity and version, architecture and pointer width. A retained provider handle
 must report the actual process identity, including after reads. Reused PIDs and
 changed identity invalidate the whole observation.
+
+### Windows provider and attestation boundary
+
+`windows.py` owns each process handle and serializes identity, query, read and close.
+It opens only `PROCESS_QUERY_INFORMATION`, `PROCESS_VM_READ` and `SYNCHRONIZE`.
+The last right permits a zero-time process-liveness check. It never requests write,
+terminate, all-access or privilege-adjustment rights. Failed close keeps ownership
+with the existing reader cleanup queue.
+
+`windows_native.py` binds DWORD and BOOL with fixed widths and address/length
+arguments with pointer-sized ctypes. `VirtualQueryEx` uses the caller's 28-byte
+or 48-byte layout, including when a 64-bit caller observes a 32-bit WOW64 target.
+A 32-bit caller refuses a 64-bit target. `IsWow64Process2` must be available;
+unknown architectures are unsupported rather than guessed.
+
+The provider measures PID, process creation time, Windows session ID, architecture
+and liveness from the retained process relationship. A required host-reviewed
+attestor receives those immutable `NativeProcessFacts` and returns a `ProcessIdentity`.
+It must independently bind host/session, executable identity and application version
+to those facts and the owned launch. The provider supplies no default attestor,
+passes no expected identity to the callback, rejects replaced native identity fields,
+and measures facts again after attestation. A path string, fixture nonce, self-reported
+digest or a callback that merely echoes an expected identity is not an attestation.
+The production attestor and trusted fixture bootstrap matching remain unimplemented.
+
+Each native read is limited to 1 MiB and one committed, readable, unguarded region.
+The semantic reader splits reviewed ranges at region boundaries under its smaller
+per-probe budget. Failed or short reads publish no bytes; post-read region and native
+identity changes fail the observation. These checks and cooperative checkpoints do
+not interrupt a blocked syscall. Owned helper retirement remains M3 work.
+
+Two provider shapes were considered: exposing raw handles to application adapters,
+or retaining handle lifetime and native checks behind `ProcessHandle`. The latter
+keeps cleanup and read bounds in one owner. The attestation callback receives facts,
+not a raw native handle, and must use separately reviewed launch evidence.
+
+ABI references are Microsoft's [memory information layouts](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-memory_basic_information),
+[VirtualQueryEx](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualqueryex),
+[ReadProcessMemory](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-readprocessmemory),
+[IsWow64Process2](https://learn.microsoft.com/en-us/windows/win32/api/wow64apiset/nf-wow64apiset-iswow64process2)
+and [process access rights](https://learn.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights).
 
 The reviewed resolver runs anew for each observation. It supplies one private
 payload range and optionally an eight-byte sequence range. A native adapter must
@@ -146,6 +188,6 @@ desktop noninterference. Shared-memory mappings were rejected because parent-sid
 mapping reads would bypass the future process-memory provider.
 
 No native acceptance command is supplied or executed by this increment. Native
-execution stays paused under `Progress.md`; typed Win32 calls, trusted bootstrap
-matching, page-protection fault injection, host probe configuration, runtime
+execution stays paused under `Progress.md`; native verification of the typed calls,
+trusted bootstrap matching, page-protection fault injection, host probe configuration, runtime
 lifecycle/policy integration and application coverage remain required for M1/M3.

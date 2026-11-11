@@ -52,6 +52,18 @@ def _range(address: int, size: int, bits: int) -> None:
         _fail(FailureReason.UNREADABLE_REGION)
 
 
+def _region_metadata(value: MemoryRegion, bits: int) -> None:
+    _range(value.base, value.size, bits)
+    if (any(type(flag) is not bool for flag in (value.committed, value.readable, value.guard))
+            or type(value.allocation) is not int or not 0 <= value.allocation < 1 << bits
+            or type(value.protection) is not int or not 0 <= value.protection < 1 << 32):
+        _fail(FailureReason.UNREADABLE_REGION)
+
+
+def _allows_fields(selected: tuple[str, ...], allowed: tuple[str, ...]) -> bool:
+    return bool(selected) and len(set(selected)) == len(selected) and set(selected) <= set(allowed)
+
+
 @dataclass
 class _Operation:
     expected: ProcessIdentity
@@ -79,11 +91,8 @@ class _Operation:
         self.check()
         if not isinstance(value, MemoryRegion):
             _fail(FailureReason.UNREADABLE_REGION)
-        _range(value.base, value.size, self.expected.pointer_bits)
-        if (any(type(flag) is not bool for flag in (value.committed, value.readable, value.guard))
-                or type(value.allocation) is not int or not 0 <= value.allocation < 1 << self.expected.pointer_bits
-                or type(value.protection) is not int or not 0 <= value.protection < 1 << 32
-                or not value.base <= address < value.base + value.size or not value.committed
+        _region_metadata(value, self.expected.pointer_bits)
+        if (not value.base <= address < value.base + value.size or not value.committed
                 or not value.readable or value.guard):
             _fail(FailureReason.UNREADABLE_REGION)
         return value
@@ -181,7 +190,7 @@ class ProcessMemoryReader:
                 target_id: str, checkpoint: Callable[[], None] = cancellation_checkpoint) -> ObservationResult:
         """Query semantic fields under a host-reviewed probe and the runtime's live checkpoint."""
         selected = tuple(fields)
-        if not selected or len(set(selected)) != len(selected) or not set(selected) <= set(probe.fields):
+        if not _allows_fields(selected, probe.fields):
             return ObservationFailure(FailureReason.SCOPE_DENIED)
         _identifier(target_id)
         if (expected.executable != probe.executable or expected.version not in probe.versions

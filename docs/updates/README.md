@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261111-02 | 2026-11-11 | Bound Windows memory reads behind reviewed attestation | #snapshot #agent | [2026-11](2026-11.md) |
 | U-20261111-01 | 2026-11-11 | Prepare owned memory fixture buffers and bounded control | #snapshot #agent | [2026-11](2026-11.md) |
 | U-20261110-11 | 2026-11-10 | Own Screenshot lifecycle and run reads asynchronously | #done #agent | [2026-11](2026-11.md) |
 | U-20261110-10 | 2026-11-10 | Forward nested owner grants to presence sources | #done #agent | [2026-11](2026-11.md) |

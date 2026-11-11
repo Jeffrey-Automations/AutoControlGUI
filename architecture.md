@@ -4,6 +4,10 @@ The process-memory test fixture owns fixed payload and sequence buffers in a hid
 child process. Bounded inherited pipes expose expected state and validated fixture
 updates. Bootstrap facts remain unverified until a native provider independently
 matches the retained process identity. This tooling adds no public memory API.
+The internal Windows provider owns read/query handles and measures native process
+facts before asking an explicit reviewed attestor for application identity. Its
+bindings are tested through injected calls; trusted attestation and native acceptance
+remain separate requirements.
 
 The package facade resolves each public export from its existing source module. Concrete typing
 declarations generate runtime binding tables, checked by

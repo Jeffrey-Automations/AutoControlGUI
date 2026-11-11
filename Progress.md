@@ -20,7 +20,7 @@
 
 ### 行程記憶體自有 fixture 原生驗收
 
-`TODO` — 原生執行仍暫緩。須先完成 Windows provider、自有 fixture 與受管權限整合，
+`TODO` — 原生執行仍暫緩。須先完成 Windows provider 的可信應用身分核對、自有 fixture 與受管權限整合，
 再驗證 ASLR、32／64 位配置、跨區段／guard／不可讀頁、程序退出、PID 重用、權限拒絕、
 取消及 handle 回收。以 fixture 的已知狀態比對語意結果，獨立觀測前景、焦點、滑鼠與輸入事件。
 目前 injected-provider 測試不算原生通過；設計見 [記憶體觀察契約](docs/process_memory_contract.md)。
@@ -632,7 +632,9 @@ browser adapter 從受管頁面取得欄位、透過 DOM 提交，再驗證新�
 [process_memory_contract.md](docs/process_memory_contract.md)。M0／M1 尚未完成，
 已有自有 fixture 的固定緩衝區與有界管線控制協定，測試僅驗證本機資料配置及背景子程序通訊。
 bootstrap 的 PID、位址、來源雜湊與 launch nonce 都是未驗證自報資訊，不能充當 OS 出生身分或可信 resolver。
-仍缺 typed Windows provider、可信 ASLR resolver、fixture 的原生身分核對與頁面故障注入、runtime grant／helper
+typed Windows provider 已有有界查詢／讀取、原生身分事實與保留 handle 的注入測試；
+應用身分仍須由明確受審的 attestor 提供，沒有預設信任或由期望身分反填的實作。
+仍缺可信 executable／version attestor、ASLR resolver、fixture 的原生身分核對與頁面故障注入、runtime grant／helper
 生命週期及公開入口；M2 也仍缺實際應用版本 adapter。原生驗收固定列於本檔上方。
 
 1. **M0：能力盤點與範圍契約。** 先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
