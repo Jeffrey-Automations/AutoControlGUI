@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- `sync_assets` (and `AC_sync_assets`, `materialize` of `AC_sync_workspace`) refuses up front,
+  with a `ConfigSyncError` naming the length, a generation whose published paths would pass
+  259 characters on Windows without `LongPathsEnabled`; it used to fail on the first such file
+  with a generic "could not publish a complete generation".
+
 - The executor result hook (`result_callback`, `observe_results`) now follows `AC_parallel`
   branches: a branch command is reported under the `AC_parallel` step with the branch's
   1-based index as `run`, and branches never call the callback concurrently. The Script

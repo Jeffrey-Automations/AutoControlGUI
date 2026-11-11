@@ -153,3 +153,22 @@ def test_wrapped_transport_cancellation_keeps_its_control_flow_signal(tmp_path, 
     with pytest.raises(CancelledError):
         ac.sync_assets(manifest, interrupted)
     assert not list(InterruptedTransport.target_root.glob('generation-*'))
+
+
+def test_paths_the_host_cannot_create_are_refused_before_anything_is_staged(tmp_path, monkeypatch):
+    # Windows without LongPathsEnabled stops at 259 characters; the first file past it
+    # used to fail as a bare FileNotFoundError reported as an incomplete generation.
+    from je_auto_control.utils.config_sync import assets
+    _source, manifest, transport = asset_bundle(tmp_path)
+    monkeypatch.setattr(assets, '_path_limit', lambda: len(str(tmp_path)) + 20)
+    with pytest.raises(ac.ConfigSyncError, match='LongPathsEnabled') as refused:
+        ac.sync_assets(manifest, transport)
+    assert 'characters' in str(refused.value)
+    assert not (tmp_path / 'received').exists(), 'refused before the cache root was even created'
+
+
+def test_a_host_without_a_path_limit_is_not_checked(tmp_path, monkeypatch):
+    from je_auto_control.utils.config_sync import assets
+    _source, manifest, transport = asset_bundle(tmp_path)
+    monkeypatch.setattr(assets, '_path_limit', lambda: None)
+    assert ac.sync_assets(manifest, transport).file_count == len(manifest.files)
