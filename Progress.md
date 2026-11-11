@@ -139,11 +139,10 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 - **Intel Mac 安裝要編譯 `cryptography`**：下限拉到 50 之後 `macosx_10_9_x86_64` 沒有 wheel（探測：最新只到 48.0.1），
   `pip install je_auto_control` 在 Intel Mac 需要 Rust 工具鏈。沒有在 Intel Mac 上實際編過。
 - **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；
-  私鑰是未加密的 PEM（0600，Windows 上沒驗權限位元），沒有通行碼選項；遷移模式開著時 HMAC 簽章會被接受。
-  強制簽章經 socket／REST／MCP 的端到端沒有跑過，覆蓋的是共用的 `read_executable_action_json` 與指令本身。
+  私鑰支援選用通行碼加密，未設定時仍是明文 PEM（0600，Windows 上沒驗權限位元）；遷移模式開著時 HMAC 簽章會被接受。
 - **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：
   - viewer 的其餘影像檔案型、mobile 與外掛唯讀工具仍需全面盤點 capability；自製工具仍依提示採預設分類。
-  - 沒對真的 client（Claude Desktop、VS Code、內建 dashboard）試過；SSE、無狀態與 `subscriptions/listen` 路徑、TLS 加 RBAC 沒有測試。
+  - 沒對真的 client（Claude Desktop、VS Code、內建 dashboard）試過；回送測試的 SSE、無狀態、`subscriptions/listen` 與 TLS 結果不代表真實客戶端通過。
 - **MCP 路徑根目錄**（`JE_AUTOCONTROL_MCP_PATH_ROOTS`，預設關閉）：`path-or-other` 已檢查
   `ac_open_path`／`ac_plan_open`／`ac_file_association`／`ac_act_in_view` 的 `target` 與 `ac_handle_file_dialog` 的 `path`，
   限於可辨識的絕對路徑、已存在的相對路徑及 `file:` URL；保留原字串，不代表能限制應用程式自行解讀的路徑或尚不存在的相對路徑。

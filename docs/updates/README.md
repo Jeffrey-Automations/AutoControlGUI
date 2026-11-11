@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261111-15 | 2026-11-11 | Reconcile signing and RBAC transport verification | #snapshot #security | [2026-11-b](2026-11-b.md) |
 | U-20261111-14 | 2026-11-11 | Reconcile package-loading progress with existing execution support | #snapshot #progress | [2026-11-b](2026-11-b.md) |
 | U-20261111-13 | 2026-11-11 | Validate integrated implementation and package artifacts | #snapshot #verification | [2026-11-b](2026-11-b.md) |
 | U-20261111-12 | 2026-11-11 | Remove remaining WebRTC Qt typing exemptions | #done #typing | [2026-11-b](2026-11-b.md) |
@@ -633,7 +634,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | File | Period | Entries |
 |---|---|---:|
-| [2026-11-b.md](2026-11-b.md) | 2026-11 | 3 |
+| [2026-11-b.md](2026-11-b.md) | 2026-11 | 4 |
 | [2026-11.md](2026-11.md) | 2026-11 | 43 |
 | [2026-10-f.md](2026-10-f.md) | 2026-10 | 5 |
 | [2026-10-e.md](2026-10-e.md) | 2026-10 | 91 |
