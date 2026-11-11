@@ -430,6 +430,8 @@ module = [
     "je_auto_control.utils.mcp_server.tools._handlers_vision_executor",
     "je_auto_control.utils.mcp_server._argument_policy",
     "je_auto_control.utils.mcp_server._authz",
+    "je_auto_control.utils.mcp_server._call_run",
+    "je_auto_control.utils.mcp_server._tool_calls",
     "je_auto_control.utils.mcp_server._http_origin",
     "je_auto_control.utils.mcp_server._http_responses",
     "je_auto_control.utils.mcp_server.disclosure",

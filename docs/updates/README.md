@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261112-08 | 2026-11-12 | Strict tier for the two new MCP modules; Windows Qt stub nulls | #incident #typing #ci | [2026-11-b](2026-11-b.md) |
 | U-20261112-07 | 2026-11-12 | Build only the first start-up tab; the others when first selected | #done #gui #performance | [2026-11-b](2026-11-b.md) |
 | U-20261112-06 | 2026-11-12 | Split the tools/call path out of the MCP server module | #done #mcp #quality | [2026-11-b](2026-11-b.md) |
 | U-20261112-05 | 2026-11-12 | Four WebRTC tests still asserted the pre-retention contract | #incident #remote #ci | [2026-11-b](2026-11-b.md) |

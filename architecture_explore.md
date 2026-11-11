@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,527 |
-| 程式碼總行數 | 233,497 |
+| 程式碼總行數 | 233,510 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -537,14 +537,14 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.10 遠端桌面與 USB
 
-> 6 個套件、約 31,943 行。
+> 6 個套件、約 31,951 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/admin/` | 423 | 多主機管理主控台：平行輪詢 N 個 AutoControl REST 端點 |
 | `utils/config_sync/` | 8,542 | 持久化設定與條件交易：`contract.py` 管理有限 JSON 與協定例外；`store.py` 以 SQLite 原子比較版本／記錄重送收據；`routes.py` 提供第二版 HTTP 與明確盲寫相容；`commands.py` 共用 AC／MCP／Builder；`client.py` 條件提交，另有因果模型、peer ledger 與本機 SQLite outbox；第三版 /causal 交易已接上確認／退休／回收與刪除憑證；client／outbox 已接上原請求重送、有界 CAS 重合併及原子快照確認；持久化控制、原子本機 full-resync／舊待送退役與歷史收據已接上。本機資產工具另提供 manifest、整版雜湊驗證與不可變目錄發布；七種來源 adapters 保存可攜因果 profiles；workspace INI 與 GUI 共用偏好正規化。來源／outbox 與原子 full-resync 基準已由 SyncWorkspace 協調；引用資產以不可變分塊／完整 hash 收據、具驗證 HTTP 與完整 profile 串流發布接上；Sync UI 仍屬 C3。 |
 | `utils/device_matrix/` | 201 | 行動裝置矩陣：同一 action list 於多台裝置平行執行 |
-| `utils/remote_desktop/` | 16,709 | **遠端桌面子系統**：TCP／WebSocket／WebRTC 三條傳輸路徑、主機與檢視端、訊令伺服器、TURN／中繼、多檢視者、錄影、信任清單、TOTP、稽核鏈；私有選用功能模組保留整組匯入結果。 |
+| `utils/remote_desktop/` | 16,717 | **遠端桌面子系統**：TCP／WebSocket／WebRTC 三條傳輸路徑、主機與檢視端、訊令伺服器、TURN／中繼、多檢視者、錄影、信任清單、TOTP、稽核鏈；私有選用功能模組保留整組匯入結果。 |
 | `utils/usb/` | 5,060 | 跨平台 USB 列舉／熱插拔／裝置直通（WinUSB、IOKit、libusb 後端 + ACL + WebRTC DataChannel 通道） |
 | `utils/usbip/` | 1,008 | USB/IP 線路協定主機端（協定封包、TCP 伺服器、libusb URB 後端） |
 
@@ -817,7 +817,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `rate_limit.py` | 48 | 工具呼叫的 token bucket 限流。 |
 | `__main__.py` | 126 | `je_auto_control_mcp` console script 進入點。 |
 
-#### `utils/remote_desktop/`（16,709 行／77 檔）
+#### `utils/remote_desktop/`（16,717 行／77 檔）
 
 三條傳輸路徑並存：**TCP**（JPEG 影格）、**WebSocket**（同協定換傳輸）、**WebRTC**（aiortc 視訊 + DataChannel）。
 `_export_bindings.py` 保存產生的來源對照；`_optional/` 分別管理 WebRTC、錄影、多檢視者、
@@ -826,10 +826,10 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
-| `webrtc_host.py` | 744 | WebRTC 主機：串流螢幕視訊並接受檢視端輸入;session 生命週期、DataChannel 接線、檔案收發。 |
+| `webrtc_host.py` | 746 | WebRTC 主機：串流螢幕視訊並接受檢視端輸入;session 生命週期、DataChannel 接線、檔案收發。 |
 | `webrtc_viewer.py` | 736 | WebRTC 檢視端：接收視訊並送出輸入。 |
 | `webrtc_retirement.py` | 186 | 序列化 peer 世代、保留未完成的停止 future，區分待完成與失敗清理。 |
-| `webrtc_media_owners.py` | 243 | 保留 peer 媒體建構失敗及未完成子資源，提供快取的 slot 清理結果。 |
+| `webrtc_media_owners.py` | 249 | 保留 peer 媒體建構失敗及未完成子資源，提供快取的 slot 清理結果。 |
 | `webrtc_peer_cleanup.py` | 154 | 逐項清理 host／viewer 的原始資源，保留失敗項目並等候影格任務結束。 |
 | `host.py` | 700 | TCP 主機：接受迴圈、TLS 包裝、連線／認證握手、音訊與剪貼簿廣播、檔案推送、單次 token。 |
 | `viewer.py` | 743 | TCP 檢視端。 |
@@ -1298,7 +1298,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `main_window.py` | 450 | `QMainWindow`：選單列（File／Actions／View／…）、左側導覽面板 dock（`Ctrl+K` 搜尋、`Ctrl+B` 收合）、即時語言切換、字級預設、深色／淺色主題（`theme.py` 的 token，不再用 qt-material）。分頁分為 core／editing／detection／automation／system 五類。 |
 | `main_widget.py` | 86 | Configured application workspace preserving the embedded-widget entry point. `AutoControlGUIWidget` 以單一 registry 註冊既有分頁，保留 Remote Desktop factory 與嵌入相容入口。 |
 | `tab_registry.py` | 234 | 分頁表：每個分頁一筆 `TabSpec`（鍵、標題鍵、分類、模組與類別名），`TabEntry` 在第一次存取 `widget` 時才呼叫 factory。`TabRegistry.open/close` 快取或釋放 factory 面板，保留 metadata 與外部提供的 widget；不匯入 Qt。 |
-| `navigation.py` | 203 | `NavigationPanel`：搜尋框 + 依分類的功能樹，列出每個已註冊分頁（開啟中的以粗體標示），只回報被選的鍵，開啟分頁仍由視窗負責。 |
+| `navigation.py` | 208 | `NavigationPanel`：搜尋框 + 依分類的功能樹，列出每個已註冊分頁（開啟中的以粗體標示），只回報被選的鍵，開啟分頁仍由視窗負責。 |
 | `theme.py` | 183 | 設計 token（`ThemeTokens`：顏色、圓角、間距、字族）、深色與淺色兩組值、由 token 產生的樣式表與對應的 `QPalette`；不載入圖檔或字型檔。 |
 | `workspace.py` | 466 | Registry-owned tab workspace with scrollable pages and passive execution details. `WorkspaceShell(registry, parent)` 保留分頁身分、弱關閉觀測、show/hide/close API 與右側詳情。 |
 | `workspace_details.py` | 95 | Immutable execution snapshots and a passive, scrollable workspace detail view. Diagnostics 提供第一個實際 publisher；僅訂閱目前頁面。 |
@@ -1533,9 +1533,9 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 150 | 40,652 |
+| `gui/` | 150 | 40,657 |
 | `utils/mcp_server/` | 63 | 22,228 |
-| `utils/remote_desktop/` | 77 | 16,709 |
+| `utils/remote_desktop/` | 77 | 16,717 |
 | `utils/executor/` | 11 | 10,702 |
 | `utils/usb/` | 20 | 5,060 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,167 |
@@ -1554,7 +1554,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,069 |
-| **總計** | **1,515** | **232,752** |
+| **總計** | **1,515** | **232,765** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
