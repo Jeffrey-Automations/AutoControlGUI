@@ -742,3 +742,29 @@ Executor commands::
 
 GUI: *Export Config* / *Import Config* buttons on the REST API tab,
 both with file dialogs and overwrite-confirmation dialogs.
+
+WebRTC software stop ownership
+----------------------------------------------------------------------
+
+``WebRTCDesktopHost.stop()`` and ``WebRTCDesktopViewer.stop()`` wait up to three
+seconds. ``PeerStopPending`` (from ``utils.remote_desktop.webrtc_retirement``)
+means the same retained future is still running; retrying waits on that future
+without submitting another coroutine. ``PeerStopFailed`` means a terminal failure;
+explicit retry attempts remaining resources. Both are ``RuntimeError`` compatible.
+Public and asynchronous restart paths refuse unfinished retirement. Delayed auth
+shutdown and peer callbacks remain bound to the original peer generation.
+
+Independent cleanup steps still run after an ordinary resource error. Failed child
+references remain owned, and owned frame tasks must actually finish before the
+software stop completes. ``MultiViewerHost`` retains failed child sessions and the
+shared screen source until their stop calls succeed; source failure blocks new
+sessions. ``FolderSyncEngine.stop_confirmed()`` requests cancellation, waits at most
+two seconds and returns whether that exact worker has exited. ``False`` retains the
+worker for later observation; it is not permission to start an overlapping worker.
+
+These are software completion contracts, not proof that every underlying native
+resource has retired. Media helpers may still suppress internal device errors.
+Cancelling a file-request coroutine does not join its ``asyncio.to_thread`` sender;
+that worker still depends on cooperative cancellation.
+Durable ownership and explicit retry after GUI page destruction are not yet supplied
+by these backend changes; callers must retain an owner when stop raises.

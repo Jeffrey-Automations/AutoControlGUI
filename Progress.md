@@ -535,7 +535,11 @@ F 還缺：
 - **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移，
   包含 Quick Connect 的同步啟停、已進入傳輸的取消與同頁 session generation 隔離。
 - **F3 關閉失敗恢復**：`gui/_slow_op.py` 的 StopQueue／stop_each 目前只記錄停止失敗，
-  尚未保留失敗資源的明確重試所有權；不能把背景排程等同原生資源已釋放。
+  尚未保留失敗資源的明確重試所有權。須接上應用程式生命週期的資源保管、原授權下的 Diagnostics 查詢／重試，
+  並遷移一般停止及頁面銷毀後的 discard 路徑，包含 `_drop_offer` 與廣播清理；不能把背景排程等同原生資源已釋放。
+  音訊、錄影與 LAN 廣播後端仍有吞掉清理錯誤或清掉失敗資源參照的路徑；錄影須分開記錄 flush 結果與容器關閉，
+  不可重播可能已部分完成的 flush。`webrtc_file_tasks` 的 `asyncio.to_thread` 傳送器仍缺實際工作執行緒完成確認，
+  取消並等候非同步包裝任務不代表傳送器已停止。上述缺口已用假資源重現，未執行原生／裝置／網路驗收。
 - **F4** 已有 `benchmarks/gui_startup.py` 與 `gui_workloads.py`，仍缺完整啟動／記憶體基準對照、mixed-DPI 與功能對等驗收。
 - **F3 Windows 原生釋放驗收**：`test/unit_test/headless/test_remote_desktop_host_id.py` 的 freed-thread-state abort 尚缺 Windows 原生堆疊與獨立根因確認。
 

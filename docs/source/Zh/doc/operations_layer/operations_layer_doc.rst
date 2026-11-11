@@ -673,3 +673,23 @@ Executor 指令::
 
 GUI：REST API 分頁的 *Export Config* / *Import Config* 兩顆按鈕，
 都帶檔案對話框與覆寫確認。
+
+WebRTC 軟體停止資源保管
+----------------------------------------------------------------------
+
+``WebRTCDesktopHost.stop()`` 與 ``WebRTCDesktopViewer.stop()`` 最多等待三秒。
+``utils.remote_desktop.webrtc_retirement`` 的 ``PeerStopPending`` 表示同一個保留的
+future 仍在執行；重試只會等待該 future，不另送 coroutine。``PeerStopFailed`` 表示
+操作已失敗；明確重試會處理剩餘資源。兩者都相容於 ``RuntimeError``。公開及非同步
+重新啟動入口會拒絕尚未完成的清理；延遲驗證關閉與 peer 回呼綁定原連線世代。
+
+一般資源錯誤不妨礙其他獨立清理步驟。失敗的子資源保留引用，影格工作必須真正
+結束才算軟體停止完成。``MultiViewerHost`` 保留失敗的 session 與共用畫面來源，
+直到停止呼叫成功；來源停止失敗期間禁止新增 session。
+``FolderSyncEngine.stop_confirmed()`` 請求取消、最多等待兩秒，再回報同一個工作
+執行緒是否已退出。``False`` 表示仍保留工作供後續觀測，不代表可啟動重疊工作。
+
+以上只承諾軟體操作完成，不證明所有底層原生資源已退出。媒體輔助類別仍可能吞掉
+內部裝置錯誤。取消檔案請求 coroutine 不等於等待其 ``asyncio.to_thread`` 傳送工作
+退出；該工作仍依賴合作式取消。本次後端變更尚未提供 GUI 頁面銷毀後的持久保管與明確重試；停止
+拋出例外時，呼叫端必須保留擁有者。

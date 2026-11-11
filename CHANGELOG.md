@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- WebRTC stop now reports pending or failed software cleanup, retains failed resources,
+  and blocks peer replacement until cleanup succeeds. Retrying a pending stop reuses
+  the original future. Multi-viewer teardown retains failed sessions and their capture
+  source; FolderSync exposes actual worker completion through `stop_confirmed()`.
+  Native device retirement and durable GUI recovery remain separate work.
+
 - Add internal bounded Windows image-file measurements with retained read-only leases
   and retryable cleanup. These observations do not grant loaded-code or fixture attestation.
 

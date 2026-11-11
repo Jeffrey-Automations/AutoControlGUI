@@ -9,8 +9,12 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Mapping, Optional
 
+from je_auto_control.utils.remote_desktop.webrtc_peer_cleanup import stop_viewer
+from je_auto_control.utils.remote_desktop.webrtc_retirement import (
+    PeerRetirement, stop_resource,
+)
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop.webrtc_file_callbacks import (
@@ -92,6 +96,7 @@ class WebRTCDesktopViewer:
         self._authenticated = False
         self._read_only = False
         self._host_fingerprint: Optional[str] = None
+        self._retirement = PeerRetirement()
         self._closed = threading.Event()
         # Pin fire-and-forget asyncio tasks so they aren't reaped before
         # they finish (S7502). Tasks self-discard via a done callback.
@@ -128,6 +133,8 @@ class WebRTCDesktopViewer:
                 verify_dtls_fingerprint,
             )
             verify_dtls_fingerprint(offer_sdp, expected_dtls_fingerprint)
+        self._retirement.require_startable()
+        self._retirement.admit_start()
         future = get_bridge().submit(self._async_process_offer(offer_sdp))
         return future.result(timeout=_OFFER_TIMEOUT_S)
 
@@ -273,28 +280,29 @@ class WebRTCDesktopViewer:
 
     async def _async_handle_renegotiate(self, offer_sdp: str) -> None:
         """Apply a host-initiated renegotiation offer."""
-        if self._pc is None:
-            return
-        try:
-            await self._pc.setRemoteDescription(
-                RTCSessionDescription(sdp=offer_sdp, type="offer"),
-            )
-            if self._config.share_my_screen and self._viewer_screen_track is None:
-                self._attach_viewer_screen_track()
-            if (self._config.share_my_audio_opus
-                    and self._opus_audio_track is None):
-                self._attach_opus_audio_track()
-            answer = await self._pc.createAnswer()
-            await self._pc.setLocalDescription(answer)
-            await wait_for_ice_gathering(self._pc)
-        except (RuntimeError, OSError) as error:
-            autocontrol_logger.warning("renegotiate handle: %r", error)
-            return
-        self._send({
-            "type": "renegotiate_answer",
-            "sdp": self._pc.localDescription.sdp,
-        })
-        autocontrol_logger.info("webrtc viewer: sent renegotiate answer")
+        async with self._retirement.starting():
+            if self._pc is None:
+                return
+            try:
+                await self._pc.setRemoteDescription(
+                    RTCSessionDescription(sdp=offer_sdp, type="offer"),
+                )
+                if self._config.share_my_screen and self._viewer_screen_track is None:
+                    self._attach_viewer_screen_track()
+                if (self._config.share_my_audio_opus
+                        and self._opus_audio_track is None):
+                    self._attach_opus_audio_track()
+                answer = await self._pc.createAnswer()
+                await self._pc.setLocalDescription(answer)
+                await wait_for_ice_gathering(self._pc)
+            except (RuntimeError, OSError) as error:
+                autocontrol_logger.warning("renegotiate handle: %r", error)
+                return
+            self._send({
+                "type": "renegotiate_answer",
+                "sdp": self._pc.localDescription.sdp,
+            })
+            autocontrol_logger.info("webrtc viewer: sent renegotiate answer")
 
     def _wire_files_channel(self, channel) -> None:
         from je_auto_control.utils.remote_desktop.webrtc_files import FileTransferReceiver
@@ -326,14 +334,12 @@ class WebRTCDesktopViewer:
         self._file_callbacks.published(path)
 
     def stop(self) -> None:
-        if self._pc is None:
+        """Wait for software teardown; retain and report unfinished attempts."""
+        if self._pc is None and not self._retirement.unsettled:
             return
         self._closed.set()
-        future = get_bridge().submit(self._async_stop())
-        try:
-            future.result(timeout=3.0)
-        except (asyncio.TimeoutError, OSError, RuntimeError) as error:
-            autocontrol_logger.warning("webrtc viewer stop: %r", error)
+        self._authenticated = False
+        self._retirement.stop(get_bridge().submit, self._async_stop)
 
     @property
     def connection_identity(self) -> object:
@@ -362,12 +368,17 @@ class WebRTCDesktopViewer:
     # --- async internals ----------------------------------------------------
 
     async def _async_process_offer(self, offer_sdp: str) -> str:
+        async with self._retirement.starting():
+            return await self._process_offer(offer_sdp)
+
+    async def _process_offer(self, offer_sdp: str) -> str:
         if self._pc is not None:
             # The whole previous session goes, not only its peer connection:
             # tracks, receivers and the authenticated flag outlived it.
-            await self._async_stop()
+            await self._stop_peer()
         # stop() set this and nothing cleared it, so a reused viewer's video
         # loop ended at once and showed no frames.
+        self._retirement.require_startable()
         self._closed.clear()
         self._pc = RTCPeerConnection(
             configuration=self._config.to_rtc_configuration(),
@@ -440,37 +451,16 @@ class WebRTCDesktopViewer:
         target.sender.replaceTrack(track)
         target.direction = "sendonly"
 
-    @staticmethod
-    def _stop_quietly(obj, label: str) -> None:
-        """Call ``obj.stop()``, swallowing teardown errors with a debug log."""
-        if obj is None:
-            return
-        try:
-            obj.stop()
-        except (RuntimeError, OSError) as error:
-            autocontrol_logger.debug("%s stop: %r", label, error)
+    _stop_quietly = staticmethod(stop_resource)
 
-    async def _async_stop(self) -> None:
-        self._closed.set()
-        close_file_receiver(self._files_receiver, self._files_channel)
-        self._stop_quietly(self._host_voice_receiver, "host voice")
-        self._host_voice_receiver = None
-        self._stop_quietly(self._opus_audio_track, "opus mic track")
-        self._opus_audio_track = None
-        self._stop_quietly(self._viewer_screen_track, "viewer screen track")
-        self._viewer_screen_track = None
-        self._stop_quietly(self._mic_sender, "mic sender")
-        self._mic_sender = None
-        if self._receive_task is not None:
-            self._receive_task.cancel()
-            self._receive_task = None
-        if self._pc is not None:
-            await self._pc.close()
-            self._pc = None
-        self._control_channel = None
-        self._mic_channel = None
-        self._files_channel = self._files_receiver = None
-        self._authenticated = False
+    def _async_stop(self) -> Coroutine[Any, Any, None]:
+        return self._stop_generation(self._pc)
+
+    async def _stop_generation(self, peer: object) -> None:
+        await self._retirement.retire(peer, lambda: self._pc, self._stop_peer)
+
+    async def _stop_peer(self) -> None:
+        await stop_viewer(self)
 
     # --- wiring -------------------------------------------------------------
 
@@ -496,6 +486,8 @@ class WebRTCDesktopViewer:
 
         @pc.on("track")
         def _on_track(track) -> None:
+            if self._pc is not pc or self._closed.is_set():
+                return
             autocontrol_logger.info("webrtc viewer: got %s track", track.kind)
             if track.kind == "video":
                 self._receive_task = asyncio.ensure_future(
@@ -506,6 +498,8 @@ class WebRTCDesktopViewer:
 
         @pc.on("datachannel")
         def _on_datachannel(channel) -> None:
+            if self._pc is not pc or self._closed.is_set():
+                return
             self._attach_datachannel(channel)
 
     def _attach_datachannel(self, channel) -> None:
@@ -534,7 +528,8 @@ class WebRTCDesktopViewer:
 
         @channel.on("message")
         def _on_message(message) -> None:
-            self._handle_ctrl_message(message)
+            if self._control_channel is channel:
+                self._handle_ctrl_message(message)
 
         @channel.on("close")
         def _on_close() -> None:
@@ -594,6 +589,8 @@ class WebRTCDesktopViewer:
         self._send(payload)
 
     def _handle_ctrl_message(self, message: Any) -> None:
+        if self._closed.is_set():
+            return
         if not isinstance(message, str):
             return
         try:

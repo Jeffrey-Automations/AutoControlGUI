@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import asyncio
 
+from je_auto_control.utils.remote_desktop.webrtc_retirement import PeerStopFailed
+
 import pytest
 
 from headless._webrtc_doubles import (
@@ -545,7 +547,9 @@ def test_a_teardown_failure_does_not_abort_the_rest_of_the_teardown():
     receiver = Stoppable()
     host._host_voice_track = voice
     host._opus_audio_receiver = receiver
-    asyncio.run(host._async_stop())
+    with pytest.raises(PeerStopFailed, match="host voice"):
+        asyncio.run(host._async_stop())
+    assert host._host_voice_track is voice
     assert receiver.stopped, "teardown continued past the failure"
 
 
@@ -553,8 +557,9 @@ def test_stop_quietly_ignores_a_collaborator_that_was_never_built():
     WebRTCDesktopHost._stop_quietly(None, "nothing")
 
 
-def test_a_stop_that_times_out_is_reported_rather_than_raised(monkeypatch):
+def test_a_completed_stop_with_timeout_error_is_reported_as_failure(monkeypatch):
     monkeypatch.setattr(host_module, "get_bridge", HangingBridge)
     host = _host()
     host._pc = object()
-    host.stop()   # the GUI's close button must not raise
+    with pytest.raises(PeerStopFailed):
+        host.stop()

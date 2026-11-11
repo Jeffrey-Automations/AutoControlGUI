@@ -21,6 +21,7 @@ running, and the audit log, which writes to the user's real
 `~/.je_auto_control`.
 """
 import asyncio
+from threading import Event
 
 import pytest
 
@@ -54,6 +55,8 @@ class _Host(ViewerAuthMixin):
 
     def __init__(self, *, token="secret", trust_list=None, ip_whitelist=None,
                  remote_ip=None, permissions=None, on_pending_viewer=None):
+        self._pc = object()
+        self._closed = Event()
         self._token = token
         self._trust_list = trust_list
         self._ip_whitelist = list(ip_whitelist or [])
@@ -79,6 +82,10 @@ class _Host(ViewerAuthMixin):
 
     async def _async_stop(self):
         self.stopped += 1
+
+    async def _stop_generation(self, peer):
+        if self._pc is peer:
+            await self._async_stop()
 
     def types_sent(self):
         return [message["type"] for message in self.sent]
