@@ -8,7 +8,7 @@ top-level MCP server boot cheap.
 import os
 from typing import Any, Dict, List
 
-from je_auto_control.utils.mcp_server.tools._handlers_executor_bridge import (
+from je_auto_control.utils.mcp_server.tools._handlers_vision_executor import (
     anchor_locate,
 )
 from je_auto_control.utils.mcp_server.tools._handlers_operations import (

@@ -19,7 +19,12 @@ from je_auto_control.utils.mcp_server.tools import _handlers as h
 from je_auto_control.utils.mcp_server.tools import _handlers_qa as hq
 from je_auto_control.utils.mcp_server.tools import _handlers_operations as h_ops
 from je_auto_control.utils.mcp_server.tools import _handlers_locators as h_loc
-from je_auto_control.utils.mcp_server.tools import _handlers_executor_bridge as h_exec
+from je_auto_control.utils.mcp_server.tools import _handlers_accessibility_executor as h_accessibility_exec
+from je_auto_control.utils.mcp_server.tools import _handlers_automation_executor as h_automation_exec
+from je_auto_control.utils.mcp_server.tools import _handlers_data_executor as h_data_exec
+from je_auto_control.utils.mcp_server.tools import _handlers_desktop_executor as h_desktop_exec
+from je_auto_control.utils.mcp_server.tools import _handlers_mobile_executor as h_mobile_exec
+from je_auto_control.utils.mcp_server.tools import _handlers_vision_executor as h_vision_exec
 from je_auto_control.utils.mcp_server.tools import _handlers_input as h_input
 from je_auto_control.utils.mcp_server.tools import _handlers_screen as h_screen
 from je_auto_control.utils.mcp_server.tools import _handlers_system as h_system
@@ -1075,7 +1080,7 @@ def android_widget_tools() -> List[MCPTool]:
                          "Returns {x1, y1, x2, y2}. Raises if no match "
                          "within timeout_s."),
             input_schema=schema(selector_schema),
-            handler=h_exec.android_find_element,
+            handler=h_mobile_exec.android_find_element,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1084,7 +1089,7 @@ def android_widget_tools() -> List[MCPTool]:
                          "Returns {x, y} click centre. Driven by "
                          "uiautomator2 so the daemon sees the press."),
             input_schema=schema(selector_schema),
-            handler=h_exec.android_click_element,
+            handler=h_mobile_exec.android_click_element,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1092,7 +1097,7 @@ def android_widget_tools() -> List[MCPTool]:
             description=("Return the device's current widget tree as "
                          "an XML string."),
             input_schema=schema({"serial": {"type": "string"}}),
-            handler=h_exec.android_dump_hierarchy,
+            handler=h_mobile_exec.android_dump_hierarchy,
             annotations=READ_ONLY,
         ),
     ]
@@ -1116,7 +1121,7 @@ def ios_tools() -> List[MCPTool]:
                 "y": {"type": "integer"},
                 "url": {"type": "string"},
             }, required=["x", "y"]),
-            handler=h_exec.ios_tap,
+            handler=h_mobile_exec.ios_tap,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1131,7 +1136,7 @@ def ios_tools() -> List[MCPTool]:
                 "duration_s": {"type": "number"},
                 "url": {"type": "string"},
             }, required=["x1", "y1", "x2", "y2"]),
-            handler=h_exec.ios_swipe,
+            handler=h_mobile_exec.ios_swipe,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1141,7 +1146,7 @@ def ios_tools() -> List[MCPTool]:
                 "text": {"type": "string"},
                 "url": {"type": "string"},
             }, required=["text"]),
-            handler=h_exec.ios_type,
+            handler=h_mobile_exec.ios_type,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1151,7 +1156,7 @@ def ios_tools() -> List[MCPTool]:
                 "file_path": {"type": "string", "format": "path"},
                 "url": {"type": "string"},
             }, required=["file_path"]),
-            handler=h_exec.ios_screenshot,
+            handler=h_mobile_exec.ios_screenshot,
             annotations=SIDE_EFFECT_ONLY,
         ),
         MCPTool(
@@ -1159,21 +1164,21 @@ def ios_tools() -> List[MCPTool]:
             description=("Find an XCUITest element by name / class_name / "
                          "predicate. Returns {x1, y1, x2, y2}."),
             input_schema=schema(selector_schema),
-            handler=h_exec.ios_find_element,
+            handler=h_mobile_exec.ios_find_element,
             annotations=READ_ONLY,
         ),
         MCPTool(
             name="ac_ios_click_element",
             description="Tap the first XCUITest element matching the selectors.",
             input_schema=schema(selector_schema),
-            handler=h_exec.ios_click_element,
+            handler=h_mobile_exec.ios_click_element,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
             name="ac_ios_dump_source",
             description="Return the XCUITest page source XML for the active app.",
             input_schema=schema({"url": {"type": "string"}}),
-            handler=h_exec.ios_dump_source,
+            handler=h_mobile_exec.ios_dump_source,
             annotations=READ_ONLY,
         ),
     ]
@@ -1215,7 +1220,7 @@ def redaction_tools() -> List[MCPTool]:
                 "ocr": {"type": "array",
                          "items": {"type": "object"}},
             }, required=["file_path"]),
-            handler=h_exec.redact_screenshot,
+            handler=h_vision_exec.redact_screenshot,
             annotations=SIDE_EFFECT_ONLY,
         ),
     ]
@@ -1260,7 +1265,7 @@ def computer_use_tools() -> List[MCPTool]:
                 "model": {"type": "string"},
                 "max_tokens": {"type": "integer"},
             }, required=["goal"]),
-            handler=h_exec.run_agent,
+            handler=h_automation_exec.run_agent,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -1416,7 +1421,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "(ExpandCollapsePattern). Located by name/role/app_name/"
                          "automation_id. Returns True on success."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.expand_control,
+            handler=h_accessibility_exec.expand_control,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1424,7 +1429,7 @@ def a11y_control_tools() -> List[MCPTool]:
             description=("Collapse a tree node / combobox / expander natively "
                          "(ExpandCollapsePattern). Returns True on success."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.collapse_control,
+            handler=h_accessibility_exec.collapse_control,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1432,7 +1437,7 @@ def a11y_control_tools() -> List[MCPTool]:
             description=("Read a control's expand state via ExpandCollapsePattern: "
                          "{state: expanded|collapsed|partial|leaf|null}."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.control_expand_state,
+            handler=h_accessibility_exec.control_expand_state,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1440,7 +1445,7 @@ def a11y_control_tools() -> List[MCPTool]:
             description=("Select a list / tree / tab item natively "
                          "(SelectionItemPattern). Returns True on success."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.select_control_item,
+            handler=h_accessibility_exec.select_control_item,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1448,7 +1453,7 @@ def a11y_control_tools() -> List[MCPTool]:
             description=("Read a slider / progress / spinner range via "
                          "RangeValuePattern: {found, range:{value,minimum,maximum}}."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.control_range,
+            handler=h_accessibility_exec.control_range,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1457,7 +1462,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "(RangeValuePattern). Returns True on success."),
             input_schema=schema({"value": {"type": "number"}, **_M},
                                 required=["value"]),
-            handler=h_exec.set_control_range,
+            handler=h_accessibility_exec.set_control_range,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1465,7 +1470,7 @@ def a11y_control_tools() -> List[MCPTool]:
             description=("Scroll a control into view before acting "
                          "(ScrollItemPattern). Returns True on success."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.scroll_control_into_view,
+            handler=h_accessibility_exec.scroll_control_into_view,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1486,7 +1491,7 @@ def a11y_control_tools() -> List[MCPTool]:
                 "app_name": {"type": "string"},
                 "automation_id": {"type": "string"}},
                 required=["item_name"]),
-            handler=h_exec.realize_item,
+            handler=h_accessibility_exec.realize_item,
             annotations=NON_DESTRUCTIVE,
         ),
         MCPTool(
@@ -1496,7 +1501,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "item_status, accelerator_key, access_key, "
                          "orientation}}. Check 'enabled' before clicking."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.get_element_properties,
+            handler=h_accessibility_exec.get_element_properties,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1504,7 +1509,7 @@ def a11y_control_tools() -> List[MCPTool]:
             description=("Read a native table's header labels via TablePattern: "
                          "{found, headers:{columns:[...], rows:[...]}}."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.table_headers,
+            handler=h_accessibility_exec.table_headers,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1515,7 +1520,7 @@ def a11y_control_tools() -> List[MCPTool]:
             input_schema=schema({"row": {"type": "integer"},
                                  "column": {"type": "integer"}, **_M},
                                 required=["row", "column"]),
-            handler=h_exec.table_cell,
+            handler=h_accessibility_exec.table_cell,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1527,7 +1532,7 @@ def a11y_control_tools() -> List[MCPTool]:
             input_schema=schema({"row": {"type": "integer"},
                                  "column_header": {"type": "string"}, **_M},
                                 required=["row", "column_header"]),
-            handler=h_exec.cell_by_header,
+            handler=h_accessibility_exec.cell_by_header,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1538,7 +1543,7 @@ def a11y_control_tools() -> List[MCPTool]:
             input_schema=schema({"x": {"type": "number"},
                                  "y": {"type": "number"}, **_M},
                                 required=["x", "y"]),
-            handler=h_exec.move_element,
+            handler=h_accessibility_exec.move_element,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1548,7 +1553,7 @@ def a11y_control_tools() -> List[MCPTool]:
             input_schema=schema({"width": {"type": "number"},
                                  "height": {"type": "number"}, **_M},
                                 required=["width", "height"]),
-            handler=h_exec.resize_element,
+            handler=h_accessibility_exec.resize_element,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1560,7 +1565,7 @@ def a11y_control_tools() -> List[MCPTool]:
                 "state": {"type": "string",
                           "enum": ["normal", "maximized", "minimized"]}, **_M},
                 required=["state"]),
-            handler=h_exec.set_window_state,
+            handler=h_accessibility_exec.set_window_state,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1570,7 +1575,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "closing|null}. A reliable 'is this window ready / "
                          "modal-blocked?' signal."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.window_interaction_state,
+            handler=h_accessibility_exec.window_interaction_state,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1581,7 +1586,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "last-resort read for legacy Win32 controls UIA can't "
                          "model."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.legacy_info,
+            handler=h_accessibility_exec.legacy_info,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1591,7 +1596,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "Value/Invoke/Toggle all do nothing. Returns True on "
                          "success."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.legacy_default_action,
+            handler=h_accessibility_exec.legacy_default_action,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1600,7 +1605,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "{found, selection:{items:[names], can_select_multiple, "
                          "is_required}} — what's selected in a listbox/grid/tab."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.get_selection,
+            handler=h_accessibility_exec.get_selection,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1609,7 +1614,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "MultipleViewPattern: {found, views:{current, views:"
                          "[names]}} — e.g. Explorer list / details / tile."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.list_views,
+            handler=h_accessibility_exec.list_views,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1618,7 +1623,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "MultipleViewPattern. Returns True on success."),
             input_schema=schema({"view": {"type": "string"}, **_M},
                                 required=["view"]),
-            handler=h_exec.set_view,
+            handler=h_accessibility_exec.set_view,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1628,7 +1633,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "Returns {changed, element} or {changed: false} on "
                          "'timeout' seconds (default 5)."),
             input_schema=schema({"timeout": {"type": "number"}}),
-            handler=h_exec.wait_for_focus_change,
+            handler=h_accessibility_exec.wait_for_focus_change,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1637,7 +1642,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "{text}. Works on multiline edits / RichEdit / document "
                          "controls where ac_control_get_value returns empty."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.get_control_text,
+            handler=h_accessibility_exec.get_control_text,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1649,7 +1654,7 @@ def a11y_control_tools() -> List[MCPTool]:
             input_schema=schema({"text": {"type": "string"},
                                  "ignore_case": {"type": "boolean"}, **_M},
                                 required=["text"]),
-            handler=h_exec.find_control_text,
+            handler=h_accessibility_exec.find_control_text,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1661,7 +1666,7 @@ def a11y_control_tools() -> List[MCPTool]:
             input_schema=schema({"text": {"type": "string"},
                                  "ignore_case": {"type": "boolean"}, **_M},
                                 required=["text"]),
-            handler=h_exec.select_control_text,
+            handler=h_accessibility_exec.select_control_text,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1670,7 +1675,7 @@ def a11y_control_tools() -> List[MCPTool]:
                          "attributes: {found, attributes:{font_name, font_size, "
                          "bold, italic, foreground_color}}."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.control_text_attributes,
+            handler=h_accessibility_exec.control_text_attributes,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1678,7 +1683,7 @@ def a11y_control_tools() -> List[MCPTool]:
             description=("Read a control's currently selected text via "
                          "TextPattern: {text} ('' when nothing selected)."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.get_selected_text,
+            handler=h_accessibility_exec.get_selected_text,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1686,7 +1691,7 @@ def a11y_control_tools() -> List[MCPTool]:
             description=("Read only the on-screen text of a control via "
                          "TextPattern.GetVisibleRanges: {text}."),
             input_schema=schema(dict(_M)),
-            handler=h_exec.get_visible_text,
+            handler=h_accessibility_exec.get_visible_text,
             annotations=READ_ONLY,
         ),
     ]
@@ -1717,7 +1722,7 @@ def a11y_tree_tools() -> List[MCPTool]:
                 "app_name": {"type": "string"},
                 "max_results": {"type": "integer"},
             }),
-            handler=h_exec.walk_tree,
+            handler=h_accessibility_exec.walk_tree,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1727,7 +1732,7 @@ def a11y_tree_tools() -> List[MCPTool]:
                          "already-friendly roles pass through unchanged."),
             input_schema=schema({"role": {"type": "string"}},
                                 required=["role"]),
-            handler=h_exec.humanize_role,
+            handler=h_accessibility_exec.humanize_role,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1739,7 +1744,7 @@ def a11y_tree_tools() -> List[MCPTool]:
                 "app_name": {"type": "string"},
                 "max_results": {"type": "integer"},
             }),
-            handler=h_exec.tab_order,
+            handler=h_accessibility_exec.tab_order,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1751,7 +1756,7 @@ def a11y_tree_tools() -> List[MCPTool]:
                 "app_name": {"type": "string"},
                 "max_results": {"type": "integer"},
             }),
-            handler=h_exec.audit_focus_order,
+            handler=h_accessibility_exec.audit_focus_order,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1765,7 +1770,7 @@ def a11y_tree_tools() -> List[MCPTool]:
                 "app_name": {"type": "string"},
                 "automation_id": {"type": "string"},
             }),
-            handler=h_exec.focus_control,
+            handler=h_accessibility_exec.focus_control,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -1779,7 +1784,7 @@ def a11y_tree_tools() -> List[MCPTool]:
                 "poll_interval_s": {"type": "number"},
                 "min_movement_px": {"type": "integer"},
             }),
-            handler=h_exec.a11y_record_start,
+            handler=h_accessibility_exec.a11y_record_start,
             annotations=NON_DESTRUCTIVE,
         ),
         MCPTool(
@@ -1787,7 +1792,7 @@ def a11y_tree_tools() -> List[MCPTool]:
             description=("Stop the recorder and return every captured "
                          "event in chronological order."),
             input_schema=schema({}),
-            handler=h_exec.a11y_record_stop,
+            handler=h_accessibility_exec.a11y_record_stop,
             annotations=NON_DESTRUCTIVE,
         ),
     ]
@@ -1940,7 +1945,7 @@ def smart_wait_tools() -> List[MCPTool]:
                 "poll_interval_s": {"type": "number"},
                 "gone_for_s": {"type": "number"}},
                 required=["image"]),
-            handler=h_exec.wait_image_gone,
+            handler=h_vision_exec.wait_image_gone,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1953,7 +1958,7 @@ def smart_wait_tools() -> List[MCPTool]:
                 "poll_interval_s": {"type": "number"},
                 "gone_for_s": {"type": "number"}},
                 required=["text"]),
-            handler=h_exec.wait_text_gone,
+            handler=h_vision_exec.wait_text_gone,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1971,7 +1976,7 @@ def smart_wait_tools() -> List[MCPTool]:
                 "timeout_s": {"type": "number"},
                 "poll_interval_s": {"type": "number"}},
                 required=["target_rgb"]),
-            handler=h_exec.wait_color,
+            handler=h_vision_exec.wait_color,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -1986,7 +1991,7 @@ def smart_wait_tools() -> List[MCPTool]:
                 "timeout_s": {"type": "number"},
                 "poll_interval_s": {"type": "number"}},
                 required=["pattern"]),
-            handler=h_exec.wait_window_title,
+            handler=h_vision_exec.wait_window_title,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -2298,7 +2303,7 @@ def anchor_locator_tools() -> List[MCPTool]:
                 "max_distance_px": {"type": "number"},
                 "ordinal": {"type": "integer"},
             }, required=["anchor", "target"]),
-            handler=h_exec.anchor_locate,
+            handler=h_vision_exec.anchor_locate,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -2314,7 +2319,7 @@ def anchor_locator_tools() -> List[MCPTool]:
                                        "right_of", "near"]},
                 "max_distance_px": {"type": "number"},
             }, required=["anchor", "target"]),
-            handler=h_exec.anchor_locate_all,
+            handler=h_vision_exec.anchor_locate_all,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -3522,7 +3527,7 @@ def resilience_tools() -> List[MCPTool]:
                 "threshold": {"type": "integer"},
                 "reset_s": {"type": "number"}},
                 required=["name", "actions"]),
-            handler=h_exec.circuit_call,
+            handler=h_automation_exec.circuit_call,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -3668,7 +3673,7 @@ def color_region_tools() -> List[MCPTool]:
                 "min_area": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["rgb"]),
-            handler=h_exec.find_color_region,
+            handler=h_vision_exec.find_color_region,
             annotations=READ_ONLY,
         ),
     ]
@@ -3691,7 +3696,7 @@ def feature_match_tools() -> List[MCPTool]:
                 "ratio": {"type": "number"},
                 "min_inliers": {"type": "integer"}},
                 required=["template"]),
-            handler=h_exec.feature_match,
+            handler=h_vision_exec.feature_match,
             annotations=READ_ONLY,
         ),
     ]
@@ -3711,7 +3716,7 @@ def shape_locator_tools() -> List[MCPTool]:
                 "min_area": {"type": "integer"},
                 "max_area": {"type": "integer"}},
                 required=[]),
-            handler=h_exec.find_shapes,
+            handler=h_vision_exec.find_shapes,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -3729,7 +3734,7 @@ def shape_locator_tools() -> List[MCPTool]:
                 "aspect_range": {"type": "array", "items": {"type": "number"}},
                 "epsilon": {"type": "number"}},
                 required=[]),
-            handler=h_exec.find_rectangles,
+            handler=h_vision_exec.find_rectangles,
             annotations=READ_ONLY,
         ),
     ]
@@ -3750,7 +3755,7 @@ def window_layout_tools() -> List[MCPTool]:
                 "screen": {"type": "array", "items": {"type": "integer"}},
                 "gap": {"type": "integer"}},
                 required=["slot"]),
-            handler=h_exec.tile_rect,
+            handler=h_desktop_exec.tile_rect,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -3765,7 +3770,7 @@ def window_layout_tools() -> List[MCPTool]:
                 "screen": {"type": "array", "items": {"type": "integer"}},
                 "gap": {"type": "integer"}},
                 required=["rows", "cols"]),
-            handler=h_exec.grid_rects,
+            handler=h_desktop_exec.grid_rects,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -3780,7 +3785,7 @@ def window_layout_tools() -> List[MCPTool]:
                 "offset": {"type": "integer"},
                 "size": {"type": "array", "items": {"type": "integer"}}},
                 required=["count"]),
-            handler=h_exec.cascade_rects,
+            handler=h_desktop_exec.cascade_rects,
             annotations=READ_ONLY,
         ),
     ]
@@ -3799,7 +3804,7 @@ def window_arrange_tools() -> List[MCPTool]:
                 "cols": {"type": "integer"},
                 "gap": {"type": "integer"}},
                 required=["titles"]),
-            handler=h_exec.arrange_grid,
+            handler=h_desktop_exec.arrange_grid,
             annotations=SIDE_EFFECT_ONLY,
         ),
         MCPTool(
@@ -3811,7 +3816,7 @@ def window_arrange_tools() -> List[MCPTool]:
                 "titles": {"type": "array", "items": {"type": "string"}},
                 "offset": {"type": "integer"}},
                 required=["titles"]),
-            handler=h_exec.arrange_cascade,
+            handler=h_desktop_exec.arrange_cascade,
             annotations=SIDE_EFFECT_ONLY,
         ),
     ]
@@ -3836,7 +3841,7 @@ def preprocess_tools() -> List[MCPTool]:
                 "block_size": {"type": "integer"},
                 "c": {"type": "integer"}},
                 required=["output_path"]),
-            handler=h_exec.preprocess_image,
+            handler=h_vision_exec.preprocess_image,
             annotations=SIDE_EFFECT_ONLY,
         ),
     ]
@@ -3852,7 +3857,7 @@ def monitor_layout_tools() -> List[MCPTool]:
                          "screen_size, this exposes per-monitor origins (which may "
                          "be negative) for multi-display placement."),
             input_schema=schema({}, required=[]),
-            handler=h_exec.enumerate_monitors,
+            handler=h_desktop_exec.enumerate_monitors,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -3864,7 +3869,7 @@ def monitor_layout_tools() -> List[MCPTool]:
                 "x": {"type": "integer"},
                 "y": {"type": "integer"}},
                 required=["x", "y"]),
-            handler=h_exec.monitor_at_point,
+            handler=h_desktop_exec.monitor_at_point,
             annotations=READ_ONLY,
         ),
     ]
@@ -3887,7 +3892,7 @@ def actionability_tools() -> List[MCPTool]:
                 "min_score": {"type": "number"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["template"]),
-            handler=h_exec.wait_actionable,
+            handler=h_vision_exec.wait_actionable,
             annotations=READ_ONLY,
         ),
     ]
@@ -3907,7 +3912,7 @@ def element_parse_tools() -> List[MCPTool]:
                 "a11y": {"type": "array", "items": {"type": "object"}},
                 "iou_threshold": {"type": "number"}},
                 required=[]),
-            handler=h_exec.fuse_elements,
+            handler=h_vision_exec.fuse_elements,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -3919,7 +3924,7 @@ def element_parse_tools() -> List[MCPTool]:
                 "elements": {"type": "array", "items": {"type": "object"}},
                 "row_tol": {"type": "integer"}},
                 required=["elements"]),
-            handler=h_exec.reading_order,
+            handler=h_vision_exec.reading_order,
             annotations=READ_ONLY,
         ),
     ]
@@ -3939,7 +3944,7 @@ def hsv_segment_tools() -> List[MCPTool]:
                 "min_area": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["lower_hsv", "upper_hsv"]),
-            handler=h_exec.segment_hsv,
+            handler=h_vision_exec.segment_hsv,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -3956,7 +3961,7 @@ def hsv_segment_tools() -> List[MCPTool]:
                 "min_area": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["hue"]),
-            handler=h_exec.dominant_hue_regions,
+            handler=h_vision_exec.dominant_hue_regions,
             annotations=READ_ONLY,
         ),
     ]
@@ -3978,7 +3983,7 @@ def text_regions_tools() -> List[MCPTool]:
                 "max_aspect": {"type": "number"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=[]),
-            handler=h_exec.find_text_regions,
+            handler=h_vision_exec.find_text_regions,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -3990,7 +3995,7 @@ def text_regions_tools() -> List[MCPTool]:
                 "y_tolerance": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=[]),
-            handler=h_exec.find_text_lines,
+            handler=h_vision_exec.find_text_lines,
             annotations=READ_ONLY,
         ),
     ]
@@ -4010,7 +4015,7 @@ def edge_lines_tools() -> List[MCPTool]:
                 "orientation": {"type": "string"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=[]),
-            handler=h_exec.find_lines,
+            handler=h_vision_exec.find_lines,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4023,7 +4028,7 @@ def edge_lines_tools() -> List[MCPTool]:
                 "tol": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=[]),
-            handler=h_exec.find_grid,
+            handler=h_vision_exec.find_grid,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4037,7 +4042,7 @@ def edge_lines_tools() -> List[MCPTool]:
                 "tol": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=[]),
-            handler=h_exec.find_separators,
+            handler=h_vision_exec.find_separators,
             annotations=READ_ONLY,
         ),
     ]
@@ -4061,7 +4066,7 @@ def expect_poll_tools() -> List[MCPTool]:
                 "timeout_s": {"type": "number"},
                 "interval_s": {"type": "number"}},
                 required=["action"]),
-            handler=h_exec.expect_poll,
+            handler=h_automation_exec.expect_poll,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -4080,7 +4085,7 @@ def locator_chain_tools() -> List[MCPTool]:
                 "boxes": {"type": "array", "items": {"type": "object"}},
                 "ops": {"type": "array", "items": {"type": "object"}}},
                 required=["boxes"]),
-            handler=h_exec.locate_chain,
+            handler=h_vision_exec.locate_chain,
             annotations=READ_ONLY,
         ),
     ]
@@ -4098,7 +4103,7 @@ def rich_clipboard_tools() -> List[MCPTool]:
                 "html": {"type": "string"},
                 "fragment_plaintext": {"type": "string"}},
                 required=["html"]),
-            handler=h_exec.set_clipboard_html,
+            handler=h_desktop_exec.set_clipboard_html,
             annotations=SIDE_EFFECT_ONLY,
         ),
         MCPTool(
@@ -4106,7 +4111,7 @@ def rich_clipboard_tools() -> List[MCPTool]:
             description=("Read the clipboard's HTML fragment (CF_HTML, Windows). "
                          "Returns {found, html}."),
             input_schema=schema({}, required=[]),
-            handler=h_exec.get_clipboard_html,
+            handler=h_desktop_exec.get_clipboard_html,
             annotations=READ_ONLY,
         ),
     ]
@@ -4123,7 +4128,7 @@ def clipboard_files_tools() -> List[MCPTool]:
             input_schema=schema({
                 "paths": {"type": "array", "items": {"type": "string", "format": "path"}}},
                 required=["paths"]),
-            handler=h_exec.set_clipboard_files,
+            handler=h_desktop_exec.set_clipboard_files,
             annotations=SIDE_EFFECT_ONLY,
         ),
         MCPTool(
@@ -4131,7 +4136,7 @@ def clipboard_files_tools() -> List[MCPTool]:
             description=("Read the clipboard's file-drop list (CF_HDROP, Windows). "
                          "Returns {found, paths}."),
             input_schema=schema({}, required=[]),
-            handler=h_exec.get_clipboard_files,
+            handler=h_desktop_exec.get_clipboard_files,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4140,7 +4145,7 @@ def clipboard_files_tools() -> List[MCPTool]:
                          "pastes as styled text into Word / rich editors (Windows). "
                          "Also seeds plain text. Returns {set, length}."),
             input_schema=schema({"text": {"type": "string"}}, required=["text"]),
-            handler=h_exec.set_clipboard_rtf,
+            handler=h_desktop_exec.set_clipboard_rtf,
             annotations=SIDE_EFFECT_ONLY,
         ),
         MCPTool(
@@ -4148,7 +4153,7 @@ def clipboard_files_tools() -> List[MCPTool]:
             description=("Read the clipboard's RTF document string (Windows). "
                          "Returns {found, rtf}."),
             input_schema=schema({}, required=[]),
-            handler=h_exec.get_clipboard_rtf,
+            handler=h_desktop_exec.get_clipboard_rtf,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4162,7 +4167,7 @@ def clipboard_files_tools() -> List[MCPTool]:
                          "items": {"type": "array", "items": {"type": "string"}}},
                 "delimiter": {"type": "string"}},
                 required=["rows"]),
-            handler=h_exec.set_clipboard_csv,
+            handler=h_desktop_exec.set_clipboard_csv,
             annotations=SIDE_EFFECT_ONLY,
         ),
         MCPTool(
@@ -4171,7 +4176,7 @@ def clipboard_files_tools() -> List[MCPTool]:
                          "strings (Windows). 'delimiter' defaults to ','. "
                          "Returns {found, rows}."),
             input_schema=schema({"delimiter": {"type": "string"}}),
-            handler=h_exec.get_clipboard_csv,
+            handler=h_desktop_exec.get_clipboard_csv,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4181,7 +4186,7 @@ def clipboard_files_tools() -> List[MCPTool]:
                          "{categories, formats:[{id,name,category}], has_text, "
                          "has_image, has_files}."),
             input_schema=schema({}, required=[]),
-            handler=h_exec.clipboard_formats,
+            handler=h_desktop_exec.clipboard_formats,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4191,7 +4196,7 @@ def clipboard_files_tools() -> List[MCPTool]:
                          "same summary as ac_clipboard_formats."),
             input_schema=schema({"formats": {"type": "array"}},
                                 required=["formats"]),
-            handler=h_exec.classify_formats,
+            handler=h_desktop_exec.classify_formats,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4202,7 +4207,7 @@ def clipboard_files_tools() -> List[MCPTool]:
             input_schema=schema({"before": {"type": "array"},
                                  "after": {"type": "array"}},
                                 required=["before", "after"]),
-            handler=h_exec.diff_formats,
+            handler=h_desktop_exec.diff_formats,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4214,7 +4219,7 @@ def clipboard_files_tools() -> List[MCPTool]:
                 "paths": {"type": "array", "items": {"type": "string", "format": "path"}},
                 "point": {"type": "array", "items": {"type": "integer"}}},
                 required=["paths"]),
-            handler=h_exec.plan_file_drop,
+            handler=h_desktop_exec.plan_file_drop,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4227,7 +4232,7 @@ def clipboard_files_tools() -> List[MCPTool]:
                 "paths": {"type": "array", "items": {"type": "string", "format": "path"}},
                 "point": {"type": "array", "items": {"type": "integer"}}},
                 required=["hwnd", "paths"]),
-            handler=h_exec.drop_files,
+            handler=h_desktop_exec.drop_files,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -4247,7 +4252,7 @@ def img_histogram_tools() -> List[MCPTool]:
                 "space": {"type": "string"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=[]),
-            handler=h_exec.image_histogram,
+            handler=h_vision_exec.image_histogram,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4264,7 +4269,7 @@ def img_histogram_tools() -> List[MCPTool]:
                 "space": {"type": "string"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["reference"]),
-            handler=h_exec.histogram_changed,
+            handler=h_vision_exec.histogram_changed,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4276,7 +4281,7 @@ def img_histogram_tools() -> List[MCPTool]:
             input_schema=schema({
                 "source": {"type": "string", "format": "path"},
                 "region": {"type": "array", "items": {"type": "integer"}}}),
-            handler=h_exec.image_quality,
+            handler=h_vision_exec.image_quality,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4290,7 +4295,7 @@ def img_histogram_tools() -> List[MCPTool]:
                 "region": {"type": "array", "items": {"type": "integer"}},
                 "min_sharpness": {"type": "number"},
                 "min_contrast": {"type": "number"}}),
-            handler=h_exec.quality_gate,
+            handler=h_vision_exec.quality_gate,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4306,7 +4311,7 @@ def img_histogram_tools() -> List[MCPTool]:
                 "scales": {"type": "array", "items": {"type": "number"}},
                 "method": {"type": "string"}},
                 required=["template"]),
-            handler=h_exec.detect_scale,
+            handler=h_vision_exec.detect_scale,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4322,7 +4327,7 @@ def img_histogram_tools() -> List[MCPTool]:
                 "scales": {"type": "array", "items": {"type": "number"}},
                 "method": {"type": "string"}},
                 required=["template"]),
-            handler=h_exec.scale_sweep,
+            handler=h_vision_exec.scale_sweep,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4337,7 +4342,7 @@ def img_histogram_tools() -> List[MCPTool]:
                 "size": {"type": "integer"},
                 "threshold": {"type": "number"},
                 "min_area": {"type": "integer"}}),
-            handler=h_exec.salient_regions,
+            handler=h_vision_exec.salient_regions,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4351,7 +4356,7 @@ def img_histogram_tools() -> List[MCPTool]:
                 "size": {"type": "integer"},
                 "threshold": {"type": "number"},
                 "min_area": {"type": "integer"}}),
-            handler=h_exec.most_salient,
+            handler=h_vision_exec.most_salient,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4556,7 +4561,7 @@ def motion_regions_tools() -> List[MCPTool]:
                 "min_area": {"type": "integer"},
                 "blur": {"type": "integer"}},
                 required=["before"]),
-            handler=h_exec.changed_regions,
+            handler=h_vision_exec.changed_regions,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4570,7 +4575,7 @@ def motion_regions_tools() -> List[MCPTool]:
                 "threshold": {"type": "integer"},
                 "min_area": {"type": "integer"}},
                 required=["before"]),
-            handler=h_exec.has_motion,
+            handler=h_vision_exec.has_motion,
             annotations=READ_ONLY,
         ),
     ]
@@ -4586,7 +4591,7 @@ def window_zorder_tools() -> List[MCPTool]:
                 "title": {"type": "string"},
                 "on": {"type": "boolean"}},
                 required=["title"]),
-            handler=h_exec.set_topmost,
+            handler=h_desktop_exec.set_topmost,
             annotations=SIDE_EFFECT_ONLY,
         ),
         MCPTool(
@@ -4594,7 +4599,7 @@ def window_zorder_tools() -> List[MCPTool]:
             description=("Raise the window matching 'title' to the top of the "
                          "z-order. Returns {applied}. Windows only."),
             input_schema=schema({"title": {"type": "string"}}, required=["title"]),
-            handler=h_exec.bring_to_front,
+            handler=h_desktop_exec.bring_to_front,
             annotations=SIDE_EFFECT_ONLY,
         ),
         MCPTool(
@@ -4602,7 +4607,7 @@ def window_zorder_tools() -> List[MCPTool]:
             description=("Send the window matching 'title' to the bottom of the "
                          "z-order. Returns {applied}. Windows only."),
             input_schema=schema({"title": {"type": "string"}}, required=["title"]),
-            handler=h_exec.send_to_back,
+            handler=h_desktop_exec.send_to_back,
             annotations=SIDE_EFFECT_ONLY,
         ),
     ]
@@ -4621,7 +4626,7 @@ def soft_assert_tools() -> List[MCPTool]:
                 "checks": {"type": "array", "items": {"type": "object"}},
                 "raise_on_fail": {"type": "boolean"}},
                 required=["checks"]),
-            handler=h_exec.soft_assert,
+            handler=h_automation_exec.soft_assert,
             annotations=READ_ONLY,
         ),
     ]
@@ -4643,7 +4648,7 @@ def perceptual_diff_tools() -> List[MCPTool]:
                 "include_aa": {"type": "boolean"},
                 "max_diff_ratio": {"type": "number"}},
                 required=["actual", "expected"]),
-            handler=h_exec.perceptual_diff,
+            handler=h_vision_exec.perceptual_diff,
             annotations=READ_ONLY,
         ),
     ]
@@ -4657,7 +4662,7 @@ def window_geometry_tools() -> List[MCPTool]:
                          "excluding title bar / borders) of the window matching "
                          "'title'. Returns {found, rect}. Windows only."),
             input_schema=schema({"title": {"type": "string"}}, required=["title"]),
-            handler=h_exec.get_client_rect,
+            handler=h_desktop_exec.get_client_rect,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4670,7 +4675,7 @@ def window_geometry_tools() -> List[MCPTool]:
                 "x": {"type": "integer"},
                 "y": {"type": "integer"}},
                 required=["title", "x", "y"]),
-            handler=h_exec.client_point,
+            handler=h_desktop_exec.client_point,
             annotations=READ_ONLY,
         ),
     ]
@@ -4688,7 +4693,7 @@ def cua_action_tools() -> List[MCPTool]:
                 "payload": {"type": "object"},
                 "source": {"type": "string"}},
                 required=["payload"]),
-            handler=h_exec.cua_command,
+            handler=h_automation_exec.cua_command,
             annotations=READ_ONLY,
         ),
     ]
@@ -4708,7 +4713,7 @@ def observation_tools() -> List[MCPTool]:
                 "viewport": {"type": "array", "items": {"type": "integer"}},
                 "max_elements": {"type": "integer"}},
                 required=["elements"]),
-            handler=h_exec.serialize_observation,
+            handler=h_automation_exec.serialize_observation,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4721,7 +4726,7 @@ def observation_tools() -> List[MCPTool]:
                 "viewport": {"type": "array", "items": {"type": "integer"}},
                 "max_elements": {"type": "integer"}},
                 required=["elements"]),
-            handler=h_exec.observation_index,
+            handler=h_automation_exec.observation_index,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4740,7 +4745,7 @@ def observation_tools() -> List[MCPTool]:
                 "max_lines": {"type": "integer"},
                 "interactive_only": {"type": "boolean"}},
                 required=["prev", "curr"]),
-            handler=h_exec.delta_observation,
+            handler=h_automation_exec.delta_observation,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4756,7 +4761,7 @@ def observation_tools() -> List[MCPTool]:
                 "action": {"type": "object"},
                 "radius": {"type": "integer"}},
                 required=["before", "after", "action"]),
-            handler=h_exec.classify_effect,
+            handler=h_automation_exec.classify_effect,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4769,7 +4774,7 @@ def observation_tools() -> List[MCPTool]:
                 "point": {"type": "array", "items": {"type": "integer"}},
                 "radius": {"type": "integer"}},
                 required=["before", "after", "point"]),
-            handler=h_exec.effect_near_point,
+            handler=h_automation_exec.effect_near_point,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4785,7 +4790,7 @@ def observation_tools() -> List[MCPTool]:
                 "spec": {"type": "object"},
                 "before": {"type": "array", "items": {"type": "object"}}},
                 required=["after", "spec"]),
-            handler=h_exec.check_postcondition,
+            handler=h_automation_exec.check_postcondition,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4799,7 +4804,7 @@ def observation_tools() -> List[MCPTool]:
                 "verdict": {"type": "string"},
                 "max_attempts": {"type": "integer"}},
                 required=["verdict"]),
-            handler=h_exec.plan_repair,
+            handler=h_automation_exec.plan_repair,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4815,7 +4820,7 @@ def observation_tools() -> List[MCPTool]:
                                          "items": {"type": "number"}}},
                 "cluster_radius": {"type": "number"}},
                 required=["candidates"]),
-            handler=h_exec.consensus_point,
+            handler=h_automation_exec.consensus_point,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4829,7 +4834,7 @@ def observation_tools() -> List[MCPTool]:
                                          "items": {"type": "number"}}},
                 "elements": {"type": "array", "items": {"type": "object"}}},
                 required=["candidates", "elements"]),
-            handler=h_exec.consensus_element,
+            handler=h_automation_exec.consensus_element,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4844,7 +4849,7 @@ def observation_tools() -> List[MCPTool]:
                 "quiet_samples": {"type": "integer"},
                 "max_churn": {"type": "number"}},
                 required=["churns"]),
-            handler=h_exec.settle_point,
+            handler=h_automation_exec.settle_point,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4861,7 +4866,7 @@ def observation_tools() -> List[MCPTool]:
                 "postcondition": {"type": "object"},
                 "radius": {"type": "integer"}},
                 required=["action", "before", "after"]),
-            handler=h_exec.build_critic_record,
+            handler=h_automation_exec.build_critic_record,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4871,7 +4876,7 @@ def observation_tools() -> List[MCPTool]:
                          "process_score (0..1), reasons}. Deterministic, no model."),
             input_schema=schema({"record": {"type": "object"}},
                                 required=["record"]),
-            handler=h_exec.score_step,
+            handler=h_automation_exec.score_step,
             annotations=READ_ONLY,
         ),
     ]
@@ -4891,7 +4896,7 @@ def action_grounding_tools() -> List[MCPTool]:
                 "screen": {"type": "array", "items": {"type": "integer"}},
                 "targets": {"type": "array", "items": {"type": "object"}}},
                 required=["action"]),
-            handler=h_exec.validate_action,
+            handler=h_automation_exec.validate_action,
             annotations=READ_ONLY,
         ),
     ]
@@ -4907,7 +4912,7 @@ def agent_replay_tools() -> List[MCPTool]:
                          "observation, action, result} steps. Returns {count, "
                          "results}. Side-effecting (runs the actions)."),
             input_schema=schema({"trace": {"type": "array"}}, required=["trace"]),
-            handler=h_exec.replay_trace,
+            handler=h_automation_exec.replay_trace,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -4926,7 +4931,7 @@ def element_diff_tools() -> List[MCPTool]:
                 "after": {"type": "array", "items": {"type": "object"}},
                 "iou_threshold": {"type": "number"}},
                 required=["before", "after"]),
-            handler=h_exec.match_elements,
+            handler=h_automation_exec.match_elements,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4939,7 +4944,7 @@ def element_diff_tools() -> List[MCPTool]:
                 "prior": {"type": "array", "items": {"type": "object"}},
                 "iou_threshold": {"type": "number"}},
                 required=["elements"]),
-            handler=h_exec.assign_stable_ids,
+            handler=h_automation_exec.assign_stable_ids,
             annotations=READ_ONLY,
         ),
     ]
@@ -4959,7 +4964,7 @@ def element_scoring_tools() -> List[MCPTool]:
                 "want_name": {"type": "string"},
                 "anchor": {"type": "array", "items": {"type": "integer"}}},
                 required=["candidates"]),
-            handler=h_exec.score_candidates,
+            handler=h_automation_exec.score_candidates,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -4972,7 +4977,7 @@ def element_scoring_tools() -> List[MCPTool]:
                 "want_name": {"type": "string"},
                 "anchor": {"type": "array", "items": {"type": "integer"}}},
                 required=["candidates"]),
-            handler=h_exec.best_candidate,
+            handler=h_automation_exec.best_candidate,
             annotations=READ_ONLY,
         ),
     ]
@@ -4990,7 +4995,7 @@ def barcode_tools() -> List[MCPTool]:
                 "source": {"type": "string", "format": "path"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=[]),
-            handler=h_exec.read_barcodes,
+            handler=h_vision_exec.read_barcodes,
             annotations=READ_ONLY,
         ),
     ]
@@ -5013,7 +5018,7 @@ def ssim_tools() -> List[MCPTool]:
                                      "items": {"type": "integer"}}},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["reference"]),
-            handler=h_exec.ssim_compare,
+            handler=h_vision_exec.ssim_compare,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5033,7 +5038,7 @@ def ssim_tools() -> List[MCPTool]:
                 "min_area": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["reference"]),
-            handler=h_exec.ssim_changed_regions,
+            handler=h_vision_exec.ssim_changed_regions,
             annotations=READ_ONLY,
         ),
     ]
@@ -5054,7 +5059,7 @@ def visual_match_tools() -> List[MCPTool]:
                 "region": {"type": "array", "items": {"type": "integer"}},
                 "method": {"type": "string"}},
                 required=["template"]),
-            handler=h_exec.match_template,
+            handler=h_vision_exec.match_template,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5069,7 +5074,7 @@ def visual_match_tools() -> List[MCPTool]:
                 "nms_iou": {"type": "number"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["template"]),
-            handler=h_exec.match_template_all,
+            handler=h_vision_exec.match_template_all,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5085,7 +5090,7 @@ def visual_match_tools() -> List[MCPTool]:
                 "min_score": {"type": "number"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["template"]),
-            handler=h_exec.match_masked,
+            handler=h_vision_exec.match_masked,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5100,7 +5105,7 @@ def visual_match_tools() -> List[MCPTool]:
                 "nms_iou": {"type": "number"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["template"]),
-            handler=h_exec.match_masked_all,
+            handler=h_vision_exec.match_masked_all,
             annotations=READ_ONLY,
         ),
     ]
@@ -5123,7 +5128,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "region": {"type": "array", "items": {"type": "integer"}},
                 "method": {"type": "string"}},
                 required=["template"]),
-            handler=h_exec.match_rotated,
+            handler=h_vision_exec.match_rotated,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5140,7 +5145,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "nms_iou": {"type": "number"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["template"]),
-            handler=h_exec.match_rotated_all,
+            handler=h_vision_exec.match_rotated_all,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5159,7 +5164,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "region": {"type": "array", "items": {"type": "integer"}},
                 "method": {"type": "string"}},
                 required=["template"]),
-            handler=h_exec.match_with_trust,
+            handler=h_vision_exec.match_with_trust,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5174,7 +5179,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "region": {"type": "array", "items": {"type": "integer"}},
                 "method": {"type": "string"}},
                 required=["template"]),
-            handler=h_exec.auto_threshold,
+            handler=h_vision_exec.auto_threshold,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5190,7 +5195,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "region": {"type": "array", "items": {"type": "integer"}},
                 "method": {"type": "string"}},
                 required=["template"]),
-            handler=h_exec.match_auto,
+            handler=h_vision_exec.match_auto,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5206,7 +5211,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "scales": {"type": "array", "items": {"type": "number"}},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["template"]),
-            handler=h_exec.edge_match,
+            handler=h_vision_exec.edge_match,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5221,7 +5226,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "nms_iou": {"type": "number"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["template"]),
-            handler=h_exec.edge_match_all,
+            handler=h_vision_exec.edge_match_all,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5237,7 +5242,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "region": {"type": "array", "items": {"type": "integer"}},
                 "method": {"type": "string"}},
                 required=["template"]),
-            handler=h_exec.match_subpixel,
+            handler=h_vision_exec.match_subpixel,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5255,7 +5260,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "min_votes": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["templates"]),
-            handler=h_exec.match_ensemble,
+            handler=h_vision_exec.match_ensemble,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5269,7 +5274,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "agree_px": {"type": "number"},
                 "min_votes": {"type": "integer"}},
                 required=["centers"]),
-            handler=h_exec.vote_centers,
+            handler=h_vision_exec.vote_centers,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5287,7 +5292,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "scales": {"type": "array", "items": {"type": "number"}},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["template"]),
-            handler=h_exec.match_color,
+            handler=h_vision_exec.match_color,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5303,7 +5308,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "nms_iou": {"type": "number"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["template"]),
-            handler=h_exec.match_color_all,
+            handler=h_vision_exec.match_color_all,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5317,7 +5322,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "frames": {"type": "array", "items": {"type": "string", "format": "path"}},
                 "settle_threshold": {"type": "number"}},
                 required=["frames"]),
-            handler=h_exec.region_stability,
+            handler=h_vision_exec.region_stability,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5333,7 +5338,7 @@ def rotated_match_tools() -> List[MCPTool]:
                 "min_score": {"type": "number"},
                 "agree_px": {"type": "number"}},
                 required=["template", "frames"]),
-            handler=h_exec.match_persistence,
+            handler=h_vision_exec.match_persistence,
             annotations=READ_ONLY,
         ),
     ]
@@ -5352,7 +5357,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "cols": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["rows", "cols"]),
-            handler=h_exec.grid_cells,
+            handler=h_vision_exec.grid_cells,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5366,7 +5371,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "cols": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["x", "y", "rows", "cols"]),
-            handler=h_exec.cell_for_point,
+            handler=h_vision_exec.cell_for_point,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5379,7 +5384,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "cols": {"type": "integer"},
                 "region": {"type": "array", "items": {"type": "integer"}}},
                 required=["label", "rows", "cols"]),
-            handler=h_exec.point_for_cell,
+            handler=h_vision_exec.point_for_cell,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5394,7 +5399,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "text_boxes": {"type": "array", "items": {"type": "object"}},
                 "overlap": {"type": "number"}},
                 required=["grid", "text_boxes"]),
-            handler=h_exec.populate_table,
+            handler=h_vision_exec.populate_table,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5408,7 +5413,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "page_width": {"type": "integer"},
                 "min_gap": {"type": "integer"}},
                 required=["boxes"]),
-            handler=h_exec.column_gutters,
+            handler=h_vision_exec.column_gutters,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5425,7 +5430,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "min_cols": {"type": "integer"},
                 "min_rows": {"type": "integer"}},
                 required=["boxes"]),
-            handler=h_exec.detect_borderless_table,
+            handler=h_vision_exec.detect_borderless_table,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5440,7 +5445,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "directions": {"type": "array", "items": {"type": "string"}},
                 "max_gap": {"type": "integer"}},
                 required=["text_boxes"]),
-            handler=h_exec.associate_fields,
+            handler=h_vision_exec.associate_fields,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5452,7 +5457,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "labels": {"type": "array", "items": {"type": "object"}},
                 "widgets": {"type": "array", "items": {"type": "object"}}},
                 required=["labels", "widgets"]),
-            handler=h_exec.match_labels_to_widgets,
+            handler=h_vision_exec.match_labels_to_widgets,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5466,7 +5471,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "boxes": {"type": "array", "items": {"type": "object"}},
                 "min_gap": {"type": "integer"}},
                 required=["boxes"]),
-            handler=h_exec.flow_order,
+            handler=h_vision_exec.flow_order,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5478,7 +5483,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "boxes": {"type": "array", "items": {"type": "object"}},
                 "min_gap": {"type": "integer"}},
                 required=["boxes"]),
-            handler=h_exec.xy_cut,
+            handler=h_vision_exec.xy_cut,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5491,7 +5496,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "lines": {"type": "array", "items": {"type": "object"}},
                 "line_gap_factor": {"type": "number"}},
                 required=["lines"]),
-            handler=h_exec.group_paragraphs,
+            handler=h_vision_exec.group_paragraphs,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5503,7 +5508,7 @@ def screen_grid_tools() -> List[MCPTool]:
             input_schema=schema({
                 "lines": {"type": "array", "items": {"type": "object"}}},
                 required=["lines"]),
-            handler=h_exec.detect_lists,
+            handler=h_vision_exec.detect_lists,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5516,7 +5521,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "lines": {"type": "array", "items": {"type": "object"}},
                 "heading_ratio": {"type": "number"}},
                 required=["lines"]),
-            handler=h_exec.classify_lines,
+            handler=h_vision_exec.classify_lines,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -5528,7 +5533,7 @@ def screen_grid_tools() -> List[MCPTool]:
                 "lines": {"type": "array", "items": {"type": "object"}},
                 "heading_ratio": {"type": "number"}},
                 required=["lines"]),
-            handler=h_exec.outline,
+            handler=h_vision_exec.outline,
             annotations=READ_ONLY,
         ),
     ]
@@ -5551,7 +5556,7 @@ def grid_locator_tools() -> List[MCPTool]:
                 "row_tolerance": {"type": "integer"},
                 "box_format": {"type": "string", "enum": ["xywh", "ltrb"]}},
                 required=["boxes", "row", "col"]),
-            handler=h_exec.grid_cell,
+            handler=h_vision_exec.grid_cell,
             annotations=READ_ONLY,
         ),
     ]
@@ -5569,7 +5574,7 @@ def modifier_state_tools() -> List[MCPTool]:
                 "modifiers": {"type": "array", "items": {"type": "string"}},
                 "actions": {"type": "array"}},
                 required=["modifiers", "actions"]),
-            handler=h_exec.with_modifiers,
+            handler=h_desktop_exec.with_modifiers,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -5586,7 +5591,7 @@ def text_unicode_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"text": {"type": "string"}, "modifier": {"type": "string"}},
                 required=["text"]),
-            handler=h_exec.type_unicode,
+            handler=h_desktop_exec.type_unicode,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -5598,7 +5603,7 @@ def text_unicode_tools() -> List[MCPTool]:
                          "silently do nothing while still reporting success. "
                          "Sends one inert keystroke (F13) to find out."),
             input_schema=schema({}),
-            handler=h_exec.input_reachable,
+            handler=h_desktop_exec.input_reachable,
             annotations=SIDE_EFFECT_ONLY,
         ),
         MCPTool(
@@ -5608,7 +5613,7 @@ def text_unicode_tools() -> List[MCPTool]:
                          "backend that supports it (Windows). "
                          "Returns {ops, plan, method, code_units}."),
             input_schema=schema({"text": {"type": "string"}}, required=["text"]),
-            handler=h_exec.type_unicode_keys,
+            handler=h_desktop_exec.type_unicode_keys,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -5620,7 +5625,7 @@ def text_unicode_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"text": {"type": "string"}, "modifier": {"type": "string"}},
                 required=["text"]),
-            handler=h_exec.type_unicode_text,
+            handler=h_desktop_exec.type_unicode_text,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -5635,7 +5640,7 @@ def mouse_relative_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"dx": {"type": "integer"}, "dy": {"type": "integer"}},
                 required=["dx", "dy"]),
-            handler=h_exec.move_mouse_relative,
+            handler=h_desktop_exec.move_mouse_relative,
             annotations=SIDE_EFFECT_ONLY,
         ),
     ]
@@ -5653,7 +5658,7 @@ def key_hold_tools() -> List[MCPTool]:
                 "duration_s": {"type": "number"},
                 "rate_hz": {"type": "number"}},
                 required=["key", "duration_s"]),
-            handler=h_exec.hold_key,
+            handler=h_desktop_exec.hold_key,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -5671,7 +5676,7 @@ def field_entry_tools() -> List[MCPTool]:
                 "text": {"type": "string"}, "clear": {"type": "string"},
                 "paste": {"type": "boolean"}, "modifier": {"type": "string"}},
                 required=["text"]),
-            handler=h_exec.set_field_text,
+            handler=h_desktop_exec.set_field_text,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -5691,7 +5696,7 @@ def mouse_path_tools() -> List[MCPTool]:
                 "easing": {"type": "string"},
                 "per_segment_steps": {"type": "integer"}},
                 required=["waypoints"]),
-            handler=h_exec.move_along_path,
+            handler=h_desktop_exec.move_along_path,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -5711,7 +5716,7 @@ def mouse_path_tools() -> List[MCPTool]:
                 "step_delay_s": {"type": "number", "minimum": 0},
                 "settle_s": {"type": "number", "minimum": 0}},
                 required=["waypoints"]),
-            handler=h_exec.drag_path,
+            handler=h_desktop_exec.drag_path,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -6611,7 +6616,7 @@ def http_conditional_tools() -> List[MCPTool]:
             description=("Parse the 'headers' Cache-Control into {directives} "
                          "(max-age as int, flags as true)."),
             input_schema=schema({"headers": {"type": "object"}}, ["headers"]),
-            handler=h_exec.parse_cache_control,
+            handler=h_data_exec.parse_cache_control,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6620,7 +6625,7 @@ def http_conditional_tools() -> List[MCPTool]:
                          "cache_control) from an HTTP 'response'. Returns "
                          "{validators}."),
             input_schema=schema({"response": {"type": "object"}}, ["response"]),
-            handler=h_exec.store_validators,
+            handler=h_data_exec.store_validators,
             annotations=READ_ONLY,
         ),
     ]
@@ -6636,7 +6641,7 @@ def cookie_jar_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"set_cookies": {"type": ["string", "array"]}},
                 ["set_cookies"]),
-            handler=h_exec.cookie_header,
+            handler=h_data_exec.cookie_header,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6644,7 +6649,7 @@ def cookie_jar_tools() -> List[MCPTool]:
             description=("Parse one Set-Cookie 'header' into {cookie: {name, "
                          "value, attributes}} (or null)."),
             input_schema=schema({"header": {"type": "string"}}, ["header"]),
-            handler=h_exec.parse_set_cookie,
+            handler=h_data_exec.parse_set_cookie,
             annotations=READ_ONLY,
         ),
     ]
@@ -6661,7 +6666,7 @@ def http_content_tools() -> List[MCPTool]:
                 {"headers": {"type": "object"},
                  "body_base64": {"type": "string"}},
                 ["headers", "body_base64"]),
-            handler=h_exec.decode_body,
+            handler=h_data_exec.decode_body,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6670,7 +6675,7 @@ def http_content_tools() -> List[MCPTool]:
                          "Accept-Encoding) into {values}: [token, q] sorted by q "
                          "descending."),
             input_schema=schema({"header": {"type": "string"}}, ["header"]),
-            handler=h_exec.parse_quality_values,
+            handler=h_data_exec.parse_quality_values,
             annotations=READ_ONLY,
         ),
     ]
@@ -6688,7 +6693,7 @@ def multipart_tools() -> List[MCPTool]:
                 {"fields": {"type": "object"}, "files": {"type": "array"},
                  "boundary": {"type": "string"}},
                 []),
-            handler=h_exec.build_multipart,
+            handler=h_data_exec.build_multipart,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6699,7 +6704,7 @@ def multipart_tools() -> List[MCPTool]:
                 {"content_type": {"type": "string"},
                  "body_base64": {"type": "string"}},
                 ["content_type", "body_base64"]),
-            handler=h_exec.parse_multipart,
+            handler=h_data_exec.parse_multipart,
             annotations=READ_ONLY,
         ),
     ]
@@ -6713,7 +6718,7 @@ def link_header_tools() -> List[MCPTool]:
                          "(each {uri, rel, params}), handling quoted params and "
                          "multiple links."),
             input_schema=schema({"value": {"type": "string"}}, ["value"]),
-            handler=h_exec.parse_link_header,
+            handler=h_data_exec.parse_link_header,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6721,7 +6726,7 @@ def link_header_tools() -> List[MCPTool]:
             description=("Return the rel=next URL from a Link header 'value' as "
                          "{url} (null when absent)."),
             input_schema=schema({"value": {"type": "string"}}, ["value"]),
-            handler=h_exec.next_url,
+            handler=h_data_exec.next_url,
             annotations=READ_ONLY,
         ),
     ]
@@ -6739,7 +6744,7 @@ def referential_tools() -> List[MCPTool]:
                 {"child_rows": rows, "child_col": {"type": "string"},
                  "parent_rows": rows, "parent_col": {"type": "string"}},
                 ["child_rows", "child_col", "parent_rows", "parent_col"]),
-            handler=h_exec.check_foreign_key,
+            handler=h_data_exec.check_foreign_key,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6750,7 +6755,7 @@ def referential_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"rows": rows, "cols": {"type": ["string", "array"]}},
                 ["rows", "cols"]),
-            handler=h_exec.check_unique_key,
+            handler=h_data_exec.check_unique_key,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6761,7 +6766,7 @@ def referential_tools() -> List[MCPTool]:
                 {"rows": rows, "col": {"type": "string"},
                  "allowed": {"type": "array"}},
                 ["rows", "col", "allowed"]),
-            handler=h_exec.check_accepted_values,
+            handler=h_data_exec.check_accepted_values,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6772,7 +6777,7 @@ def referential_tools() -> List[MCPTool]:
                 {"rows": rows, "minimum": {"type": "integer"},
                  "maximum": {"type": "integer"}},
                 ["rows"]),
-            handler=h_exec.check_row_count,
+            handler=h_data_exec.check_row_count,
             annotations=READ_ONLY,
         ),
     ]
@@ -6791,7 +6796,7 @@ def dataset_diff_tools() -> List[MCPTool]:
                 {"old_rows": rows_schema, "new_rows": rows_schema,
                  "key": key_schema},
                 ["old_rows", "new_rows", "key"]),
-            handler=h_exec.diff_rows,
+            handler=h_data_exec.diff_rows,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6803,7 +6808,7 @@ def dataset_diff_tools() -> List[MCPTool]:
                 {"old_rows": rows_schema, "new_rows": rows_schema,
                  "key": key_schema},
                 ["old_rows", "new_rows", "key"]),
-            handler=h_exec.cell_changes,
+            handler=h_data_exec.cell_changes,
             annotations=READ_ONLY,
         ),
     ]
@@ -6821,7 +6826,7 @@ def optimistic_tools() -> List[MCPTool]:
                  "value": {"type": "object"},
                  "expected_version": {"type": "integer"}},
                 ["name", "key", "value"]),
-            handler=h_exec.cas_put,
+            handler=h_data_exec.cas_put,
             annotations=NON_DESTRUCTIVE,
         ),
         MCPTool(
@@ -6831,7 +6836,7 @@ def optimistic_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"name": {"type": "string"}, "key": {"type": "string"}},
                 ["name", "key"]),
-            handler=h_exec.cas_get,
+            handler=h_data_exec.cas_get,
             annotations=READ_ONLY,
         ),
     ]
@@ -6846,7 +6851,7 @@ def outbox_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"name": {"type": "string"}, "event": {"type": "object"}},
                 ["name", "event"]),
-            handler=h_exec.outbox_enqueue,
+            handler=h_data_exec.outbox_enqueue,
             annotations=NON_DESTRUCTIVE,
         ),
         MCPTool(
@@ -6854,7 +6859,7 @@ def outbox_tools() -> List[MCPTool]:
             description=("List the pending entries of named outbox 'name'. "
                          "Returns {pending}."),
             input_schema=schema({"name": {"type": "string"}}, ["name"]),
-            handler=h_exec.outbox_pending,
+            handler=h_data_exec.outbox_pending,
             annotations=READ_ONLY,
         ),
     ]
@@ -6873,7 +6878,7 @@ def locale_collation_tools() -> List[MCPTool]:
                  "tailoring": {"type": "string"},
                  "reverse": {"type": "boolean"}},
                 ["items"]),
-            handler=h_exec.collation_sort,
+            handler=h_data_exec.collation_sort,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6885,7 +6890,7 @@ def locale_collation_tools() -> List[MCPTool]:
                  "strength": {"type": "string"},
                  "tailoring": {"type": "string"}},
                 ["first", "second"]),
-            handler=h_exec.collation_compare,
+            handler=h_data_exec.collation_compare,
             annotations=READ_ONLY,
         ),
     ]
@@ -6898,7 +6903,7 @@ def confusables_tools() -> List[MCPTool]:
             description=("Homoglyph / mixed-script spoofing report for 'text'. "
                          "Returns {skeleton, homoglyphs, mixed_script, scripts}."),
             input_schema=schema({"text": {"type": "string"}}, ["text"]),
-            handler=h_exec.confusable_scan,
+            handler=h_data_exec.confusable_scan,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6908,7 +6913,7 @@ def confusables_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"first": {"type": "string"}, "second": {"type": "string"}},
                 ["first", "second"]),
-            handler=h_exec.confusable_compare,
+            handler=h_data_exec.confusable_compare,
             annotations=READ_ONLY,
         ),
     ]
@@ -6921,7 +6926,7 @@ def readability_tools() -> List[MCPTool]:
             description=("Readability report for 'text': Flesch reading ease, "
                          "Flesch-Kincaid grade, Gunning Fog, SMOG, ARI + counts."),
             input_schema=schema({"text": {"type": "string"}}, ["text"]),
-            handler=h_exec.readability_report,
+            handler=h_data_exec.readability_report,
             annotations=READ_ONLY,
         ),
     ]
@@ -6937,7 +6942,7 @@ def list_format_tools() -> List[MCPTool]:
                 {"items": {"type": "array", "items": {"type": "string"}},
                  "style": {"type": "string"}, "locale": {"type": "string"}},
                 ["items"]),
-            handler=h_exec.format_list,
+            handler=h_data_exec.format_list,
             annotations=READ_ONLY,
         ),
     ]
@@ -6953,7 +6958,7 @@ def gettext_catalog_tools() -> List[MCPTool]:
                 {"po": {"type": "string"}, "msgid": {"type": "string"},
                  "context": {"type": "string"}},
                 ["po", "msgid"]),
-            handler=h_exec.gettext_translate,
+            handler=h_data_exec.gettext_translate,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6964,7 +6969,7 @@ def gettext_catalog_tools() -> List[MCPTool]:
                 {"po": {"type": "string"}, "msgid": {"type": "string"},
                  "msgid_plural": {"type": "string"}, "n": {"type": "integer"}},
                 ["po", "msgid", "msgid_plural", "n"]),
-            handler=h_exec.gettext_ngettext,
+            handler=h_data_exec.gettext_ngettext,
             annotations=READ_ONLY,
         ),
     ]
@@ -6979,7 +6984,7 @@ def checksum_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"scheme": {"type": "string"}, "number": {"type": "string"}},
                 ["scheme", "number"]),
-            handler=h_exec.checksum_validate,
+            handler=h_data_exec.checksum_validate,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -6990,7 +6995,7 @@ def checksum_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"scheme": {"type": "string"}, "partial": {"type": "string"}},
                 ["scheme", "partial"]),
-            handler=h_exec.checksum_digit,
+            handler=h_data_exec.checksum_digit,
             annotations=READ_ONLY,
         ),
     ]
@@ -7007,7 +7012,7 @@ def message_format_tools() -> List[MCPTool]:
                 {"pattern": {"type": "string"}, "args": {"type": "object"},
                  "locale": {"type": "string"}},
                 ["pattern"]),
-            handler=h_exec.format_message,
+            handler=h_data_exec.format_message,
             annotations=READ_ONLY,
         ),
     ]
@@ -7020,7 +7025,7 @@ def bidi_check_tools() -> List[MCPTool]:
             description=("Bidirectional-text QA for 'text': bidi controls, "
                          "nesting balance, base direction, Trojan-source flag."),
             input_schema=schema({"text": {"type": "string"}}, ["text"]),
-            handler=h_exec.bidi_check,
+            handler=h_data_exec.bidi_check,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7028,7 +7033,7 @@ def bidi_check_tools() -> List[MCPTool]:
             description=("Remove every bidi control character from 'text'. "
                          "Returns {text}."),
             input_schema=schema({"text": {"type": "string"}}, ["text"]),
-            handler=h_exec.bidi_strip,
+            handler=h_data_exec.bidi_strip,
             annotations=NON_DESTRUCTIVE,
         ),
     ]
@@ -7045,7 +7050,7 @@ def sequence_gap_tools() -> List[MCPTool]:
                 {"name": {"type": "string"}, "stream_id": {"type": "string"},
                  "seq": {"type": "integer"}},
                 ["name", "stream_id", "seq"]),
-            handler=h_exec.sequence_observe,
+            handler=h_data_exec.sequence_observe,
             annotations=NON_DESTRUCTIVE,
         ),
     ]
@@ -7062,7 +7067,7 @@ def dedup_window_tools() -> List[MCPTool]:
                 {"name": {"type": "string"},
                  "message_id": {"type": "string"}, "ttl_s": {"type": "number"}},
                 ["name", "message_id"]),
-            handler=h_exec.dedup_check,
+            handler=h_data_exec.dedup_check,
             annotations=NON_DESTRUCTIVE,
         ),
     ]
@@ -7079,7 +7084,7 @@ def idempotency_tools() -> List[MCPTool]:
                 {"name": {"type": "string"}, "key": {"type": "string"},
                  "request": {"type": "object"}},
                 ["name", "key"]),
-            handler=h_exec.idempotency_begin,
+            handler=h_data_exec.idempotency_begin,
             annotations=NON_DESTRUCTIVE,
         ),
         MCPTool(
@@ -7090,7 +7095,7 @@ def idempotency_tools() -> List[MCPTool]:
                 {"name": {"type": "string"}, "key": {"type": "string"},
                  "response": {"type": "object"}},
                 ["name", "key", "response"]),
-            handler=h_exec.idempotency_complete,
+            handler=h_data_exec.idempotency_complete,
             annotations=NON_DESTRUCTIVE,
         ),
         MCPTool(
@@ -7101,7 +7106,7 @@ def idempotency_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"name": {"type": "string"}, "key": {"type": "string"}},
                 ["name", "key"]),
-            handler=h_exec.idempotency_release,
+            handler=h_data_exec.idempotency_release,
             annotations=NON_DESTRUCTIVE,
         ),
     ]
@@ -7116,7 +7121,7 @@ def smoothing_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"values": {"type": "array"}, "window": {"type": "integer"}},
                 ["values", "window"]),
-            handler=h_exec.sma,
+            handler=h_data_exec.sma,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7126,7 +7131,7 @@ def smoothing_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"values": {"type": "array"}, "alpha": {"type": "number"}},
                 ["values"]),
-            handler=h_exec.ewma,
+            handler=h_data_exec.ewma,
             annotations=READ_ONLY,
         ),
     ]
@@ -7143,7 +7148,7 @@ def anomaly_tools() -> List[MCPTool]:
                 {"values": {"type": "array"}, "method": {"type": "string"},
                  "threshold": {"type": "number"}},
                 ["values"]),
-            handler=h_exec.detect_anomalies,
+            handler=h_data_exec.detect_anomalies,
             annotations=READ_ONLY,
         ),
     ]
@@ -7159,7 +7164,7 @@ def timeseries_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"series": {"type": "array"}, "window_s": {"type": "number"}},
                 ["series"]),
-            handler=h_exec.ts_rate,
+            handler=h_data_exec.ts_rate,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7171,7 +7176,7 @@ def timeseries_tools() -> List[MCPTool]:
                 {"series": {"type": "array"}, "bucket_s": {"type": "number"},
                  "agg": {"type": "string"}},
                 ["series", "bucket_s"]),
-            handler=h_exec.ts_downsample,
+            handler=h_data_exec.ts_downsample,
             annotations=READ_ONLY,
         ),
     ]
@@ -7188,7 +7193,7 @@ def schema_compat_tools() -> List[MCPTool]:
                 {"old": {"type": "object"}, "new": {"type": "object"},
                  "mode": {"type": "string"}},
                 ["old", "new"]),
-            handler=h_exec.check_compatibility,
+            handler=h_data_exec.check_compatibility,
             annotations=READ_ONLY,
         ),
     ]
@@ -7207,7 +7212,7 @@ def data_drift_tools() -> List[MCPTool]:
                 {"reference": seq_schema, "current": seq_schema,
                  "threshold": {"type": "number"}, "bins": {"type": "integer"}},
                 ["reference", "current"]),
-            handler=h_exec.detect_drift,
+            handler=h_data_exec.detect_drift,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7218,7 +7223,7 @@ def data_drift_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"reference": seq_schema, "current": seq_schema},
                 ["reference", "current"]),
-            handler=h_exec.categorical_drift,
+            handler=h_data_exec.categorical_drift,
             annotations=READ_ONLY,
         ),
     ]
@@ -7233,7 +7238,7 @@ def layered_config_tools() -> List[MCPTool]:
                          "mapping, priority?}; higher priority wins) into a "
                          "single {config}."),
             input_schema=schema({"layers": layer_schema}, ["layers"]),
-            handler=h_exec.resolve_config,
+            handler=h_data_exec.resolve_config,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7243,7 +7248,7 @@ def layered_config_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"layers": layer_schema, "key": {"type": "string"}},
                 ["layers", "key"]),
-            handler=h_exec.explain_config,
+            handler=h_data_exec.explain_config,
             annotations=READ_ONLY,
         ),
     ]
@@ -7257,7 +7262,7 @@ def sse_client_tools() -> List[MCPTool]:
                          "'text' blob into {events} (event/data/id/retry), "
                          "flushing a trailing event without a final blank line."),
             input_schema=schema({"text": {"type": "string"}}, ["text"]),
-            handler=h_exec.parse_sse,
+            handler=h_data_exec.parse_sse,
             annotations=READ_ONLY,
         ),
     ]
@@ -7270,7 +7275,7 @@ def dotenv_tools() -> List[MCPTool]:
             description=("Parse .env 'text' (KEY=VALUE lines, export prefixes, "
                          "quoting, escapes, inline comments) into {values}."),
             input_schema=schema({"text": {"type": "string"}}, ["text"]),
-            handler=h_exec.parse_dotenv,
+            handler=h_data_exec.parse_dotenv,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7280,7 +7285,7 @@ def dotenv_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"path": {"type": "string", "format": "path"}, "override": {"type": "boolean"}},
                 ["path"]),
-            handler=h_exec.load_dotenv,
+            handler=h_data_exec.load_dotenv,
             annotations=READ_ONLY,
         ),
     ]
@@ -7295,7 +7300,7 @@ def http_problem_tools() -> List[MCPTool]:
                          "{problem} (type/title/status/detail/instance + "
                          "extensions) or null when not a problem document."),
             input_schema=schema({"response": {"type": "object"}}, ["response"]),
-            handler=h_exec.parse_problem,
+            handler=h_data_exec.parse_problem,
             annotations=READ_ONLY,
         ),
     ]
@@ -7312,7 +7317,7 @@ def data_profile_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"rows": {"type": "array"}, "columns": {"type": "array"}},
                 ["rows"]),
-            handler=h_exec.profile_rows,
+            handler=h_data_exec.profile_rows,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7323,7 +7328,7 @@ def data_profile_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"rows": {"type": "array"}, "columns": {"type": "array"}},
                 ["rows"]),
-            handler=h_exec.infer_schema,
+            handler=h_data_exec.infer_schema,
             annotations=READ_ONLY,
         ),
     ]
@@ -7339,7 +7344,7 @@ def config_redaction_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"obj": {"type": "object"}, "mask": {"type": "string"}},
                 ["obj"]),
-            handler=h_exec.redact_config,
+            handler=h_data_exec.redact_config,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7350,7 +7355,7 @@ def config_redaction_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"text": {"type": "string"}, "mask": {"type": "string"}},
                 ["text"]),
-            handler=h_exec.redact_secret_text,
+            handler=h_data_exec.redact_secret_text,
             annotations=READ_ONLY,
         ),
     ]
@@ -7366,7 +7371,7 @@ def config_schema_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"schema": {"type": "object"}, "config": {"type": "object"}},
                 ["schema", "config"]),
-            handler=h_exec.validate_config,
+            handler=h_data_exec.validate_config,
             annotations=READ_ONLY,
         ),
     ]
@@ -7379,7 +7384,7 @@ def secret_ref_tools() -> List[MCPTool]:
             description=("Resolve a value reference 'ref' (env://VAR, "
                          "file://path, or secret://name) to {value}."),
             input_schema=schema({"ref": {"type": "string", "format": "value-ref"}}, ["ref"]),
-            handler=h_exec.resolve_ref,
+            handler=h_data_exec.resolve_ref,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7387,7 +7392,7 @@ def secret_ref_tools() -> List[MCPTool]:
             description=("Recursively resolve every env:// / file:// / secret:// "
                          "reference inside 'obj'. Returns {resolved}."),
             input_schema=schema({"obj": {"type": "object", "format": "value-ref"}}, ["obj"]),
-            handler=h_exec.resolve_refs,
+            handler=h_data_exec.resolve_refs,
             annotations=READ_ONLY,
         ),
     ]
@@ -7405,7 +7410,7 @@ def otlp_export_tools() -> List[MCPTool]:
                 {"spans": {"type": "array"},
                  "resource_attrs": {"type": "object"}},
                 ["spans"]),
-            handler=h_exec.spans_to_otlp,
+            handler=h_data_exec.spans_to_otlp,
             annotations=READ_ONLY,
         ),
     ]
@@ -7420,7 +7425,7 @@ def near_dup_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"text": {"type": "string"}, "bits": {"type": "integer"}},
                 ["text"]),
-            handler=h_exec.simhash,
+            handler=h_data_exec.simhash,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7431,7 +7436,7 @@ def near_dup_tools() -> List[MCPTool]:
                 {"texts": {"type": "array"},
                  "max_distance": {"type": "integer"}},
                 ["texts"]),
-            handler=h_exec.near_duplicates,
+            handler=h_data_exec.near_duplicates,
             annotations=READ_ONLY,
         ),
     ]
@@ -7448,7 +7453,7 @@ def text_similarity_tools() -> List[MCPTool]:
                 {"a": {"type": "string"}, "b": {"type": "string"},
                  "metric": {"type": "string"}},
                 ["a", "b"]),
-            handler=h_exec.text_similarity,
+            handler=h_data_exec.text_similarity,
             annotations=READ_ONLY,
         ),
     ]
@@ -7466,7 +7471,7 @@ def text_normalize_tools() -> List[MCPTool]:
                  "casefold": {"type": "boolean"},
                  "collapse_ws": {"type": "boolean"}},
                 ["text"]),
-            handler=h_exec.normalize_text,
+            handler=h_data_exec.normalize_text,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7477,7 +7482,7 @@ def text_normalize_tools() -> List[MCPTool]:
             input_schema=schema(
                 {"text": {"type": "string"}, "sep": {"type": "string"}},
                 ["text"]),
-            handler=h_exec.slugify,
+            handler=h_data_exec.slugify,
             annotations=READ_ONLY,
         ),
     ]
@@ -7490,7 +7495,7 @@ def canonical_log_tools() -> List[MCPTool]:
             description=("Build a canonical (wide-event) log line from a "
                          "'fields' object. Returns {line, json}."),
             input_schema=schema({"fields": {"type": "object"}}, ["fields"]),
-            handler=h_exec.canonical_log,
+            handler=h_data_exec.canonical_log,
             annotations=READ_ONLY,
         ),
     ]
@@ -7503,7 +7508,7 @@ def baggage_tools() -> List[MCPTool]:
             description=("Parse a W3C 'baggage' header (percent-encoded "
                          "key=value list, optional ;metadata) into {items}."),
             input_schema=schema({"header": {"type": "string"}}, ["header"]),
-            handler=h_exec.baggage_parse,
+            handler=h_data_exec.baggage_parse,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7511,7 +7516,7 @@ def baggage_tools() -> List[MCPTool]:
             description=("Serialise an 'items' object into a percent-encoded "
                          "W3C baggage {header}."),
             input_schema=schema({"items": {"type": "object"}}, ["items"]),
-            handler=h_exec.baggage_format,
+            handler=h_data_exec.baggage_format,
             annotations=READ_ONLY,
         ),
     ]
@@ -7529,7 +7534,7 @@ def trace_context_tools() -> List[MCPTool]:
                 {"headers": {"type": "object"},
                  "traceparent": {"type": "string"}},
                 []),
-            handler=h_exec.trace_inject,
+            handler=h_data_exec.trace_inject,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -7537,7 +7542,7 @@ def trace_context_tools() -> List[MCPTool]:
             description=("Extract a W3C trace context from request 'headers'. "
                          "Returns {context} (or null when no traceparent)."),
             input_schema=schema({"headers": {"type": "object"}}, ["headers"]),
-            handler=h_exec.trace_extract,
+            handler=h_data_exec.trace_extract,
             annotations=READ_ONLY,
         ),
     ]
@@ -7572,7 +7577,7 @@ def bulkhead_tools() -> List[MCPTool]:
                  "max_concurrent": {"type": "integer"},
                  "actions": {"type": "array"}},
                 ["name", "max_concurrent", "actions"]),
-            handler=h_exec.bulkhead_run,
+            handler=h_automation_exec.bulkhead_run,
             annotations=DESTRUCTIVE,
         ),
         MCPTool(
@@ -7640,7 +7645,7 @@ def chaos_tools() -> List[MCPTool]:
                          " — verify steady state, inject faults, re-verify, roll "
                          "back. Returns the journal {status, deviated, ...}."),
             input_schema=schema({"spec": {"type": "object"}}, ["spec"]),
-            handler=h_exec.run_chaos,
+            handler=h_automation_exec.run_chaos,
             annotations=DESTRUCTIVE,
         ),
     ]
@@ -9040,7 +9045,7 @@ def flakiness_tools() -> List[MCPTool]:
             input_schema=schema({"error": {"type": "string"},
                                  "length": {"type": "integer"}},
                                 required=["error"]),
-            handler=h_exec.failure_signature,
+            handler=h_automation_exec.failure_signature,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -9051,7 +9056,7 @@ def flakiness_tools() -> List[MCPTool]:
             input_schema=schema({
                 "errors": {"type": "array", "items": {"type": "string"}}},
                 required=["errors"]),
-            handler=h_exec.group_failures,
+            handler=h_automation_exec.group_failures,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -9067,7 +9072,7 @@ def flakiness_tools() -> List[MCPTool]:
                 "key": {"type": "string"},
                 "regress_factor": {"type": "number"}},
                 required=["before", "after"]),
-            handler=h_exec.diff_runs,
+            handler=h_automation_exec.diff_runs,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -9083,7 +9088,7 @@ def flakiness_tools() -> List[MCPTool]:
                 "threshold": {"type": "number"},
                 "min_size": {"type": "integer"}},
                 required=["runs"]),
-            handler=h_exec.failure_clusters,
+            handler=h_automation_exec.failure_clusters,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -9096,7 +9101,7 @@ def flakiness_tools() -> List[MCPTool]:
                          "items": {"type": "array", "items": {"type": "string"}}},
                 "threshold": {"type": "number"}},
                 required=["runs"]),
-            handler=h_exec.cofailure_pairs,
+            handler=h_automation_exec.cofailure_pairs,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -9108,7 +9113,7 @@ def flakiness_tools() -> List[MCPTool]:
             input_schema=schema({
                 "steps": {"type": "array", "items": {"type": "object"}}},
                 required=["steps"]),
-            handler=h_exec.build_timeline,
+            handler=h_automation_exec.build_timeline,
             annotations=READ_ONLY,
         ),
         MCPTool(
@@ -9120,7 +9125,7 @@ def flakiness_tools() -> List[MCPTool]:
                 "steps": {"type": "array", "items": {"type": "object"}},
                 "top": {"type": "integer"}},
                 required=["steps"]),
-            handler=h_exec.critical_steps,
+            handler=h_automation_exec.critical_steps,
             annotations=READ_ONLY,
         ),
     ]

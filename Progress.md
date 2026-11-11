@@ -724,7 +724,6 @@ typed Windows provider 已有有界查詢／讀取、原生身分事實與保留
 
 | 檔案 | 行數 | 為何還沒拆 |
 | --- | ---: | --- |
-| `utils/mcp_server/tools/_handlers_executor_bridge.py` | 1,429 | 純委派函式（函式內匯入後立即轉呼叫，沒有分支），不適用 flat data tables 豁免。需先定義領域邊界再拆分。 |
 
 **本質豁免（flat data tables）**：`utils/mcp_server/tools/_factories.py`、
 `utils/executor/action_executor.py`、`gui/script_builder/command_schema.py`、

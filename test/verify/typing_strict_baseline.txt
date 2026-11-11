@@ -600,7 +600,6 @@ je_auto_control.utils.mcp_server.tools
 je_auto_control.utils.mcp_server.tools._base
 je_auto_control.utils.mcp_server.tools._factories
 je_auto_control.utils.mcp_server.tools._handlers
-je_auto_control.utils.mcp_server.tools._handlers_executor_bridge
 je_auto_control.utils.mcp_server.tools._handlers_input
 je_auto_control.utils.mcp_server.tools._handlers_locators
 je_auto_control.utils.mcp_server.tools._handlers_operations

@@ -1,5 +1,9 @@
 # AutoControl Architecture
 
+MCP executor adapters are grouped by accessibility, automation, data, desktop,
+mobile and vision. Factories bind the same tool schemas to these strict modules;
+each adapter imports its executor function only when called.
+
 Navigation handles optional Qt tree items through one iterator. Script fields are
 read and written through their concrete editor types, and trigger actions retain
 typed common arguments while checking missing table cells before use.
@@ -754,7 +758,7 @@ wrapper/auto_control_record.record → OS listener (e.g. windows/record/win32_in
 5. Optional MCP tool: factory in `utils/mcp_server/tools/_factories.py`, adapter in the themed handler module —
    `_handlers_input.py`, `_handlers_screen.py`, `_handlers_system.py`, `_handlers_runs.py`,
    `_handlers_scheduling.py`, `_handlers_remote.py`, `_handlers_locators.py`, `_handlers_operations.py`,
-   `_handlers_qa.py`, `_handlers_executor_bridge.py` (a three-line delegation to an executor function), or
+   `_handlers_qa.py`, the six `_handlers_<domain>_executor.py` modules (lazy executor delegation), or
    `_handlers.py` for data, text and the WebRunner bridge.
 6. GUI: thin widget in `gui/`, registered by one `TabSpec` row in `gui/tab_registry.py` (module and class name, so
    it is imported only when opened) with commands exposed through `menu_actions()`; strings in every

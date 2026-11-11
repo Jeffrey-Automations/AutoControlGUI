@@ -7,7 +7,7 @@ by theme because ``_handlers.py`` is over the 750-line limit.
 import math
 from typing import Any, Dict, List, Optional
 
-from je_auto_control.utils.mcp_server.tools._handlers_executor_bridge import (
+from je_auto_control.utils.mcp_server.tools._handlers_automation_executor import (
     _observe_handler,
 )
 

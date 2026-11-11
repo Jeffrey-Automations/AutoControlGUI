@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,500 |
-| 程式碼總行數 | 229,250 |
+| Python 模組總數（含周邊子專案） | 1,505 |
+| 程式碼總行數 | 229,797 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -512,7 +512,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 52,207 行。
+> 14 個套件、約 52,754 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -526,7 +526,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cua_action/` | 204 | 標準化 computer-use 動作結構（Anthropic／OpenAI → `AC_*`） |
 | `utils/llm/` | 369 | 自然語言 → action list 規劃器 + Anthropic／null 後端；規劃執行隔離頂層變數並沿用巢狀範圍 |
 | `utils/mcp_registry/` | 97 | MCP registry `server.json` 資訊清單產生（可被發現） |
-| `utils/mcp_server/` | 21,490 | **無頭 MCP 伺服器**（預設註冊 820 個工具＝801 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
+| `utils/mcp_server/` | 22,037 | **無頭 MCP 伺服器**（預設註冊 820 個工具＝801 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
 | `utils/tool_use_schema/` | 191 | 把 `AC_*` 指令匯出成 Claude／OpenAI 的 tool-use schema |
 | `utils/trajectory_eval/` | 132 | agent 軌跡評估：依評分規準為一次執行打分 |
 | `utils/vision/` | 660 | VLM 元素定位器（依描述找元素）+ Anthropic／OpenAI／null 後端 |
@@ -739,11 +739,11 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `mouse_aliases.py` | 39 | 單鍵點擊別名（`AC_click_left` 等），executor 與 callback executor 共用。 |
 | `flags.py` | 19 | 旗標讀取 `as_bool`：依拼法（`"true"`／`"yes"`／`"on"`／`"1"`）而非 Python 真值判斷，所以 JSON、CLI、MCP 傳來的 `"false"` 是關；所有 adapter 與流程指令共用。 |
 
-#### `utils/mcp_server/`（21,490 行，820 個工具）— 最大子系統
+#### `utils/mcp_server/`（22,037 行，820 個工具）— 最大子系統
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
-| `tools/_factories.py` | 9,383 | 工具工廠：每個函式回傳一個領域的 `MCPTool` 清單（把 `AC_*` 能力包成 MCP 工具）。 |
+| `tools/_factories.py` | 9,388 | 工具工廠：每個函式回傳一個領域的 `MCPTool` 清單（把 `AC_*` 能力包成 MCP 工具）。 |
 | `tools/_handlers.py` | 547 | 把 MCP 工具呼叫橋接到 AutoControl 無頭 API 的 adapter；主題模組拆完之後這裡留的是資料／文字／HTTP 那一類與 WebRunner 橋接。 |
 | `tools/_handlers_qa.py` | 619 | 同一種 adapter，QA 主題：斷言 DSL、資料驅動、SQL／PDF／郵件／HTTP 步驟、codegen、視覺回歸、狀態機、flaky 偵測與隔離、suite runner、無障礙稽核、裝置矩陣、媒體斷言。從 `_handlers.py` 依主題拆出的第一塊（750 行上限）；兩者互不引用。 |
 | `tools/_handlers_input.py` | 221 | 同一種 adapter，輸入主題：滑鼠、鍵盤、虛擬手把（ViGEm）。 |
@@ -765,7 +765,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `tools/_diagnostics.py` | 51 | 主動唯讀診斷 MCP；共用 report、request-owned 取消與進度，拒絕外部 token／授權資料。 |
 | `tools/_handlers_scheduling.py` | 200 | 同一種 adapter，排程主題：排程器、觸發器、熱鍵常駐。 |
 | `tools/_handlers_remote.py` | 66 | 同一種 adapter，遠端桌面的 host 與 viewer。 |
-| `tools/_handlers_executor_bridge.py` | 1,429 | 252 個純委派（中位數 3 行，最長的 16 行全是參數簽章）：每個都是 `from action_executor import _x` 再 `return _x(...)`，沒有分支邏輯。超過 750 行,理由記在 `Progress.md` 的豁免表（再切只能照 MCP 工廠領域分,會把同一種委派散進十幾個沒有語意邊界的檔）。 |
+| `tools/_handlers_accessibility_executor.py` | 383 | 35 個領域委派；保留函式內 executor 匯入、參數預設與轉送契約，使用 strict typing。 |
+| `tools/_handlers_automation_executor.py` | 236 | 33 個領域委派；保留函式內 executor 匯入、參數預設與轉送契約，使用 strict typing。 |
+| `tools/_handlers_data_executor.py` | 428 | 70 個領域委派；保留函式內 executor 匯入、參數預設與轉送契約，使用 strict typing。 |
+| `tools/_handlers_desktop_executor.py` | 225 | 35 個領域委派；保留函式內 executor 匯入、參數預設與轉送契約，使用 strict typing。 |
+| `tools/_handlers_mobile_executor.py` | 135 | 10 個領域委派；保留函式內 executor 匯入、參數預設與轉送契約，使用 strict typing。 |
+| `tools/_handlers_vision_executor.py` | 564 | 70 個領域委派；保留函式內 executor 匯入、參數預設與轉送契約，使用 strict typing。 |
 | `tools/_handlers_locators.py` | 436 | 同一種 adapter，定位主題：無障礙樹、智慧等待、自我修復、螢幕觀察、座標空間、視覺與 OCR、影像去重、元件倉庫、A/B 定位。 |
 | `tools/_handlers_operations.py` | 655 | 同一種 adapter，營運主題：agent 與其記憶／追蹤、治理與合規、成本與遙測、失敗掛鉤、看門狗、速率限制、檢查點、核可、產物與資產、測試選擇與分片、佇列與 saga。 |
 | `server.py` | 744 | JSON-RPC 2.0 over stdio 的最小 MCP 伺服器：連線範圍狀態、行內／併發分派、工具與 resource／prompt 處理器；握手時代的方法表（`_run_method`），兩個協定時代的逐請求分派在 `_stateless.py`；工具清單／session profile 在 `_disclosure_server.py`。 |
@@ -1406,7 +1411,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `scripts/dev_release.py` | 只用標準函式庫的發佈輔助腳本 | dev 通道（PyPI 的 `je_auto_control_dev`）的版本與比對：`prepare` 把 `dev.toml` 寫成 `pyproject.toml`，版本取 PyPI 最新一版加一個 patch（`dev.toml` 的版本只是下限，不回寫 repo）；`changed dist` 把建好的 wheel 跟 PyPI 最新一版逐檔比對，內容沒變就不上傳。只給 `dev.yml` 的 `publish-dev` job 與拋棄式的 checkout 用，因為 `prepare` 會蓋掉 `pyproject.toml`。 |
 | `docs/` | Sphinx（`API`／`Eng`／`Zh`／`getting_started`） | Read the Docs 文件。 |
 | `architecture_diagram/` | drawio + png | 既有的架構圖原始檔。 |
-| `test/` | `unit_test/headless`（主要）、`unit_test/flow_control`、`integrated_test`、`gui_test`、`manual_test`、`verify`、`test_source` | 1,174 個 `test_*.py`／11,393 個測試函式。**注意**：`test/unit_test/` 下的 `*_test.py` 是會真的驅動滑鼠鍵盤的手動示範腳本，因此 `pyproject.toml` 把 `python_files` 釘成 `test_*.py`。`unit_test/headless/conftest.py` 有一個 autouse fixture，每個測試結束都沖掉 Qt 排隊中的 `deleteLater()`——不沖會讓殘留的 widget 在後面某個不相干的測試裡被銷毀，曾經整個直譯器 `__fastfail`。`test_doc_counts.py` 守住文件引用的指令／工具／子套件／範例數,`test_doc_line_counts.py` 守住所有行數（`--fix` 可一次重新產生）。 `verify/macos_verify.py` 是在真的 `macos-14` runner 上量測 TCC 到底允許什麼的探針（macOS 是唯一沒有容器可用的支援平台），不被 pytest 收集。 |
+| `test/` | `unit_test/headless`（主要）、`unit_test/flow_control`、`integrated_test`、`gui_test`、`manual_test`、`verify`、`test_source` | 1,175 個 `test_*.py`／11,394 個測試函式。**注意**：`test/unit_test/` 下的 `*_test.py` 是會真的驅動滑鼠鍵盤的手動示範腳本，因此 `pyproject.toml` 把 `python_files` 釘成 `test_*.py`。`unit_test/headless/conftest.py` 有一個 autouse fixture，每個測試結束都沖掉 Qt 排隊中的 `deleteLater()`——不沖會讓殘留的 widget 在後面某個不相干的測試裡被銷毀，曾經整個直譯器 `__fastfail`。`test_doc_counts.py` 守住文件引用的指令／工具／子套件／範例數,`test_doc_line_counts.py` 守住所有行數（`--fix` 可一次重新產生）。 `verify/macos_verify.py` 是在真的 `macos-14` runner 上量測 TCC 到底允許什麼的探針（macOS 是唯一沒有容器可用的支援平台），不被 pytest 收集。 |
 
 ---
 
@@ -1498,7 +1503,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
 | `gui/` | 144 | 39,971 |
-| `utils/mcp_server/` | 55 | 21,490 |
+| `utils/mcp_server/` | 60 | 22,037 |
 | `utils/remote_desktop/` | 72 | 15,252 |
 | `utils/executor/` | 11 | 10,702 |
 | `utils/usb/` | 20 | 5,060 |
@@ -1518,7 +1523,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,002 | 102,291 |
-| **總計** | **1,488** | **228,505** |
+| **總計** | **1,493** | **229,052** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
