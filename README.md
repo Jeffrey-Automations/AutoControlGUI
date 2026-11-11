@@ -67,9 +67,11 @@ Managed agent tasks and cross-host transfers include experimental features. See 
 
 [MIT](LICENSE) © JE-Chen. [Third-party licenses](Third_Party_License.md).
 
-Closing Remote Desktop releases its page. Reopening creates fresh controls without reattaching shared sessions. Registry TCP/WebSocket sessions remain available to scripts; page-owned WebRTC sessions and audio retire in the background. Pending approvals are denied, and late callbacks are discarded. An already-entered file transfer is not interrupted by closing the page.
+Closing Remote Desktop releases its page. Reopening creates fresh controls without reattaching shared sessions. Registry TCP/WebSocket sessions remain available to scripts; page-owned WebRTC sessions and audio retire in the background. Pending approvals are denied, and late callbacks are discarded. Stopping an entered file transfer depends on the backend's cooperative cancellation.
 
 WebRTC host/viewer `stop()` waits up to three seconds for software teardown. `PeerStopPending` retains the same running attempt; explicit retry waits on it. `PeerStopFailed` retains failed resources for explicit retry, and restarting is blocked until cleanup succeeds. Multi-viewer hosts retain failed sessions and their shared source. `FolderSyncEngine.stop_confirmed()` returns `False` while the original worker remains alive. These outcomes do not prove native device release; recovery after page destruction still needs durable ownership and retry integration.
+
+Host-requested file sends remain owned until their sender worker exits, including after repeated stop requests. Stop signals cancellation and waits for that original worker; an uninterruptible backend operation can still leave stop pending.
 
 MCP read-only hints do not grant viewer access. Reviewed live-screen and caller-data tools use `read_screen`; stored files, device data and unknown tools require `read_data`. Aliases share canonical policy and stronger overrides take precedence. Optional image sources, environment-backed config fields and file open plans require `read_data`. Anchor locators permit live accessibility/OCR; image templates require `read_data` and VLM requests require `drive_input`. Read-only invocation rejects capture artifacts and VLM branches, and its catalogue excludes caller-selected ADB executables. MCP CI annotations return formatted lines without writing to stdout. Unreviewed plugin and WebRunner initialization tools are omitted from read-only catalogues and require dependency-specific review.
 

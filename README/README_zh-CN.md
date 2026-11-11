@@ -67,9 +67,11 @@ Wayland NORMAL 输入通过受管理的子进程执行 libei 与 portal 调用�
 
 [MIT](../LICENSE) © JE-Chen. [第三方许可](../Third_Party_License.md).
 
-关闭 Remote Desktop 会释放页面；重新打开会创建新控件，不自动接回共享连接。Registry 的 TCP／WebSocket 连接仍可供脚本使用；页面拥有的 WebRTC 连接与音频在后台停止。待处理批准会拒绝，延迟回调会丢弃。已进入发送阶段的文件传输不会因关闭页面而中断。
+关闭 Remote Desktop 会释放页面；重新打开会创建新控件，不自动接回共享连接。Registry 的 TCP／WebSocket 连接仍可供脚本使用；页面拥有的 WebRTC 连接与音频在后台停止。待处理批准会拒绝，延迟回调会丢弃。已进入发送阶段的文件传输须依后端的协作式取消停止。
 
 WebRTC host/viewer 的 `stop()` 最多等待三秒完成软件清理。`PeerStopPending` 保留同一个尚未完成的操作；显式重试只会继续等待。`PeerStopFailed` 保留清理失败的资源供显式重试，成功前禁止重新启动。Multi-viewer host 保留失败的 session 与共享来源。`FolderSyncEngine.stop_confirmed()` 在原工作线程仍存活时返回 `False`。这些结果不代表原生设备已释放；页面销毁后的恢复仍需持久资源保管与重试整合。
+
+主机文件请求会保留原发送工作，直到工作线程退出，重复停止也不会提前释放所有权。停止会通知取消并等待原工作；无法中断的后端操作仍可能让停止保持待完成。
 
 MCP 只读标记不授予 viewer 访问权限。已审查的实时画面与调用者数据运算使用 `read_screen`；文件、设备数据及未知工具需要 `read_data`。别名共用标准名称的权限，较强的明确设置优先。提供图像来源、从环境变量读取配置字段或规划打开本地文件时需要 `read_data`。Anchor locator 的 accessibility／OCR 允许观察实时画面，图像模板需要 `read_data`，VLM 请求需要 `drive_input`。只读调用拒绝捕获产物及 VLM 分支，目录排除可自选 ADB 可执行文件的工具。MCP CI annotations 只返回格式化文本，不写入 stdout。未经审查的 plugin 与 WebRunner 初始化工具不列入只读目录，等待依赖版本的单独审查。
 

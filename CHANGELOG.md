@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- File-request cancellation retains the original sender worker and queue ownership
+  until actual completion, including repeated cancellation, without blocking the event loop.
+
 - Align audited REST host-data routes and registered status/diagnostic commands with
   MCP `read_data` authority. Viewer requests are refused before providers execute;
   operator/admin diagnostics and cancellation remain supported. Dashboard panels

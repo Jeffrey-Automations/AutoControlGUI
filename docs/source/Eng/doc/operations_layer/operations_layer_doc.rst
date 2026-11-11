@@ -764,7 +764,9 @@ worker for later observation; it is not permission to start an overlapping worke
 
 These are software completion contracts, not proof that every underlying native
 resource has retired. Media helpers may still suppress internal device errors.
-Cancelling a file-request coroutine does not join its ``asyncio.to_thread`` sender;
-that worker still depends on cooperative cancellation.
+File-request cancellation signals the original sender and waits for its actual worker
+completion. Repeated cancellation retains that worker and its queue slot until it exits.
+The sender runs with the original context; an uninterruptible backend can leave stop
+pending. This does not guarantee hard interruption or completion at process shutdown.
 Durable ownership and explicit retry after GUI page destruction are not yet supplied
 by these backend changes; callers must retain an owner when stop raises.

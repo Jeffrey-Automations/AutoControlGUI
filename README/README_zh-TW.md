@@ -67,9 +67,11 @@ Wayland NORMAL 輸入透過受管理的子程序執行 libei 與 portal 呼叫�
 
 [MIT](../LICENSE) © JE-Chen. [Third-party licenses](../Third_Party_License.md).
 
-關閉 Remote Desktop 會釋放頁面；重新開啟會建立新控制項，不自動接回共用連線。Registry 的 TCP／WebSocket 連線仍可供腳本使用；頁面擁有的 WebRTC 連線與音訊在背景停止。待處理核准會拒絕，延遲回呼會丟棄。已進入傳送階段的檔案傳輸不會因關閉頁面而中斷。
+關閉 Remote Desktop 會釋放頁面；重新開啟會建立新控制項，不自動接回共用連線。Registry 的 TCP／WebSocket 連線仍可供腳本使用；頁面擁有的 WebRTC 連線與音訊在背景停止。待處理核准會拒絕，延遲回呼會丟棄。已進入傳送階段的檔案傳輸須依後端的合作式取消停止。
 
 WebRTC host/viewer 的 `stop()` 最多等待三秒完成軟體清理。`PeerStopPending` 保留同一個尚未完成的操作；明確重試只會繼續等待。`PeerStopFailed` 保留清理失敗的資源供明確重試，成功前禁止重新啟動。Multi-viewer host 保留失敗的 session 與共用來源。`FolderSyncEngine.stop_confirmed()` 在原工作執行緒仍存活時回傳 `False`。這些結果不代表原生裝置已釋放；頁面銷毀後的復原仍需持久資源保管與重試整合。
+
+主機檔案請求會保留原傳送工作，直到工作執行緒退出，重複停止也不會提前釋放所有權。停止會通知取消並等候原工作；無法中斷的後端操作仍可能讓停止維持待完成。
 
 MCP 唯讀標記不授予 viewer 存取權。已審查的即時畫面與呼叫者資料運算使用 `read_screen`；檔案、裝置資料及未知工具需要 `read_data`。別名共用標準名稱的權限，較強的明確設定優先。提供影像來源、從環境變數讀取設定欄位或規劃開啟本機檔案時需要 `read_data`。Anchor locator 的 accessibility／OCR 允許觀測即時畫面，影像範本需要 `read_data`，VLM 請求需要 `drive_input`。唯讀呼叫拒絕擷取產物及 VLM 分支，目錄排除可自選 ADB 執行檔的工具。MCP CI annotations 只回傳格式化文字，不寫入 stdout。未審查的 plugin 與 WebRunner 初始化工具不列入唯讀目錄，等待相依版本的個別審查。
 
