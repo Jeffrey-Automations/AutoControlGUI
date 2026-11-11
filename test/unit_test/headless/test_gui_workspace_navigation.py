@@ -222,7 +222,8 @@ def test_switching_theme_keeps_the_text_size(window):
 def test_rebuilding_the_menus_for_a_language_switch_adds_no_shortcut(window):
     assert window["actions_after"] == window["actions_before"]
     assert window["placeholder"]
-    assert window["view_menu"] == ["Search Features...", "Navigation Panel", "Tabs", "Theme", "Text Size"]
+    assert window["view_menu"] == ["Search Features...", "Navigation Panel", "Execution details",
+                                   "Tabs", "Theme", "Text Size"]
 
 
 def test_the_window_shrinks_to_a_small_screen_with_both_panes_usable(window):

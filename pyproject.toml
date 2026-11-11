@@ -362,6 +362,7 @@ module = [
     "je_auto_control.gui.config_sync_tab",
     "je_auto_control.gui.mobile_tab",
     "je_auto_control.gui.navigation",
+    "je_auto_control.gui.workspace_details",
     "je_auto_control.gui.remote_desktop.webrtc_panel_state",
     "je_auto_control.gui.remote_desktop.view_lifetime",
     "je_auto_control.gui.remote_desktop.view_approvals",

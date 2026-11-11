@@ -189,3 +189,17 @@ Remote Desktop 生命週期
 -----------------------
 
 關閉 Remote Desktop 會釋放頁面；重新開啟會建立新控制項，不自動接回共用連線。Registry 的 TCP／WebSocket 連線仍可供腳本使用；頁面擁有的 WebRTC 連線與音訊在背景停止。待處理核准會拒絕，延遲回呼會丟棄。已進入傳送階段的檔案傳輸不會因關閉頁面而中斷。
+
+執行詳情
+~~~~~~~~
+
+**View → 執行詳情** （``Ctrl+Shift+D``）展開可捲動的右側詳情，初始為收合。
+診斷分頁提供實際執行進度、停止要求、結果與錯誤；未提供詳情的分頁會明確顯示。
+切換或關閉分頁會斷開更新，包含已排隊的舊結果。詳情不啟動工作，也不持有取消權限；
+操作仍使用分頁的 Actions 選單。
+
+嵌入程式可從 ``je_auto_control.gui.workspace`` 建立 ``WorkspaceShell(registry, parent)``。
+傳入的 ``TabRegistry`` 是唯一的分頁資料來源，直接呼叫 registry 關閉也會移除畫面。
+``AutoControlGUIWidget(parent)`` 保留匯入路徑、預設功能與 show/hide/list API。
+隱藏會保留分頁；關閉擁有的分頁後，重開會重新建立。Registry 若比工作區存活更久，
+會在 Qt 銷毀頁面時清除該快取。

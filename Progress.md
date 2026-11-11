@@ -530,7 +530,7 @@ H 已有三平台型別 gate 與真實相依型別檢查；仍缺嚴格型別深
 F 還缺：
 
 - **Remote Desktop 與 Script Builder 仍在啟動時建立**（預設開啟），啟動時間 2.6–2.7 秒裡大半是它們與門面匯入。
-- **F2 其餘**：計畫指定的 `WorkspaceShell` 介面、右側可收合詳情，以及各面板的空白／錯誤／permission states 還沒全面交付。
+- **F2 其餘**：Diagnostics 以外面板的執行詳情，以及各面板的空白／錯誤／permission states 尚未全面交付。
 - **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移，
   包含 Quick Connect 的同步啟停、已進入傳輸的取消與同頁 session generation 隔離。
 - **F3 關閉失敗恢復**：`gui/_slow_op.py` 的 StopQueue／stop_each 目前只記錄停止失敗，

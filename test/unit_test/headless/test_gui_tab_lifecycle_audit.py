@@ -240,7 +240,8 @@ def test_a_hidden_tab_is_owned_and_stays_hidden(qapp):
     class _Owner(QWidget):
         def __init__(self):
             super().__init__()
-            self._tab_entries = []
+            from je_auto_control.gui.tab_registry import TabRegistry
+            self.tab_registry = TabRegistry([])
             self.tabs = QTabWidget(self)
 
     owner, page = _Owner(), QWidget()

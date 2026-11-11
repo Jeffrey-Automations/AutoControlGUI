@@ -197,3 +197,19 @@ Remote Desktop lifetime
 -----------------------
 
 Closing Remote Desktop releases its page. Reopening creates fresh controls without reattaching shared sessions. Registry TCP/WebSocket sessions remain available to scripts; page-owned WebRTC sessions and audio retire in the background. Pending approvals are denied, and late callbacks are discarded. An already-entered file transfer is not interrupted by closing the page.
+
+Execution details
+~~~~~~~~~~~~~~~~~
+
+**View → Execution details** (``Ctrl+Shift+D``) expands a scrollable right pane.
+It starts collapsed. Diagnostics publishes actual run progress, stop requests,
+results and errors; pages without a publisher show an explicit unavailable state.
+Switching or closing a page disconnects its updates, including queued old results.
+The pane does not start work or own cancellation. Use the page's Actions menu.
+
+Embedders can construct ``WorkspaceShell(registry, parent)`` from
+``je_auto_control.gui.workspace``. The supplied ``TabRegistry`` remains authoritative,
+including direct registry closes. ``AutoControlGUIWidget(parent)`` keeps its import
+path, default features and show/hide/list APIs. Hiding retains a page; closing an
+owned page rebuilds it on reopening. A registry outliving its shell forgets pages
+when Qt destroys them.

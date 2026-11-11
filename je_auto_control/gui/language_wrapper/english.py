@@ -2070,3 +2070,14 @@ english_word_dict.update({
     'mcp_disclosure_page_size': 'Tools per progressive/static page',
     'mcp_disclosure_plan': 'Preview MCP server configuration'
 })
+
+english_word_dict.update({'workspace_details_title': 'Execution details',
+ 'workspace_details_empty': 'Select a feature to see execution details.',
+ 'workspace_details_unavailable': 'This feature does not publish execution details.',
+ 'workspace_phase_idle': 'Idle',
+ 'workspace_phase_running': 'Running',
+ 'workspace_phase_stopping': 'Stopping',
+ 'workspace_phase_succeeded': 'Completed',
+ 'workspace_phase_cancelled': 'Cancelled',
+ 'workspace_phase_error': 'Error',
+ 'workspace_phase_unavailable': 'Unavailable'})

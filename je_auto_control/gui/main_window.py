@@ -140,6 +140,12 @@ class AutoControlGUIUI(QMainWindow):
         self._sidebar_action = self._navigation_dock.toggleViewAction()
         self._sidebar_action.setShortcut(QKeySequence("Ctrl+B"))
         self.addAction(self._sidebar_action)
+        self._details_action = QAction(self)
+        self._details_action.setCheckable(True)
+        self._details_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
+        self._details_action.toggled.connect(self.auto_control_gui_widget.set_details_visible)
+        self.auto_control_gui_widget.details_visibility_changed.connect(self._details_action.setChecked)
+        self.addAction(self._details_action)
         self._refresh_navigation()
 
     def _refresh_navigation(self) -> None:
@@ -203,6 +209,8 @@ class AutoControlGUIUI(QMainWindow):
         menu.addAction(self._search_action)
         self._sidebar_action.setText(_t("menu_view_sidebar", "Navigation Panel"))
         menu.addAction(self._sidebar_action)
+        self._details_action.setText(_t("workspace_details_title", "Execution details"))
+        menu.addAction(self._details_action)
         tabs_menu = menu.addMenu(_t("menu_view_tabs", "Tabs"))
         self._view_menu = tabs_menu
         self._rebuild_tabs_menu()

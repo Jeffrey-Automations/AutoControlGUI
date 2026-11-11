@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add an injectable WorkspaceShell and collapsible execution details under View.
+  Diagnostics publishes progress and outcomes; existing embedded-widget imports,
+  constructors and tab visibility/close behavior remain supported.
+
 - Closing Image Detection, Auto Click, Record, Script Executor or Remote Desktop now
   releases its page controls. Hiding still preserves them. Reopening starts fresh
   local state; the shared recorder and registry-owned TCP/WebSocket sessions survive

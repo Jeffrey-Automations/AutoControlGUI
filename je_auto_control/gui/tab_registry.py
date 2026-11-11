@@ -11,6 +11,7 @@ them start) before it can show the three it opens on.
 """
 from __future__ import annotations
 
+import weakref
 from dataclasses import dataclass, field
 from importlib import import_module
 from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple
@@ -69,9 +70,22 @@ class TabEntry:
         """The tab's widget, building it on first access."""
         if self._widget is None:
             self._widget = self.factory()
+            self._track_destruction()
             if self.on_build is not None:
                 self.on_build(self._widget)
         return self._widget
+
+    def _track_destruction(self) -> None:
+        destroyed = getattr(self._widget, "destroyed", None)
+        if destroyed is None:
+            return
+        entry_ref, page_ref = weakref.ref(self), weakref.ref(self._widget)
+
+        def forget() -> None:
+            entry = entry_ref()
+            if entry is not None and entry._widget is page_ref():
+                entry._widget = None
+        destroyed.connect(forget)
 
     def release(self) -> bool:
         """Drop an owned panel and schedule its Qt cleanup, retaining metadata.
@@ -105,6 +119,26 @@ class TabRegistry:
                  on_close: Optional[Callable[[QWidget], None]] = None) -> None:
         self._entries = entries
         self._on_close = on_close
+        self._close_listeners: set[Callable[[QWidget], None]] = set()
+
+    @property
+    def entries(self) -> tuple[TabEntry, ...]:
+        """Return registered metadata without building any page."""
+        return tuple(self._entries)
+
+    def add(self, entry: TabEntry) -> None:
+        """Register metadata in this registry's authoritative order."""
+        if self._find(entry.key) is not None:
+            raise AutoControlActionException(f"Duplicate tab: {entry.key}")
+        self._entries.append(entry)
+
+    def subscribe_close(self, callback: Callable[[QWidget], None]) -> Callable[[], None]:
+        """Observe accepted closes before release; return an idempotent disconnector."""
+        self._close_listeners.add(callback)
+
+        def disconnect() -> None:
+            self._close_listeners.discard(callback)
+        return disconnect
 
     def _find(self, key: str) -> Optional[TabEntry]:
         return next((entry for entry in self._entries if entry.key == key), None)
@@ -131,6 +165,8 @@ class TabRegistry:
             return
         if self._on_close is not None:
             self._on_close(page)
+        for callback in tuple(self._close_listeners):
+            callback(page)
         entry.release()
 
 

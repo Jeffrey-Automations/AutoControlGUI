@@ -1962,3 +1962,14 @@ japanese_word_dict.update({
     'mcp_disclosure_page_size': '段階／固定モードのページ件数',
     'mcp_disclosure_plan': 'MCP サーバー設定をプレビュー'
 })
+
+japanese_word_dict.update({'workspace_details_title': '実行の詳細',
+ 'workspace_details_empty': '機能を選択すると実行の詳細を表示します。',
+ 'workspace_details_unavailable': 'この機能は実行の詳細を提供していません。',
+ 'workspace_phase_idle': '待機中',
+ 'workspace_phase_running': '実行中',
+ 'workspace_phase_stopping': '停止中',
+ 'workspace_phase_succeeded': '完了',
+ 'workspace_phase_cancelled': 'キャンセル済み',
+ 'workspace_phase_error': 'エラー',
+ 'workspace_phase_unavailable': '利用不可'})

@@ -41,6 +41,8 @@ Cancellation prevents later move/click steps, but cannot interrupt a native call
 
 Auto Click, Record and Script Executor own their controls and background tasks. Closing them stops local work; reopening creates fresh inputs. The shared recorder continues after its page closes, and a reopened page reads backend status (unknown when unsupported). This status does not verify native hook health. Ctrl+4 still stops scripts and auto-clicking.
 
+View → Execution details (Ctrl+Shift+D) opens a collapsible right pane. Diagnostics publishes its actual progress, stop, result and error state there; other pages explicitly say when details are unavailable. Switching or closing a page disconnects its updates. Embedders can supply a TabRegistry to WorkspaceShell; AutoControlGUIWidget(parent) remains supported.
+
 WebRTC statistics polling starts in the background and discards late samples after it stops.
 
 Windows, macOS, X11 and Wayland use different backends. Available features depend on system permissions and optional dependencies; Windows ARM64 has additional limitations. See the installation guide before choosing a deployment target.

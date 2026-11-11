@@ -1904,3 +1904,14 @@ simplified_chinese_word_dict.update({
     'mcp_disclosure_page_size': '渐进／固定模式的每页工具数',
     'mcp_disclosure_plan': '预览 MCP 服务器设置'
 })
+
+simplified_chinese_word_dict.update({'workspace_details_title': '执行详情',
+ 'workspace_details_empty': '选择功能以查看执行详情。',
+ 'workspace_details_unavailable': '此功能尚未提供执行详情。',
+ 'workspace_phase_idle': '待命',
+ 'workspace_phase_running': '执行中',
+ 'workspace_phase_stopping': '停止中',
+ 'workspace_phase_succeeded': '已完成',
+ 'workspace_phase_cancelled': '已取消',
+ 'workspace_phase_error': '错误',
+ 'workspace_phase_unavailable': '无法使用'})

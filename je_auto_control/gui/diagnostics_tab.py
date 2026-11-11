@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.diagnostics_capabilities import CapabilityView
 from je_auto_control.gui.mcp_discovery_view import MCPDiscoveryView
+from je_auto_control.gui.workspace_details import ExecutionDetails, ExecutionDetailsSource, ExecutionPhase
 from je_auto_control.gui.task_controller import TaskController, TaskHandle, TaskOutcome
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -61,6 +62,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         self._view = _DiagnosticViewState()
+        self.execution_details = ExecutionDetailsSource(self)
         self._task_controller = TaskController(self)
         self._active_task: Optional[TaskHandle] = None
         self._summary_label = QLabel(_t("diag_summary_idle"))
@@ -77,6 +79,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         )
         self._build_layout()
         self._apply_table_headers()
+        self._render_summary()
 
     def _build_layout(self) -> None:
         # The run command runs from the Actions menu; the tab keeps only
@@ -186,6 +189,14 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         if self._active_task is not None and self._view.total:
             progress = _t('diag_progress').format(completed=self._view.completed, total=self._view.total)
         self._progress_label.setText(progress)
+        phase: ExecutionPhase
+        if self._view.kind == 'result':
+            phase = 'succeeded' if report is not None and report.ok else 'error'
+        else:
+            phase = self._view.kind
+        self.execution_details.publish(ExecutionDetails(
+            phase, text, self._view.completed, self._view.total if self._active_task is not None else 0,
+        ))
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Abandon this run's display and request cleanup without blocking or closing another owner."""
