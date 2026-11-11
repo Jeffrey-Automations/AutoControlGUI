@@ -114,8 +114,8 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
   主執行緒 STA、其他執行緒進 MTA），Accessibility 分頁與 A11y Audit 已移出 GUI 執行緒。開發環境沒裝 `comtypes`，CI 也沒有同時有 `comtypes` 與桌面的 job，
   測試全是假 COM 物件。未驗證的假設：MTA 工作執行緒上的 UIA 呼叫可用；焦點事件 callback 不需要 message pump；
   `import comtypes` 第一次發生在已經是 MTA 的執行緒上會丟 `OSError`（憑記憶，沒處理）。焦點等待的 cooperative cancellation 已有 headless 回歸測試；真實 COM 訂閱／解除與停止行為仍待原生驗收。
-- **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）；`AC_parallel` 分支裡產生的值不經結果掛鉤回報，
-  只能從區塊的結果裡取得（標成 `results[0].…`）。結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
+- **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）。
+  結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
   `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
 - **stop 還叫不醒的**：已經進到後端的單一指令（一次影像搜尋、OCR、HTTP 請求、shell 指令）、單一手勢內的節奏 sleep；

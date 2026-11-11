@@ -179,7 +179,7 @@ token 控制項。Python 伺服器的 ``token`` 屬性仍保留設定的共用 t
   結果掛鉤回報給 Script Builder，值則以路徑標示（``步驟 2 › Loop 第 3 次，步驟 1 ·
   User: Rotate Token · alice · token``）。一次執行最多保留 200 個值——保留最先
   產生的；超過時結果面板會註明。被停止或失敗的執行，仍可看到在那之前已經產生的值。
-  掛鉤只跟著執行本身的執行緒，所以 ``AC_parallel`` 分支裡的指令改由區塊的結果取得。
+  掛鉤也會跟到 ``AC_parallel`` 的分支，所以分支產生的 token 只會出現一次，並以分支標示。
   結果面板會遮蔽每個指令結果中、任何深度、名稱屬於機密的欄位（``token``、
   ``password``、``api_key``…）——``AC_lease_secret``／``AC_lease_active`` 的租約
   token、``AC_rest_api_start``／``AC_rest_api_status`` 回傳的共用 bearer token——

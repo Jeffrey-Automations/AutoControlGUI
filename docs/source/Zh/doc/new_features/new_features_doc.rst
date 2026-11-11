@@ -52,8 +52,9 @@ Linux (``xclip`` 或 ``xsel``)。若無可用後端會拋出 ``RuntimeError``。
 
    executor.execute_action(actions, result_callback=seen)
 
-掛鉤只在該次執行、呼叫它的執行緒上有效（執行中啟動的執行緒，例如 ``AC_parallel``
-的分支，不會被跟到）；失敗的指令與 ``dry_run`` 不會回報；callback 丟出例外時只記錄
+掛鉤只在該次執行、呼叫它的執行緒上有效。``AC_parallel`` 的分支會被跟到：分支裡指令的
+路徑是 ``AC_parallel`` 那一步的路徑，再加上以分支序號（從 1 起）為 ``run`` 的一層；兩個
+分支不會同時呼叫 callback。執行中啟動的其他執行緒不會被跟到。失敗的指令與 ``dry_run`` 不會回報；callback 丟出例外時只記錄
 例外型別並忽略。有沒有掛鉤，執行的回傳值與 log 都相同。``result`` 就是紀錄裡的那個
 物件，請勿修改。要觀察多次執行，可用
 ``je_auto_control.utils.executor.result_hook`` 的 ``with observe_results(seen):``。

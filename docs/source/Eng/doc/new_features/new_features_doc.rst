@@ -55,8 +55,10 @@ whose results are in no execution record::
 
    executor.execute_action(actions, result_callback=seen)
 
-The hook lasts for that run on the calling thread only (a thread the run
-starts, such as an ``AC_parallel`` branch, is not followed), a failed command
+The hook lasts for that run on the calling thread. ``AC_parallel`` branches
+are followed: a branch command's path is the ``AC_parallel`` step's path plus
+the branch's 1-based index as ``run``, and two branches never call the
+callback at the same time. Any other thread the run starts is not followed. A failed command
 and a ``dry_run`` report nothing, and a callback that raises is logged by its
 exception type and ignored. The run returns and logs the same with or without
 it. ``result`` is the recorded object: do not change it. To observe several

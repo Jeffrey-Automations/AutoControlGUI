@@ -205,8 +205,8 @@ surface, each of which needs the ``manage_users`` capability:
   Rotate Token · alice · token``). At most 200 values are kept for one run
   -- the first ones; the result pane says when a run issued more. A run
   that was stopped or failed still offers what it had issued by then. The
-  hook follows the run's own thread, so a command in an ``AC_parallel``
-  branch is offered from the block's result instead. The pane masks every
+  hook follows ``AC_parallel`` branches too, so a token a branch issued is
+  offered once, labelled by its branch. The pane masks every
   secret-named field (``token``, ``password``, ``api_key``...) of every
   command's result at any depth -- a lease token from ``AC_lease_secret`` /
   ``AC_lease_active``, the shared bearer token ``AC_rest_api_start`` /

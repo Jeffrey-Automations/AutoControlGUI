@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- The executor result hook (`result_callback`, `observe_results`) now follows `AC_parallel`
+  branches: a branch command is reported under the `AC_parallel` step with the branch's
+  1-based index as `run`, and branches never call the callback concurrently. The Script
+  Builder therefore offers a token a branch issued as that command's own value instead of
+  `AC_parallel` `results[0].…`.
+
 - Of the three GUI tabs open at start, only Record is built then: Script Builder and Remote
   Desktop sit in the tab bar as empty stand-ins and are built in place the first time they
   are selected or their widget is asked for (`TabEntry.widget`, `activate_tab`). Offscreen,

@@ -134,13 +134,14 @@ def test_a_block_that_returns_its_body_record_does_not_offer_a_value_twice(tmp_p
     assert values[0].value not in shown
 
 
-def test_a_value_only_a_parallel_branch_produced_is_taken_from_the_block_result():
-    """A branch runs on its own thread, which the hook does not follow; its record is in the result."""
+def test_a_value_a_parallel_branch_produced_is_offered_once_from_its_branch():
+    """The hook follows AC_parallel branches; the block's repeat of the same token is not offered again."""
+    from je_auto_control.utils.executor.result_hook import StepPosition
     record, values, _truncated = _collected(
         [["AC_parallel", {"branches": [[["AC_lease_secret", {"name": "one-time-par", "ttl": 5}]]]}]])
     try:
-        assert [(value.command, value.name) for value in values] == [
-            ("AC_parallel", "results[0].AC_lease_secret.token")]
+        assert [(value.command, value.name) for value in values] == [("AC_lease_secret", "token")]
+        assert values[0].path == (StepPosition(1, 1, "AC_parallel"), StepPosition(1, 1, "AC_lease_secret"))
         assert values[0].value not in json.dumps(displayable_record(record), default=str)
     finally:
         execute_action([["AC_revoke_lease", {"token": values[0].value}]])
