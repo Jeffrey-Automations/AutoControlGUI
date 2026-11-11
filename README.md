@@ -41,6 +41,8 @@ Cancellation prevents later move/click steps, but cannot interrupt a native call
 
 Auto Click, Record and Script Executor own their controls and background tasks. Closing them stops local work; reopening creates fresh inputs. The shared recorder continues after its page closes, and a reopened page reads backend status (unknown when unsupported). This status does not verify native hook health. Ctrl+4 still stops scripts and auto-clicking.
 
+WebRTC statistics polling starts in the background and discards late samples after it stops.
+
 Windows, macOS, X11 and Wayland use different backends. Available features depend on system permissions and optional dependencies; Windows ARM64 has additional limitations. See the installation guide before choosing a deployment target.
 
 Wayland NORMAL input runs libei and portal calls in an owned helper process. Timeouts, cancellation and uncertain replies retire that helper without replay or automatic provider fallback. The direct `LibeiBackend` API remains in-process. Helper retirement is not proof that a compositor released input; native acceptance remains pending.

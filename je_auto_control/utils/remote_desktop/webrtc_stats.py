@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import time
+import threading
+from concurrent.futures import Future
+from enum import Enum, auto
 from dataclasses import asdict, dataclass
 from typing import Callable, Optional
 
@@ -30,53 +33,89 @@ class StatsSnapshot:
         return asdict(self)
 
 
+class _PollState(Enum):
+    NEW = auto()
+    SUBMITTING = auto()
+    RUNNING = auto()
+    STOPPED = auto()
+
+
 class StatsPoller:
     """Drive a periodic ``getStats()`` poll on the asyncio bridge."""
 
     def __init__(self, pc, callback: Callable[[StatsSnapshot], None],
                  interval_s: float = _DEFAULT_INTERVAL_S) -> None:
         self._pc = pc
-        self._callback = callback
+        self._callback: Optional[Callable[[StatsSnapshot], None]] = callback
         self._interval = max(0.25, float(interval_s))
-        self._task: Optional[asyncio.Task] = None
+        self._lifecycle_lock = threading.Lock()
+        self._state = _PollState.NEW
+        self._future: Optional[Future[None]] = None
         self._prev_packets_received = 0
         self._prev_packets_lost = 0
         self._prev_bytes_received = 0
         self._prev_frames_decoded = 0
         self._prev_sample_time: Optional[float] = None
-        self._stopped = False
+
+    @property
+    def _stopped(self) -> bool:
+        return self._state is _PollState.STOPPED
 
     def start(self) -> None:
-        from je_auto_control.utils.remote_desktop.webrtc_transport import get_bridge
-        future = get_bridge().submit(self._async_start())
-        try:
-            future.result(timeout=2.0)
-        # Not redundant: TimeoutError is not an OSError on Python 3.10, the
-        # lowest supported version; the overlap only exists from 3.11.
-        except (RuntimeError, TimeoutError, OSError) as error:  # NOSONAR
-            autocontrol_logger.warning("stats poller start: %r", error)
+        """Submit polling once without waiting for the bridge to run it.
 
-    # Must stay a coroutine although it awaits nothing: bridge.submit hands it
-    # to asyncio.run_coroutine_threadsafe, and the body schedules the loop task.
-    async def _async_start(self) -> None:  # NOSONAR
-        if self._task is not None:
+        Stop is terminal. A submission already in progress is cancelled as
+        soon as its future arrives; duplicate starts cannot submit another loop.
+        """
+        with self._lifecycle_lock:
+            if self._state is not _PollState.NEW:
+                return
+            self._state = _PollState.SUBMITTING
+        coroutine = self._loop()
+        try:
+            from je_auto_control.utils.remote_desktop.webrtc_transport import get_bridge
+            future = get_bridge().submit(coroutine)
+        except BaseException as error:  # reason: release unsubmitted coroutine; only expected bridge errors are logged
+            coroutine.close()
+            with self._lifecycle_lock:
+                if self._state is _PollState.SUBMITTING:
+                    self._state = _PollState.NEW
+            if not isinstance(error, (RuntimeError, OSError)):
+                raise
+            autocontrol_logger.warning("stats poller start: %r", error)
             return
-        self._task = asyncio.ensure_future(self._loop())
+        with self._lifecycle_lock:
+            stopped = self._stopped
+            if not stopped:
+                self._state = _PollState.RUNNING
+                self._future = future
+        future.add_done_callback(self._finished)
+        if stopped:
+            future.cancel()
+
+    def _finished(self, future: Future[None]) -> None:
+        with self._lifecycle_lock:
+            self._state = _PollState.STOPPED
+            self._callback = None
+            if self._future is future:
+                self._future = None
+        if not future.cancelled():
+            error = future.exception()
+            if error is not None:
+                autocontrol_logger.warning("stats poller: %r", error)
 
     def stop(self) -> None:
-        """Stop polling; safe from any thread, and it never waits.
+        """Retire this poller without joining, waiting or acquiring a bridge.
 
-        It sets a flag and asks the bridge's loop to cancel the poll task
-        (``call_soon_threadsafe``): no thread is joined, no future is waited
-        for and no socket is closed, so a GUI slot may call it directly. The
-        loop finishes a sample that is already in flight on its own time.
+        Samples finishing after stop are discarded. A callback already admitted
+        may finish; stop does not preempt application callback code.
         """
-        self._stopped = True
-        if self._task is None:
-            return
-        from je_auto_control.utils.remote_desktop.webrtc_transport import get_bridge
-        get_bridge().call_soon(self._task.cancel)
-        self._task = None
+        with self._lifecycle_lock:
+            self._state = _PollState.STOPPED
+            self._callback = None
+            future, self._future = self._future, None
+        if future is not None:
+            future.cancel()
 
     async def _loop(self) -> None:
         # No try/except CancelledError wrapper here — cancellation must
@@ -84,16 +123,26 @@ class StatsPoller:
         # to cancellation rather than completing normally (S7497).
         while not self._stopped:
             await asyncio.sleep(self._interval)
+            if self._stopped:
+                return
             try:
                 snapshot = await self._sample()
             except (RuntimeError, OSError) as error:
                 autocontrol_logger.debug("stats sample: %r", error)
                 continue
+            if self._stopped:
+                return
             if snapshot is not None:
-                try:
-                    self._callback(snapshot)
-                except (RuntimeError, OSError) as error:
-                    autocontrol_logger.debug("stats cb: %r", error)
+                self._deliver(snapshot)
+
+    def _deliver(self, snapshot: StatsSnapshot) -> None:
+        """Keep callback ownership out of the polling coroutine's suspended frame."""
+        callback = self._callback
+        if callback is not None and not self._stopped:
+            try:
+                callback(snapshot)
+            except (RuntimeError, OSError) as error:
+                autocontrol_logger.debug("stats cb: %r", error)
 
     async def _sample(self) -> Optional[StatsSnapshot]:
         if self._pc is None:

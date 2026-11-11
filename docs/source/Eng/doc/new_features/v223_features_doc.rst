@@ -14,7 +14,7 @@ Image Detection and Report, expose ``menu_actions()`` returning
 ``[(label_key, handler), ...]``. The menu bar queries the active page and
 renders its commands. Registry-supplied actions remain supported for embedders.
 
-46 of 48 registered tabs surface their commands this way. **Script Builder**
+49 of 51 registered tabs surface their commands this way. **Script Builder**
 and **Remote Desktop** intentionally keep their interactive panel layouts, and
 the Actions menu shows a placeholder there. Controls a window-level menu cannot
 replace stay in place: per-page browse buttons inside stacked trigger forms,
@@ -185,3 +185,10 @@ Closing stops page-owned work but does not stop the shared recorder. Reopening
 reads existing backend capture state; unsupported/custom backends show unknown.
 The read-only state does not prove hook health or native input acceptance.
 Hiding preserves page state; closing and reopening creates a fresh page.
+
+WebRTC statistics
+-----------------
+
+Statistics polling starts without waiting for the network loop. Stopping it
+discards late samples and releases the callback owner; a callback already
+executing may finish. This does not close the remote session itself.

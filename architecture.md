@@ -1,5 +1,9 @@
 # AutoControl Architecture
 
+WebRTC statistics owns one submitted polling future. Start does not wait for
+the event loop; stop closes admission, cancels pending submission and drops
+the callback owner without acquiring a bridge. Late awaited samples are discarded.
+
 WebRTC host and viewer mixins share concrete typed state and slot contracts.
 Initialization remains in the composed panels. STUN/TURN controls use a common
 contract; the host supplies a separate optional hardware-codec owner.

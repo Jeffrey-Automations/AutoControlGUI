@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261111-17 | 2026-11-11 | Start and stop WebRTC statistics without waiting | #done #gui | [2026-11-b](2026-11-b.md) |
 | U-20261111-16 | 2026-11-11 | Reconcile historical coverage comparison and file budgets | #snapshot #progress | [2026-11-b](2026-11-b.md) |
 | U-20261111-15 | 2026-11-11 | Reconcile signing and RBAC transport verification | #snapshot #security | [2026-11-b](2026-11-b.md) |
 | U-20261111-14 | 2026-11-11 | Reconcile package-loading progress with existing execution support | #snapshot #progress | [2026-11-b](2026-11-b.md) |
@@ -635,7 +636,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | File | Period | Entries |
 |---|---|---:|
-| [2026-11-b.md](2026-11-b.md) | 2026-11 | 5 |
+| [2026-11-b.md](2026-11-b.md) | 2026-11 | 6 |
 | [2026-11.md](2026-11.md) | 2026-11 | 43 |
 | [2026-10-f.md](2026-10-f.md) | 2026-10 | 5 |
 | [2026-10-e.md](2026-10-e.md) | 2026-10 | 91 |
