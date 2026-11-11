@@ -357,6 +357,7 @@ module = [
     "je_auto_control.utils.remote_desktop.webrtc_retirement",
     "je_auto_control.utils.remote_desktop.webrtc_peer_cleanup",
     "je_auto_control.utils.remote_desktop.media_retirement",
+    "je_auto_control.utils.remote_desktop.webrtc_media_owners",
     "je_auto_control.utils.remote_desktop.audio_retirement",
     "je_auto_control.android.apps",
     "je_auto_control.android.input",

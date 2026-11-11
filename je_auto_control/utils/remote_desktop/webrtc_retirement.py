@@ -42,6 +42,7 @@ class CleanupAttempt:
     def __init__(self) -> None:
         self.failed: list[str] = []
         self.pending: list[str] = []
+        self._errors: list[BaseException] = []
 
     def run(self, action: Callable[[], None], label: str) -> bool:
         try:
@@ -49,8 +50,8 @@ class CleanupAttempt:
         except PeerStopPending:
             self.pending.append(label)
             return False
-        except Exception as error:  # reason: Preserve cancellation; ordinary failures retain the resource for retry.
-            raise_caused_run_interruption(error)
+        except BaseException as error:  # reason: finish independent cleanup before preserving controls
+            self._errors.append(error)
             self.failed.append(label)
             return False
         return True
@@ -61,8 +62,8 @@ class CleanupAttempt:
         except PeerStopPending:
             self.pending.append(label)
             return False
-        except Exception as error:  # reason: Independent resources still need cleanup after an ordinary step failure.
-            raise_caused_run_interruption(error)
+        except BaseException as error:  # reason: retain failures until independent asynchronous cleanup has run
+            self._errors.append(error)
             self.failed.append(label)
             return False
         return True
@@ -73,6 +74,8 @@ class CleanupAttempt:
         return None
 
     def finish(self) -> None:
+        for error in self._errors:
+            raise_caused_run_interruption(error)
         if self.failed:
             raise PeerStopFailed("unfinished cleanup: " + ", ".join(self.failed))
         if self.pending:

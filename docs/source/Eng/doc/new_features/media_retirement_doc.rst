@@ -19,6 +19,12 @@ before queuing cleanup. Receipt retries cannot stop a replacement peer or screen
 source even when its session ID is reused. The legacy tuple-returning API remains.
 GUI disconnect and discarded offers still need to adopt this ownership.
 
+Peer hosts and viewers adopt failed-constructor cleanup owners and expose cached,
+immutable ``media_failures``. Failed children cannot be overwritten. Live disable
+observes original task completion, and peer close proceeds alongside unrelated
+media cleanup. A busy microphone-start slot reports pending without blocking the
+bridge loop on its lock. Deferred detach and renegotiation bind their original peer.
+
 This producer unit does not complete application caretaker, GUI saved-result
-reporting, peer replacement/discard paths, or HostBrowser dialog ownership. Native acceptance
+reporting, GUI discard paths, or HostBrowser dialog ownership. Native acceptance
 remains pending; validation uses injected resources only.

@@ -33,7 +33,7 @@ except ImportError as exc:  # pragma: no cover - optional dep
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop.media_retirement import (
-    Completion, RetirementStatus, require_retired, raise_cleanup_failures,
+    Completion, MediaRetirementError, RetirementStatus, require_retired, raise_cleanup_failures,
 )
 from je_auto_control.utils.remote_desktop.audio import (
     AudioBackendError, AudioCapture, AudioPlayer, is_audio_backend_available,
@@ -143,7 +143,7 @@ class OpusMicAudioTrack(MediaStreamTrack):
                                 Completion.CONFIRMED)
 
     def stop(self) -> None:
-        failures = []
+        failures: list[BaseException] = []
         try:
             super().stop()
         except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
@@ -232,6 +232,25 @@ class OpusMicReceiver:
             chunks.append(arr.tobytes())
         return chunks
 
+    async def stop_confirmed(self) -> None:
+        """Observe the original drain task on its loop before acknowledging stop."""
+        failures: list[BaseException] = []
+        try:
+            self.stop()
+        except MediaRetirementError as error:
+            if error.owner is not self or not error.status.retryable:
+                failures.append(error)
+        except BaseException as error:  # reason: observe the task despite an independent player or scheduling failure
+            failures.append(error)
+        task = self._task
+        try:
+            if task is not None and not task.done() and not task.get_loop().is_closed():
+                await asyncio.wait({task})
+            self.stop()
+        except BaseException as error:  # reason: preserve earlier controls after observing actual task completion
+            failures.append(error)
+        raise_cleanup_failures(failures)
+
     @property
     def retirement_status(self) -> RetirementStatus:
         if not self._player_retired:
@@ -247,7 +266,7 @@ class OpusMicReceiver:
 
     def stop(self) -> None:
         self._stopped = True
-        failures = []
+        failures: list[BaseException] = []
         try:
             self._cancel_task()
         except BaseException as error:  # reason: attempt independent child cleanup before preserving failures

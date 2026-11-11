@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- WebRTC peers retain media constructor and disable failures, expose cached slot outcomes,
+  observe actual receiver/task completion, and guard deferred media operations against
+  peer replacement. GUI caretaker and Diagnostics integration remain pending.
+
 - Bind delayed MultiViewer session retirement to its original peer and screen source.
   Owned offers preserve cleanup identity before delivery; existing tuple APIs remain compatible.
 

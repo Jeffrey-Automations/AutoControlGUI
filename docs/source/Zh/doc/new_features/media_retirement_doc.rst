@@ -18,5 +18,10 @@ MultiViewerHost 的 ``create_owned_session_offer()`` 回傳 SDP 與原始 sessio
 即使 ID 重用，重試也不會停止新的連線或畫面來源。既有 tuple API 保持相容。
 GUI 斷線與丟棄 offer 路徑仍須接入此所有權。
 
-此 producer 單元尚未完成應用程式 caretaker、GUI 儲存成功提示、peer 替換及丟棄路徑，
+Host／viewer peer 會接收建構失敗的清理 owner，並透過 ``media_failures`` 提供快取的
+不可變結果。失敗的子資源不能被覆寫；即時停用會觀測原 task 的實際完成，其他媒體與
+peer 關閉仍可獨立進行。麥克風啟動佔用中的 slot 會回報待完成，不會卡住 bridge loop
+等待鎖。延後執行的 detach 與重新協商均綁定原 peer。
+
+此 producer 單元尚未完成應用程式 caretaker、GUI 儲存成功提示、GUI 丟棄路徑，
 以及 HostBrowser 對話框所有權整合。原生驗收仍待完成；本單元使用注入的資源驗證。
