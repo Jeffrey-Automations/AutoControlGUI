@@ -1,5 +1,11 @@
 # AutoControl Architecture
 
+Image Detection is a lazy independent widget. It owns its inputs and mouse-button
+selection, captures immutable worker arguments and runs matching through TabTask.
+Close cancels work and discards late results; reopen creates fresh controls.
+The shared locate-and-click path checks cancellation before detection and before
+moving or clicking. Calls already inside a native backend may still finish.
+
 The process-memory test fixture owns fixed payload and sequence buffers in a hidden
 child process. Bounded inherited pipes expose expected state and validated fixture
 updates. Bootstrap facts remain unverified until a native provider independently

@@ -11,10 +11,11 @@ The Actions menu
 
 Two ways a tab surfaces its commands:
 
-* **Registry actions** — core tabs (Auto Click, Screenshot, Image Detection,
-  Record, Script Executor, Report) declare ``(label_key, handler)`` pairs when
+* **Registry actions** — legacy core tabs (Auto Click, Record and Script Executor)
+  declare ``(label_key, handler)`` pairs when
   they are registered in ``gui/main_widget.py``.
-* **The** ``menu_actions()`` **hook** — feature tabs expose a
+* **The** ``menu_actions()`` **hook** — independent tabs, including Screenshot,
+  Image Detection and Report, expose a
   ``menu_actions()`` method returning the same ``[(label_key, handler), ...]``
   shape; the menu bar queries the active tab and renders whatever it returns.
 
@@ -27,6 +28,15 @@ checkboxes.
 
 The navigation panel
 --------------------
+
+Image Detection is built only when opened and owns its template, threshold,
+draw option and mouse-button selection. Matching runs through ``TabTask`` with
+an input snapshot. **Actions > Stop run** cancels pending work. Closing the page
+discards late results; reopening creates fresh inputs. Hiding the page preserves
+them. Cancellation is checked before detection and before each move/click step
+in ``locate_and_click``. An entered native call may still finish. Cropping remains
+interactive, and the draw option retains the backend's visualization behavior.
+
 
 Every registered tab is listed on the left of the window, grouped by the same
 five categories, whether it is open or not; open tabs are shown in bold.

@@ -94,12 +94,17 @@ def test_image_detection_shows_no_match(qapp, monkeypatch):
 
     for name in ("locate_image_center", "locate_all_image", "locate_and_click"):
         monkeypatch.setattr(tab, name, not_found)
-    fake = types.SimpleNamespace(_get_detect_params=lambda: ("t.png", 0.8, False),
-                                 detect_result_text=QTextEdit(), mouse_button_combo=QComboBox())
-    for slot in ("_locate_image", "_locate_all", "_locate_click"):
-        fake.detect_result_text.clear()
-        getattr(tab.ImageDetectTabMixin, slot)(fake)
-        assert "not on screen" in fake.detect_result_text.toPlainText()
+    from headless._qt_settle import pump_until
+    page = tab.ImageDetectionTab()
+    page.img_path_input.setText("t.png")
+    try:
+        for slot in ("_locate_image", "_locate_all", "_locate_click"):
+            page.detect_result_text.clear()
+            getattr(page, slot)()
+            assert pump_until(lambda: not page._task.running)
+            assert "not on screen" in page.detect_result_text.toPlainText()
+    finally:
+        page.deleteLater()
 
 
 def test_screenshot_shows_a_bad_region(qapp, monkeypatch):

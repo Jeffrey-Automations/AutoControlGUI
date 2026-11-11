@@ -143,7 +143,7 @@ _GUI = "je_auto_control.gui"
 TAB_SPECS: Tuple[TabSpec, ...] = (
     TabSpec("auto_click", "tab_auto_click", "core"),
     TabSpec("screenshot", "tab_screenshot", "core", f"{_GUI}._screenshot_tab", "ScreenshotTab"),
-    TabSpec("image_detect", "tab_image_detect", "core"),
+    TabSpec("image_detect", "tab_image_detect", "core", f"{_GUI}._image_detect_tab", "ImageDetectionTab"),
     TabSpec("record", "tab_record", "core", default_visible=True),
     TabSpec("script_builder", "tab_script_builder", "core",
             f"{_GUI}.script_builder", "ScriptBuilderTab", default_visible=True),

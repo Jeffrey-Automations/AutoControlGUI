@@ -35,6 +35,10 @@ python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 - Connect AI clients through MCP, or integrate through REST and Python.
 - Use recording, scheduling and remote-desktop tools through the optional GUI.
 
+The Image Detection page runs matching in the background and owns its mouse-button selection.
+Its Actions menu can stop a pending search; closing the page discards late results and reopening resets its inputs.
+Cancellation prevents later move/click steps, but cannot interrupt a native call already in progress.
+
 Windows, macOS, X11 and Wayland use different backends. Available features depend on system permissions and optional dependencies; Windows ARM64 has additional limitations. See the installation guide before choosing a deployment target.
 
 Managed agent tasks and cross-host transfers include experimental features. See the implementation notes and project progress before relying on them in production.

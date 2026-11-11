@@ -1,6 +1,7 @@
 from typing import List, Tuple
 
 from je_auto_control.utils.cv2_utils import template_detection
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.exception.exception_tags import cant_find_image_error_message
 from je_auto_control.utils.exception.exceptions import ImageNotFoundException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -67,6 +68,7 @@ def locate_and_click(image, mouse_keycode: int | str,
 
     :return: (center_x, center_y)
     """
+    cancellation_checkpoint()
     autocontrol_logger.info(f"Locate and click {image}, keycode={mouse_keycode}, threshold={detect_threshold}")
     try:
         image_data_array = template_detection.find_image(image, detect_threshold, draw_image)
@@ -74,7 +76,9 @@ def locate_and_click(image, mouse_keycode: int | str,
             x1, y1, x2, y2 = image_data_array[1]
             center_x = int((x1 + x2) // 2)
             center_y = int((y1 + y2) // 2)
+            cancellation_checkpoint()
             set_mouse_position(center_x, center_y)
+            cancellation_checkpoint()
             click_mouse(mouse_keycode)
             record_action_to_list("locate_and_click", {"image": image, "threshold": detect_threshold})
             return center_x, center_y

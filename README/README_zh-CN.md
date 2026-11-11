@@ -35,6 +35,10 @@ python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 - 通过 MCP 连接 AI 客户端，或通过 REST 与 Python 整合。
 - 在可选 GUI 中使用录制、调度与远程桌面工具。
 
+图像检测分页在后台执行匹配，并有自己的鼠标按键选择。
+Actions 菜单可停止待完成的搜索；关闭分页会丢弃延迟结果，重新打开会重置输入字段。
+取消可阻止后续移动与点击步骤，但无法中断已进入的原生调用。
+
 Windows、macOS、X11 与 Wayland 使用不同后端，实际功能取决于系统权限与可选依赖。Windows ARM64 另有限制，部署前请先阅读安装文件。
 
 受管理的 Agent 任务与跨主机传输包含实验性功能；采用前请查看实现记录与项目进度中的验收状态。

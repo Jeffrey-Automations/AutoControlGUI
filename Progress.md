@@ -531,7 +531,7 @@ D2 仍缺 helper 隔離與半開交握資源回收；D3 的錄製／全域停止
 計畫 E（Android／iOS）、H（型別深化與總驗收）尚未開始。F 還缺：
 
 - **Remote Desktop 與 Script Builder 仍在啟動時建立**（預設開啟），啟動時間 2.6–2.7 秒裡大半是它們與門面匯入。
-- **F1 的遺留面板釋放**：Auto Click、Image Detection、Record、Script 四個核心表單與 Remote Desktop 在關閉時仍保留 widget；需隨 F3 遷移直接控制項引用、執行中工作與連線生命週期，再啟用銷毀。
+- **F1 的遺留面板釋放**：Auto Click、Record、Script 三個核心表單與 Remote Desktop 在關閉時仍保留 widget；需隨 F3 遷移直接控制項引用、執行中工作與連線生命週期，再啟用銷毀。
 - **F2 其餘**：計畫指定的 `WorkspaceShell` 介面、右側可收合詳情，以及各面板的空白／錯誤／permission states 還沒全面交付。
 - **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移。
 - **F4**（啟動／記憶體基準、mixed-DPI、功能對等測試）尚未開始。

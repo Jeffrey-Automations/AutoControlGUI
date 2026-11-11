@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._auto_click_tab import AutoClickTabMixin
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._image_detect_tab import ImageDetectTabMixin
 from je_auto_control.gui._record_tab import RecordTabMixin
 from je_auto_control.gui._script_tab import ScriptTabMixin
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
@@ -35,7 +34,7 @@ class _WorkerSignals(QObject):
 # =============================================================================
 class AutoControlGUIWidget(
     TranslatableMixin, AutoClickTabMixin,
-    ImageDetectTabMixin, RecordTabMixin, ScriptTabMixin,
+    RecordTabMixin, ScriptTabMixin,
     QWidget,
 ):
     """Owns the QTabWidget and exposes show/hide/list APIs for the menu bar."""
@@ -97,13 +96,6 @@ class AutoControlGUIWidget(
                 ("hotkey_send", self._send_hotkey),
                 ("write_send", self._send_write),
                 ("scroll_send", self._send_scroll),
-            )),
-            "image_detect": (self._build_image_detect_tab(), (
-                ("browse", self._browse_img),
-                ("crop_template", self._crop_template),
-                ("locate_image", self._locate_image),
-                ("locate_all", self._locate_all),
-                ("locate_click", self._locate_click),
             )),
             "record": (self._build_record_tab(), (
                 ("start_record", self._start_record),
