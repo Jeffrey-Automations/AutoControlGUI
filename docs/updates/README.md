@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261112-10 | 2026-11-12 | The capability-probe Progress item described deleted code | #snapshot #capabilities #macos | [2026-11-b](2026-11-b.md) |
 | U-20261112-09 | 2026-11-12 | The result hook follows AC_parallel branches | #done #executor #gui | [2026-11-b](2026-11-b.md) |
 | U-20261112-08 | 2026-11-12 | Strict tier for the two new MCP modules; Windows Qt stub nulls | #incident #typing #ci | [2026-11-b](2026-11-b.md) |
 | U-20261112-07 | 2026-11-12 | Build only the first start-up tab; the others when first selected | #done #gui #performance | [2026-11-b](2026-11-b.md) |

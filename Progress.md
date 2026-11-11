@@ -170,8 +170,6 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
   PySide6 6.11.2（`[gui]` 要求 6.12.0）。共用環境的升級需要使用者同意，沒有動；不影響 CI。
 - **free-threaded**：呼叫者身分、綁定的裝置、自愈的執行標記與 stop token 都改成只在設定它的執行緒上有效（`utils/thread_bound.py`）。
   這台機器沒有 free-threaded 直譯器：驗證用的是模擬繼承與真的 `-X thread_inherit_context=1`（3.14.7，GIL 開著）；`free-threaded-scope` job（3.14t）是第一次真的跑。
-- **能力探測**：Windows 的鎖定工作站、session 0、低完整性與擷取失敗分支只用假資料判斷；macOS 的三個 preflight 呼叫只對假物件跑過，
-  pyobjc 的 `Quartz` 有沒有 `CGPreflightListenEventAccess` 未知（沒有的話 `recording`／`stop_shortcut` 回 `unknown`）。
 - **Windows 的版面鍵名**（`slash` 等 8 個）只在美式配置上實際呼叫過。
 - **設定同步在 Windows 的路徑長度**：`LongPathsEnabled=0` 的機器上，`test_sync_workspace_surfaces.py` 的長紀錄名稱案例
   （64＋64 字元的 `scripts/…json`）在 `cache/.incoming-*/files/` 下組成 265 字元的路徑，`FileNotFoundError` 後回報
