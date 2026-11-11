@@ -537,7 +537,6 @@ D2 仍缺原生半開交握資源回收與合成器釋放證據；D3 的錄製�
 H 已有三平台型別 gate 與真實相依型別檢查；仍缺嚴格型別深化、完整範例／文件及最終固定來源總驗收。
 F 還缺：
 
-- **Remote Desktop 與 Script Builder 仍在啟動時建立**（預設開啟），啟動時間 2.6–2.7 秒裡大半是它們與門面匯入。
 - **F2 其餘**：Diagnostics 以外面板的執行詳情，以及各面板的空白／錯誤／permission states 尚未全面交付。
 - **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移，
   包含 Quick Connect 的同步啟停、已進入傳輸的取消與同頁 session generation 隔離。

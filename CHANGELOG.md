@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Of the three GUI tabs open at start, only Record is built then: Script Builder and Remote
+  Desktop sit in the tab bar as empty stand-ins and are built in place the first time they
+  are selected or their widget is asked for (`TabEntry.widget`, `activate_tab`). Offscreen,
+  median start-up went from 3.2 s to 1.7 s and memory from 172 MB to 111 MB. Code that
+  expected those two widgets to exist right after `AutoControlGUIWidget()` now builds them
+  on first access.
+
 - iOS `swipe` (`Swipe` gestures, `AC_ios_swipe`, `ac_ios_swipe`) no longer presses for
   `duration_s` before moving: facebook-wda's swipe duration is the start-point hold, so the
   old mapping made swipes start as drags. WebDriverAgent sets the travel speed and

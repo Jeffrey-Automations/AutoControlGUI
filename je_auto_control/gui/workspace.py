@@ -89,16 +89,35 @@ class ScrollableTabs(QTabWidget):
         container.setFrameShape(QScrollArea.Shape.NoFrame)
         container.setWidget(widget)
         result = super().insertTab(index, container, *args)
+        self._install_close_button(result, widget)
+        return result
+
+    def _install_close_button(self, index: int, widget: QWidget) -> None:
         tab_bar = self.tabBar()
         for side in (QTabBar.ButtonPosition.LeftSide, QTabBar.ButtonPosition.RightSide):
-            old_button = tab_bar.tabButton(result, side)
+            old_button = tab_bar.tabButton(index, side)
             if old_button is not None:
-                tab_bar.setTabButton(result, side, None)
+                tab_bar.setTabButton(index, side, None)
                 old_button.deleteLater()
         button = _CloseButton(tab_bar)
         button.clicked.connect(lambda: self.tabCloseRequested.emit(self.indexOf(widget)))
-        tab_bar.setTabButton(result, QTabBar.ButtonPosition.RightSide, button)
-        return result
+        tab_bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, button)
+
+    def replace_page(self, old: QWidget, new: QWidget) -> bool:
+        """Put ``new`` in ``old``'s place, keeping the tab's index, title and selection.
+
+        ``old`` is detached but not deleted. ``False`` when ``old`` is not a page here.
+        """
+        index = self.indexOf(old)
+        container = self.scroll_area(index) if index >= 0 else None
+        if container is None:
+            return False
+        detached = container.takeWidget()
+        if detached is not None:
+            detached.setParent(None)
+        container.setWidget(new)
+        self._install_close_button(index, new)
+        return True
 
     def removeTab(self, index: int) -> None:  # noqa: N802  # reason: Qt override
         """Remove the scroll container while retaining ownership of its page."""
@@ -126,8 +145,22 @@ class ScrollableTabs(QTabWidget):
                 button.retranslate()
 
 
+class _UnbuiltPage(QWidget):
+    """Stands in the tab bar for a start-up tab that has not been built yet."""
+
+    def __init__(self, key: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.tab_key = key
+
+
 class WorkspaceShell(TranslatableMixin, QWidget):
-    """Present one supplied tab registry and the active page's execution details."""
+    """Present one supplied tab registry and the active page's execution details.
+
+    Of the tabs registered as open at start-up, only the first is built then;
+    each of the others shows an empty stand-in until it is selected or its
+    widget is asked for, and is built in that tab's place at that moment.
+    Remote Desktop alone took about 0.9 s of the start-up.
+    """
 
     tabs_changed = Signal()
     current_tab_changed = Signal()
@@ -137,6 +170,7 @@ class WorkspaceShell(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         self.tab_registry = registry
+        self._unbuilt: dict[str, _UnbuiltPage] = {}
         self.tabs = ScrollableTabs()
         self.tabs.setDocumentMode(True)
         self.tabs.setUsesScrollButtons(True)
@@ -213,16 +247,40 @@ class WorkspaceShell(TranslatableMixin, QWidget):
             def adopt(page: QWidget) -> None:
                 shell = owner()
                 if shell is not None:
-                    shell._adopt_hidden_tab(page)
+                    shell._adopt_built_page(key, page)
             entry = TabEntry(key=key, title_key=title_key, factory=widget,
                              category=category, default_visible=default_visible, actions=actions,
                              retain_on_close=False,
                              on_build=adopt)
         self.tab_registry.add(entry)
-        if default_visible:
-            self.tabs.addTab(entry.widget, language_wrapper.translate(title_key, title_key))
+        title = language_wrapper.translate(title_key, title_key)
+        if default_visible and not isinstance(widget, QWidget) and self.tabs.count() > 0:
+            self._unbuilt[key] = page = _UnbuiltPage(key)
+            self.tabs.addTab(page, title)
+        elif default_visible:
+            self.tabs.addTab(entry.widget, title)
         elif isinstance(widget, QWidget):
             WorkspaceShell._adopt_hidden_tab(self, entry.widget)
+
+    def _adopt_built_page(self, key: str, page: QWidget) -> None:
+        """Seat a newly built page in its stand-in's tab, or keep it hidden and owned."""
+        stand_in = self._unbuilt.pop(key, None)
+        if stand_in is not None and self.tabs.replace_page(stand_in, page):
+            stand_in.deleteLater()
+            return
+        self._adopt_hidden_tab(page)
+
+    def _drop_unbuilt(self, key: str) -> bool:
+        """Close a start-up tab that was never built; ``False`` when ``key`` has none."""
+        stand_in = self._unbuilt.pop(key, None)
+        if stand_in is None:
+            return False
+        index = self.tabs.indexOf(stand_in)
+        if index != -1:
+            self.tabs.removeTab(index)
+        stand_in.deleteLater()
+        self.tabs_changed.emit()
+        return True
 
     def _adopt_hidden_tab(self, widget: QWidget) -> None:
         # Owned from the start: an unparented hidden tab outlived this
@@ -240,9 +298,14 @@ class WorkspaceShell(TranslatableMixin, QWidget):
         return [entry for entry in self.tab_registry.entries if self._is_built(entry)]
 
     def _is_open(self, entry: Any) -> bool:
+        if entry.key in self._unbuilt:
+            return True
         return self._is_built(entry) and self.tabs.indexOf(entry.widget) != -1
 
     def _on_current_tab_changed(self, _index: int) -> None:
+        page = self.tabs.currentWidget()
+        if isinstance(page, _UnbuiltPage):
+            self.tab_registry.open(page.tab_key)   # builds it into the stand-in's place
         self._bind_details()
         self.current_tab_changed.emit()
 
@@ -303,6 +366,8 @@ class WorkspaceShell(TranslatableMixin, QWidget):
     def current_tab_key(self) -> Optional[str]:
         """Key of the tab on screen, or ``None`` when every tab is closed."""
         widget = self.tabs.currentWidget()
+        if isinstance(widget, _UnbuiltPage):
+            return widget.tab_key
         for entry in self._built_entries():
             if entry.widget is widget:
                 return str(entry.key)
@@ -339,7 +404,7 @@ class WorkspaceShell(TranslatableMixin, QWidget):
     def hide_tab(self, key: str) -> None:
         """Close the tab ``key``; its widget is kept for the next time it is opened."""
         entry = self._find_entry(key)
-        if entry is None or not self._is_built(entry):
+        if entry is None or self._drop_unbuilt(key) or not self._is_built(entry):
             return
         index = self.tabs.indexOf(entry.widget)
         if index != -1:
@@ -348,6 +413,9 @@ class WorkspaceShell(TranslatableMixin, QWidget):
 
     def _on_tab_close_requested(self, index: int) -> None:
         widget = self.tabs.widget(index)
+        if isinstance(widget, _UnbuiltPage):
+            self._drop_unbuilt(widget.tab_key)
+            return
         for entry in self._built_entries():
             if entry.widget is widget:
                 self.close_tab(entry.key)
@@ -359,8 +427,10 @@ class WorkspaceShell(TranslatableMixin, QWidget):
         Unlike ``hide_tab``, closing a feature discards its local UI state and
         schedules cleanup of subscriptions and timers. Reopening rebuilds it.
         Remote Desktop keeps registry-owned sessions while retiring its view callbacks.
+        A start-up tab that was never built just leaves the tab bar.
         """
-        self.tab_registry.close(key)
+        if not self._drop_unbuilt(key):
+            self.tab_registry.close(key)
 
     def _detach_closed_tab(self, page: QWidget) -> None:
         """Remove a closed page before its deferred Qt destruction."""
@@ -376,8 +446,11 @@ class WorkspaceShell(TranslatableMixin, QWidget):
         """Relabel tab titles and propagate into every child tab."""
         self.tabs.retranslate()
         self.details.retranslate()
-        for entry in self._built_entries():
-            index = self.tabs.indexOf(entry.widget)
+        for entry in self.tab_registry.entries:
+            stand_in = self._unbuilt.get(entry.key)
+            if stand_in is None and not self._is_built(entry):
+                continue
+            index = self.tabs.indexOf(stand_in if stand_in is not None else entry.widget)
             if index != -1:
                 self.tabs.setTabText(
                     index, language_wrapper.translate(entry.title_key, entry.title_key),

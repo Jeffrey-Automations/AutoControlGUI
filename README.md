@@ -41,6 +41,8 @@ Cancellation prevents later move/click steps, but cannot interrupt a native call
 
 Auto Click, Record and Script Executor own their controls and background tasks. Closing them stops local work; reopening creates fresh inputs. The shared recorder continues after its page closes, and a reopened page reads backend status (unknown when unsupported). This status does not verify native hook health. Ctrl+4 still stops scripts and auto-clicking.
 
+Of the three tabs open at start, only Record is built then; Script Builder and Remote Desktop are built the first time they are selected, which roughly halves start-up time and memory.
+
 View → Execution details (Ctrl+Shift+D) opens a collapsible right pane. Diagnostics publishes its actual progress, stop, result and error state there; other pages explicitly say when details are unavailable. Switching or closing a page disconnects its updates. Embedders can supply a TabRegistry to WorkspaceShell; AutoControlGUIWidget(parent) remains supported.
 
 WebRTC statistics polling starts in the background and discards late samples after it stops.
