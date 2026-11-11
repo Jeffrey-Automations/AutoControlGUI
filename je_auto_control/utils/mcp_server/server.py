@@ -20,7 +20,7 @@ from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.logging.secret_scope import secret_log_scope
 from je_auto_control.utils.mcp_server._authz import (
-    authorize_resource, authorize_tool_call, visible_resources,
+    authorize_resource, authorize_tool_call, capture_error_artifact, visible_resources,
 )
 from je_auto_control.utils.mcp_server.audit import AuditLogger
 from je_auto_control.utils.mcp_server._disclosure_server import DisclosureServerMixin
@@ -638,6 +638,7 @@ class MCPServer(StatelessDispatchMixin, SubscriptionMixin, ClientRequestMixin,
         tool = self._tools.get(name)
         if tool is None:
             raise _MCPError(-32602, f"Unknown tool: {name}")
+        tool = self._tool_for_invocation(tool)
         authorize_tool_call(tool, arguments, self._audit)  # RBAC; a no-op without a user
         self._require_disclosed_tool(name, tool_view, tool)
         violation = (validate_arguments(tool.input_schema, arguments)
@@ -683,7 +684,7 @@ class MCPServer(StatelessDispatchMixin, SubscriptionMixin, ClientRequestMixin,
         # left the call unanswered (stdio) or dropped the connection (HTTP).
         except Exception as error:  # noqa: BLE001  # reason: a tool's failure of any type must answer the call with isError
             autocontrol_logger.warning("MCP tool %s failed: %r", name, error)
-            artifact = _capture_error_screenshot(name)
+            artifact = capture_error_artifact(tool, self._read_only_tools, _capture_error_screenshot)
             self._audit.record(
                 tool=name, arguments=arguments, status="error",
                 duration_seconds=time.monotonic() - started_at,

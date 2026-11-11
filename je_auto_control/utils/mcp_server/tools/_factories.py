@@ -3537,9 +3537,9 @@ def ci_annotation_tools() -> List[MCPTool]:
     return [
         MCPTool(
             name="ac_ci_annotations",
-            description=("Emit GitHub Actions workflow annotations from result "
-                         "dicts ({level, message, file?, line?, title?}) so "
-                         "failures show inline in a PR. Returns the {lines}."),
+            description=("Format GitHub Actions workflow annotations from result "
+                         "dicts ({level, message, file?, line?, title?}). "
+                         "Returns {lines} without writing to stdout."),
             input_schema=schema({
                 "annotations": {"type": "array",
                                 "items": {"type": "object"}}},

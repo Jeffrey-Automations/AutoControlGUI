@@ -415,6 +415,8 @@ module = [
     "je_auto_control.utils.config_sync.store",
     "je_auto_control.utils.config_sync.versions",
     "je_auto_control.utils.generate_report.report_path",
+    "je_auto_control.utils.rbac.tool_classification",
+    "je_auto_control.utils.mcp_server.tools._readonly",
     "je_auto_control.utils.mcp_server.tools._handlers_accessibility_executor",
     "je_auto_control.utils.mcp_server.tools._handlers_automation_executor",
     "je_auto_control.utils.mcp_server.tools._handlers_data_executor",

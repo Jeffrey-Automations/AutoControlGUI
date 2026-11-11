@@ -176,9 +176,10 @@ def checkpoint_clear(run_id, db):
     return {"cleared": CheckpointStore(db).clear(run_id)}
 
 
-def ci_annotations(annotations):
-    from je_auto_control.utils.ci_annotations import emit_annotations
-    return {"lines": emit_annotations(annotations)}
+def ci_annotations(annotations: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+    """Return formatted annotations without writing into the MCP transport."""
+    from je_auto_control.utils.ci_annotations import format_annotation
+    return {"lines": [format_annotation(item) for item in annotations]}
 
 
 def scan_secrets(data):

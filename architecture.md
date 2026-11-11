@@ -684,6 +684,16 @@ TCP client authentication marks rejection terminal before writing AUTH_FAIL. Adm
 reaping therefore releases its client slot before an immediate retry can arrive, while
 the separate handshake semaphore bounds outstanding cleanup and authentication threads.
 
+MCP capability policy uses an explicit reviewed screen/caller-data catalogue in
+`utils/rbac/tool_classification.py`; unknown read-only hints require read_data.
+Canonical aliases and stronger overrides share base and argument requirements at
+admission and refreshed direct/nested invocation. The readonly variant builder
+applies equally to default, explicit and dynamically registered catalogues. It
+excludes executable selectors/unreviewed external initializers and rejects capture
+or VLM branches before handlers. Failure artifacts require writable host/tool
+ownership and refreshed drive authority. CI annotation formatting returns data
+without writing into the MCP stdio stream. External initializer review remains open.
+
 Delayed work captures registration authority through `utils/rbac/deferred.py`.
 Schedulers, triggers, hotkeys, watchdogs, webhooks, e-mail watchers and observers
 bind that owner at dispatch, independently of the worker's ambient context.

@@ -145,6 +145,7 @@ class MCPTool:
     annotations: MCPToolAnnotations = MCPToolAnnotations()
     output_schema: Optional[Dict[str, Any]] = None
     category: str = ""
+    enforce_readonly_arguments: bool = False
 
     def descriptor(self) -> MCPToolDescriptor:
         """Return the typed form of :meth:`to_descriptor`."""
@@ -183,6 +184,9 @@ class MCPTool:
         A source path policy follows managed submissions through legacy wrappers.
         Task-aware dispatch resolves this lazily carried policy's private metadata.
         """
+        if self.enforce_readonly_arguments:
+            from je_auto_control.utils.mcp_server.tools._readonly import check_readonly_arguments
+            check_readonly_arguments(self.name, arguments)
         from je_auto_control.utils.script_vars.execution import execution_scope
         from je_auto_control.utils.agent_runtime.origin_policy import source_policy_scope
         from je_auto_control.utils.mcp_server._call_authority import invocation_authority

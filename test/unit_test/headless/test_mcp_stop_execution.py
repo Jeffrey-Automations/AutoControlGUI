@@ -30,11 +30,11 @@ def test_both_tools_are_registered_with_their_annotations():
     assert listing.input_schema["properties"] == {}
 
 
-def test_stopping_needs_drive_input_and_listing_only_read_screen():
+def test_stopping_needs_drive_input_and_listing_needs_read_data():
     tools = _tools(read_only=False)
     stop, listing = tools["ac_stop_execution"], tools["ac_list_executions"]
     assert capability_for_tool(stop.name, stop.annotations.read_only) == Capability.DRIVE_INPUT
-    assert capability_for_tool(listing.name, listing.annotations.read_only) == Capability.READ_SCREEN
+    assert capability_for_tool(listing.name, listing.annotations.read_only) == Capability.READ_DATA
 
 
 def test_a_read_only_server_lists_runs_but_cannot_stop_them():

@@ -11,6 +11,7 @@ from je_auto_control.utils.rbac.authorization import current_authorization
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 from je_auto_control.utils.rbac.policy import capability_for_tool
 from je_auto_control.utils.mcp_server.tools._base import MCPTool
+from je_auto_control.utils.mcp_server.tools._readonly import readonly_tools
 
 if TYPE_CHECKING:
     import threading
@@ -136,5 +137,5 @@ class ToolCatalogMixin:
 
     def _filtered_tool_index(self, read_only: bool) -> ToolIndex:
         with self._tools_lock:
-            return ToolIndex(tool for tool in self._tools.values()
-                             if not read_only or tool.annotations.read_only)
+            tools = list(self._tools.values())
+            return ToolIndex(readonly_tools(tools) if read_only else tools)

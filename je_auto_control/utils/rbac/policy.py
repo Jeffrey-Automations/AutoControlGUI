@@ -7,8 +7,9 @@ Three surfaces, one rule each:
   than open. A ``GET`` route that returns records or configuration the host
   keeps needs ``read_data`` like the MCP tool reading the same thing; one
   that observes live state needs ``read_screen``.
-* **MCP tools** default to ``read_screen`` for a read-only annotation and
-  ``drive_input`` otherwise. Named overrides separate non-mutating sensitive
+* **MCP tools** default to ``read_data`` for a read-only annotation and
+  ``drive_input`` otherwise. Only reviewed screen/caller-data tools grant
+  ``read_screen``. Named overrides separate non-mutating sensitive
   reads (clipboard, local data, credentials, network and audio) from screen
   observation, hand the host's records to ``read_data``, manage users, and
   protect administration of the host itself.
@@ -26,6 +27,7 @@ and egress policy, its secrets vault and its audit log.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Dict, Iterator, Optional, Tuple
 
 from je_auto_control.utils.rbac.authorization import (
@@ -185,13 +187,9 @@ COMMAND_CAPABILITIES: Dict[str, str] = {
 #: says a tool changes nothing; it does not say that what it returns is
 #: something a viewer of the desktop was meant to see.
 #:
-#: The rule: a tool that returns records or configuration the host keeps --
-#: history, traces, cost ledgers, healing logs, journals, saved libraries, ACL
-#: contents -- is listed here; a tool that only observes the live screen (or
-#: computes on what the caller sent) is not. What a tool costs to run is a
-#: separate question this table does not answer: ``ac_vlm_locate`` and
-#: ``ac_self_heal_locate`` read the screen and stay ``read_screen`` although a
-#: call may be billed by a model provider.
+#: These explicit data classifications remain stable when annotations change.
+#: Other read-only tools also default to READ_DATA unless their canonical name
+#: has a reviewed screen classification. Effectful overrides take precedence.
 DATA_TOOLS = frozenset({
     # the clipboard and its history, a connected device's included
     "ac_get_clipboard", "ac_get_clipboard_csv", "ac_get_clipboard_files",
@@ -365,10 +363,24 @@ def capability_for_route(method: str, path: str) -> str:
 
 def capability_for_tool(name: str, read_only: bool) -> str:
     """The capability the MCP tool ``name`` needs, given its read-only hint."""
+    from je_auto_control.utils.rbac.tool_classification import (
+        MIXED_ARGUMENT_TOOLS, SCREEN_SOURCE_TOOLS, SCREEN_TOOLS, canonical_tool_name,
+    )
+    name = canonical_tool_name(name)
     listed = TOOL_CAPABILITIES.get(name)
     if listed is not None:
         return listed
-    return _READ if read_only else _DRIVE
+    if not read_only:
+        return _DRIVE
+    return _READ if name in SCREEN_TOOLS or name in SCREEN_SOURCE_TOOLS or name in MIXED_ARGUMENT_TOOLS else _DATA
+
+
+def capabilities_for_tool_call(name: str, read_only: bool, arguments: Mapping[str, object]) -> tuple[str, ...]:
+    """Use one base and argument policy at admission and refreshed invocation."""
+    from je_auto_control.utils.rbac.tool_classification import argument_capability
+    base = capability_for_tool(name, read_only)
+    extra = argument_capability(name, arguments)
+    return (base,) if extra is None or extra == base else (base, extra)
 
 
 def capability_for_command(name: str) -> str:

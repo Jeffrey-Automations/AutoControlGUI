@@ -207,7 +207,7 @@ def test_a_server_that_is_not_read_only_offers_both():
 
 
 @pytest.mark.parametrize("mode", _MODES)
-def test_a_viewer_may_call_the_declared_tool_and_only_that_one(mode):
+def test_a_viewer_cannot_call_plugins_based_on_read_only_declaration(mode):
     plugin = _Plugin()
     server = MCPServer(tools=[])
     register_plugin_tools(server, plugin.commands)
@@ -215,18 +215,18 @@ def test_a_viewer_may_call_the_declared_tool_and_only_that_one(mode):
         _enable(server, mode, _PEEK)
         listed = _listed(server)
         peek, poke = _call(server, _PEEK), _call(server, _POKE)
-    assert _PEEK in listed
+    assert _PEEK not in listed
     assert _POKE not in listed
-    assert peek["result"]["isError"] is False
+    assert "error" in peek
     assert "error" in poke
-    assert plugin.ran == ["peek"]
+    assert plugin.ran == []
 
 
-def test_the_declared_tool_needs_read_screen_and_a_role_without_it_is_refused():
+def test_the_declared_tool_needs_read_data_and_a_role_without_it_is_refused():
     plugin = _Plugin()
     tools = [make_plugin_tool(name, handler) for name, handler in plugin.commands.items()]
     peek = tools[0]
-    assert capability_for_tool(peek.name, peek.annotations.read_only) == Capability.READ_SCREEN
+    assert capability_for_tool(peek.name, peek.annotations.read_only) == Capability.READ_DATA
     with authorization_scope(AuthorizationContext("nobody", "no-such-role")):
         assert visible_tools(tools) == []
     with authorization_scope(AuthorizationContext("op", Role.OPERATOR)):

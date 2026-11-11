@@ -294,7 +294,7 @@ def test_policy_tables_name_things_that_exist():
 
 
 def test_only_admin_holds_the_signing_capability():
-    assert capability_for_tool("anything", read_only=True) == Capability.READ_SCREEN
+    assert capability_for_tool("anything", read_only=True) == Capability.READ_DATA
     assert capability_for_tool("anything", read_only=False) == Capability.DRIVE_INPUT
     holders = [role for role in Role.all()
                if AuthorizationContext("u", role).allows(Capability.SIGN_ACTIONS)]
@@ -329,7 +329,7 @@ def mcp_http(tmp_path):
         return MCPTool(name=name, description=name, annotations=annotations, handler=handler,
                        input_schema=schema({"actions": {"type": "array"}}))
 
-    tools = [tool("peek", READ_ONLY), tool("poke", DESTRUCTIVE),
+    tools = [tool("ac_screen_size", READ_ONLY), tool("peek", READ_ONLY), tool("poke", DESTRUCTIVE),
              tool("ac_load_plugins", DESTRUCTIVE)]
     audit_path = tmp_path / "mcp_audit.jsonl"
     started = []
@@ -365,12 +365,12 @@ def _audit_entries(server):
 
 def test_mcp_tool_list_matches_what_each_role_may_call(mcp_http, users):
     server = mcp_http(user_store=users)
-    expected = {Role.VIEWER: ["peek"], Role.OPERATOR: ["peek", "poke"],
-                Role.ADMIN: ["peek", "poke", "ac_load_plugins"]}
+    expected = {Role.VIEWER: ["ac_screen_size"], Role.OPERATOR: ["ac_screen_size", "peek", "poke"],
+                Role.ADMIN: ["ac_screen_size", "peek", "poke", "ac_load_plugins"]}
     for role, names in expected.items():
         token = users.tokens[role]
         assert _tool_names(server, token) == names
-        for name in ("peek", "poke", "ac_load_plugins"):
+        for name in ("ac_screen_size", "peek", "poke", "ac_load_plugins"):
             _status, body = _rpc(server, "tools/call", {"name": name, "arguments": {}}, token)
             assert ("result" in body) is (name in names), (role, name, body)
 
@@ -422,12 +422,12 @@ def test_mcp_rbac_refuses_the_shared_token_and_unknown_roles(mcp_http, users):
 def test_mcp_unconfigured_rbac_keeps_shared_token(mcp_http):
     server = mcp_http(auth_token="shared-secret")
     assert _rpc(server, "tools/list")[0] == 401
-    assert _tool_names(server, "shared-secret") == ["peek", "poke"]
+    assert _tool_names(server, "shared-secret") == ["ac_screen_size", "peek", "poke"]
     _status, body = _rpc(server, "tools/call", {"name": "ac_load_plugins", "arguments": {}},
                          "shared-secret")
     assert "result" in body
     assert "user_id" not in _audit_entries(server)[0]
-    assert _tool_names(mcp_http(), None) == ["peek", "poke"]
+    assert _tool_names(mcp_http(), None) == ["ac_screen_size", "peek", "poke"]
 
 
 def test_default_registry_offers_a_viewer_only_read_only_tools(users):
