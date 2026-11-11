@@ -11,11 +11,14 @@ CI 以 `python scripts/generate_facade_exports.py --check` 檢查一致性。六
 > 擷取每個模組的 docstring 與頂層公開名稱；統計數字取自實際檔案，非估算。
 > 指令數與公開 API 數以 `executor.known_commands()` 與 `je_auto_control.__all__` 在工作樹上實測取得。
 >
-> **掃描時間**：2026-11-10　**版本**：`pyproject.toml` version `1.2.0`　**分支**：`dev`
+> **掃描時間**：2026-11-11　**版本**：`pyproject.toml` version `1.2.0`　**分支**：`dev`
 
 ---
 
 ## 1. 專案定位與規模
+
+`test/fixtures/process_memory_fixture.py` 由子程序持有固定 payload 與 sequence 緩衝區，
+以有界管線提供已知語意狀態及更新。bootstrap 僅自報資訊，原生身分核對與記憶體讀回仍待實作。
 
 `je_auto_control` 是一套跨平台 GUI 自動化框架，涵蓋 Windows（Win32 API）、macOS（pyobjc/Quartz）、
 Linux X11（python-Xlib）與 Linux Wayland（libei / ydotool），並延伸到 Android（ADB / uiautomator2）與
@@ -1403,7 +1406,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `scripts/dev_release.py` | 只用標準函式庫的發佈輔助腳本 | dev 通道（PyPI 的 `je_auto_control_dev`）的版本與比對：`prepare` 把 `dev.toml` 寫成 `pyproject.toml`，版本取 PyPI 最新一版加一個 patch（`dev.toml` 的版本只是下限，不回寫 repo）；`changed dist` 把建好的 wheel 跟 PyPI 最新一版逐檔比對，內容沒變就不上傳。只給 `dev.yml` 的 `publish-dev` job 與拋棄式的 checkout 用，因為 `prepare` 會蓋掉 `pyproject.toml`。 |
 | `docs/` | Sphinx（`API`／`Eng`／`Zh`／`getting_started`） | Read the Docs 文件。 |
 | `architecture_diagram/` | drawio + png | 既有的架構圖原始檔。 |
-| `test/` | `unit_test/headless`（主要）、`unit_test/flow_control`、`integrated_test`、`gui_test`、`manual_test`、`verify`、`test_source` | 846 個 `test_*.py`／8,825 個測試函式。**注意**：`test/unit_test/` 下的 `*_test.py` 是會真的驅動滑鼠鍵盤的手動示範腳本，因此 `pyproject.toml` 把 `python_files` 釘成 `test_*.py`。`unit_test/headless/conftest.py` 有一個 autouse fixture，每個測試結束都沖掉 Qt 排隊中的 `deleteLater()`——不沖會讓殘留的 widget 在後面某個不相干的測試裡被銷毀，曾經整個直譯器 `__fastfail`。`test_doc_counts.py` 守住文件引用的指令／工具／子套件／範例數,`test_doc_line_counts.py` 守住所有行數（`--fix` 可一次重新產生）。 `verify/macos_verify.py` 是在真的 `macos-14` runner 上量測 TCC 到底允許什麼的探針（macOS 是唯一沒有容器可用的支援平台），不被 pytest 收集。 |
+| `test/` | `unit_test/headless`（主要）、`unit_test/flow_control`、`integrated_test`、`gui_test`、`manual_test`、`verify`、`test_source` | 1,168 個 `test_*.py`／11,354 個測試函式。**注意**：`test/unit_test/` 下的 `*_test.py` 是會真的驅動滑鼠鍵盤的手動示範腳本，因此 `pyproject.toml` 把 `python_files` 釘成 `test_*.py`。`unit_test/headless/conftest.py` 有一個 autouse fixture，每個測試結束都沖掉 Qt 排隊中的 `deleteLater()`——不沖會讓殘留的 widget 在後面某個不相干的測試裡被銷毀，曾經整個直譯器 `__fastfail`。`test_doc_counts.py` 守住文件引用的指令／工具／子套件／範例數,`test_doc_line_counts.py` 守住所有行數（`--fix` 可一次重新產生）。 `verify/macos_verify.py` 是在真的 `macos-14` runner 上量測 TCC 到底允許什麼的探針（macOS 是唯一沒有容器可用的支援平台），不被 pytest 收集。 |
 
 ---
 

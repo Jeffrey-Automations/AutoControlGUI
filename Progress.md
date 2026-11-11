@@ -630,7 +630,9 @@ browser adapter 從受管頁面取得欄位、透過 DOM 提交，再驗證新�
 `WIP` — 內部 `utils/process_memory/` 已有不可變身分／probe、區段與位元組預算、
 序號一致性檢查、語意欄位白名單及失敗 handle 保留重試。契約與 fixture 協定見
 [process_memory_contract.md](docs/process_memory_contract.md)。M0／M1 尚未完成，
-仍缺 typed Windows provider、可信 ASLR resolver、自有 fixture 程序、runtime grant／helper
+已有自有 fixture 的固定緩衝區與有界管線控制協定，測試僅驗證本機資料配置及背景子程序通訊。
+bootstrap 的 PID、位址、來源雜湊與 launch nonce 都是未驗證自報資訊，不能充當 OS 出生身分或可信 resolver。
+仍缺 typed Windows provider、可信 ASLR resolver、fixture 的原生身分核對與頁面故障注入、runtime grant／helper
 生命週期及公開入口；M2 也仍缺實際應用版本 adapter。原生驗收固定列於本檔上方。
 
 1. **M0：能力盤點與範圍契約。** 先列 Windows 的 UI／OS／應用操作矩陣，每項記錄

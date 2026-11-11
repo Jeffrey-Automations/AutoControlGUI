@@ -1,5 +1,10 @@
 # AutoControl Architecture
 
+The process-memory test fixture owns fixed payload and sequence buffers in a hidden
+child process. Bounded inherited pipes expose expected state and validated fixture
+updates. Bootstrap facts remain unverified until a native provider independently
+matches the retained process identity. This tooling adds no public memory API.
+
 The package facade resolves each public export from its existing source module. Concrete typing
 declarations generate runtime binding tables, checked by
 `python scripts/generate_facade_exports.py --check` in CI. Resolution obtains the real object

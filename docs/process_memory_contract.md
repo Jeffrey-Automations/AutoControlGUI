@@ -124,7 +124,28 @@ reuse, permission denial, cancellation and failed handle retirement. Compare exa
 semantic values to fixture-owned expected values. Independently observe foreground
 window, focus, mouse and desktop-input events to establish noninterference.
 
+### Owned fixture preparation
+
+`test/fixtures/process_memory_fixture.py` owns fixed payload and sequence buffers
+for its process lifetime. Its bounded JSON-lines protocol uses inherited stdin and
+stdout pipes. Bootstrap and control replies have distinct message kinds on the
+same transport. This is not yet the separate native acceptance control channel.
+Only the fixture changes its buffers. The parent can request expected semantic
+state, a validated state change or shutdown; it cannot request arbitrary memory
+reads or writes.
+
+Bootstrap reports PID, pointer width, buffer locations, fixture source digest and
+a fresh launch nonce as unverified self-reports. The nonce is not OS process birth,
+and the source digest is not measured executable identity. No reviewed probe may
+trust these records without the future provider's independent identity checks.
+
+Headless tests exercise exact local buffer layout and real hidden child-process
+communication, invalid requests, EOF and shutdown. These checks do not establish
+cross-process memory readback, ASLR resolution, native publication guarantees or
+desktop noninterference. Shared-memory mappings were rejected because parent-side
+mapping reads would bypass the future process-memory provider.
+
 No native acceptance command is supplied or executed by this increment. Native
-execution stays paused under `Progress.md`; the fixture, typed Win32 provider,
-host probe configuration, runtime lifecycle/policy integration and application
-coverage must be implemented and reviewed before M1/M3 can be marked complete.
+execution stays paused under `Progress.md`; typed Win32 calls, trusted bootstrap
+matching, page-protection fault injection, host probe configuration, runtime
+lifecycle/policy integration and application coverage remain required for M1/M3.
