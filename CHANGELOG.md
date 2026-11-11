@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Retain unfinished HostBrowser cleanup, reject late publications, and observe the
+  original browser thread without replaying cancellation. One-shot browsing preserves
+  interruption identity and retained cleanup ownership. Dialog integration remains pending.
+
 - Require `read_data` for USB enumeration/events, retained inspector statistics and
   process metrics over REST, and for the four matching registered AC reads.
   Viewer denial happens before providers or metrics child queries execute;

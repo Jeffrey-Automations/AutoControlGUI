@@ -31,8 +31,19 @@ Stopping closes frame admission under the same lock used for encoding. Encoder f
 
 Unregister is attempted once, and Zeroconf close is attempted even when unregister fails. Zeroconf documents close as idempotent, so a failed close can be retried on that same owner. Successful close does not convert failed unregister into a confirmed goodbye. Constructor failure attempts cleanup and returns a retained owner through `MediaRetirementError` if ordinary cleanup remains unresolved. Cancellation and hard control signals keep their original identity. For those signals, `interrupted_retirement_owners(error)` returns the explicitly attached cleanup owners, including when the interruption was wrapped. The application must retain those owners before discarding its error outcome.
 
+## LAN browsing
+
+HostBrowser closes publication admission before cleanup. An admitted callback keeps
+retirement pending until it returns, including when that callback requests stop.
+Browser cancellation is attempted once; completion requires observing the original
+browser thread exit and acknowledgement of Zeroconf close. Only that documented
+idempotent close is retried. A failed constructor can leave acquisition uncertain,
+even after known resources close. Retain its error owner; never infer completion
+from the absence of a returned browser object. One-shot browsing preserves an
+original interruption and attaches the browser owner when cleanup also fails.
+
 ## Wrappers and current limits
 
 Mic wrappers retain children when child stop fails. Opus track ending also rejects queued PCM and wakes a waiting receive operation. Opus receiver cancellation retains the exact task until actual completion is observed; cancellation requested is not completion. Repeated stop can observe a completed task. Direct TCP host cleanup continues socket/client teardown after an audio failure and retains the original capture for later observation.
 
-These producer contracts do not complete application shutdown. The application caretaker, original-authority Diagnostics retries, GUI success reporting, HostBrowser cleanup, and all peer replacement/discard paths still require integration. In particular, a GUI must not display a recording as saved just because `has_output` is true. Existing consumer paths that swallow errors or drop references are not made durable by this producer unit. Native media/network acceptance remains pending. Validation for this unit uses injected resources and event-loop tasks only.
+These producer contracts do not complete application shutdown. The application caretaker, original-authority Diagnostics retries, GUI success reporting, HostBrowser dialog ownership, and all peer replacement/discard paths still require integration. In particular, a GUI must not display a recording as saved just because `has_output` is true. Existing consumer paths that swallow errors or drop references are not made durable by this producer unit. Native media/network acceptance remains pending. Validation for this unit uses injected resources and event-loop tasks only.

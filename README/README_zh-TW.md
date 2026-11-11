@@ -82,3 +82,5 @@ REST 主機資料讀取與對應 MCP 權限一致：排程、遠端 session、US
 內部 Windows 行程記憶體準備工作新增映像檔量測，透過保留的唯讀 handle 執行有界雜湊並保留失敗清理供重試。這只是觀測到的檔案證據，不是已載入程式碼或 fixture 的身分證明；原生驗收及公開記憶體工具仍未提供。詳見[契約](../docs/process_memory_contract.md)。
 
 媒體 producer 關閉會回報待完成或不確定的清理結果，並保留原始資源。音訊與錄影不會透過不安全的 close／flush 重播宣稱成功；LAN close 可明確重試。應用程式 caretaker 與 GUI 整合仍待完成。詳見[清理契約](../docs/media_retirement_contract.md)。
+
+HostBrowser 亦會拒絕晚到發布，並保留未完成的執行緒與關閉所有權；對話框整合仍待完成。

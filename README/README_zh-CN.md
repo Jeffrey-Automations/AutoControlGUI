@@ -82,3 +82,5 @@ REST 主机数据读取与对应 MCP 权限一致：调度、远程 session、US
 内部 Windows 进程内存准备工作新增映像文件测量，通过保留的只读 handle 执行有界哈希并保留失败清理供重试。这只是观察到的文件证据，不是已加载代码或 fixture 的身份证明；原生验收及公开内存工具仍未提供。详见[契约](../docs/process_memory_contract.md)。
 
 媒体 producer 关闭会报告待完成或不确定的清理结果，并保留原始资源。音频与录影不会通过不安全的 close／flush 重播宣称成功；LAN close 可明确重试。应用程序 caretaker 与 GUI 整合仍待完成。详见[清理契约](../docs/media_retirement_contract.md)。
+
+HostBrowser 也会拒绝晚到发布，并保留未完成的线程与关闭所有权；对话框整合仍待完成。

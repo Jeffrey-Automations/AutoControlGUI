@@ -8,6 +8,11 @@ Resource closure and finalization have separate acknowledgements. Recording flus
 is attempted once; uncertain PyAV or sounddevice close is never replayed to claim
 success. Zeroconf close supports retry on its original owner.
 
+HostBrowser rejects late publications, retains admitted callbacks and observes the
+original browser thread after one cancellation attempt. Its Zeroconf close can be
+retried; failed acquisition remains uncertain. One-shot interruption preserves its
+identity and exposes the retained owner if cleanup also fails.
+
 This producer unit does not complete application caretaker, GUI saved-result
-reporting, peer replacement/discard paths, or HostBrowser cleanup. Native acceptance
+reporting, peer replacement/discard paths, or HostBrowser dialog ownership. Native acceptance
 remains pending; validation uses injected resources only.
