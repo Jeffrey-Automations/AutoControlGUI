@@ -173,6 +173,10 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 - **能力探測**：Windows 的鎖定工作站、session 0、低完整性與擷取失敗分支只用假資料判斷；macOS 的三個 preflight 呼叫只對假物件跑過，
   pyobjc 的 `Quartz` 有沒有 `CGPreflightListenEventAccess` 未知（沒有的話 `recording`／`stop_shortcut` 回 `unknown`）。
 - **Windows 的版面鍵名**（`slash` 等 8 個）只在美式配置上實際呼叫過。
+- **設定同步在 Windows 的路徑長度**：`LongPathsEnabled=0` 的機器上，`test_sync_workspace_surfaces.py` 的長紀錄名稱案例
+  （64＋64 字元的 `scripts/…json`）在 `cache/.incoming-*/files/` 下組成 265 字元的路徑，`FileNotFoundError` 後回報
+  `asset transfer could not publish a complete generation`（`utils/config_sync/assets.py`）；CI 的暫存根目錄較短所以會過。
+  真的安裝把快取放在深一點的目錄時也會撞到。`TODO`：Windows 上改用 `\\?\` 長路徑，或在超出前以明確錯誤拒絕該紀錄名稱。
 - **狀態機 `on_enter` 的單一動作寫法**以前一直被拒絕、從沒執行過（已修，U-20261009-24）：依賴「它不會跑」的既有狀態機現在會跑它。
 
 ---
