@@ -149,3 +149,23 @@ def test_invoke_without_a_server_context_is_not_a_run():
                    handler=lambda: seen.append(current_stop_token()) or "ok")
     assert tool.invoke({}) == "ok"
     assert seen == [None]
+
+
+def test_failure_screenshot_is_still_looked_up_on_the_server_module(monkeypatch):
+    # The tools/call path moved to _tool_calls.py; server._capture_error_screenshot
+    # must remain the seam callers and tests replace.
+    from je_auto_control.utils.mcp_server import server as server_module
+    shots = []
+    monkeypatch.setattr(server_module, "_capture_error_screenshot",
+                        lambda name: shots.append(name) or "shot.png")
+
+    def broken():
+        raise RuntimeError("boom")
+
+    server = MCPServer(tools=[MCPTool(name="broken", description="d",
+                                      input_schema=_EMPTY, handler=broken)])
+    result = _call(server, 31, "broken", {})["result"]
+    assert result["isError"] is True
+    assert "RuntimeError: boom" in result["content"][0]["text"]
+    assert "(error screenshot saved to shot.png)" in result["content"][0]["text"]
+    assert shots == ["broken"]

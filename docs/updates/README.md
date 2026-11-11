@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261112-06 | 2026-11-12 | Split the tools/call path out of the MCP server module | #done #mcp #quality | [2026-11-b](2026-11-b.md) |
 | U-20261112-05 | 2026-11-12 | Four WebRTC tests still asserted the pre-retention contract | #incident #remote #ci | [2026-11-b](2026-11-b.md) |
 | U-20261112-04 | 2026-11-12 | Mobile SDK calls checked against uiautomator2 and facebook-wda source | #done #mobile | [2026-11-b](2026-11-b.md) |
 | U-20261112-03 | 2026-11-12 | MCP tool calls are stoppable runs; a cancel stops them | #done #mcp #executor | [2026-11-b](2026-11-b.md) |

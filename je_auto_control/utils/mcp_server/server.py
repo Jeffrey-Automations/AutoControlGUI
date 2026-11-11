@@ -18,9 +18,8 @@ from typing import Any, Callable, Dict, List, Optional, TextIO
 from je_auto_control.utils.cli_output import utf8_stream
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
-from je_auto_control.utils.logging.secret_scope import secret_log_scope
 from je_auto_control.utils.mcp_server._authz import (
-    authorize_resource, authorize_tool_call, capture_error_artifact, visible_resources,
+    authorize_resource, visible_resources,
 )
 from je_auto_control.utils.mcp_server.audit import AuditLogger
 from je_auto_control.utils.mcp_server._disclosure_server import DisclosureServerMixin
@@ -41,27 +40,22 @@ from je_auto_control.utils.mcp_server.resources import (
 from je_auto_control.utils.mcp_server.tools import (
     MCPTool, build_default_tool_registry,
 )
-from je_auto_control.utils.mcp_server.tools._base import _tool_result_error
-from je_auto_control.utils.mcp_server.tools._validation import (
-    undeclared_arguments, validate_arguments,
-)
 from je_auto_control.utils.mcp_server._argument_policy import ArgumentPolicy
 from je_auto_control.utils.mcp_server._origin_policies import OriginPoliciesMixin
 from je_auto_control.utils.mcp_server._client_requests import (
     ClientRequestMixin,
 )
-from je_auto_control.utils.mcp_server._input_required import (
-    AnsweredByGate, RequestStateSigner,
-)
+from je_auto_control.utils.mcp_server._input_required import RequestStateSigner
 from je_auto_control.utils.mcp_server._stateless import StatelessDispatchMixin
 from je_auto_control.utils.mcp_server._subscriptions import NO_RESPONSE, SubscriptionMixin
+from je_auto_control.utils.mcp_server._tool_calls import ToolCallMixin
 from je_auto_control.utils.mcp_server._protocol import (
     PROTOCOL_VERSION,  # noqa: F401  # reason: re-exported; callers import it from server
-    _capture_error_screenshot, negotiate_protocol_version,
-    _coerce_params, _DISPATCH_ERRORS, _error_response, _invalid_envelope, _InvalidToolArguments,
-    _is_hashable,
-    _MCPError, _notification_message, _result_response, _server_info, _to_content_blocks,
-    _TOOLS_CALL_METHOD,
+    # The failure-screenshot seam: _tool_calls looks it up here at call time.
+    _capture_error_screenshot,  # noqa: F401  # reason: patched on this module by callers and tests
+    negotiate_protocol_version,
+    _coerce_params, _DISPATCH_ERRORS, _error_response, _invalid_envelope, _is_hashable,
+    _MCPError, _notification_message, _result_response, _server_info, _TOOLS_CALL_METHOD,
 )
 
 #: How long a transport waits for in-flight tool replies before it gives up
@@ -69,7 +63,7 @@ from je_auto_control.utils.mcp_server._protocol import (
 WORKER_DRAIN_TIMEOUT = 10.0
 
 
-class MCPServer(StatelessDispatchMixin, SubscriptionMixin, ClientRequestMixin,
+class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, ClientRequestMixin,
                 OriginPoliciesMixin, DisclosureServerMixin):
     """JSON-RPC 2.0 MCP server with a configurable tool registry."""
 
@@ -617,118 +611,6 @@ class MCPServer(StatelessDispatchMixin, SubscriptionMixin, ClientRequestMixin,
         if payload is None:
             raise _MCPError(-32602, f"Unknown prompt: {name}")
         return payload
-
-    def _prepare_tool_call(
-        self, params: Dict[str, Any], tool_view: Any = None,
-    ) -> tuple[str, Any, Dict[str, Any]]:
-        """Validate a tools/call request; return ``(name, tool, arguments)``.
-
-        Raises :class:`_MCPError` when the request is malformed, the tool is
-        unknown or the rate limit is hit, and :class:`_InvalidToolArguments`
-        when the arguments fail the tool's schema or name a path or value
-        reference the configured :attr:`argument_policy` refuses. The
-        arguments returned carry the canonical form of every checked path.
-        """
-        name = params.get("name")
-        arguments = params.get("arguments") or {}
-        if not isinstance(name, str):
-            raise _MCPError(-32602, "tools/call requires string 'name'")
-        if not isinstance(arguments, dict):
-            raise _MCPError(-32602, "tools/call 'arguments' must be an object")
-        tool = self._tools.get(name)
-        if tool is None:
-            raise _MCPError(-32602, f"Unknown tool: {name}")
-        tool = self._tool_for_invocation(tool)
-        authorize_tool_call(tool, arguments, self._audit)  # RBAC; a no-op without a user
-        self._require_disclosed_tool(name, tool_view, tool)
-        violation = (validate_arguments(tool.input_schema, arguments)
-                     or undeclared_arguments(tool.input_schema, arguments))
-        if violation is not None:
-            raise _InvalidToolArguments(f"Invalid arguments for {name}: {violation}")
-        try:
-            arguments = self._active_argument_policy.apply(name, tool.input_schema, arguments)
-        except AutoControlException as error:
-            raise _InvalidToolArguments(f"Invalid arguments for {name}: {error}") from error
-        if self._rate_limiter is not None and not self._rate_limiter.try_acquire():
-            raise _MCPError(-32000, f"Rate limit exceeded for tool {name!r}")
-        self._maybe_confirm_destructive(name, tool, arguments)
-        return name, tool, arguments
-
-    @secret_log_scope()
-    def _handle_tools_call(self, msg_id: Any,
-                           params: Dict[str, Any]) -> Dict[str, Any]:
-        try:
-            view = self._accepted_tool_view()
-            name, tool, arguments = self._prepare_tool_call(params, view)
-        except _InvalidToolArguments as error:
-            return {"content": [{"type": "text", "text": str(error)}], "isError": True}
-        except AnsweredByGate as answered:
-            return answered.result
-        ctx = self._build_call_context(msg_id, params, view)
-        call_key = (self._connection_id, msg_id)
-        with self._calls_lock:
-            self._active_calls[call_key] = ctx
-        started_at = time.monotonic()
-        try:
-            result = tool.invoke(arguments, ctx=ctx)
-        except OperationCancelledError:
-            self._audit.record(
-                tool=name, arguments=arguments, status="cancelled",
-                duration_seconds=time.monotonic() - started_at,
-            )
-            raise
-        except _MCPError:
-            raise
-        # Any exception, not a list: re.PatternError, ET.ParseError, cv2.error or
-        # a plugin's own error escaped the list, killed the worker thread and
-        # left the call unanswered (stdio) or dropped the connection (HTTP).
-        except Exception as error:  # noqa: BLE001  # reason: a tool's failure of any type must answer the call with isError
-            autocontrol_logger.warning("MCP tool %s failed: %r", name, error)
-            artifact = capture_error_artifact(tool, self._read_only_tools, _capture_error_screenshot)
-            self._audit.record(
-                tool=name, arguments=arguments, status="error",
-                duration_seconds=time.monotonic() - started_at,
-                error_text=f"{type(error).__name__}: {error}",
-                artifact_path=artifact,
-            )
-            error_text = f"{type(error).__name__}: {error}"
-            if artifact is not None:
-                error_text += f"\n(error screenshot saved to {artifact})"
-            return {
-                "content": [{"type": "text", "text": error_text}],
-                "isError": True,
-            }
-        finally:
-            with self._calls_lock:
-                self._active_calls.pop(call_key, None)
-        failure = _tool_result_error(result)
-        self._audit.record(
-            tool=name, arguments=arguments, status="error" if failure is not None else "ok",
-            duration_seconds=time.monotonic() - started_at,
-            error_text=failure,
-        )
-        response: Dict[str, Any] = {
-            "content": _to_content_blocks(result),
-            "isError": failure is not None,
-        }
-        # 2025-06-18 spec: tools with an outputSchema return their dict result
-        # as structuredContent for typed, token-cheap client consumption.
-        if tool.output_schema is not None and isinstance(result, dict):
-            response["structuredContent"] = result
-        return response
-
-    def _build_call_context(self, msg_id: Any,
-                            params: Dict[str, Any], tool_view: Any = None) -> ToolCallContext:
-        meta = params.get("_meta") if isinstance(params.get("_meta"),
-                                                  dict) else {}
-        progress_token = meta.get("progressToken") if isinstance(meta, dict) else None
-        return ToolCallContext(
-            request_id=msg_id, progress_token=progress_token,
-            notifier=self._notifier,
-            path_policy=self._active_argument_policy.path_policy,
-            session_id=f"{self._agent_session}:{self._connection_id}",
-            tool_catalog=self._call_tool_catalog(tool_view),
-        )
 
 
 def _parse_request(line: str) -> "tuple[Optional[Dict[str, Any]], Optional[str]]":
