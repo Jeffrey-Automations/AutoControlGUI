@@ -183,14 +183,17 @@ device input coordinates:
      - WDA touch-and-hold
    * - ``Swipe(x1, y1, x2, y2, duration_s)``
      - ``input swipe``
-     - WDA drag
+     - WDA drag with no press hold; WDA sets the travel speed, so
+       ``duration_s`` has no effect (WDA's drag duration is the hold)
    * - ``Drag(x1, y1, x2, y2, hold_s, duration_s)``
      - ``input draganddrop``; falls back to ``uiautomator2`` on a device
        whose ``input`` lacks it
      - WDA drag with ``hold_s`` as the press duration
    * - ``Pinch(x, y, scale, duration_s, span)``
      - ``uiautomator2`` two-pointer gesture; ``adb shell input`` has one
-       pointer, so without it this raises ``DeviceUnsupportedError``
+       pointer, so without it this raises ``DeviceUnsupportedError``. A
+       finger that would start or end left of / above the screen raises
+       ``DeviceError``
      - Pinch on the frontmost application. WDA pinches an element, not a
        coordinate, so ``x`` / ``y`` / ``span`` are ignored.
 
@@ -324,9 +327,11 @@ reason::
    * - ``clipboard``
      - Through ``uiautomator2``; ``needs_dependency`` without it, because
        ``adb`` cannot reach the clipboard on current Android.
-     - Set only. Reading is allowed by WDA only while WDA itself is in front,
-       and raises ``DeviceUnsupportedError`` on a ``facebook-wda`` build
-       without ``get_clipboard``.
+     - Set; reading is allowed by WDA only while WDA itself is in front.
+       ``facebook-wda`` 1.5.4's ``get_clipboard`` asks Siri to open
+       WebDriverAgentRunner, waits 3 s, reads, and relaunches the app that was
+       in front, so the app under test leaves the foreground meanwhile. A
+       build without ``get_clipboard`` raises ``DeviceUnsupportedError``.
    * - ``recording``
      - ``adb shell screenrecord`` (180 s at most), stopped with ``SIGINT`` so
        the file is finalised, then pulled and removed from the device. A

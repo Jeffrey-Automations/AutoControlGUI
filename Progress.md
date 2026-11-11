@@ -79,15 +79,18 @@
 
 `BLOCKED` — 需要 Android 模擬器或實機、iPhone 與 WebDriverAgent；這台機器連 `adb` 都沒有
 
-U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WDA 測過。`uiautomator2` 與 `facebook-wda` 沒有安裝在開發環境裡，
-方法名稱與參數是憑記憶寫的，第一次接上真的 SDK 很可能要修：
+U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WDA 測過。方法名稱與簽章已對 SDK 原始碼核過
+（uiautomator2 3.7.1、facebook-wda 1.5.4，U-20261112-04）：全部存在、參數相符；沒有一個在裝置上執行過。還沒驗的：
 
-- uiautomator2：`send_keys`、`drag`、空 selector 的 `gesture(...)`（捏合）、`clipboard`／`set_clipboard`、對話框按鈕的 resource id。
-- facebook-wda：`app_launch`／`app_terminate`／`app_state`、`alert.*`、`set_clipboard`、`status()`、`orientation` 的值、元素的 `pinch`、`screenshot()` 回傳 PIL 影像。
+- uiautomator2：對話框按鈕的 resource id（`ACCEPT_BUTTONS`／`DISMISS_BUTTONS`）是裝置與 OEM 的資料，原始碼驗不到。
+- facebook-wda：`orientation` 只回 `PORTRAIT`／`LANDSCAPE`（原始碼的 docstring），`UIA_DEVICE_ORIENTATION_*` 兩個值是否真的會回來未知；
+  `app_state` 的 `value` 依 `XCUIApplicationState`（4 是前景），SDK 的 docstring 寫成 1–3，以 Apple 的列舉為準，沒在裝置上看過。
 - 旋轉方向：螢幕截圖以面板自然方向回來時，`landscape_left` 轉 270°、`landscape_right` 轉 90°，是從文件推的，沒看過。
 - Android：`input draganddrop` 是否存在、`monkey` 啟動輸出、`pidof`／`pm path` 的結束碼、`dumpsys activity activities` 的格式、`pkill -INT screenrecord` 能否收尾 MP4。
   ADBKeyBoard 的送達無法由裝置確認，是從 IME 被選取推定的。
-- 已知限制：iOS 捏合忽略 `x`／`y`／`span`；iOS `app_state` 不會回 `not_installed`；iOS 的安裝／檔案／錄影沒有 adapter（只有 `MobileExtension` 協定與註冊點）；
+- 已知限制：iOS 捏合忽略 `x`／`y`／`span`；iOS 滑動忽略 `duration_s`（WDA 的 drag duration 是按住時間，不能設移動時間）；iOS `app_state` 不會回 `not_installed`；iOS 的安裝／檔案／錄影沒有 adapter（只有 `MobileExtension` 協定與註冊點）；
+  `DECIDE`：iOS 讀剪貼簿（`AC_ios_get_clipboard`、`WdaExtension.get_clipboard`）在 facebook-wda 1.5.4 會請 Siri 把 WDA 帶到前景約 3 秒、
+  再重新啟動原本在前景的 App——已寫進文件與能力說明，但是否該改成要明確啟用才讀，請維護者決定。
   Mobile 分頁的 probe／run 已由 TabTask 在背景執行；真實 SDK 的逾時、取消與裝置回應仍待實機驗收。`AC_android_shell` 刻意不做成 MCP 工具，**請維護者確認**。
 - 沒有 `examples/` 的實機腳本以外的 smoke；Xcode／WDA 的建置與簽章只寫成前置條件。
 

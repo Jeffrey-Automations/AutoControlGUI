@@ -85,7 +85,8 @@ class WdaExtension:
         if feature == "clipboard":
             return DeviceCapability(
                 feature, STATE_AVAILABLE,
-                "set only: reading the pasteboard is allowed only while WDA is in front")
+                "set; reading brings WebDriverAgent to the front through Siri for about "
+                "3 s and then relaunches the app that was in front")
         if feature in ("install", "files", "recording"):
             return DeviceCapability(feature, STATE_NEEDS_DEPENDENCY, NEEDS_ADAPTER)
         return DeviceCapability(feature, STATE_UNSUPPORTED, f"unknown feature {feature!r}")
@@ -121,7 +122,13 @@ class WdaExtension:
         _set_pasteboard(self._device_source(), text)
 
     def get_clipboard(self) -> str:
-        """The pasteboard's text, where this facebook-wda build can read it."""
+        """The pasteboard's text, where this facebook-wda build can read it.
+
+        WebDriverAgent reads the pasteboard only while it is in front, so
+        facebook-wda 1.5.4's ``get_clipboard`` asks Siri to open
+        WebDriverAgentRunner, waits 3 s, reads, and relaunches the app that
+        was in front: the app under test leaves the foreground meanwhile.
+        """
         return _get_pasteboard(self._device_source())
 
 

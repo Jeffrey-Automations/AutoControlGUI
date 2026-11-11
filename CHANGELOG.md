@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- iOS `swipe` (`Swipe` gestures, `AC_ios_swipe`, `ac_ios_swipe`) no longer presses for
+  `duration_s` before moving: facebook-wda's swipe duration is the start-point hold, so the
+  old mapping made swipes start as drags. WebDriverAgent sets the travel speed and
+  `duration_s` has no effect on iOS; a negative or NaN value is rejected. An Android pinch
+  whose fingers would reach past the left or top edge raises `DeviceError` instead of
+  uiautomator2's bare `AssertionError`.
+
 - Each MCP `tools/call` now runs as a stoppable executor run (`mcp-…`). `notifications/cancelled`
   stops it: an action list from `ac_execute_actions` halts before its next action and
   `ac_wait_for_image` / `ac_wait_for_pixel` wake mid-poll, answered `-32800` as before for a
