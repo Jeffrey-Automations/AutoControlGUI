@@ -64,3 +64,5 @@ Managed agent tasks and cross-host transfers include experimental features. See 
 ## License
 
 [MIT](LICENSE) © JE-Chen. [Third-party licenses](Third_Party_License.md).
+
+Closing Remote Desktop releases its page. Reopening creates fresh controls without reattaching shared sessions. Registry TCP/WebSocket sessions remain available to scripts; page-owned WebRTC sessions and audio retire in the background. Pending approvals are denied, and late callbacks are discarded. An already-entered file transfer is not interrupted by closing the page.

@@ -4,13 +4,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable, Optional, Sequence
 
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import _PanelPart
+from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QPoint, QTimer
     from PySide6.QtWidgets import (
         QCheckBox, QComboBox, QLabel, QLineEdit, QPushButton, QSpinBox, QTableWidget, QTextEdit,
     )
-    from je_auto_control.gui.remote_desktop._webrtc_types import AvFrameT, MultiViewerHostT, WebRTCDesktopViewerT
+    from je_auto_control.gui.remote_desktop._webrtc_types import (
+        AvFrameT, MultiViewerHostT, WebRTCDesktopViewerT, SessionRecorderT,
+    )
     from je_auto_control.gui.remote_desktop.annotation_overlay import HostAnnotationOverlay
     from je_auto_control.gui.remote_desktop.viewer_screen_window import ViewerScreenWindow
     from je_auto_control.gui.remote_desktop.remote_screen_window import RemoteScreenWindow
@@ -20,6 +23,7 @@ if TYPE_CHECKING:
     from je_auto_control.gui.remote_desktop.webrtc_dialogs import AddressBookList, RemoteFilesTable, TrustedViewersList
     from je_auto_control.utils.remote_desktop.session_quality_cache import SessionQualityCache
     from je_auto_control.utils.remote_desktop.webrtc_stats import StatsPoller
+    from je_auto_control.utils.remote_desktop.file_sync import FolderSyncEngine
     from je_auto_control.utils.remote_desktop.trust_list import TrustList
     from je_auto_control.utils.remote_desktop.address_book import AddressBook
     from je_auto_control.utils.remote_desktop.fingerprint import KnownHosts
@@ -28,6 +32,7 @@ if TYPE_CHECKING:
 class _HostPanelPart(_PanelPart):
     """State initialized by the host panel and slots supplied by its mixins."""
 
+    _view: ViewLifetime[_HostPanelPart]
     _accept_viewer_video_check: QCheckBox
     _adaptive_check: QCheckBox
     _annotation_overlay: Optional[HostAnnotationOverlay]
@@ -87,6 +92,10 @@ class _HostPanelPart(_PanelPart):
 
 class _ViewerPanelPart(_PanelPart):
     """State initialized by the viewer panel and slots supplied by its mixins."""
+
+    _view: ViewLifetime[_ViewerPanelPart]
+    _recorder: Optional[SessionRecorderT]
+    _sync_engine: Optional[FolderSyncEngine]
 
     _address_book: AddressBook
     _address_list: AddressBookList

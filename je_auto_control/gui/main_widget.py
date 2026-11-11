@@ -120,7 +120,7 @@ class AutoControlGUIWidget(
         else:
             entry = TabEntry(key=key, title_key=title_key, factory=widget,
                              category=category, default_visible=default_visible, actions=actions,
-                             retain_on_close=key == "remote_desktop",
+                             retain_on_close=False,
                              on_build=lambda page: AutoControlGUIWidget._adopt_hidden_tab(self, page))
         self._tab_entries.append(entry)
         if default_visible:
@@ -257,11 +257,11 @@ class AutoControlGUIWidget(
                 return
 
     def close_tab(self, key: str) -> None:
-        """Release a feature; keep Remote Desktop reusable.
+        """Release a feature and its page-owned resources.
 
         Unlike ``hide_tab``, closing a feature discards its local UI state and
         schedules cleanup of subscriptions and timers. Reopening rebuilds it.
-        Remote Desktop retains live sessions until its lifecycle is migrated.
+        Remote Desktop keeps registry-owned sessions while retiring its view callbacks.
         """
         self.tab_registry.close(key)
 

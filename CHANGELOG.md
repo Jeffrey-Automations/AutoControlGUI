@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+- Closing Image Detection, Auto Click, Record, Script Executor or Remote Desktop now
+  releases its page controls. Hiding still preserves them. Reopening starts fresh
+  local state; the shared recorder and registry-owned TCP/WebSocket sessions survive
+  their views. Remote Desktop does not automatically reattach a reopened view, and
+  its page-owned WebRTC sessions are stopped in the background.
+
 ## [1.2.0] - 2026-11-02
 
 Python 3.11 is now the minimum. Pillow 13.0.0 and dnspython 2.9.0, the releases that fix the advisories

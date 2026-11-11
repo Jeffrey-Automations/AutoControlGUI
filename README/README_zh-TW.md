@@ -64,3 +64,5 @@ Wayland NORMAL 輸入透過受管理的子程序執行 libei 與 portal 呼叫�
 ## License
 
 [MIT](../LICENSE) © JE-Chen. [Third-party licenses](../Third_Party_License.md).
+
+關閉 Remote Desktop 會釋放頁面；重新開啟會建立新控制項，不自動接回共用連線。Registry 的 TCP／WebSocket 連線仍可供腳本使用；頁面擁有的 WebRTC 連線與音訊在背景停止。待處理核准會拒絕，延遲回呼會丟棄。已進入傳送階段的檔案傳輸不會因關閉頁面而中斷。

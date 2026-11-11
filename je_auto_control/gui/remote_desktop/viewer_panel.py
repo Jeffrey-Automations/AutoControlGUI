@@ -11,13 +11,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from je_auto_control.gui._daemon_thread import DaemonThread
+from je_auto_control.gui._slow_op import StopQueue
+from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui.remote_desktop._connect_task import connect_viewer
 from je_auto_control.gui.remote_desktop._helpers import (
     _CollapsibleSection, _StatusBadge, _build_insecure_client_context,
-    _build_verifying_client_context, _t, displaced_notifier,
+    _build_verifying_client_context, _t,
     wire_remote_input,
 )
 from je_auto_control.gui.remote_desktop.remote_screen_window import (
@@ -59,6 +60,8 @@ class _ViewerPanel(TranslatableMixin, QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
+        self._view = ViewLifetime(self)
+        self._stops = StopQueue(self)
         # This panel's name in the registry: it only ever reads, drives and
         # disconnects the viewer it opened itself.
         self._owner = new_owner("viewer-tab")
@@ -238,7 +241,8 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         reach goes -- a connect that has not answered is cancelled and the
         viewer it may still produce is disconnected.
         """
-        release_resources(self, self._cancel_pending_connect, self._stop_audio_player,
+        self._view.retire()
+        release_resources(self, self._cancel_pending_connect, self._retire_audio_player,
                           self._close_screen_window)
 
     def _connect(self) -> None:
@@ -263,26 +267,22 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         self._cancel_pending_connect()
         registry.evict(SLOT_VIEWER, by=self._owner)
         authority = DeferredAuthorization.capture()
-        clipboard_receiver = ClipboardReceiver(authority, self._clipboard_signal.emit)
+        clipboard_receiver = ClipboardReceiver(authority, self._view.callback("_on_clipboard_main"))
         viewer: RemoteDesktopViewer
         self._early_frame = None            # a frame of the session being replaced
         try:
             viewer = viewer_cls(
                 host=host, port=port, token=token,
-                on_frame=self._frame_signal.emit,
-                on_error=lambda exc: self._error_signal.emit(str(exc)),
-                on_audio=self._audio_signal.emit,
+                on_frame=self._view.callback("_on_frame_main"),
+                on_error=self._view.error_callback("_on_error_main"),
+                on_audio=self._view.callback("_on_audio_main"),
                 on_clipboard=clipboard_receiver,
                 expected_host_id=expected_id,
                 ssl_context=ssl_context,
             )
             viewer.set_file_receiver(FileReceiver(
-                on_progress=lambda tid, done, total:
-                    self._file_progress_signal.emit(tid, done, total),
-                on_complete=lambda tid, ok, err, dst:
-                    self._file_complete_signal.emit(
-                        tid, bool(ok), err or "", dst,
-                    ),
+                on_progress=self._view.callback("_on_file_progress_main"),
+                on_complete=self._view.callback("_received_file_complete"),
                 base_dir=default_download_dir(),
             ))
             clipboard_receiver.bind(viewer)
@@ -315,7 +315,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
 
     def _on_connected(self, viewer) -> None:
         """GUI thread: the viewer this panel asked for is connected."""
-        registry.adopt(SLOT_VIEWER, viewer, self._owner, displaced_notifier(self))
+        registry.adopt(SLOT_VIEWER, viewer, self._owner, self._view.callback("_on_displaced"))
         self._clipboard_authority, self._connect_authority = self._connect_authority, None
         self._connected = True
         self._start_audio_player_if_requested()
@@ -366,6 +366,11 @@ class _ViewerPanel(TranslatableMixin, QWidget):
                 player.stop()
             except (OSError, RuntimeError):
                 pass
+
+    def _retire_audio_player(self) -> None:
+        player, self._audio_player = self._audio_player, None
+        if player is not None:
+            self._stops.retire(player.stop)
 
     def _own_viewer(self):
         """The viewer this panel opened, or None once it is gone or replaced."""
@@ -499,6 +504,9 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             .replace("{total}", str(total))
         )
 
+    def _received_file_complete(self, transfer_id: str, success: bool, error: str | None, dest: str) -> None:
+        self._on_file_complete_main(transfer_id, bool(success), error or "", dest)
+
     def _on_file_complete_main(self, transfer_id: str, success: bool,
                                error: str, dest_path: str) -> None:
         del transfer_id
@@ -587,37 +595,5 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         viewer = self._own_viewer()
         if viewer is None:
             return
-        thread = _FileSendThread(viewer, source_path, dest, self)
-        thread.progress.connect(self._on_file_progress_main)
-        thread.completed.connect(self._on_file_complete_main)
-        thread.finished.connect(thread.deleteLater)
-        thread.start()
-
-
-class _FileSendThread(DaemonThread):
-    """Run send_file off the GUI thread; bridge progress via signals."""
-
-    progress = Signal(str, int, int)
-    completed = Signal(str, bool, str, str)
-
-    def __init__(self, viewer: RemoteDesktopViewer, source: str, dest: str,
-                 parent=None) -> None:
-        super().__init__(parent)
-        self._viewer = viewer
-        self._source = source
-        self._dest = dest
-
-    def run(self) -> None:
-        def relay(transfer_id, done, total):
-            self.progress.emit(transfer_id, done, total)
-        try:
-            result = self._viewer.send_file(
-                self._source, self._dest, on_progress=relay,
-            )
-        except (OSError, RuntimeError) as error:
-            self.completed.emit("", False, str(error), self._dest)
-            return
-        self.completed.emit(
-            result.transfer_id, bool(result.success),
-            result.error or "", self._dest,
-        )
+        from je_auto_control.gui.remote_desktop.view_upload import start_upload
+        start_upload(self, viewer, source_path, dest, self._view)

@@ -14,8 +14,9 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
+from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui.remote_desktop._helpers import (
-    _CollapsibleSection, _StatusBadge, _t, displaced_notifier,
+    _CollapsibleSection, _StatusBadge, _t,
 )
 from je_auto_control.gui.remote_desktop.frame_display import _FrameDisplay
 from je_auto_control.utils.remote_desktop import (
@@ -67,6 +68,7 @@ class _HostPanel(TranslatableMixin, QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
+        self._view = ViewLifetime(self)
         self._owner = new_owner("host-tab")
         self._displaced.connect(self._on_displaced)
         # Start and Stop both stop a host, which joins its threads.
@@ -127,8 +129,10 @@ class _HostPanel(TranslatableMixin, QWidget):
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: its status and preview timers (the host keeps running).
 
-        Called by ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
+        Called by ``close_tab(key)`` before the widget is deleted; safe to call twice.
         """
+        self._view.retire()
+        release_resources(self._host_op)
         release_resources(self)
 
     def retranslate(self) -> None:
@@ -357,7 +361,7 @@ class _HostPanel(TranslatableMixin, QWidget):
         self._starting = {"bind": bind, "transport": transport, "token": token}
         self._pending_key = "gui_op_starting"
         self._host_op.run(
-            functools.partial(_replace_host, self._owner, build, displaced_notifier(self)),
+            functools.partial(_replace_host, self._owner, build, self._view.callback("_on_displaced")),
             on_done=self._on_started, on_error=self._on_start_failed,
             discard=functools.partial(_release_host, self._owner))
         self._refresh_status()

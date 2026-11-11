@@ -264,16 +264,17 @@ class _HostConnectionMixin(_HostPanelPart):
         whitelist_text = self._ip_whitelist_edit.toPlainText().strip()
         whitelist = [line.strip() for line in whitelist_text.splitlines()
                      if line.strip() and not line.strip().startswith("#")]
+        state_changed = self._view.callback("_on_state")
         host = MultiViewerHost(
             token=token,
             config=_read_webrtc_config(self),
             trust_list=self._trust_list,
             read_only=self._readonly_check.isChecked(),
             ip_whitelist=whitelist,
-            on_annotation=self._signals.annotation.emit,
-            on_session_state=lambda _sid, state: self._signals.state.emit(state),
-            on_session_authenticated=self._on_session_authed,
-            on_pending_viewer=self._signals.pending_viewer.emit,
+            on_annotation=self._view.callback("_on_annotation_event"),
+            on_session_state=lambda _sid, state: state_changed(state),
+            on_session_authenticated=self._view.callback("_on_session_authed"),
+            on_pending_viewer=self._view.callback("_on_pending_viewer"),
         )
         return host
 

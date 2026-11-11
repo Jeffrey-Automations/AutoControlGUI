@@ -192,3 +192,8 @@ WebRTC statistics
 Statistics polling starts without waiting for the network loop. Stopping it
 discards late samples and releases the callback owner; a callback already
 executing may finish. This does not close the remote session itself.
+
+Remote Desktop lifetime
+-----------------------
+
+Closing Remote Desktop releases its page. Reopening creates fresh controls without reattaching shared sessions. Registry TCP/WebSocket sessions remain available to scripts; page-owned WebRTC sessions and audio retire in the background. Pending approvals are denied, and late callbacks are discarded. An already-entered file transfer is not interrupted by closing the page.

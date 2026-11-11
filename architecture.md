@@ -338,6 +338,12 @@ only its token; controller retirement also cleans jobs after the controller
 has gone. Context/identity are refreshed on dispatch, without prescribing
 one capability for every task. Each work function authorizes its operation.
 Qt-free cancellation/progress live in utils/exception/cancellation.py.
+Remote Desktop factory pages retire weak callback delivery before destruction.
+ViewLifetime gates queued delivery; ViewApprovals wakes pending requests with denial.
+Value-only upload tasks and frame conversion do not retain the page. Registry TCP/WS
+sessions survive close; page-owned WebRTC cleanup runs through the detached stop queue.
+Reopening creates a fresh page without reattaching those sessions. Stop failures are
+logged; explicit failed-resource retry ownership remains open in Progress.md.
 Legacy start_worker retains its API and now rolls back failed thread starts.
 Remaining panel/backend integration and WebRTC splitting remain open.
 
@@ -588,7 +594,7 @@ safe source strings/references and masks resolved input strings/dynamic keys.
 | `je_auto_control/wrapper/` | Platform-neutral API (`auto_control_mouse/keyboard/screen/image/record/window.py`); `platform_wrapper.py` picks the backend; `backend_contract.py` types the seam; `window_backends/`. |
 | `je_auto_control/{windows,osx,linux_with_x11,linux_wayland}/` | Desktop OS backends; only the running OS's backend is imported. |
 | `je_auto_control/{android,ios}/` | Mobile device control (adb / uiautomator2, WebDriverAgent). |
-| `je_auto_control/gui/` | Optional PySide6 GUI (`[gui]` extra): `main_window.py` (menus, navigation dock, theme), `main_widget.py` (the tabbed workspace), `workspace.py` (scroll containers preserving original page identity, vector close buttons), `workspace_settings.py` (validated per-user QSettings, injectable in tests), the Qt-free `TabRegistry` in `tab_registry.py` (open caches panels; close detaches and schedules owned panels for destruction, retaining metadata and legacy forms), `navigation.py`, `theme.py`, `script_builder/`, `remote_desktop/`, `language_wrapper/`. |
+| `je_auto_control/gui/` | Optional PySide6 GUI (`[gui]` extra): `main_window.py` (menus, navigation dock, theme), `main_widget.py` (the tabbed workspace), `workspace.py` (scroll containers preserving original page identity, vector close buttons), `workspace_settings.py` (validated per-user QSettings, injectable in tests), the Qt-free `TabRegistry` in `tab_registry.py` (open caches panels; close detaches and schedules owned panels for destruction, retaining metadata and embedder-supplied widgets), `navigation.py`, `theme.py`, `script_builder/`, `remote_desktop/`, `language_wrapper/`. |
 | `autocontrol-lsp/` | Separate distribution: language server for `AC_*` action JSON, plus a `vscode/` client. |
 | `native/owner_service/` | Optional Linux owner service in C, not shipped in the wheel. A root guardian (epoch journal, cgroup v2 delegation, client verification, crash recovery) starts a service that authenticates every packet by pidfd, issues leases and runs each helper in its own protected cgroup tree. `build.sh` and an administrator-reviewed manifest build it; `tests/` holds the unprivileged and root acceptance. The Python side is `helper_owner_linux.py`, selected by `owned_channel_factory.py` through a root-owned binding file. |
 | `native/android_helper/` | Android device-side helper in Kotlin, not shipped in the wheel (stage 2 of 4): `core/` holds `FenceLedger` (the epoch fence and per-command settlement `AndroidCommandLease` requires) and `ProtocolHandler`, tested on the JVM; `app/` is the instrumentation (shell/root-only socket, fence-aware injector), built into an APK by `.github/workflows/android-helper.yml`. Not wired into the runtime yet; protocol in its `README.md`. |

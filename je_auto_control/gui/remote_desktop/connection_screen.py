@@ -17,7 +17,6 @@ the Advanced sub-tabs.
 """
 import functools
 import secrets
-import threading
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -31,10 +30,12 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._weak_call import WeakCall
+from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
+from je_auto_control.gui.remote_desktop.view_approvals import ApprovalRequest as _ApprovalRequest, ViewApprovals
 from je_auto_control.gui.remote_desktop._connect_task import connect_viewer
 from je_auto_control.gui.remote_desktop.connection_recent import _RecentConnectionsMixin
 from je_auto_control.gui.remote_desktop._helpers import (
-    _StatusBadge, _build_verifying_client_context, _t, displaced_notifier,
+    _StatusBadge, _build_verifying_client_context, _t,
     wire_remote_input,
 )
 from je_auto_control.gui.remote_desktop.remote_screen_window import (
@@ -76,23 +77,6 @@ _PRIMARY_BTN_CSS = (
 _APPROVAL_TIMEOUT_S = 60.0
 
 
-class _ApprovalRequest:
-    """Threading-safe request envelope passed from host thread to GUI.
-
-    The host's accept thread blocks on :attr:`event` while the GUI
-    thread shows a modal "Allow / View only / Deny" dialog and writes
-    ``decision``. Falls back to deny if the operator never answers.
-    """
-
-    __slots__ = ("pending", "event", "decision")
-
-    def __init__(self, pending: PendingViewer) -> None:
-        self.pending = pending
-        self.event = threading.Event()
-        # One of "full", "view_only", "denied".
-        self.decision: str = "denied"
-
-
 class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
     """AnyDesk-style single-screen entry point for Remote Desktop."""
 
@@ -127,6 +111,9 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
+        self._view = ViewLifetime(self)
+        self._approvals = ViewApprovals(self._view.callback("_show_approval_dialog"), _APPROVAL_TIMEOUT_S)
+        self.destroyed.connect(self._approvals.retire)
         self._owner = new_owner("quick-connect")
         self._displaced.connect(self._on_displaced)
         self._host_id_label = QLabel("---")
@@ -190,6 +177,8 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         them. A connect that has not answered is cancelled, and the viewer it
         may still produce is disconnected.
         """
+        self._view.retire()
+        self._approvals.retire()
         release_resources(self, self._cancel_pending_connect, self._close_screen_window)
 
     def retranslate(self) -> None:
@@ -312,13 +301,13 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
             host = RemoteDesktopHost(
                 token=token, bind="127.0.0.1", port=0,
                 fps=10.0, quality=70,
-                on_pending_viewer=self._host_approval_callback,
+                on_pending_viewer=self._approvals.request,
             )
             host.start()
         except (OSError, ValueError, RuntimeError) as error:
             QMessageBox.warning(self, _t("rd_quick_start_host"), str(error))
             return
-        registry.adopt(SLOT_HOST, host, self._owner, displaced_notifier(self))
+        registry.adopt(SLOT_HOST, host, self._owner, self._view.callback("_on_displaced"))
         self._refresh_status()
 
     def _host_approval_callback(self, pending: PendingViewer):
@@ -329,14 +318,13 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         then block here until the operator clicks (or the timeout
         fires, in which case we deny).
         """
-        request = _ApprovalRequest(pending)
-        self._approval_requested.emit(request)
-        if not request.event.wait(timeout=_APPROVAL_TIMEOUT_S):
-            return False
-        return request.decision
+        return self._approvals.request(pending)
 
     def _show_approval_dialog(self, request: _ApprovalRequest) -> None:
         """GUI thread: ask the operator how to admit ``request.pending``."""
+        if request.event.is_set() or self._view.retired:
+            request.resolve("denied")
+            return
         try:
             address = ":".join(str(part) for part in request.pending.address)
             transport = request.pending.transport.upper()
@@ -460,9 +448,9 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._refresh_status()
 
     def _viewer_callbacks(self) -> dict:
-        return {"on_frame": self._frame_arrived.emit,
-                "on_error": lambda exc: self._error_arrived.emit(str(exc)),
-                "on_cursor": self._cursor_moved.emit}
+        return {"on_frame": self._view.callback("_on_frame"),
+                "on_error": self._view.error_callback("_on_error"),
+                "on_cursor": self._view.callback("_on_remote_cursor")}
 
     def _begin_connect(self, slot: str, build, on_live) -> None:
         """Take ``slot``, build the viewer, and connect it off the GUI thread (see ``_connect_task``).
@@ -484,7 +472,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
 
     def _on_viewer_live(self, slot: str, on_live: WeakCall, live_viewer) -> None:
         """GUI thread: the connect succeeded; register the viewer and show it."""
-        registry.adopt(slot, live_viewer, self._owner, displaced_notifier(self))
+        registry.adopt(slot, live_viewer, self._owner, self._view.callback("_on_displaced"))
         on_live()
 
     def _cancel_pending_connect(self) -> None:

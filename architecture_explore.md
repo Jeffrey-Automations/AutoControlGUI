@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,510 |
-| 程式碼總行數 | 230,622 |
+| Python 模組總數（含周邊子專案） | 1,514 |
+| 程式碼總行數 | 230,812 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1275,8 +1275,8 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `gui/__init__.py` | 25 | `start_autocontrol_gui()`：**唯一**會延遲匯入 PySide6 的地方，維持頂層套件 Qt-free。 |
 | `main_window.py` | 442 | `QMainWindow`：選單列（File／Actions／View／…）、左側導覽面板 dock（`Ctrl+K` 搜尋、`Ctrl+B` 收合）、即時語言切換、字級預設、深色／淺色主題（`theme.py` 的 token，不再用 qt-material）。分頁分為 core／editing／detection／automation／system 五類。 |
-| `main_widget.py` | 317 | 工作區：擁有 `QTabWidget`，依 `tab_registry.TAB_SPECS` 註冊 49 個分頁，並暴露 show/hide/close/activate/list API 給選單列與導覽面板。只有預設開啟的三個分頁與保留的 Remote Desktop 表單在啟動時建立，其餘第一次開啟才匯入模組、建立 widget。核心分頁在 `_own_tab_builders` 宣告 `(label_key, handler)` 動作對。 |
-| `tab_registry.py` | 198 | 分頁表：每個分頁一筆 `TabSpec`（鍵、標題鍵、分類、模組與類別名），`TabEntry` 在第一次存取 `widget` 時才呼叫 factory。`TabRegistry.open/close` 快取或釋放 factory 面板，保留 metadata 與既有表單；不匯入 Qt。 |
+| `main_widget.py` | 317 | 工作區：擁有 `QTabWidget`，依 `tab_registry.TAB_SPECS` 註冊 49 個分頁，並暴露 show/hide/close/activate/list API 給選單列與導覽面板。只有預設開啟的分頁在啟動時建立，其餘第一次開啟才匯入模組、建立 widget。核心分頁在 `_own_tab_builders` 宣告 `(label_key, handler)` 動作對。 |
+| `tab_registry.py` | 198 | 分頁表：每個分頁一筆 `TabSpec`（鍵、標題鍵、分類、模組與類別名），`TabEntry` 在第一次存取 `widget` 時才呼叫 factory。`TabRegistry.open/close` 快取或釋放 factory 面板，保留 metadata 與外部提供的 widget；不匯入 Qt。 |
 | `navigation.py` | 203 | `NavigationPanel`：搜尋框 + 依分類的功能樹，列出每個已註冊分頁（開啟中的以粗體標示），只回報被選的鍵，開啟分頁仍由視窗負責。 |
 | `theme.py` | 183 | 設計 token（`ThemeTokens`：顏色、圓角、間距、字族）、深色與淺色兩組值、由 token 產生的樣式表與對應的 `QPalette`；不載入圖檔或字型檔。 |
 | `workspace.py` | 121 | 可捲動的分頁容器：保留 `widget/currentWidget/indexOf/setCurrentWidget` 的原始頁面身分、移除時保留頁面所有權，並直接繪製隨 palette 變色的向量關閉鈕。 |
@@ -1354,7 +1354,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | dag_runner | `dag_tab.py` | 369 | 編輯、驗證、執行跨主機 DAG。 |
 | chatops | `chatops_tab.py` | 144 | 在接上 Slack 前先本機測試 slash 指令。 |
 | trace_replay | `trace_replay_tab.py` | 192 | 拖曳捲動時光回溯錄製內容。 |
-| remote_desktop | `remote_desktop/`（17 檔） | 8,162 | 見下。 |
+| remote_desktop | `remote_desktop/`（17 檔） | 8,353 | 見下。 |
 | presence | `presence_tab.py` | 164 | 多檢視者在場名單。 |
 | rest_api | `rest_api_tab.py` | 260 | 啟停 HTTP 前端並顯示 URL、實際驗證模式與可用 token。 |
 | admin_console | `admin_console_tab.py` | 318 | 管理多個遠端 AutoControl REST 端點。 |
@@ -1372,21 +1372,25 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `gui/diagnostics_capabilities.py` | 60 | 只呈現既有不可變能力快照與四語狀態；不探測、不連線，不持有原生物件。 |
 
-#### 遠端桌面 GUI（`gui/remote_desktop/`，36 檔／8,162 行）
+#### 遠端桌面 GUI（`gui/remote_desktop/`，40 檔／8,353 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
-| `folder_sync_controls.py` | 70 | Translate the existing folder toggle into owned start, reconnect handoff and explicit baseline reset. |
+| `view_lifetime.py` | 85 | Retirable weak delivery from surviving transports to one Qt view. |
+| `view_approvals.py` | 64 | Terminal default-deny approval ownership independent of a Qt page. |
+| `view_frames.py` | 25 | Frame conversion and optional recording without retaining a remote view. |
+| `view_upload.py` | 30 | Value-only legacy viewer uploads owned by the shared GUI task controller. |
+| `folder_sync_controls.py` | 72 | Translate the existing folder toggle into owned start, reconnect handoff and explicit baseline reset. |
 | `folder_sync_io.py` | 130 | Bind confirmed folder sends, cancellation and frozen receipts to one captured GUI owner. |
-| `webrtc_panel_state.py` | 156 | 主機／檢視端 mixin 的具體 Qt 狀態與 slot 型別契約；不新增執行時預設值。 |
-| `webrtc_panel.py` | 417 | WebRTC 子分頁主體。 |
+| `webrtc_panel_state.py` | 165 | 主機／檢視端 mixin 的具體 Qt 狀態與 slot 型別契約；不新增執行時預設值。 |
+| `webrtc_panel.py` | 422 | WebRTC 子分頁主體。 |
 | `webrtc_dialogs.py` | 520 | WebRTC GUI 用的自訂對話框與清單元件（待審檢視者、信任清單、通訊錄、遠端檔案表、稽核記錄、LAN 瀏覽）。 |
 | `advanced_group.py` | 104 | 兩個 WebRTC 面板共用的 Advanced STUN／TURN（含選用硬體編碼器）群組，含分離的 STUN／TURN 與選用主機硬體編碼器 Protocol。 |
 | `trusted_group.py` | 73 | WebRTC host 面板的信任 viewer 清單群組（移除／清空／匯入／匯出），含它寫回面板的 Protocol。 |
-| `connection_screen.py` | 679 | Quick Connect —— AnyDesk 風格單畫面入口。 |
-| `viewer_panel.py` | 623 | 「控制另一台機器」子分頁。 |
+| `connection_screen.py` | 667 | Quick Connect —— AnyDesk 風格單畫面入口。 |
+| `viewer_panel.py` | 599 | 「控制另一台機器」子分頁。 |
 | `webrtc_known_hosts.py` | 346 | TOFU 釘選庫瀏覽器：`KnownHostsDialog` 與帶外釘選用的小表單。由 `webrtc_dialogs` 再匯出。 |
-| `host_panel.py` | 433 | 「分享這台機器」子分頁。 |
+| `host_panel.py` | 437 | 「分享這台機器」子分頁。 |
 | `frame_display.py` | 229 | 繪製 JPEG 影格並發出遠端輸入事件的元件。 |
 | `webrtc_workers.py` | 237 | 訊令流程的背景 worker（`DaemonThread`，長輪詢比面板或程式活得久也不會中止行程）。 |
 | `tab.py` | 179 | 外層容器分頁。 |
@@ -1416,7 +1420,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `scripts/dev_release.py` | 只用標準函式庫的發佈輔助腳本 | dev 通道（PyPI 的 `je_auto_control_dev`）的版本與比對：`prepare` 把 `dev.toml` 寫成 `pyproject.toml`，版本取 PyPI 最新一版加一個 patch（`dev.toml` 的版本只是下限，不回寫 repo）；`changed dist` 把建好的 wheel 跟 PyPI 最新一版逐檔比對，內容沒變就不上傳。只給 `dev.yml` 的 `publish-dev` job 與拋棄式的 checkout 用，因為 `prepare` 會蓋掉 `pyproject.toml`。 |
 | `docs/` | Sphinx（`API`／`Eng`／`Zh`／`getting_started`） | Read the Docs 文件。 |
 | `architecture_diagram/` | drawio + png | 既有的架構圖原始檔。 |
-| `test/` | `unit_test/headless`（主要）、`unit_test/flow_control`、`integrated_test`、`gui_test`、`manual_test`、`verify`、`test_source` | 1,177 個 `test_*.py`／11,429 個測試函式。**注意**：`test/unit_test/` 下的 `*_test.py` 是會真的驅動滑鼠鍵盤的手動示範腳本，因此 `pyproject.toml` 把 `python_files` 釘成 `test_*.py`。`unit_test/headless/conftest.py` 有一個 autouse fixture，每個測試結束都沖掉 Qt 排隊中的 `deleteLater()`——不沖會讓殘留的 widget 在後面某個不相干的測試裡被銷毀，曾經整個直譯器 `__fastfail`。`test_doc_counts.py` 守住文件引用的指令／工具／子套件／範例數,`test_doc_line_counts.py` 守住所有行數（`--fix` 可一次重新產生）。 `verify/macos_verify.py` 是在真的 `macos-14` runner 上量測 TCC 到底允許什麼的探針（macOS 是唯一沒有容器可用的支援平台），不被 pytest 收集。 |
+| `test/` | `unit_test/headless`（主要）、`unit_test/flow_control`、`integrated_test`、`gui_test`、`manual_test`、`verify`、`test_source` | 1,178 個 `test_*.py`／11,443 個測試函式。**注意**：`test/unit_test/` 下的 `*_test.py` 是會真的驅動滑鼠鍵盤的手動示範腳本，因此 `pyproject.toml` 把 `python_files` 釘成 `test_*.py`。`unit_test/headless/conftest.py` 有一個 autouse fixture，每個測試結束都沖掉 Qt 排隊中的 `deleteLater()`——不沖會讓殘留的 widget 在後面某個不相干的測試裡被銷毀，曾經整個直譯器 `__fastfail`。`test_doc_counts.py` 守住文件引用的指令／工具／子套件／範例數,`test_doc_line_counts.py` 守住所有行數（`--fix` 可一次重新產生）。 `verify/macos_verify.py` 是在真的 `macos-14` runner 上量測 TCC 到底允許什麼的探針（macOS 是唯一沒有容器可用的支援平台），不被 pytest 收集。 |
 
 ---
 
@@ -1507,7 +1511,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 145 | 40,154 |
+| `gui/` | 149 | 40,344 |
 | `utils/mcp_server/` | 60 | 22,037 |
 | `utils/remote_desktop/` | 72 | 15,301 |
 | `utils/executor/` | 11 | 10,702 |
@@ -1528,7 +1532,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,002 | 102,291 |
-| **總計** | **1,498** | **229,877** |
+| **總計** | **1,502** | **230,067** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

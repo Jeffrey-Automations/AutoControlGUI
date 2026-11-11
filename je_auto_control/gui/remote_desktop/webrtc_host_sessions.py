@@ -99,17 +99,14 @@ class _HostSessionsMixin(_HostPanelPart):
 
     def _make_session_stats_handler(self, session_id: str) -> Callable[[StatsSnapshot], None]:
         """Closure capturing session_id for the per-session poller."""
-        def _handle(snapshot: StatsSnapshot) -> None:
-            default_webrtc_inspector().record(snapshot)
-            color = self._quality_color(snapshot)
-            self._session_cache.set(
-                session_id, color=color, snapshot=snapshot,
-            )
-            # Re-paint just the dot cell for this session_id (avoid full reflow).
-            # One read: the GUI thread can clear it between a check and a call.
-            host = self._multi_host
-            self._signals.session_count.emit(host.session_count() if host else 0)
-        return _handle
+        return functools.partial(self._view.post, "_store_session_stats", session_id)
+
+    def _store_session_stats(self, session_id: str, snapshot: StatsSnapshot) -> None:
+        default_webrtc_inspector().record(snapshot)
+        color = self._quality_color(snapshot)
+        self._session_cache.set(session_id, color=color, snapshot=snapshot)
+        host = self._multi_host
+        self._signals.session_count.emit(host.session_count() if host else 0)
 
     @staticmethod
     def _format_quality_tooltip(snapshot: Optional[StatsSnapshot]) -> str:

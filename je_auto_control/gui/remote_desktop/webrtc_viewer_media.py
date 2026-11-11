@@ -228,7 +228,7 @@ class _ViewerMediaMixin(_ViewerPanelPart):
             return
         self._stop_stats_polling()
         self._stats_poller = StatsPoller(
-            self._viewer._pc, self._on_viewer_stats_sample,
+            self._viewer._pc, self._view.callback("_on_viewer_stats_sample"),
         )
         self._stats_poller.start()
 

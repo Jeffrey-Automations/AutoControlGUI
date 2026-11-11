@@ -163,7 +163,7 @@ class RemoteDesktopTab(TranslatableMixin, QWidget):
     def dispose(self) -> None:
         """Release what the sub-panels hold beyond their widgets, through each panel's own ``dispose()``.
 
-        Called by ``close_tab(key, release=True)``; safe to call twice.
+        Called by ``close_tab(key)``; safe to call twice.
         Timers stop, connects and transfers still out are cancelled and the
         pop-out windows close. A TCP / WebSocket host or session a panel
         opened is left running -- it belongs to the registry, where scripts
