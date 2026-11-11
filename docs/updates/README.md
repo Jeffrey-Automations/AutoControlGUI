@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261112-02 | 2026-11-12 | minimatch 5.1.9 is outside the revised advisory range | #done #deps #security | [2026-11-b](2026-11-b.md) |
 | U-20261112-01 | 2026-11-12 | Remove the stale dev package from the shared .venv | #done #tooling | [2026-11-b](2026-11-b.md) |
 | U-20261111-32 | 2026-11-11 | Retain peer media failures and observe live cleanup | #done #remote | [2026-11-b](2026-11-b.md) |
 | U-20261111-31 | 2026-11-11 | Bind delayed session retirement to original resources | #done #remote | [2026-11-b](2026-11-b.md) |

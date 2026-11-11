@@ -754,7 +754,7 @@ ASLR resolver、fixture 的原生身分核對與頁面故障注入、runtime gra
 | 秘密金庫（`${secrets.NAME}`） | `cryptography` | 同上 |
 | ACME／TLS 發證、加密錄影 | `cryptography` | 模組層 `ImportError` 轉述（照 `webrtc_transport` 慣例） |
 
-`BLOCKED` — 仍需相容的上游 wheel：`opencv-python>=4.8,<6`、
+`BLOCKED`（2026-11-12 以下方指令重驗，三者仍無 win_arm64 wheel；cryptography 仍只到 46.0.3）— 仍需相容的上游 wheel：`opencv-python>=4.8,<6`、
 `cryptography>=50.0.0` 與 `aiortc` 的傳遞相依 `google-crc32c`。
 不能為相容性降低 cryptography 安全下限。上游提供相容版本後，需重驗安裝與功能，
 再移除 `pyproject.toml` 中相應平台標記並同步更新
@@ -772,11 +772,3 @@ pip install --dry-run --only-binary=:all: --platform win_arm64 --python-version 
 它只影響 wheel 相容性標籤，所以拿本機做 `--dry-run` **驗不到標記的效果**（兩個
 套件依舊會被要求）。能驗的是兩件事：直接評估 marker（上面那支測試在做的），
 以及 `windows-11-arm` 那一格自己綠。
-
-## minimatch 11 在 VS Code 擴充套件
-
-`BLOCKED` — `autocontrol-lsp/vscode/package-lock.json` 的 `minimatch` 5.1.9 有 Dependabot 警示
-GHSA-g3hv-75wg-m249（moderate），只有 11.0.1 起修好（U-20261101-17）。它來自 `vscode-languageclient` 9.0.1，
-會被 esbuild 打包進擴充套件；到 11.0.0 為止的每一版都要求 `minimatch` ^5 或 ^10，並呼叫 minimatch 11 已移除的
-`Minimatch#makeRe()`，所以用 `overrides` 強制 11 會讓文件篩選在執行時壞掉。等 `vscode-languageclient`
-出支援 minimatch 11 的版本，再升級並重新產生 lock。
