@@ -8,9 +8,11 @@ from types import SimpleNamespace
 import pytest
 
 pytest.importorskip('PySide6.QtWidgets', exc_type=ImportError)
+from PySide6.QtCore import QObject
 from headless.test_webrtc_file_delivery import bridge as bridge
 from je_auto_control.gui.remote_desktop import webrtc_panel, webrtc_viewer_files
 from je_auto_control.gui.remote_desktop.folder_sync_io import make_folder_engine
+from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.utils.rbac import (
     AuthorizationContext, Role, UserStore, authorization_scope, current_authorization,
 )
@@ -122,8 +124,14 @@ def test_mid_file_stop_or_replacement_aborts_without_committing_partial_bytes(
                 finished.set()
 
     viewer = Viewer()
-    owner = SimpleNamespace(_viewer=viewer, _sync_engine=None, _sync_dir_edit=SimpleNamespace(text=lambda: str(watch)),
-                            _sync_btn=Button(), _require_viewer=lambda: viewer)
+    owner = QObject() if via_gui else SimpleNamespace()
+    owner._viewer = viewer
+    owner._sync_engine = None
+    owner._sync_dir_edit = SimpleNamespace(text=lambda: str(watch))
+    owner._sync_btn = Button()
+    owner._require_viewer = lambda: viewer
+    if via_gui:
+        owner._view = ViewLifetime(owner)
     context = AuthorizationContext('owner', Role.OPERATOR, store_path=str(store.path))
     factory = make_folder_engine
 
@@ -158,6 +166,8 @@ def test_mid_file_stop_or_replacement_aborts_without_committing_partial_bytes(
         assert failures == []
     finally:
         engine.stop()
+        if via_gui:
+            owner._view.retire()
 
 
 def test_owner_replaced_after_scan_can_stop_without_reentering_a_nonrecursive_lock(tmp_path):

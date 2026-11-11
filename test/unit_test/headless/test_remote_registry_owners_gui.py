@@ -24,7 +24,7 @@ from je_auto_control.utils.remote_desktop.connect_coordinator import parse_targe
 from je_auto_control.utils.remote_desktop.registry import (  # noqa: E402
     SCRIPT_OWNER, SLOT_HOST, SLOT_VIEWER, SLOT_WS_VIEWER, registry,
 )
-from headless._qt_settle import deleting, settle, settle_op  # noqa: E402
+from headless._qt_settle import deleting, pump_until, settle, settle_op  # noqa: E402
 
 
 class _Viewer:
@@ -256,7 +256,7 @@ def test_a_script_connect_closes_the_panels_session(monkeypatch):
     _script_connect(monkeypatch)
     tab = _tab()
     registry.connect_viewer("desk", 5555, "tok")
-    assert _idle(tab)
+    assert pump_until(lambda: _idle(tab))
     assert tab._status.text() == _t("rd_viewer_displaced")
     assert registry.viewer_status()["owner"] == SCRIPT_OWNER
     tab._disconnect()
@@ -266,7 +266,7 @@ def test_a_script_connect_closes_the_panels_session(monkeypatch):
 def test_a_script_disconnect_closes_the_panels_session():
     screen = _quick()
     registry.disconnect_viewer()
-    assert _idle(screen)
+    assert pump_until(lambda: _idle(screen))
     assert screen._viewer_badge.text() == _t("rd_quick_disconnected")
 
 
@@ -345,7 +345,7 @@ def test_quick_connect_hosting_replaces_the_host_tabs_host_and_tells_it(qapp):
     screen._start_hosting()
     assert not first.is_running
     assert registry.owner_of(SLOT_HOST) == screen._owner
-    assert tab._shared is None                       # no share text for a host it does not run
+    assert pump_until(lambda: tab._shared is None)   # no share text for a host it does not run
     tab._copy_share_text()
     assert qapp.messages == [_t("rd_host_copy_share_unavailable")]
     assert registry.host.is_running
@@ -359,13 +359,13 @@ def test_stop_stops_the_host_on_show_and_tells_its_owner():
     screen._stop_hosting()
     assert not running.is_running
     assert registry.host is None
-    assert tab._shared is None
+    assert pump_until(lambda: tab._shared is None)
 
 
 def test_a_script_stopping_the_host_clears_the_panels_share_text():
     tab = _host_tab()
     registry.stop_host()
-    assert tab._shared is None
+    assert pump_until(lambda: tab._shared is None)
     assert registry.host_status()["running"] is False
 
 
