@@ -21,7 +21,7 @@ import threading
 from typing import Any, Optional
 
 try:
-    import av  # type: ignore
+    import av
     import numpy as np
     from aiortc import MediaStreamTrack
 except ImportError as exc:  # pragma: no cover - optional dep
@@ -61,7 +61,7 @@ class OpusMicAudioTrack(MediaStreamTrack):
         self._channels = channels
         self._device = device
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=50)
-        self._loop = asyncio.get_running_loop()
+        self._loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         self._timestamp = 0
         self._capture: Optional[AudioCapture] = None
         self._lock = threading.Lock()

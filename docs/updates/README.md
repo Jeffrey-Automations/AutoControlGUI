@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261111-04 | 2026-11-11 | Validate media types and restore package complexity checks | #done #typing | [2026-11](2026-11.md) |
 | U-20261111-03 | 2026-11-11 | Release Image Detection and cancel pending click work | #done #gui | [2026-11](2026-11.md) |
 | U-20261111-02 | 2026-11-11 | Bound Windows memory reads behind reviewed attestation | #snapshot #agent | [2026-11](2026-11.md) |
 | U-20261111-01 | 2026-11-11 | Prepare owned memory fixture buffers and bounded control | #snapshot #agent | [2026-11](2026-11.md) |

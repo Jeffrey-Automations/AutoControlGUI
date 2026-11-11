@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 try:
-    import av  # type: ignore
+    import av
 except ImportError as exc:  # pragma: no cover - 'webrtc' extra
     raise ImportError(
         "Session recording requires the 'webrtc' extra (PyAV).",
@@ -63,10 +63,16 @@ class SessionRecorder:
             return self._container, self._stream
         self._path.parent.mkdir(parents=True, exist_ok=True)
         container = av.open(str(self._path), mode="w")
-        stream = container.add_stream(self._codec, rate=self._fps)
-        stream.width = frame.width
-        stream.height = frame.height
-        stream.pix_fmt = self._pixel_format
+        try:
+            stream = container.add_stream(self._codec, rate=self._fps)
+            if not isinstance(stream, av.video.stream.VideoStream):
+                raise ValueError("session recording requires a video codec")
+            stream.width = frame.width
+            stream.height = frame.height
+            stream.pix_fmt = self._pixel_format
+        except (ValueError, OSError, RuntimeError):
+            container.close()
+            raise
         self._container = container
         self._stream = stream
         self._started = True

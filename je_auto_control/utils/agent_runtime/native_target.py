@@ -203,8 +203,7 @@ class NativeDesktopTarget:
         if self._profile is not None:
             payload["profile"] = self._profile.to_dict()
         deadline = None
-        if (self.supports_readonly_completion and spec.target != 'local-files'
-                and (self._profile is None or self._profile.kind == 'desktop')):
+        if self._requires_presence(spec):
             self._presence.check_platform()
             channel = self._ensure()
             deadline = time.monotonic() + spec.budget.action_seconds
@@ -214,6 +213,10 @@ class NativeDesktopTarget:
                 payload['presence_endpoint'] = endpoint
         result = self._request("configure", payload, deadline=deadline)
         return bool(result["ready"]), str(result.get("reason", ""))
+
+    def _requires_presence(self, spec: AgentTaskSpec) -> bool:
+        return (self.supports_readonly_completion and spec.target != 'local-files'
+                and (self._profile is None or self._profile.kind == 'desktop'))
 
     def observe(self) -> dict[str, Any]:
         """Capture in the helper, enforcing the host's live operation deadline."""

@@ -81,6 +81,7 @@ def _fake_create(monkeypatch, hw_codec, refuse):
 
     # CodecContext is an immutable extension type, so the module is swapped.
     fake_av = types.SimpleNamespace(CodecContext=types.SimpleNamespace(create=create),
+                                    VideoCodecContext=_FakeContext,
                                     FFmpegError=hw_codec.av.FFmpegError)
     monkeypatch.setattr(hw_codec, "av", fake_av)
     return created

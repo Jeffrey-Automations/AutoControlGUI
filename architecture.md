@@ -1,5 +1,9 @@
 # AutoControl Architecture
 
+Remote media adapters validate PyAV video contexts and streams before assigning
+video properties, and close failed recording containers. ScreenVideoTrack uses a
+separate frame-clock helper so aiortc can retain its integer timestamp field.
+
 Image Detection is a lazy independent widget. It owns its inputs and mouse-button
 selection, captures immutable worker arguments and runs matching through TabTask.
 Close cancels work and discards late results; reopen creates fresh controls.

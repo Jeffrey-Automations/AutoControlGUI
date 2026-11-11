@@ -12,7 +12,7 @@
 # Measure with the versions the `typing-extras` job of `quality.yml` pins.
 #
 # Targets: win32, linux, darwin
-# Measured entries: 18
+# Measured entries: 14
 
 je_auto_control.gui.navigation
 je_auto_control.gui.remote_desktop.webrtc_host_connection
@@ -28,7 +28,3 @@ je_auto_control.gui.remote_desktop.webrtc_viewer_media
 je_auto_control.gui.remote_desktop.webrtc_viewer_ui
 je_auto_control.gui.script_builder.step_form_view
 je_auto_control.gui.triggers_tab
-je_auto_control.utils.remote_desktop.hw_codec
-je_auto_control.utils.remote_desktop.session_recorder
-je_auto_control.utils.remote_desktop.webrtc_audio
-je_auto_control.utils.remote_desktop.webrtc_transport

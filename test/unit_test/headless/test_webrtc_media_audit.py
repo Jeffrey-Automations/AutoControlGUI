@@ -89,9 +89,9 @@ def test_the_screen_track_stamps_frames_at_the_real_rate(monkeypatch):
     clock = [100.0]
     monkeypatch.setattr(webrtc_transport.time, "monotonic", lambda: clock[0])
     track = webrtc_transport.ScreenVideoTrack(fps=10)
-    first, time_base = track._timestamp()
+    first, time_base = track._frame_timestamp()
     clock[0] += 0.1
-    second, _ = track._timestamp()
+    second, _ = track._frame_timestamp()
     assert (second - first) * time_base == pytest.approx(0.1)
 
 
