@@ -16,7 +16,11 @@ import socket
 import threading
 from typing import Callable, Dict, List, Optional
 
+from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.remote_desktop.media_retirement import (
+    Completion, RetirementStatus, require_retired, preserve_interrupted_owner,
+)
 
 try:
     from zeroconf import ServiceBrowser, ServiceInfo, ServiceListener, Zeroconf
@@ -67,13 +71,20 @@ class HostAdvertiser:
                 "pip install je_auto_control[discovery]"
             )
         self._host_id = host_id
+        self._retire_lock = threading.Lock()
+        self._unregister = Completion.PENDING
+        self._release = Completion.PENDING
+        self._stopping = False
+        self._info = None
         self._zc = Zeroconf()
         try:
             ip = self._register(host_id, port, signaling_url, server_name)
-        except BaseException:
-            # A taken name (NonUniqueNameException) left this instance's
-            # sockets and thread running.
-            self._zc.close()
+        except BaseException as error:
+            try:
+                self.stop()
+            except BaseException as cleanup_error:
+                preserve_interrupted_owner(self, error, cleanup_error)
+                raise cleanup_error from error
             raise
         autocontrol_logger.info(
             "lan discovery: advertised host_id=%s on %s", host_id, ip,
@@ -97,12 +108,44 @@ class HostAdvertiser:
         self._zc.register_service(self._info)
         return ip
 
+    @property
+    def retirement_status(self) -> RetirementStatus:
+        with self._retire_lock:
+            failed: tuple[str, ...] = ()
+            if self._unregister is Completion.UNCERTAIN:
+                failed += ("advertiser.unregister",)
+            if self._release is not Completion.CONFIRMED:
+                failed += ("advertiser.close",)
+            return RetirementStatus(self._stopping, self._release,
+                                    self._unregister,
+                                    self._stopping and self._release is not Completion.CONFIRMED,
+                                    failed)
+
     def stop(self) -> None:
-        try:
-            self._zc.unregister_service(self._info)
-        except (RuntimeError, OSError) as error:
-            autocontrol_logger.debug("zeroconf unregister: %r", error)
-        self._zc.close()
+        """Retain a failed close; a failed goodbye remains uncertain."""
+        failures = []
+        with self._retire_lock:
+            self._stopping = True
+            if self._unregister is Completion.PENDING:
+                self._unregister = Completion.UNCERTAIN
+                try:
+                    if self._info is not None:
+                        self._zc.unregister_service(self._info)
+                except BaseException as error:  # reason: finish close and then preserve any control signal
+                    failures.append(error)
+                else:
+                    self._unregister = Completion.CONFIRMED
+            if self._release is not Completion.CONFIRMED:
+                try:
+                    self._zc.close()
+                except BaseException as error:  # reason: finish close and then preserve any control signal
+                    failures.append(error)
+                    self._release = Completion.UNCERTAIN
+                else:
+                    self._release = Completion.CONFIRMED
+        for failure in failures:
+            raise_caused_run_interruption(failure)
+        require_retired(self)
 
 
 class _BrowseListener:

@@ -37,10 +37,10 @@ class _Stream:
         if self.fail_write:
             raise _PortAudioError("device removed")
 
-    def stop(self):
+    def stop(self, ignore_errors=True):
         pass
 
-    def close(self):
+    def close(self, ignore_errors=True):
         self.closed = True
 
 
@@ -103,7 +103,7 @@ def test_a_failed_registration_closes_zeroconf(monkeypatch):
         def register_service(self, _info):
             raise RuntimeError("NonUniqueNameException")
 
-        def close(self):
+        def close(self, ignore_errors=True):
             closed.append(True)
 
     monkeypatch.setattr(lan_discovery, "_AVAILABLE", True)

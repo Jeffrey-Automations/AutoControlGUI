@@ -8,6 +8,8 @@ from functools import partial
 from typing import Any, Callable, List, Mapping, Optional, Sequence
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.remote_desktop.media_retirement import MediaRetirementError
+from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.remote_desktop.audio import (
     AudioCapture, AudioCaptureConfig,
 )
@@ -281,9 +283,14 @@ class RemoteDesktopHost(FrameProductionMixin):
 
     def _stop_locked(self, timeout: float) -> None:
         if self._listen_sock is None:
+            self._stop_audio_capture()
             return
         self._shutdown.set()
-        self._stop_audio_capture()
+        audio_error = None
+        try:
+            self._stop_audio_capture()
+        except BaseException as error:  # reason: finish independent host cleanup before preserving the audio failure
+            audio_error = error
         try:
             self._listen_sock.close()
         except OSError:
@@ -310,9 +317,14 @@ class RemoteDesktopHost(FrameProductionMixin):
         self._accept_thread = None
         self._capture_thread = None
         self._cursor_thread = None
+        if audio_error is not None:
+            raise_caused_run_interruption(audio_error)
+            raise audio_error
 
     def _start_audio_capture(self) -> None:
         """Open the audio input stream when audio capture is enabled."""
+        if self._audio_capture is not None:
+            self._stop_audio_capture()
         config = self._audio_config
         if not config.enabled:
             return
@@ -321,10 +333,12 @@ class RemoteDesktopHost(FrameProductionMixin):
             try:
                 self._audio_capture.start()
             except (OSError, RuntimeError) as error:
+                raise_caused_run_interruption(error)
                 autocontrol_logger.warning(
                     "remote_desktop audio capture failed to start: %r", error,
                 )
-                self._audio_capture = None
+                if not isinstance(error, MediaRetirementError):
+                    self._audio_capture = None
             return
         try:
             capture = AudioCapture(
@@ -334,12 +348,15 @@ class RemoteDesktopHost(FrameProductionMixin):
                 channels=config.channels,
                 block_frames=config.block_frames,
             )
+            self._audio_capture = capture
             capture.start()
         except (OSError, RuntimeError) as error:
+            raise_caused_run_interruption(error)
             autocontrol_logger.warning(
                 "remote_desktop audio capture disabled: %r", error,
             )
-            self._audio_capture = None
+            if not isinstance(error, MediaRetirementError):
+                self._audio_capture = None
             return
         self._audio_capture = capture
 
@@ -347,10 +364,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         capture = self._audio_capture
         if capture is None:
             return
-        try:
-            capture.stop()
-        except (OSError, RuntimeError):
-            pass
+        capture.stop()
         self._audio_capture = None
 
     def _broadcast_audio(self, chunk: bytes) -> None:

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Retain original audio, recording and LAN advertisement cleanup outcomes. Reject unsafe
+  flush/close replay and report pending work or uncertain finalization through typed
+  errors. Application caretaker and GUI integration remain pending.
+
 - File-request cancellation retains the original sender worker and queue ownership
   until actual completion, including repeated cancellation, without blocking the event loop.
 

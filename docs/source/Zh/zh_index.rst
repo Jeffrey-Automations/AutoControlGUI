@@ -26,6 +26,7 @@ AutoControl 所有功能的完整使用指南。
    doc/cli/cli_doc
    doc/create_project/create_project_doc
    doc/new_features/new_features_doc
+   doc/new_features/media_retirement_doc
    doc/new_features/v2_features_doc
    doc/new_features/healing_evaluation_doc
    doc/new_features/v3_features_doc
