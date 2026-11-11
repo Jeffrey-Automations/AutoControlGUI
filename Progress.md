@@ -125,8 +125,8 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
   系統匣路徑在 offscreen 下沒有 tray，`_on_tray_open` 是直接呼叫測的。基準（`benchmarks/gui_*.py`）CI 仍不設門檻。
 - **把 Python 建的 widget 放進分頁列在結束時崩潰**：已查明觸發條件——分頁列按鈕上接了 Python callable、又有排隊中的 `deleteLater()`、而行程經 `os._exit` 離開；
   先把 deferred delete 沖掉就不會。機制（Qt 在行程結束時釋放那個 slot）是推論，沒有 C 堆疊可看。`_tab_close_icon.py` 沒有改回自訂按鈕。
-- **對真實 Qt 型別的型別檢查**：`test/verify/typing_extras_exempt.txt` 從 70 個模組降到 14 個（11 個 WebRTC 面板 mixin、`navigation`、`step_form_view`、
-  `triggers_tab`），只准變少。`QImage.fromData(x, "JPEG")` 的 5 處保留 `# type: ignore[arg-type]`：
+- **對真實 Qt 型別的型別檢查**：`test/verify/typing_extras_exempt.txt` 從 70 個模組降到 11 個 WebRTC 面板 mixin，
+  只准變少。`QImage.fromData(x, "JPEG")` 的 5 處保留 `# type: ignore[arg-type]`：
   stub 要 bytes，實際的 binding 對 bytes 丟 `ValueError`。
 - 遠端桌面的輸入改成佇列送出後，`AC_remote_send_input` 回的 `{"sent": True}` 意思是「已排入」；`SO_SNDTIMEO` 的 POSIX 包法與經 TLS socket 的行為沒在這台機器上驗過。
 - 沒在 macOS／Linux 上看過新的關閉鈕、捲動與重設樣式；沒在真的多螢幕桌面試過視窗位置還原；PyBreeze 沒有對這一版跑過；各語系新增的字串（日文、簡體中文）沒有母語者看過。

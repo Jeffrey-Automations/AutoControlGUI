@@ -205,11 +205,11 @@ def _file_edit(editor: QWidget) -> Optional[QLineEdit]:
     return line if isinstance(line, QLineEdit) else None
 
 
-def _set_text_value(editor: QWidget, value: Any) -> None:
+def _set_text_value(editor: QLineEdit, value: Any) -> None:
     editor.setText("" if value is None else str(value))
 
 
-def _set_rgb_value(editor: QWidget, value: Any) -> None:
+def _set_rgb_value(editor: QLineEdit, value: Any) -> None:
     if isinstance(value, (list, tuple)):
         try:
             editor.setText(",".join(str(int(v)) for v in value))
@@ -227,7 +227,7 @@ def _set_file_value(editor: QWidget, value: Any) -> None:
         _set_text_value(line, value)
 
 
-def _set_enum_value(editor: QWidget, value: Any) -> None:
+def _set_enum_value(editor: QComboBox, value: Any) -> None:
     """Select ``value``, adding it when it is not one of the choices.
 
     ``setCurrentText`` ignores a value the combo does not hold, so the next
@@ -240,40 +240,44 @@ def _set_enum_value(editor: QWidget, value: Any) -> None:
     editor.setCurrentText(text)
 
 
-_SETTERS = {
+_TEXT_SETTERS: Dict[FieldType, Callable[[QLineEdit, Any], None]] = {
     FieldType.STRING: _set_text_value,
     FieldType.JSON: lambda editor, value: _set_text_value(
         editor, json.dumps(value, ensure_ascii=False) if value is not None else None),
     FieldType.INT: _set_text_value,
     FieldType.FLOAT: _set_text_value,
-    FieldType.BOOL: lambda e, v: e.setChecked(bool(v)),
-    FieldType.ENUM: _set_enum_value,
-    FieldType.FILE_PATH: _set_file_value,
     FieldType.RGB: _set_rgb_value,
 }
 
 
 def _set_editor_value(editor: QWidget, spec: FieldSpec, value: Any) -> None:
-    setter = _SETTERS.get(spec.field_type)
-    if setter is not None:
-        setter(editor, value)
+    if isinstance(editor, QLineEdit):
+        setter = _TEXT_SETTERS.get(spec.field_type)
+        if setter is not None:
+            setter(editor, value)
+    elif isinstance(editor, QCheckBox):
+        editor.setChecked(bool(value))
+    elif isinstance(editor, QComboBox):
+        _set_enum_value(editor, value)
+    elif spec.field_type == FieldType.FILE_PATH:
+        _set_file_value(editor, value)
 
 
-def _read_string(editor: QWidget) -> Any:
+def _read_string(editor: QLineEdit) -> Any:
     return editor.text() or None
 
 
-def _read_int(editor: QWidget) -> Any:
+def _read_int(editor: QLineEdit) -> Any:
     text = editor.text().strip()
     return int(text) if text else None
 
 
-def _read_json(editor: QWidget) -> Any:
+def _read_json(editor: QLineEdit) -> Any:
     text = _read_string(editor)
     return json.loads(text) if text is not None else None
 
 
-def _read_float(editor: QWidget) -> Any:
+def _read_float(editor: QLineEdit) -> Any:
     text = editor.text().strip()
     return float(text) if text else None
 
@@ -283,7 +287,7 @@ def _read_file(editor: QWidget) -> Any:
     return (line.text() or None) if line is not None else None
 
 
-def _read_rgb(editor: QWidget) -> Any:
+def _read_rgb(editor: QLineEdit) -> Any:
     text = editor.text().strip()
     if not text:
         return None
@@ -291,21 +295,24 @@ def _read_rgb(editor: QWidget) -> Any:
     return [int(p) for p in parts]
 
 
-_READERS = {
+_TEXT_READERS: Dict[FieldType, Callable[[QLineEdit], Any]] = {
     FieldType.STRING: _read_string,
     FieldType.JSON: _read_json,
     FieldType.INT: _read_int,
     FieldType.FLOAT: _read_float,
-    FieldType.BOOL: lambda e: bool(e.isChecked()),
-    FieldType.ENUM: lambda e: e.currentText() or None,
-    FieldType.FILE_PATH: _read_file,
     FieldType.RGB: _read_rgb,
 }
 
 
 def _read_editor_value(editor: QWidget, spec: FieldSpec) -> Any:
-    reader = _READERS.get(spec.field_type)
-    return reader(editor) if reader is not None else None
+    if isinstance(editor, QLineEdit):
+        reader = _TEXT_READERS.get(spec.field_type)
+        return reader(editor) if reader is not None else None
+    if isinstance(editor, QCheckBox):
+        return bool(editor.isChecked())
+    if isinstance(editor, QComboBox):
+        return editor.currentText() or None
+    return _read_file(editor) if spec.field_type == FieldType.FILE_PATH else None
 
 
 def _read_field_value(editor: QWidget, spec: FieldSpec) -> tuple[bool, Any]:

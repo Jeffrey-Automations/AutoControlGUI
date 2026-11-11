@@ -5,7 +5,7 @@ feature is one click or a few typed letters away instead of three menus deep.
 The panel only reports which key was chosen; opening the tab stays with the
 window that owns the tab registry.
 """
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QKeyEvent
@@ -131,11 +131,16 @@ class NavigationPanel(QWidget):
 
     # --- search --------------------------------------------------------------
 
+    def _groups(self) -> Iterator[QTreeWidgetItem]:
+        for index in range(self.tree.topLevelItemCount()):
+            group = self.tree.topLevelItem(index)
+            if group is not None:
+                yield group
+
     def apply_filter(self, text: str = "") -> int:
         """Hide what ``text`` does not match; return how many features remain."""
         shown = 0
-        for index in range(self.tree.topLevelItemCount()):
-            group = self.tree.topLevelItem(index)
+        for group in self._groups():
             in_group = 0
             for row in range(group.childCount()):
                 item = group.child(row)
@@ -152,8 +157,7 @@ class NavigationPanel(QWidget):
     def visible_keys(self) -> List[str]:
         """Keys of the features the current search leaves on screen, top to bottom."""
         keys: List[str] = []
-        for index in range(self.tree.topLevelItemCount()):
-            group = self.tree.topLevelItem(index)
+        for group in self._groups():
             for row in range(group.childCount()):
                 item = group.child(row)
                 if not item.isHidden():
@@ -161,8 +165,7 @@ class NavigationPanel(QWidget):
         return keys
 
     def _first_match(self) -> Optional[QTreeWidgetItem]:
-        for index in range(self.tree.topLevelItemCount()):
-            group = self.tree.topLevelItem(index)
+        for group in self._groups():
             for row in range(group.childCount()):
                 if not group.child(row).isHidden():
                     return group.child(row)

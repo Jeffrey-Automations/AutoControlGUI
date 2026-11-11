@@ -1,5 +1,5 @@
 """Triggers tab: image / window / pixel / file event watchers."""
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, TypedDict
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
@@ -35,6 +35,12 @@ _TYPE_KEYS = (
 COMPOSITE_BY_MODE: Dict[str, type] = {
     "all": AllOfTrigger, "any": AnyOfTrigger, "sequence": SequenceTrigger,
 }
+
+
+class _TriggerOptions(TypedDict):
+    trigger_id: str
+    script_path: str
+    repeat: bool
 
 
 def children_to_combine(ids: Sequence[str],
@@ -251,8 +257,8 @@ class TriggersTab(TranslatableMixin, QWidget):
 
     def _build_trigger(self, script: str):
         idx = self._type_combo.currentIndex()
-        common = {"trigger_id": "", "script_path": script,
-                  "repeat": self._repeat_check.isChecked()}
+        common: _TriggerOptions = {"trigger_id": "", "script_path": script,
+                                   "repeat": self._repeat_check.isChecked()}
         if idx == 0:
             return ImageAppearsTrigger(
                 image_path=self._image_widgets["path"].text().strip(),
@@ -285,7 +291,7 @@ class TriggersTab(TranslatableMixin, QWidget):
         self._stack.addWidget(widget)
         return {"cron": cron_input}
 
-    def _build_pixel_trigger(self, common: dict):
+    def _build_pixel_trigger(self, common: _TriggerOptions):
         w = self._pixel_widgets
         return PixelColorTrigger(
             x=int(w["x"].text() or "0"), y=int(w["y"].text() or "0"),
@@ -300,15 +306,17 @@ class TriggersTab(TranslatableMixin, QWidget):
         row = self._table.currentRow()
         if row < 0:
             return
-        tid = self._table.item(row, 0).text()
-        default_trigger_engine.remove(tid)
+        item = self._table.item(row, 0)
+        if item is None:
+            return
+        default_trigger_engine.remove(item.text())
         self._refresh()
 
     def _selected_ids(self) -> List[str]:
         """Trigger ids of the selected rows, in row order, without duplicates."""
         rows = sorted({idx.row() for idx in self._table.selectedIndexes()})
-        return [self._table.item(row, 0).text() for row in rows
-                if self._table.item(row, 0) is not None]
+        return [item.text() for row in rows
+                if (item := self._table.item(row, 0)) is not None]
 
     def _on_combine(self, mode: str) -> None:
         ids = self._selected_ids()

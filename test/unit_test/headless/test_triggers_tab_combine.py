@@ -46,3 +46,26 @@ def test_every_button_mode_maps_to_its_composite():
     assert COMPOSITE_BY_MODE == {
         "all": AllOfTrigger, "any": AnyOfTrigger, "sequence": SequenceTrigger,
     }
+
+
+def test_empty_trigger_table_cell_does_not_remove_an_engine_entry(monkeypatch):
+    from types import SimpleNamespace
+    from PySide6.QtWidgets import QApplication
+    from je_auto_control.gui import triggers_tab
+
+    app = QApplication.instance() or QApplication([])
+    removed = []
+    engine = SimpleNamespace(is_running=False, list_triggers=lambda: [], remove=removed.append)
+    monkeypatch.setattr(triggers_tab, "default_trigger_engine", engine)
+    tab = triggers_tab.TriggersTab()
+    try:
+        tab._table.setRowCount(1)
+        tab._table.setCurrentCell(0, 0)
+        assert tab._table.currentRow() == 0
+        assert tab._selected_ids() == []
+        tab._on_remove()
+        assert removed == []
+    finally:
+        tab.dispose()
+        tab.deleteLater()
+        app.processEvents()

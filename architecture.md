@@ -1,5 +1,9 @@
 # AutoControl Architecture
 
+Navigation handles optional Qt tree items through one iterator. Script fields are
+read and written through their concrete editor types, and trigger actions retain
+typed common arguments while checking missing table cells before use.
+
 Remote media adapters validate PyAV video contexts and streams before assigning
 video properties, and close failed recording containers. ScreenVideoTrack uses a
 separate frame-clock helper so aiortc can retain its integer timestamp field.
