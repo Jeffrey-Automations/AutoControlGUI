@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261113-01 | 2026-11-13 | Move the finished on_enter note out of Progress | #docs #executor | [2026-11-b](2026-11-b.md) |
 | U-20261112-11 | 2026-11-12 | Refuse asset paths Windows cannot create before staging | #done #config-sync #windows | [2026-11-b](2026-11-b.md) |
 | U-20261112-10 | 2026-11-12 | The capability-probe Progress item described deleted code | #snapshot #capabilities #macos | [2026-11-b](2026-11-b.md) |
 | U-20261112-09 | 2026-11-12 | The result hook follows AC_parallel branches | #done #executor #gui | [2026-11-b](2026-11-b.md) |

@@ -171,7 +171,6 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 - **free-threaded**：呼叫者身分、綁定的裝置、自愈的執行標記與 stop token 都改成只在設定它的執行緒上有效（`utils/thread_bound.py`）。
   這台機器沒有 free-threaded 直譯器：驗證用的是模擬繼承與真的 `-X thread_inherit_context=1`（3.14.7，GIL 開著）；`free-threaded-scope` job（3.14t）是第一次真的跑。
 - **Windows 的版面鍵名**（`slash` 等 8 個）只在美式配置上實際呼叫過。
-- **狀態機 `on_enter` 的單一動作寫法**以前一直被拒絕、從沒執行過（已修，U-20261009-24）：依賴「它不會跑」的既有狀態機現在會跑它。
 
 ---
 
