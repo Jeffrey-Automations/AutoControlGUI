@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261112-14 | 2026-11-12 | Reading the iOS pasteboard needs an explicit allowance | #done #mobile #ios | [2026-11-b](2026-11-b.md) |
 | U-20261112-13 | 2026-11-12 | Bring the shared .venv to the pinned pillow and PySide6 | #done #tooling | [2026-11-b](2026-11-b.md) |
 | U-20261112-12 | 2026-11-12 | Move the finished on_enter note out of Progress | #docs #executor | [2026-11-b](2026-11-b.md) |
 | U-20261112-11 | 2026-11-12 | Refuse asset paths Windows cannot create before staging | #done #config-sync #windows | [2026-11-b](2026-11-b.md) |

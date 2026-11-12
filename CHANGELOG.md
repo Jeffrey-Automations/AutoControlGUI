@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Reading the iOS pasteboard (`WdaExtension.get_clipboard`, `AC_ios_get_clipboard`,
+  `ac_ios_get_clipboard`) now needs `allow_app_switch=True`: facebook-wda brings WebDriverAgent
+  to the front through Siri for about 3 s and relaunches the app that was in front. Without it
+  the call raises `DeviceUnsupportedError` and sends nothing. Android accepts and ignores the
+  flag; an adapter registered through `register_mobile_extension` is called without it unless
+  it is set.
+
 - `sync_assets` (and `AC_sync_assets`, `materialize` of `AC_sync_workspace`) refuses up front,
   with a `ConfigSyncError` naming the length, a generation whose published paths would pass
   259 characters on Windows without `LongPathsEnabled`; it used to fail on the first such file

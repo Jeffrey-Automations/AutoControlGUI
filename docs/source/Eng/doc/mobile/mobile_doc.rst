@@ -330,8 +330,10 @@ reason::
      - Set; reading is allowed by WDA only while WDA itself is in front.
        ``facebook-wda`` 1.5.4's ``get_clipboard`` asks Siri to open
        WebDriverAgentRunner, waits 3 s, reads, and relaunches the app that was
-       in front, so the app under test leaves the foreground meanwhile. A
-       build without ``get_clipboard`` raises ``DeviceUnsupportedError``.
+       in front, so the app under test leaves the foreground meanwhile. The
+       read therefore needs ``allow_app_switch=True`` (``get_clipboard`` and
+       ``AC_ios_get_clipboard``); without it, or on a build without
+       ``get_clipboard``, it raises ``DeviceUnsupportedError`` and sends nothing.
    * - ``recording``
      - ``adb shell screenrecord`` (180 s at most), stopped with ``SIGINT`` so
        the file is finalised, then pulled and removed from the device. A

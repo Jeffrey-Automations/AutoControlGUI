@@ -305,8 +305,9 @@ Device matrix 的裝置規格可以寫 ``app_id``\ ：第一個步驟之前會�
        Android 上 ``adb`` 碰不到剪貼簿。
      - 可寫入；WDA 只在 WDA 自己位於前景時才允許讀取。\ ``facebook-wda`` 1.5.4
        的 ``get_clipboard`` 會請 Siri 開啟 WebDriverAgentRunner、等 3 秒、讀取，
-       再重新啟動原本在前景的 App，期間受測 App 離開前景。沒有 ``get_clipboard``
-       的版本丟 ``DeviceUnsupportedError``\ 。
+       再重新啟動原本在前景的 App，期間受測 App 離開前景。因此讀取需要
+       ``allow_app_switch=True``\ （\ ``get_clipboard`` 與 ``AC_ios_get_clipboard``\ ）；
+       沒有給、或版本沒有 ``get_clipboard`` 時丟 ``DeviceUnsupportedError``\ ，不送任何東西。
    * - ``recording``
      - ``adb shell screenrecord``\ （最長 180 秒），以 ``SIGINT`` 停止好讓檔案
        收尾，再拉回主機並從裝置刪除。錄影是裝置端的狀態：關閉 session 不會

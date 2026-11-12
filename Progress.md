@@ -89,8 +89,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - Android：`input draganddrop` 是否存在、`monkey` 啟動輸出、`pidof`／`pm path` 的結束碼、`dumpsys activity activities` 的格式、`pkill -INT screenrecord` 能否收尾 MP4。
   ADBKeyBoard 的送達無法由裝置確認，是從 IME 被選取推定的。
 - 已知限制：iOS 捏合忽略 `x`／`y`／`span`；iOS 滑動忽略 `duration_s`（WDA 的 drag duration 是按住時間，不能設移動時間）；iOS `app_state` 不會回 `not_installed`；iOS 的安裝／檔案／錄影沒有 adapter（只有 `MobileExtension` 協定與註冊點）；
-  `DECIDE`：iOS 讀剪貼簿（`AC_ios_get_clipboard`、`WdaExtension.get_clipboard`）在 facebook-wda 1.5.4 會請 Siri 把 WDA 帶到前景約 3 秒、
-  再重新啟動原本在前景的 App——已寫進文件與能力說明，但是否該改成要明確啟用才讀，請維護者決定。
   Mobile 分頁的 probe／run 已由 TabTask 在背景執行；真實 SDK 的逾時、取消與裝置回應仍待實機驗收。`AC_android_shell` 刻意不做成 MCP 工具，**請維護者確認**。
 - 沒有 `examples/` 的實機腳本以外的 smoke；Xcode／WDA 的建置與簽章只寫成前置條件。
 

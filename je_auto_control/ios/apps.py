@@ -20,6 +20,8 @@ _APP_STATES = {2: AppState.BACKGROUND, 3: AppState.BACKGROUND, 4: AppState.FOREG
 NEEDS_ADAPTER = ("WebDriverAgent has no API for this; it needs a host-side adapter "
                  "(for example tidevice, pymobiledevice3 or Appium) registered with "
                  "register_mobile_extension('ios', ...)")
+_PASTEBOARD_SWITCH = ("reading the pasteboard brings WebDriverAgent to the front through Siri "
+                      "for about 3 s and then relaunches the app that was in front")
 _NO_PASTEBOARD_READ = ("this facebook-wda build cannot read the pasteboard "
                        "(WebDriverAgent only allows it while WDA itself is in front)")
 
@@ -85,8 +87,8 @@ class WdaExtension:
         if feature == "clipboard":
             return DeviceCapability(
                 feature, STATE_AVAILABLE,
-                "set; reading brings WebDriverAgent to the front through Siri for about "
-                "3 s and then relaunches the app that was in front")
+                "set; reading needs allow_app_switch=True, because it brings WebDriverAgent "
+                "to the front through Siri for about 3 s and then relaunches the app that was in front")
         if feature in ("install", "files", "recording"):
             return DeviceCapability(feature, STATE_NEEDS_DEPENDENCY, NEEDS_ADAPTER)
         return DeviceCapability(feature, STATE_UNSUPPORTED, f"unknown feature {feature!r}")
@@ -121,14 +123,20 @@ class WdaExtension:
         """Put ``text`` on the device pasteboard."""
         _set_pasteboard(self._device_source(), text)
 
-    def get_clipboard(self) -> str:
-        """The pasteboard's text, where this facebook-wda build can read it.
+    def get_clipboard(self, *, allow_app_switch: bool = False) -> str:
+        """The pasteboard's text, only when the caller accepts the app switch it costs.
 
         WebDriverAgent reads the pasteboard only while it is in front, so
         facebook-wda 1.5.4's ``get_clipboard`` asks Siri to open
         WebDriverAgentRunner, waits 3 s, reads, and relaunches the app that
         was in front: the app under test leaves the foreground meanwhile.
+        Without ``allow_app_switch=True`` nothing is sent to the device and
+        :class:`DeviceUnsupportedError` says why.
         """
+        if not allow_app_switch:
+            raise DeviceUnsupportedError(
+                "reading the iOS pasteboard switches apps; it was not allowed", reason=_PASTEBOARD_SWITCH,
+                alternative="pass allow_app_switch=True, or read the text from the screen (find_text)")
         return _get_pasteboard(self._device_source())
 
 
