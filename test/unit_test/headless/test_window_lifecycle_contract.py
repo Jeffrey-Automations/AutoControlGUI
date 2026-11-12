@@ -474,3 +474,20 @@ def test_a_short_poll_still_polls_at_its_own_pace(clock):
         w.wait_for_window("never", timeout=1.0, poll=0.25)
     assert clock.sleeps[0] == pytest.approx(0.25)
     assert sum(clock.sleeps) == pytest.approx(1.0)
+
+
+@windows_only
+@pytest.mark.parametrize("zoomed", [True, False])
+def test_moving_a_maximized_window_restores_it_first_without_activating(monkeypatch, zoomed):
+    """Measured on Windows 11: MoveWindow alone left a maximized window flagged maximized."""
+    from je_auto_control.windows.window import windows_window_manage
+    calls = []
+    fake = types.SimpleNamespace(
+        IsZoomed=lambda hwnd: int(zoomed),
+        ShowWindow=lambda hwnd, command: calls.append(("show", command)),
+        SetForegroundWindow=lambda hwnd: calls.append(("foreground",)),
+        MoveWindow=lambda hwnd, x, y, w, h, repaint: calls.append(("move", x, y, w, h)) or 1)
+    monkeypatch.setattr(windows_window_manage, "_user32", fake)
+    assert windows_window_manage.move_window(7, 150, 160, 600, 300)
+    expected = [("show", 4)] if zoomed else []   # SW_SHOWNOACTIVATE
+    assert calls == expected + [("move", 150, 160, 600, 300)]

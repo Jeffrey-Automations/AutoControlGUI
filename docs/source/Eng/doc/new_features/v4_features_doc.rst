@@ -122,7 +122,11 @@ Window management
   ``MoveWindow`` positions (Win32 ``GetWindowRect``), so a window comes back
   exactly where it was. A layout file saved by an earlier version holds the
   visible frame instead and restores 7 px to the right and 14 x 7 px smaller;
-  save it again. ``AC_save_window_layout`` / ``AC_restore_window_layout``.
+  save it again. A window that is maximized when the layout is restored is
+  un-maximized first, without being activated, so it ends at the saved size
+  instead of keeping the maximized flag. A window saved while maximized comes
+  back as a normal window of the screen's size: the maximized state itself is
+  not stored. ``AC_save_window_layout`` / ``AC_restore_window_layout``.
 * **Snap / tile** — ``snap_window(title, "left")`` moves a window to a
   half (left / right / top / bottom), a quarter (the four corners), or
   ``"max"`` of the primary monitor's *work area* — the screen minus the

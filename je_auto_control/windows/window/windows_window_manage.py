@@ -93,6 +93,7 @@ _dwmapi = _load_dwmapi()
 
 WM_CLOSE = 0x0010
 SW_RESTORE = 9
+_SW_SHOWNOACTIVATE = 4
 _DWMWA_CLOAKED = 14
 
 
@@ -308,9 +309,17 @@ def show_window(hwnd: int, cmd_show: int) -> bool:
 def move_window(hwnd: int, x: int, y: int, width: int, height: int,
                 repaint: bool = True) -> bool:
     """
-    搬移與調整視窗大小 (一次設定座標與寬高)
-    Move and resize a window in one call.
+    搬移與調整視窗大小 (一次設定座標與寬高)；最大化的視窗先還原（不啟用）
+    Move and resize a window in one call; a maximized window is restored first.
+
+    ``MoveWindow`` on a maximized window gives it the requested rectangle but
+    leaves it maximized (measured on Windows 11, U-20261113-01): the caption
+    still shows Restore and the next restore jumps back to the old size. It is
+    therefore restored first with ``SW_SHOWNOACTIVATE``, which does not take
+    the foreground.
     """
+    if _user32.IsZoomed(int(hwnd)):
+        _user32.ShowWindow(int(hwnd), _SW_SHOWNOACTIVATE)
     return bool(_user32.MoveWindow(int(hwnd), int(x), int(y),
                                    int(width), int(height),
                                    bool(repaint)))

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Windows: `move_window` (used by `restore_window_layout`, `snap_window`, the grid and
+  cascade layouts, `ac_window_move` and the window backend) un-maximizes a maximized window
+  first, without activating it. `MoveWindow` alone gave it the new rectangle but left it
+  flagged maximized.
+- Windows accessibility: the first `comtypes` import initialises COM to match the importing
+  thread. Imported first on a worker it used to put that worker in an STA, and on a thread
+  already in the MTA it raised `OSError` (`RPC_E_CHANGED_MODE`).
+
 - Reading the iOS pasteboard (`WdaExtension.get_clipboard`, `AC_ios_get_clipboard`,
   `ac_ios_get_clipboard`) now needs `allow_app_switch=True`: facebook-wda brings WebDriverAgent
   to the front through Siri for about 3 s and relaunches the app that was in front. Without it

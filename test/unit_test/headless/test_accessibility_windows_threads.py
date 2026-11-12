@@ -391,3 +391,59 @@ def test_a_per_thread_attribute_is_one_value_per_thread_and_per_instance():
     assert first.slot == "main"
     assert second.slot is None
     assert isinstance(_Holder.slot, PerThread)
+
+
+# --- the first comtypes import --------------------------------------------------
+# Measured with comtypes 1.5.0 (U-20261113-01): imported first on a worker it put
+# the worker in an STA; imported first on a thread already in the MTA it raised
+# OSError 0x80010106. Its import-time CoInitializeEx must follow the thread.
+
+@pytest.mark.parametrize("apartment_type, flags", [
+    (1, windows_automation.COINIT_MULTITHREADED),        # APTTYPE_MTA
+    (0, windows_automation.COINIT_APARTMENTTHREADED),    # APTTYPE_STA
+    (3, windows_automation.COINIT_APARTMENTTHREADED),    # APTTYPE_MAINSTA
+])
+def test_an_initialised_thread_keeps_its_apartment(apartment_type, flags):
+    assert windows_automation.coinit_flags_for_this_thread(apartment_type) == flags
+
+
+def test_an_uninitialised_thread_follows_the_module_rule(monkeypatch):
+    monkeypatch.setattr(windows_automation, "_current_apartment_type", lambda: None)
+    assert windows_automation.coinit_flags_for_this_thread() == windows_automation.COINIT_APARTMENTTHREADED
+    seen = []
+    worker = threading.Thread(target=lambda: seen.append(windows_automation.coinit_flags_for_this_thread()))
+    worker.start()
+    worker.join(10)
+    assert seen == [windows_automation.COINIT_MULTITHREADED]
+
+
+def _fake_comtypes_import(monkeypatch):
+    import builtins
+    real_import, seen = builtins.__import__, []
+
+    def fake(name, *args, **kwargs):
+        if name.startswith("comtypes"):
+            seen.append(getattr(sys, "coinit_flags", "unset"))
+            fake_package = types.SimpleNamespace(client="client-module")
+            return fake_package
+        return real_import(name, *args, **kwargs)
+    monkeypatch.delitem(sys.modules, "comtypes", raising=False)
+    monkeypatch.setattr(builtins, "__import__", fake)
+    return seen
+
+
+def test_the_first_import_sees_the_threads_flags_and_leaves_none_behind(monkeypatch):
+    monkeypatch.delattr(sys, "coinit_flags", raising=False)
+    monkeypatch.setattr(windows_automation, "coinit_flags_for_this_thread", lambda: 0)
+    seen = _fake_comtypes_import(monkeypatch)
+    assert windows_automation.import_comtypes_client() == "client-module"
+    assert seen == [0]
+    assert not hasattr(sys, "coinit_flags")
+
+
+def test_flags_someone_else_chose_are_left_alone(monkeypatch):
+    monkeypatch.setattr(sys, "coinit_flags", 2, raising=False)
+    seen = _fake_comtypes_import(monkeypatch)
+    windows_automation.import_comtypes_client()
+    assert seen == [2]
+    assert sys.coinit_flags == 2

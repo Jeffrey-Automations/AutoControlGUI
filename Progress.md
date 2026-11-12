@@ -36,8 +36,11 @@
 - **混合 DPI 座標與樣板**：需實測各螢幕上的舊版座標、`screen_region`、視窗版面與樣板，
   包含縮放不同的副螢幕、負原點與多螢幕排列；必要時重新錄製，不能以推導代替驗收。
 - **舊版存的視窗版面檔要重存**：`save_window_layout` 改存 `GetWindowRect`，舊檔還原會偏右 7 px、縮小 14×7 px。
-- **真的 Win32 行為沒有實測**：`post_key` 在真的編輯框是否只出現一個字、DWM cloak 過濾掉的是哪些視窗、
-  `MoveWindow` 對最大化視窗與另一個 DPI 的螢幕是否能原樣還原，都只用假的 `user32` 驗過。
+- **Win32 行為的實測（U-20261113-01，Windows 11、單一 1920×1080 螢幕）只涵蓋自有的原生 `EDIT` 視窗**：
+  `post_key` 每個字只到一次、DWM cloak 過濾與最大化視窗的還原都已驗；還沒驗的：另一個 DPI 的螢幕上的還原（只有一個螢幕）、
+  WinUI（新版記事本）／Chromium 等非原生編輯控制項、零面積過濾（有標題列的視窗被系統夾到 202×56，到不了零）。
+  `TODO`：版面檔不存最大化狀態，最大化時存下的視窗還原成螢幕大小的一般視窗；要恢復最大化就得啟用視窗，須先決定可否。
+  `TODO`：`post_key_to_window` 拒絕鍵表外的可列印字元（如 `%`），Windows 只送 `WM_CHAR` 其實能送；X11 以 keycode 送，須一起設計。
 - **X11／Wayland**：大寫與 Shift 標點的判斷假設 `keysym_to_keycode` 把大寫字母對到小寫的 keycode，沒有對著 X server 跑過。
 
 ---
@@ -108,10 +111,9 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 
 `TODO` — U-20261009-27、-28、-34、-36、-38、-40 之後還開著的
 
-- **Windows UIA 後端的執行緒模型完全沒對真的 COM 驗過**：現在每個呼叫執行緒各有一個自動化物件（`accessibility/backends/windows_automation.py`；
-  主執行緒 STA、其他執行緒進 MTA），Accessibility 分頁與 A11y Audit 已移出 GUI 執行緒。開發環境沒裝 `comtypes`，CI 也沒有同時有 `comtypes` 與桌面的 job，
-  測試全是假 COM 物件。未驗證的假設：MTA 工作執行緒上的 UIA 呼叫可用；焦點事件 callback 不需要 message pump；
-  `import comtypes` 第一次發生在已經是 MTA 的執行緒上會丟 `OSError`（憑記憶，沒處理）。焦點等待的 cooperative cancellation 已有 headless 回歸測試；真實 COM 訂閱／解除與停止行為仍待原生驗收。
+- **Windows UIA 後端的執行緒模型**已對真的 COM 驗過一次（U-20261113-01，comtypes 1.5.0 裝在暫存目錄、Windows 11）：MTA 工作執行緒上的 UIA
+  讀取可用、焦點事件不需要 message pump、第一次 `import comtypes` 現在依執行緒的 apartment 初始化。還缺的：CI 仍沒有同時有 `comtypes` 與桌面的 job，
+  `comtypes` 也不是宣告的相依；`AC_wait_for_focus_change` 被 stop 叫醒的路徑沒在真的 COM 上跑過；`utils/system_volume` 自己的 `comtypes` 匯入不經這條路。
 - **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）。
   結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。

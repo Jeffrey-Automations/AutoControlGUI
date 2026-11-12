@@ -101,7 +101,9 @@ Builder 項目。視覺與視窗功能的 geometry / IO 操作皆可注入,因�
   成 JSON;``restore_window_layout(path)`` 再把它們全部移回(方便測試
   setup / teardown)。存下的是 ``MoveWindow`` 定位的那個矩形(Win32
   ``GetWindowRect``),所以視窗會回到原本的位置。舊版存的版面檔記的是可見
-  外框,還原會右移 7 px、縮小 14 x 7 px,請重新儲存。
+  外框,還原會右移 7 px、縮小 14 x 7 px,請重新儲存。還原時已最大化的視窗會先
+  取消最大化(不啟用它),因此會停在存下的大小,而不是保留最大化狀態。最大化時存下
+  的視窗會以螢幕大小的一般視窗回來:最大化狀態本身沒有存。
   ``AC_save_window_layout`` / ``AC_restore_window_layout``。
 * **貼齊 / 平鋪** — ``snap_window(title, "left")`` 把視窗移到主螢幕\ *工作區*\
   (螢幕扣掉工作列)的一半(left / right / top / bottom)、四分之一(四個角)
