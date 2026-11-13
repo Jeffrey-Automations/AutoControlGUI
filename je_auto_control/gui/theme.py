@@ -217,7 +217,15 @@ def apply_theme(window: Any, tokens: ThemeTokens, point_size: Optional[int] = No
     close_rules = close_button_rules(tokens)
     if close_rules:
         sheet = f"{sheet}\n{close_rules}"
-    window.setPalette(_palette(tokens))
+    palette = _palette(tokens)
+    window.setPalette(palette)
+    # A widget a style sheet styles starts from the *application* palette, not
+    # its window's: on Windows that palette carries the system accent colour,
+    # so check boxes were drawn in the user's accent instead of the theme's.
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    if isinstance(app, QApplication) and window.isWindow():
+        app.setPalette(palette)
     window.setStyleSheet(sheet if point_size is None
                          else f"{sheet}\n{font_rule(point_size)}\n{type_scale_rules(point_size)}")
     return sheet

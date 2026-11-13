@@ -299,3 +299,20 @@ def test_the_type_scale_grows_titles_with_the_text_size():
     assert 'QLabel[role="pageTitle"] { font-size: 18pt; }' in rules
     assert 'QLabel[role="hint"], QLabel[role="pageSubtitle"] { font-size: 11pt; }' in rules
     assert "font-size: 8pt" in type_scale_rules(6), "hints never drop below 8 pt"
+
+
+def test_applying_a_theme_sets_the_application_palette_so_styled_widgets_follow_it(qapp):
+    from PySide6.QtGui import QPalette
+    from PySide6.QtWidgets import QWidget
+    from je_auto_control.gui.theme import DARK, LIGHT, apply_theme
+    previous = qapp.palette()
+    window, child = QWidget(), None
+    try:
+        apply_theme(window, DARK)
+        assert qapp.palette().color(QPalette.ColorRole.Highlight).name() == DARK.accent
+        child = QWidget(window)
+        apply_theme(child, LIGHT)   # an embedded widget leaves the application alone
+        assert qapp.palette().color(QPalette.ColorRole.Highlight).name() == DARK.accent
+    finally:
+        qapp.setPalette(previous)
+        window.deleteLater()

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- GUI: applying a theme to a top-level window also sets the application palette. Widgets a
+  style sheet styles start from the application palette, which on Windows carries the system
+  accent colour, so checked boxes were drawn in the user's accent instead of the theme's.
+
 - GUI: every tab's layout is rebuilt on cards, wrapping rows and side-by-side panes that stack
   when narrow; widget objects, attributes, signals, Actions-menu entries and translation keys
   are unchanged. Each page's scroll area no longer uses `setWidgetResizable(True)`

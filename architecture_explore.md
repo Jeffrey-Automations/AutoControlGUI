@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,536 |
-| 程式碼總行數 | 235,230 |
+| 程式碼總行數 | 235,238 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1299,7 +1299,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `main_widget.py` | 86 | Configured application workspace preserving the embedded-widget entry point. `AutoControlGUIWidget` 以單一 registry 註冊既有分頁，保留 Remote Desktop factory 與嵌入相容入口。 |
 | `tab_registry.py` | 234 | 分頁表：每個分頁一筆 `TabSpec`（鍵、標題鍵、分類、模組與類別名），`TabEntry` 在第一次存取 `widget` 時才呼叫 factory。`TabRegistry.open/close` 快取或釋放 factory 面板，保留 metadata 與外部提供的 widget；不匯入 Qt。 |
 | `navigation.py` | 212 | `NavigationPanel`：品牌標題、搜尋框 + 依分類的功能樹，列出每個已註冊分頁（開啟中的以粗體標示），只回報被選的鍵，開啟分頁仍由視窗負責。停靠面板與窄視窗抽屜各有一個實例。 |
-| `theme.py` | 234 | 設計 token（`ThemeTokens`：顏色、狀態色、圓角、間距、字族）、深色與淺色兩組值、由 token 產生的樣式表（卡片、頁首、`role` 屬性）、隨字級縮放的標題字階（`type_scale_rules`）與對應的 `QPalette`；不載入圖檔或字型檔。 |
+| `theme.py` | 242 | 設計 token（`ThemeTokens`：顏色、狀態色、圓角、間距、字族）、深色與淺色兩組值、由 token 產生的樣式表（卡片、頁首、`role` 屬性）、隨字級縮放的標題字階（`type_scale_rules`）與對應的 `QPalette`；不載入圖檔或字型檔。 |
 | `adaptive/__init__.py` | 9 | Adaptive layout building blocks shared by the window and every page. 只匯出 Qt-free 的 `WidthClass`／`classify`。 |
 | `adaptive/breakpoints.py` | 46 | Width classes for the adaptive window, with hysteresis so a resize near a boundary does not flicker. compact（<800）／medium／expanded（≥1200），邊界前後 24 px 不反覆切換；不匯入 Qt。 |
 | `adaptive/flow_layout.py` | 166 | A layout that places items left to right and wraps them onto the next line when the row is full. 最小寬度只等於最寬的一項。 |
@@ -1542,7 +1542,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 159 | 42,033 |
+| `gui/` | 159 | 42,041 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1563,7 +1563,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,153 |
-| **總計** | **1,524** | **234,485** |
+| **總計** | **1,524** | **234,493** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
