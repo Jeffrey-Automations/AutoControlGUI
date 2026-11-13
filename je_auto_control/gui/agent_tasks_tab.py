@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (  # pylint: disable=no-name-in-module  # reason: 
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.task_controller import TaskController, TaskOutcome
 from je_auto_control.gui.agent_transfer_view import AgentTransferView
@@ -77,13 +79,19 @@ class AgentTasksTab(TranslatableMixin, QWidget):
         self._table.cellClicked.connect(self._select)
         self._status = QLabel()
         self._task_id.textChanged.connect(self._clear_observation)
-        layout = QVBoxLayout(self)
-        layout.addWidget(self._task_id)
-        layout.addWidget(self._pages)
-        layout.addWidget(self._status)
-        layout.addWidget(self._table)
-        layout.addWidget(self._output)
+        self._build_layout()
         self.retranslate()
+
+    def _build_layout(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.addWidget(Card().add(self._task_id))
+        layout.addWidget(self._pages, stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
+        layout.addWidget(self._status)
+        results = ResponsiveBox(Card().add(self._table, stretch=1), Card().add(self._output, stretch=1))
+        layout.addWidget(results, stretch=1)
 
     def _setup_fields(self) -> None:
         self._goal, self._target, self._task_id = QLineEdit(), QLineEdit("local-desktop"), QLineEdit()
@@ -161,6 +169,7 @@ class AgentTasksTab(TranslatableMixin, QWidget):
 
     def _page(self, key: str, fields: tuple) -> None:
         page = QWidget()
+        page.setProperty("role", "bare")
         form = QFormLayout()
         for label_key, control in fields:
             label = QLabel()

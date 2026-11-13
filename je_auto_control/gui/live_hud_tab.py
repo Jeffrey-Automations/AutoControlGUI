@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -72,6 +73,7 @@ class LiveHUDTab(TranslatableMixin, QWidget):
         # Start/stop/clear commands run from the Actions menu; the tab
         # keeps only the watcher labels and the log view.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         status_group = self._tr(QGroupBox(), "hud_watchers_group")
         status_layout = QVBoxLayout()
         status_layout.addWidget(self._pos_label)
@@ -79,8 +81,10 @@ class LiveHUDTab(TranslatableMixin, QWidget):
         status_group.setLayout(status_layout)
         root.addWidget(status_group)
 
-        root.addWidget(self._tr(QLabel(), "hud_recent_log"))
-        root.addWidget(self._log_view, stretch=1)
+        log_card = Card()
+        log_card.add(self._tr(QLabel(), "hud_recent_log"))
+        log_card.add(self._log_view, stretch=1)
+        root.addWidget(log_card, stretch=1)
 
     def menu_actions(self) -> list:
         """Expose tab commands to the window-level Actions menu."""

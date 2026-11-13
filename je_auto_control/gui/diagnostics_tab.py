@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.diagnostics_capabilities import CapabilityView
 from je_auto_control.gui.mcp_discovery_view import MCPDiscoveryView
 from je_auto_control.gui.workspace_details import ExecutionDetails, ExecutionDetailsSource, ExecutionPhase
@@ -85,11 +86,12 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         # The run command runs from the Actions menu; the tab keeps only
         # the summary label and the results table.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         root.addWidget(self._capability_view)
-        root.addWidget(self._summary_label)
-        root.addWidget(self._progress_label)
-        root.addWidget(self._table, stretch=1)
-        root.addWidget(self._mcp_discovery)
+        set_role(self._progress_label, "hint")
+        results = Card().add(self._summary_label).add(self._progress_label).add(self._table, stretch=1)
+        root.addWidget(results, stretch=1)
+        root.addWidget(Card().add(self._mcp_discovery))
 
     def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""

@@ -134,13 +134,14 @@ QHeaderView::section {{ background-color: {surface_raised}; color: {text_muted};
     border-bottom: 1px solid {border}; padding: {half}px {spacing}px; }}
 QTableCornerButton::section {{ background-color: {surface_raised}; border: 0; }}
 
-QGroupBox {{ border: 1px solid {border}; border-radius: {radius_large}px; margin-top: 1.7em;
-    padding: {half}px {half}px {half}px {half}px; background-color: {surface}; font-weight: 600; }}
-QGroupBox::title {{ subcontrol-origin: margin; subcontrol-position: top left; left: {small}px; top: 0;
+QGroupBox {{ border: 1px solid {border}; border-radius: {radius_large}px; margin-top: 0;
+    padding: 2.3em {spacing}px {spacing}px {spacing}px; background-color: {surface}; font-weight: 600; }}
+QGroupBox::title {{ subcontrol-origin: padding; subcontrol-position: top left; left: {wide}px; top: {spacing}px;
     padding: 0; color: {text}; background: transparent; }}
 QGroupBox QLabel, QGroupBox QCheckBox, QGroupBox QRadioButton, QGroupBox QPushButton,
 QGroupBox QLineEdit, QGroupBox QComboBox, QGroupBox QAbstractItemView {{ font-weight: normal; }}
 QFrame[role="card"] {{ background-color: {surface}; border: 1px solid {border}; border-radius: {radius_large}px; }}
+QWidget[role="bare"] {{ background: transparent; }}
 QLabel[role="pageTitle"] {{ font-weight: 600; color: {text}; }}
 QLabel[role="pageSubtitle"], QLabel[role="hint"] {{ color: {text_muted}; }}
 QLabel[role="sectionTitle"] {{ font-weight: 600; color: {text}; }}

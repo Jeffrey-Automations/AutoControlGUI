@@ -195,3 +195,34 @@ def test_the_glyphs_draw_on_transparent_ground(qapp):
         assert image.pixelColor(0, 0).alpha() == 0
         assert any(image.pixelColor(x, y).red() > 200 and image.pixelColor(x, y).alpha() > 200
                    for x in range(40) for y in range(40)), name
+
+
+def test_a_page_with_wrapped_text_scrolls_only_below_its_minimum(qapp):
+    from PySide6.QtWidgets import QLabel, QPlainTextEdit, QVBoxLayout, QWidget
+    from je_auto_control.gui.workspace import ScrollableTabs
+    page = QWidget()
+    layout = QVBoxLayout(page)
+    note = QLabel("A note long enough to wrap onto a second line in a narrow window, as status lines do.")
+    note.setWordWrap(True)
+    layout.addWidget(note)
+    editor = QPlainTextEdit()
+    editor.setMinimumHeight(60)
+    layout.addWidget(editor, 1)
+    tabs = ScrollableTabs()
+    tabs.addTab(page, "Page")
+    scroll = tabs.scroll_area(0)
+    tabs.resize(420, 200)            # shorter than the page's preferred height, taller than its minimum
+    tabs.show()
+    for _ in range(4):
+        qapp.processEvents()
+    try:
+        assert page.sizeHint().height() > scroll.viewport().height()
+        assert scroll.verticalScrollBar().maximum() == 0, "a page that fits its minimum must not scroll"
+        assert page.size() == scroll.viewport().size(), "the page fills the viewport"
+        tabs.resize(420, 90)         # now below the page's minimum
+        for _ in range(4):
+            qapp.processEvents()
+        assert scroll.verticalScrollBar().maximum() > 0
+        assert page.height() >= page.minimumSizeHint().height()
+    finally:
+        tabs.deleteLater()

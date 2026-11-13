@@ -12,7 +12,7 @@ from typing import List, Optional
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QFormLayout, QGroupBox, QLabel, QLineEdit, QMessageBox,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
@@ -20,6 +20,8 @@ from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask, was_stopped
 from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -98,13 +100,13 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         # Plan/run commands run from the Actions menu; the tab keeps only
         # the description/model inputs, the plan/result views, and status.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
 
         desc_group = self._tr(QGroupBox(), "llm_desc_group")
         desc_layout = QVBoxLayout()
         desc_layout.addWidget(self._description)
-        model_row = QHBoxLayout()
-        model_row.addWidget(self._tr(QLabel(), "llm_model_label"))
-        model_row.addWidget(self._model, stretch=1)
+        model_row = QFormLayout()
+        model_row.addRow(self._tr(QLabel(), "llm_model_label"), self._model)
         desc_layout.addLayout(model_row)
         desc_group.setLayout(desc_layout)
         root.addWidget(desc_group)
@@ -113,14 +115,15 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         actions_layout = QVBoxLayout()
         actions_layout.addWidget(self._actions_view)
         actions_group.setLayout(actions_layout)
-        root.addWidget(actions_group, stretch=1)
 
         result_group = self._tr(QGroupBox(), "llm_result_group")
         result_layout = QVBoxLayout()
         result_layout.addWidget(self._result_view)
         result_group.setLayout(result_layout)
-        root.addWidget(result_group, stretch=1)
+        root.addWidget(ResponsiveBox(actions_group, result_group), stretch=1)
 
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def dispose(self) -> None:

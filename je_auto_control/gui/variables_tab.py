@@ -9,12 +9,13 @@ import json
 from typing import Optional
 
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox,
+    QFormLayout, QGroupBox, QHeaderView, QLabel, QLineEdit, QMessageBox,
     QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout,
     QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -63,29 +64,29 @@ class VariablesTab(TranslatableMixin, QWidget):
         # Refresh/clear/set/seed commands run from the Actions menu; the
         # tab keeps only the table, the inputs, and the status line.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
 
         view_group = self._tr(QGroupBox(), "vars_current_group")
         view_layout = QVBoxLayout()
         self._update_table_headers()
         view_layout.addWidget(self._table)
         view_group.setLayout(view_layout)
-        root.addWidget(view_group)
+        root.addWidget(view_group, stretch=2)
 
         set_group = self._tr(QGroupBox(), "vars_set_group")
-        set_layout = QHBoxLayout()
-        set_layout.addWidget(self._tr(QLabel(), "vars_name_label"))
-        set_layout.addWidget(self._set_name, stretch=1)
-        set_layout.addWidget(self._tr(QLabel(), "vars_value_label"))
-        set_layout.addWidget(self._set_value, stretch=2)
-        set_group.setLayout(set_layout)
+        set_layout = QFormLayout(set_group)
+        set_layout.addRow(self._tr(QLabel(), "vars_name_label"), self._set_name)
+        set_layout.addRow(self._tr(QLabel(), "vars_value_label"), self._set_value)
         root.addWidget(set_group)
 
         seed_group = self._tr(QGroupBox(), "vars_seed_group")
         seed_layout = QVBoxLayout()
         seed_layout.addWidget(self._seed_text)
         seed_group.setLayout(seed_layout)
-        root.addWidget(seed_group)
+        root.addWidget(seed_group, stretch=1)
 
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def menu_actions(self) -> list:

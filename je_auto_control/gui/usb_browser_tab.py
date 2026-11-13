@@ -24,13 +24,14 @@ from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox,
+    QFormLayout, QGroupBox, QHeaderView, QLabel, QLineEdit, QMessageBox,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._worker_thread import CallWorker as _CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -157,11 +158,14 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
 
     def _build_layout(self) -> None:
         # Fetch/open commands run from the Actions menu; the tab keeps
-        # only the target inputs, the status line, and the device table.
+        # only the target inputs, the device table, and the status line.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         root.addWidget(self._build_target_group())
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._status_label.setWordWrap(True)
+        set_role(self._status_label, "hint")
         root.addWidget(self._status_label)
-        root.addWidget(self._table, stretch=1)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: the device listing or open still out, whose answer is dropped.
@@ -180,15 +184,9 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
 
     def _build_target_group(self) -> QGroupBox:
         group = self._tr(QGroupBox(), "usb_browser_target_group")
-        form = QVBoxLayout(group)
-        url_row = QHBoxLayout()
-        url_row.addWidget(self._tr(QLabel(), "usb_browser_url"))
-        url_row.addWidget(self._url_input, stretch=1)
-        form.addLayout(url_row)
-        token_row = QHBoxLayout()
-        token_row.addWidget(self._tr(QLabel(), "usb_browser_token"))
-        token_row.addWidget(self._token_input, stretch=1)
-        form.addLayout(token_row)
+        form = QFormLayout(group)
+        form.addRow(self._tr(QLabel(), "usb_browser_url"), self._url_input)
+        form.addRow(self._tr(QLabel(), "usb_browser_token"), self._token_input)
         return group
 
     def _apply_table_headers(self) -> None:

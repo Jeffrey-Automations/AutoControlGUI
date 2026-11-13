@@ -6,7 +6,7 @@ Styling ``::indicator`` in the style sheet would fix the outline but drop the
 check mark, which a style sheet can only draw from an image file. This proxy
 paints both in code instead, from the widget's palette, so they follow the theme.
 """
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
@@ -15,7 +15,7 @@ from PySide6.QtWidgets import QProxyStyle, QStyle, QStyleOption, QWidget
 _INDICATORS = (QStyle.PrimitiveElement.PE_IndicatorCheckBox, QStyle.PrimitiveElement.PE_IndicatorRadioButton)
 
 
-def _state(option: QStyleOption) -> tuple:
+def _state(option: QStyleOption) -> Tuple[bool, bool, bool, bool]:
     flags = option.state
     checked = bool(flags & QStyle.StateFlag.State_On)
     partial = bool(flags & QStyle.StateFlag.State_NoChange)
@@ -24,7 +24,7 @@ def _state(option: QStyleOption) -> tuple:
     return checked, partial, enabled, hovered
 
 
-def _colours(option: QStyleOption, checked: bool, enabled: bool, hovered: bool) -> tuple:
+def _colours(option: QStyleOption, checked: bool, enabled: bool, hovered: bool) -> Tuple[QColor, QColor, QColor]:
     palette = option.palette
     accent = palette.highlight().color()
     base = palette.base().color()

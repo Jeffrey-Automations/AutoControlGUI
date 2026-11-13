@@ -3,7 +3,7 @@ from typing import Optional
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QFileDialog, QGroupBox, QHBoxLayout,
+    QAbstractItemView, QCheckBox, QFileDialog, QFormLayout, QGroupBox,
     QHeaderView, QLabel, QLineEdit, QMessageBox, QSpinBox,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -86,41 +88,32 @@ class WebhooksTab(TranslatableMixin, QWidget):
         # Start/stop/browse/register/remove commands run from the Actions
         # menu; the tab keeps only the inputs, the table, and the status.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
 
         server_box = self._tr(QGroupBox(), "wh_server_group")
-        server_layout = QHBoxLayout(server_box)
-        server_layout.addWidget(self._tr(QLabel(), "wh_host_label"))
-        server_layout.addWidget(self._host_input)
-        server_layout.addWidget(self._tr(QLabel(), "wh_port_label"))
-        server_layout.addWidget(self._port_input)
-        server_layout.addStretch()
+        server_layout = QVBoxLayout(server_box)
+        server_layout.addLayout(flow_of(
+            field_pair(self._tr(QLabel(), "wh_host_label"), self._host_input),
+            field_pair(self._tr(QLabel(), "wh_port_label"), self._port_input),
+        ))
+        self._status_label.setWordWrap(True)
+        set_role(self._status_label, "hint")
+        server_layout.addWidget(self._status_label)
         root.addWidget(server_box)
-        root.addWidget(self._status_label)
 
         add_box = self._tr(QGroupBox(), "wh_add_group")
-        add_layout = QVBoxLayout(add_box)
-        path_row = QHBoxLayout()
-        path_row.addWidget(self._tr(QLabel(), "wh_path_label"))
-        path_row.addWidget(self._path_input)
-        add_layout.addLayout(path_row)
-        script_row = QHBoxLayout()
-        script_row.addWidget(self._tr(QLabel(), "wh_script_label"))
-        script_row.addWidget(self._script_input)
-        add_layout.addLayout(script_row)
-        method_row = QHBoxLayout()
-        method_row.addWidget(self._tr(QLabel(), "wh_methods_label"))
-        for method, check in self._method_checks.items():
-            method_row.addWidget(check)
-        method_row.addStretch()
-        add_layout.addLayout(method_row)
-        token_row = QHBoxLayout()
-        token_row.addWidget(self._tr(QLabel(), "wh_token_label"))
-        self._token_input.setPlaceholderText(_t("wh_token_placeholder"))
-        token_row.addWidget(self._token_input)
-        add_layout.addLayout(token_row)
+        add_layout = QFormLayout(add_box)
+        add_layout.addRow(self._tr(QLabel(), "wh_path_label"), self._path_input)
+        add_layout.addRow(self._tr(QLabel(), "wh_script_label"), self._script_input)
+        methods = QWidget()
+        methods.setProperty("role", "bare")
+        methods.setLayout(flow_of(*self._method_checks.values()))
+        add_layout.addRow(self._tr(QLabel(), "wh_methods_label"), methods)
+        self._tr(self._token_input, "wh_token_placeholder")
+        add_layout.addRow(self._tr(QLabel(), "wh_token_label"), self._token_input)
         root.addWidget(add_box)
 
-        root.addWidget(self._table, stretch=1)
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
 
     def menu_actions(self) -> list:
         """Expose tab commands to the window-level Actions menu."""

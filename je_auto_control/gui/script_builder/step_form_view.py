@@ -48,8 +48,11 @@ class StepFormView(QWidget):
         # one at a time — so without this each setText() commits a half-filled
         # form, overwriting params from fields that have not been set yet.
         self._populating = False
+        # Sits on the Script Builder's card: paint nothing of its own.
+        self.setProperty("role", "bare")
         self._layout = QFormLayout(self)
         self._title = _plain_label(_t("sb_no_step_selected"))
+        self._title.setWordWrap(True)
         self._layout.addRow(self._title)
 
     def retranslate(self) -> None:
@@ -136,6 +139,7 @@ class StepFormView(QWidget):
 
     def _build_file(self, spec: FieldSpec) -> QWidget:
         container = QWidget()
+        container.setProperty("role", "bare")
         row = QHBoxLayout(container)
         row.setContentsMargins(0, 0, 0, 0)
         line = QLineEdit()

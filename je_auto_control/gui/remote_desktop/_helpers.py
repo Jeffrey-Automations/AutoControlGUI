@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeyEvent
-from PySide6.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -187,6 +187,7 @@ class _CollapsibleSection(QGroupBox):
         self.setCheckable(True)
         self.setChecked(False)
         self._body = QWidget(self)
+        self._body.setProperty("role", "bare")
         outer = QVBoxLayout(self)
         outer.setContentsMargins(8, 14, 8, 8)
         outer.addWidget(self._body)
@@ -199,6 +200,26 @@ class _CollapsibleSection(QGroupBox):
 
     def set_body_layout(self, layout) -> None:
         self._body.setLayout(layout)
+
+
+def _row(field: QWidget, *extras: QWidget) -> QHBoxLayout:
+    """``field`` taking the width, followed by its buttons at their natural size (one form row)."""
+    row = QHBoxLayout()
+    row.addWidget(field, 1)
+    for extra in extras:
+        row.addWidget(extra)
+    return row
+
+
+def _pane(label: QLabel, field: QWidget) -> QWidget:
+    """A caption over its field, as one part of a side-by-side pair."""
+    pane = QWidget()
+    pane.setProperty("role", "bare")
+    layout = QVBoxLayout(pane)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.addWidget(label)
+    layout.addWidget(field, 1)
+    return pane
 
 
 def displaced_notifier(panel: Any) -> Callable[[str, str], None]:

@@ -13,6 +13,9 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._worker_thread import CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -112,10 +115,18 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         # Add/remove/refresh/thumbnail/broadcast commands run from the
         # Actions menu; the tab keeps only the inputs, tables, and output.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         root.addWidget(self._build_add_group())
-        root.addWidget(self._table, stretch=1)
-        root.addWidget(self._build_thumbnails_group(), stretch=1)
-        root.addWidget(self._build_broadcast_group(), stretch=1)
+        # Hosts and their thumbnails in one column, the broadcast beside them:
+        # side by side the page stays one screen tall; stacked it keeps the old order.
+        hosts = QWidget()
+        hosts.setProperty("role", "bare")
+        column = QVBoxLayout(hosts)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(12)
+        column.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        column.addWidget(self._build_thumbnails_group(), stretch=1)
+        root.addWidget(ResponsiveBox(hosts, self._build_broadcast_group(), stretches=(3, 2)), stretch=1)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: its thumbnail timer and the polls still out.
@@ -147,13 +158,10 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
 
     def _build_add_group(self) -> QGroupBox:
         group = self._tr(QGroupBox(), "admin_add_group")
-        form = QHBoxLayout(group)
-        form.addWidget(self._tr(QLabel(), "admin_label"))
-        form.addWidget(self._label_input)
-        form.addWidget(self._tr(QLabel(), "admin_url"))
-        form.addWidget(self._url_input, stretch=1)
-        form.addWidget(self._tr(QLabel(), "admin_token"))
-        form.addWidget(self._token_input)
+        layout = QVBoxLayout(group)
+        layout.addLayout(flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
+            ("admin_label", self._label_input), ("admin_url", self._url_input),
+            ("admin_token", self._token_input)))))
         return group
 
     def _build_broadcast_group(self) -> QGroupBox:

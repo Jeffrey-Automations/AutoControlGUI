@@ -8,13 +8,15 @@ import functools
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit,
+    QCheckBox, QComboBox, QFormLayout, QLabel, QLineEdit,
     QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.flow_layout import flow_of
+from je_auto_control.gui.adaptive.surfaces import Card
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -60,26 +62,22 @@ class AssertionsTab(TranslatableMixin, QWidget):
         # The run command runs from the Actions menu; the tab keeps only
         # the assertion form and the result label.
         root = QVBoxLayout(self)
-        krow = QHBoxLayout()
-        krow.addWidget(QLabel(_t("assert_kind")))
-        krow.addWidget(self._kind)
-        krow.addStretch()
-        root.addLayout(krow)
-
-        self._target_label = QLabel(_t("assert_target"))
-        root.addWidget(self._target_label)
-        root.addWidget(self._target)
-
-        self._xy_label = QLabel(_t("assert_pixel_xy"))
-        root.addWidget(self._xy_label)
-        root.addWidget(self._xy)
-        self._rgb_label = QLabel(_t("assert_pixel_rgb"))
-        root.addWidget(self._rgb_label)
-        root.addWidget(self._rgb)
-
-        root.addWidget(self._expect)
-        root.addWidget(self._regex)
-        root.addWidget(self._result)
+        root.setSpacing(12)
+        kind_row = QFormLayout()
+        kind_row.addRow(self._tr(QLabel(), "assert_kind"), self._kind)
+        form = Card().add(kind_row)
+        # Each label sits above its field; the kind decides which pairs show.
+        self._target_label = self._tr(QLabel(), "assert_target")
+        self._xy_label = self._tr(QLabel(), "assert_pixel_xy")
+        self._rgb_label = self._tr(QLabel(), "assert_pixel_rgb")
+        for widget in (self._target_label, self._target, self._xy_label, self._xy,
+                       self._rgb_label, self._rgb):
+            form.add(widget)
+        self._tr(self._expect, "assert_expect_present")
+        self._tr(self._regex, "assert_regex")
+        form.add(flow_of(self._expect, self._regex))
+        root.addWidget(form)
+        root.addWidget(Card().add(self._result))
         root.addStretch()
 
     def dispose(self) -> None:

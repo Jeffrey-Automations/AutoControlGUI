@@ -537,7 +537,7 @@ english_word_dict = {
     "rd_webrtc_host_id_placeholder": "8-char ID shown on the host",
     "rd_webrtc_secret_label": "Server secret:",
     "rd_webrtc_regen_id": "New ID",
-    "rd_webrtc_publish_via_server": "Publish & wait for viewer",
+    "rd_webrtc_publish_via_server": "Publish and wait for viewer",
     "rd_webrtc_connect_via_server": "Connect to host",
     "rd_webrtc_stun_label": "STUN URL:",
     "rd_webrtc_turn_label": "TURN URL:",

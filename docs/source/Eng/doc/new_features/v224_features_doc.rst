@@ -3,9 +3,23 @@ Adaptive GUI: Page Headers, Cards and Controls That Shrink
 
 The GUI is being redesigned around one set of adaptive building blocks, so
 every page looks the same and fits a small window. This page describes what
-is in place: the building blocks, the window's own breakpoints, and what every
-page gets from them. Reworking each page onto the blocks follows in later
-releases.
+is in place: the building blocks, the window's own breakpoints, and every
+page rebuilt on them.
+
+Every page is rebuilt
+---------------------
+
+All 51 pages now group their controls on cards, put their main table or result
+on a card that takes the remaining height, wrap rows of fields and buttons
+instead of widening, and set side-by-side panes (list and details, input and
+output) one above the other in a narrow window. Status lines and notes are
+muted hints. Nothing a page does changed: its widgets, menu actions and
+translations are the same.
+
+A page scrolls only when the window is smaller than the page can shrink: each
+page is given the visible area, or its minimum size where that is larger. (Qt's
+default sized a page holding a wrapped label from every control's preferred
+height, so pages with a table scrolled in windows they fitted.)
 
 The window adapts to its width
 ------------------------------
@@ -83,6 +97,5 @@ The width check
 ``test/unit_test/headless/test_gui_page_widths.py`` opens every registered tab
 the way the window does and reads its minimum width, in average characters of
 the window's label font so the same limit holds on Windows and Linux fonts. A
-page may need at most 72 characters (about 460 px in 10 pt Segoe UI). Four
-pages are still over it and listed with a ceiling each (Script Builder,
-Flaky Tests, Audit Log, USB Sharing); the list only shrinks.
+page may need at most 72 characters (about 460 px in 10 pt Segoe UI). Every
+page fits; before the rework Script Builder alone needed 818 px.

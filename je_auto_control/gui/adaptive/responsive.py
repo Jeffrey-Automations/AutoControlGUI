@@ -1,7 +1,7 @@
 """Containers that rearrange by width, and the pass that stops a page's controls from forcing it wide."""
-from typing import Optional
+from typing import Callable, Optional, Tuple
 
-from PySide6.QtCore import QCoreApplication, QEvent, QObject
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSize
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QBoxLayout, QComboBox, QFormLayout, QLabel, QLayout, QSizePolicy, QTabWidget, QWidget
 
@@ -20,9 +20,10 @@ class ResponsiveBox(QWidget):
     """
 
     def __init__(self, *parts: QWidget, stack_below: int = DEFAULT_STACK_BELOW,
-                 stretches: tuple = (), spacing: int = 12, parent: Optional[QWidget] = None) -> None:
+                 stretches: Tuple[int, ...] = (), spacing: int = 12, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.stack_below = stack_below
+        self.setProperty("role", "bare")
         self._layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(spacing)
@@ -35,7 +36,7 @@ class ResponsiveBox(QWidget):
         """Whether the parts are currently one above the other."""
         return self._layout.direction() == QBoxLayout.Direction.TopToBottom
 
-    def minimumSizeHint(self):  # noqa: N802  # reason: Qt override
+    def minimumSizeHint(self) -> QSize:  # noqa: N802  # reason: Qt override
         """Never ask for more width than the widest part needs on its own."""
         hint = super().minimumSizeHint()
         items = (self._layout.itemAt(index) for index in range(self._layout.count()))
@@ -107,7 +108,7 @@ def fit_to_width(root: QWidget) -> int:
 class WidthWatcher(QObject):
     """Call ``callback(width)`` whenever ``target`` is resized."""
 
-    def __init__(self, target: QWidget, callback) -> None:
+    def __init__(self, target: QWidget, callback: Callable[[int], None]) -> None:
         super().__init__(target)
         self._callback = callback
         target.installEventFilter(self)

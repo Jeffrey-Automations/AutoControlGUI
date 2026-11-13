@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView, QDialog, QFileDialog, QFormLayout, QHBoxLayout,
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui.adaptive.flow_layout import flow_of
 from je_auto_control.gui.remote_desktop._helpers import (
     _format_last_seen, _short_fp, _t,
 )
@@ -53,35 +55,26 @@ class KnownHostsDialog(QDialog):
             QAbstractItemView.EditTrigger.NoEditTriggers,
         )
         layout.addWidget(self._table)
+        buttons = []
+        for key, slot in (
+            ("rd_webrtc_kh_add", self._on_add_manual),
+            ("rd_webrtc_kh_import", self._on_import),
+            ("rd_webrtc_kh_export", self._on_export),
+            ("rd_webrtc_kh_copy_app", self._on_copy_app),
+            ("rd_webrtc_kh_copy_dtls", self._on_copy_dtls),
+            ("rd_webrtc_kh_forget", self._on_forget),
+            ("rd_webrtc_kh_forget_stale", self._on_forget_stale),
+            ("rd_webrtc_kh_clear_all", self._on_clear_all),
+        ):
+            button = QPushButton(_t(key))
+            button.clicked.connect(slot)
+            buttons.append(button)
+        # Eight actions wrap onto a second line in a narrow dialog; Close stays on the right.
         button_row = QHBoxLayout()
-        add_btn = QPushButton(_t("rd_webrtc_kh_add"))
-        add_btn.clicked.connect(self._on_add_manual)
-        button_row.addWidget(add_btn)
-        import_btn = QPushButton(_t("rd_webrtc_kh_import"))
-        import_btn.clicked.connect(self._on_import)
-        button_row.addWidget(import_btn)
-        export_btn = QPushButton(_t("rd_webrtc_kh_export"))
-        export_btn.clicked.connect(self._on_export)
-        button_row.addWidget(export_btn)
-        copy_app_btn = QPushButton(_t("rd_webrtc_kh_copy_app"))
-        copy_app_btn.clicked.connect(self._on_copy_app)
-        button_row.addWidget(copy_app_btn)
-        copy_dtls_btn = QPushButton(_t("rd_webrtc_kh_copy_dtls"))
-        copy_dtls_btn.clicked.connect(self._on_copy_dtls)
-        button_row.addWidget(copy_dtls_btn)
-        forget_btn = QPushButton(_t("rd_webrtc_kh_forget"))
-        forget_btn.clicked.connect(self._on_forget)
-        button_row.addWidget(forget_btn)
-        forget_stale_btn = QPushButton(_t("rd_webrtc_kh_forget_stale"))
-        forget_stale_btn.clicked.connect(self._on_forget_stale)
-        button_row.addWidget(forget_stale_btn)
-        clear_btn = QPushButton(_t("rd_webrtc_kh_clear_all"))
-        clear_btn.clicked.connect(self._on_clear_all)
-        button_row.addWidget(clear_btn)
-        button_row.addStretch()
+        button_row.addLayout(flow_of(*buttons, spacing=8), stretch=1)
         close_btn = QPushButton(_t("rd_webrtc_kh_close"))
         close_btn.clicked.connect(self.accept)
-        button_row.addWidget(close_btn)
+        button_row.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignBottom)
         layout.addLayout(button_row)
         self._refresh()
 

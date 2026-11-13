@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -83,6 +84,7 @@ class ComputerUseTab(TranslatableMixin, QWidget):
         # The run command runs from the Actions menu; the tab keeps only
         # the goal/model/limit inputs, the output view, and the status.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         form = QFormLayout()
         self._goal_label = QLabel()
         self._model_label = QLabel()
@@ -94,11 +96,15 @@ class ComputerUseTab(TranslatableMixin, QWidget):
         form.addRow(self._max_steps_label, self._max_steps)
         form.addRow(self._wall_seconds_label, self._wall_seconds)
         form.addRow(self._max_tokens_label, self._max_tokens)
-        root.addLayout(form)
-        root.addWidget(self._status)
+        root.addWidget(Card().add(form))
         self._output_label = QLabel()
-        root.addWidget(self._output_label)
-        root.addWidget(self._output, stretch=1)
+        output = Card()
+        output.add(self._output_label)
+        output.add(self._output, stretch=1)
+        root.addWidget(output, stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
+        root.addWidget(self._status)
         self._apply_translations()
 
     def _apply_translations(self) -> None:

@@ -12,7 +12,7 @@ from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
+    QComboBox, QFileDialog, QFormLayout, QGroupBox, QLabel,
     QLineEdit, QListWidget, QMessageBox, QTextEdit,
     QVBoxLayout, QWidget,
 )
@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -69,15 +71,14 @@ class WebRunnerTab(TranslatableMixin, QWidget):
         # Browse/open/quit/screenshot/run/refresh commands run from the
         # Actions menu; the tab keeps only the inputs, list, and output.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
+        self._available_label.setWordWrap(True)
+        set_role(self._available_label, "hint")
         root.addWidget(self._available_label)
-        root.addWidget(self._build_convenience_group())
-        root.addWidget(self._build_freeform_group())
-        commands_row = QHBoxLayout()
-        commands_row.addWidget(QLabel(_t("web_commands_label")), stretch=0)
-        commands_row.addWidget(self._commands_list, stretch=1)
-        root.addLayout(commands_row, stretch=1)
-        root.addWidget(QLabel(_t("web_output_label")))
-        root.addWidget(self._output, stretch=2)
+        root.addWidget(ResponsiveBox(self._build_convenience_group(), self._build_freeform_group()))
+        commands = Card().add(self._tr(QLabel(), "web_commands_label")).add(self._commands_list, stretch=1)
+        output = Card().add(self._tr(QLabel(), "web_output_label")).add(self._output, stretch=1)
+        root.addWidget(ResponsiveBox(commands, output, stretches=(1, 2)), stretch=1)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: the command still running in the background.
@@ -99,22 +100,20 @@ class WebRunnerTab(TranslatableMixin, QWidget):
         ]
 
     def _build_convenience_group(self) -> QGroupBox:
-        group = QGroupBox(_t("web_convenience_title"))
+        group = self._tr(QGroupBox(), "web_convenience_title")
         form = QFormLayout(group)
-        form.addRow(QLabel(_t("web_url_label")), self._url_input)
-        form.addRow(QLabel(_t("web_browser_label")), self._browser_input)
-        form.addRow(QLabel(_t("web_screenshot_label")), self._screenshot_input)
+        form.addRow(self._tr(QLabel(), "web_url_label"), self._url_input)
+        form.addRow(self._tr(QLabel(), "web_browser_label"), self._browser_input)
+        form.addRow(self._tr(QLabel(), "web_screenshot_label"), self._screenshot_input)
         return group
 
     def _build_freeform_group(self) -> QGroupBox:
-        group = QGroupBox(_t("web_freeform_title"))
+        group = self._tr(QGroupBox(), "web_freeform_title")
         form = QFormLayout(group)
-        self._action_input.setPlaceholderText(_t("web_action_placeholder"))
-        self._params_input.setPlaceholderText(
-            _t("web_params_placeholder"),
-        )
-        form.addRow(QLabel(_t("web_action_label")), self._action_input)
-        form.addRow(QLabel(_t("web_params_label")), self._params_input)
+        self._tr(self._action_input, "web_action_placeholder")
+        self._tr(self._params_input, "web_params_placeholder", "setPlaceholderText")
+        form.addRow(self._tr(QLabel(), "web_action_label"), self._action_input)
+        form.addRow(self._tr(QLabel(), "web_params_label"), self._params_input)
         return group
 
     # --- availability ---------------------------------------------

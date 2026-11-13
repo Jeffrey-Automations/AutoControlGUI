@@ -7,11 +7,13 @@ from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QHBoxLayout, QHeaderView, QLabel,
+    QAbstractItemView, QComboBox, QHeaderView, QLabel,
     QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -67,16 +69,13 @@ class FlakinessTab(TranslatableMixin, QWidget):
         # The refresh command runs from the Actions menu; the tab keeps
         # only the filter inputs, the table, and the status line.
         root = QVBoxLayout(self)
-        controls = QHBoxLayout()
-        controls.addWidget(QLabel(_t("flaky_limit")))
-        controls.addWidget(self._limit)
-        controls.addWidget(QLabel(_t("flaky_min_runs")))
-        controls.addWidget(self._min_runs)
-        controls.addWidget(QLabel(_t("flaky_group_by")))
-        controls.addWidget(self._group_by)
-        controls.addStretch()
-        root.addLayout(controls)
-        root.addWidget(self._table, stretch=1)
+        root.setSpacing(12)
+        filters = flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
+            ("flaky_limit", self._limit), ("flaky_min_runs", self._min_runs), ("flaky_group_by", self._group_by))))
+        root.addWidget(Card().add(filters))
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def menu_actions(self) -> list:

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- GUI: every tab's layout is rebuilt on cards, wrapping rows and side-by-side panes that stack
+  when narrow; widget objects, attributes, signals, Actions-menu entries and translation keys
+  are unchanged. Each page's scroll area no longer uses `setWidgetResizable(True)`
+  (`ScrollableTabs.scroll_area()` returns a `PageScrollArea`, which sizes the page to the
+  viewport or its minimum), `FlowLayout` no longer reports height-for-width, and group-box
+  titles are drawn inside the box. The WebRTC viewer's remote-files section showed the raw key
+  `rd_webrtc_files_group`; it uses `rd_webrtc_remote_files_group`. The English
+  "Publish & wait for viewer" button read "Publish _wait"; it is "Publish and wait for viewer".
+
 - The `gui` extra and the development and CI pins are back on `PySide6==6.11.2`. 6.12.0 crashed
   the test process at interpreter exit on every CI platform (a double free while
   `destroyQCoreApplication` tears down Python-held widgets); Dependabot now skips 6.12.0.

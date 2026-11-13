@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.healing_evaluation_worker import HealingEvaluationOutcome, HealingEvaluationWorker
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -86,18 +87,25 @@ class HealingEvaluationPanel(TranslatableMixin, QWidget):
         self._status.setTextFormat(Qt.TextFormat.PlainText)
         self._status.setWordWrap(True)
         self._state, self._error = "idle", ""
+        self.setProperty("role", "bare")
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         form = QFormLayout()
         form.addRow(self._tr(QLabel(), "healing_eval_path"), self._path)
-        root.addLayout(form)
-        root.addWidget(self._tr(QLabel(), "healing_eval_explanation"))
+        explanation = self._tr(QLabel(), "healing_eval_explanation")
+        explanation.setWordWrap(True)
+        set_role(explanation, "hint")
+        root.addWidget(Card().add(form).add(explanation))
         views = QSplitter(Qt.Orientation.Vertical)
         views.addWidget(self._summary)
         cases = QSplitter(Qt.Orientation.Horizontal)
-        cases.addWidget(self._cases)
-        cases.addWidget(self._details)
+        # A user-resizable split: each side may shrink well below its content.
+        for pane in (self._cases, self._details):
+            pane.setMinimumWidth(120)
+            cases.addWidget(pane)
         views.addWidget(cases)
-        root.addWidget(views, stretch=1)
+        root.addWidget(Card().add(views, stretch=1), stretch=1)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
         # pylint: disable-next=no-member  # reason: PySide binds the Qt signal at runtime
         self._path.textChanged.connect(self._path_changed)

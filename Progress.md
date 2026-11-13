@@ -534,10 +534,13 @@ F 還缺：
 
 - **F2 其餘**：Diagnostics 以外面板的執行詳情，以及各面板的空白／錯誤／permission states 尚未全面交付。
 - **F2 GUI 重製（`WIP`，維護者 2026-11-14 決定：全面視覺改版；窄視窗時導覽與詳情改為浮層）**：
-  設計系統（`gui/adaptive/`、主題 token 與字階）、每頁頁首與 fit pass、視窗斷點（圖示欄、導覽與詳情抽屜）已交付（U-20261114-02）。仍缺：
-  51 個分頁逐頁改用 `Card`／`FlowLayout`／`ResponsiveBox` 重排（目前多數頁只套上群組框的卡片樣式，頁首標題與頁內第一個群組標題重複）；
-  `test_gui_page_widths.py` 的 `WIDE_PAGES`（script_builder、flakiness、audit_log、usb_share）降到 72 字元內後移除；
-  所有截圖都是 offscreen 平台加 Windows 字型，尚未在真實螢幕、混合 DPI 與 Linux／macOS 字型上目視審閱。
+  設計系統、視窗斷點（U-20261114-02）與 51 個分頁的版面重排（U-20261114-04）已交付，`WIDE_PAGES` 已清空。仍缺：
+  - 所有截圖都是 offscreen 平台加 Windows 字型，尚未在真實螢幕、混合 DPI 與 Linux／macOS 字型上目視審閱。
+  - 重排時看到、但屬邏輯或字串而未改的：Self-Healing 執行表在空表時 `resizeColumnsToContents()` 把欄名擠扁；
+    Remote Desktop 的走勢圖背景（黑）、統計文字（`#ccaa55`）與大號 ID（`#2070d0`）寫死顏色，淺色主題下不協調；
+    收合中的區段仍畫出一條空卡片、展開後區段與內層群組標題重複；Diagnostics 閒置時空的進度列仍佔一行；
+    Assertions 的種類下拉選單項目與 Email Triggers 的密碼提示字在 `__init__` 設定，切換語言不會更新；
+    下拉選單的箭頭貼齊右緣（`theme.py`）；Trace Replay 的畫面／動作改為 `ResponsiveBox` 後不能再拖曳分隔線。
 - **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移，
   包含 Quick Connect 的同步啟停、已進入傳輸的取消與同頁 session generation 隔離。
 - **F3 關閉失敗恢復**：`gui/_slow_op.py` 的 StopQueue／stop_each 目前只記錄停止失敗，

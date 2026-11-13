@@ -3,13 +3,16 @@ from functools import partial
 from typing import Callable, Literal, Optional
 
 from PySide6.QtWidgets import (
-    QFileDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._validators import int_validator
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.selector import open_region_selector
 from je_auto_control.wrapper.auto_control_screen import screen_size, screenshot, get_pixel
@@ -27,55 +30,53 @@ class ScreenshotTab(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         layout = QVBoxLayout(self)
-
-        # Screen size (read via Actions menu -> Get Screen Size)
-        size_group = self._tr(QGroupBox(), "screen_size_label")
-        sg = QHBoxLayout()
-        self.screen_size_label = QLabel("--")
-        sg.addWidget(self.screen_size_label)
-        size_group.setLayout(sg)
-        layout.addWidget(size_group)
-
+        layout.setSpacing(12)
         # Screenshot inputs; capture runs from the Actions menu.
-        ss_group = self._tr(QGroupBox(), "take_screenshot")
-        ss_grid = QGridLayout()
-        ss_grid.addWidget(self._tr(QLabel(), "file_path_label"), 0, 0)
-        self.ss_path_input = QLineEdit()
-        ss_grid.addWidget(self.ss_path_input, 0, 1)
-
-        ss_grid.addWidget(self._tr(QLabel(), "region_label"), 1, 0)
-        self.ss_region_input = QLineEdit()
-        self.ss_region_input.setPlaceholderText("0, 0, 800, 600")
-        ss_grid.addWidget(self.ss_region_input, 1, 1)
-        ss_group.setLayout(ss_grid)
-        layout.addWidget(ss_group)
-
-        # Pixel probe inputs; lookup runs from the Actions menu.
-        px_group = self._tr(QGroupBox(), "get_pixel_label")
-        px_grid = QGridLayout()
-        px_grid.addWidget(self._tr(QLabel(), "pixel_x"), 0, 0)
-        self.pixel_x_input = QLineEdit("0")
-        self.pixel_x_input.setValidator(int_validator())
-        px_grid.addWidget(self.pixel_x_input, 0, 1)
-        px_grid.addWidget(self._tr(QLabel(), "pixel_y"), 0, 2)
-        self.pixel_y_input = QLineEdit("0")
-        self.pixel_y_input.setValidator(int_validator())
-        px_grid.addWidget(self.pixel_y_input, 0, 3)
-        self.pixel_result_label = QLabel()
-        self._pixel_result: tuple[Literal["value", "error", "running"], str] = ("value", "--")
-        self._render_pixel_result()
-        px_grid.addWidget(self.pixel_result_label, 1, 0, 1, 4)
-        px_group.setLayout(px_grid)
-        layout.addWidget(px_group)
-
+        layout.addWidget(self._build_screenshot_group())
+        # Screen size (read via Actions menu -> Get Screen Size) beside the
+        # pixel probe inputs; lookup runs from the Actions menu.
+        layout.addWidget(ResponsiveBox(self._build_size_group(), self._build_pixel_group(), stretches=(1, 2)))
         self.ss_result_text = QTextEdit()
         self.ss_result_text.setReadOnly(True)
         self.ss_result_text.setMaximumHeight(100)
-        layout.addWidget(self.ss_result_text)
-        layout.addStretch()
+        layout.addWidget(Card().add(self.ss_result_text))
+        # A stretch factor, so the capped result card keeps its own height.
+        layout.addStretch(1)
         self._task = TabTask(self)
         self._task.result.connect(self._on_result)
         self._task.error.connect(self._on_error)
+
+    def _build_size_group(self) -> QGroupBox:
+        size_group = self._tr(QGroupBox(), "screen_size_label")
+        self.screen_size_label = QLabel("--")
+        QHBoxLayout(size_group).addWidget(self.screen_size_label)
+        return size_group
+
+    def _build_screenshot_group(self) -> QGroupBox:
+        ss_group = self._tr(QGroupBox(), "take_screenshot")
+        ss_form = QFormLayout(ss_group)
+        self.ss_path_input = QLineEdit()
+        ss_form.addRow(self._tr(QLabel(), "file_path_label"), self.ss_path_input)
+        self.ss_region_input = QLineEdit()
+        self.ss_region_input.setPlaceholderText("0, 0, 800, 600")
+        ss_form.addRow(self._tr(QLabel(), "region_label"), self.ss_region_input)
+        return ss_group
+
+    def _build_pixel_group(self) -> QGroupBox:
+        px_group = self._tr(QGroupBox(), "get_pixel_label")
+        px_layout = QVBoxLayout(px_group)
+        self.pixel_x_input = QLineEdit("0")
+        self.pixel_x_input.setValidator(int_validator())
+        self.pixel_y_input = QLineEdit("0")
+        self.pixel_y_input.setValidator(int_validator())
+        px_layout.addLayout(flow_of(field_pair(self._tr(QLabel(), "pixel_x"), self.pixel_x_input),
+                                    field_pair(self._tr(QLabel(), "pixel_y"), self.pixel_y_input)))
+        self.pixel_result_label = QLabel()
+        self.pixel_result_label.setWordWrap(True)
+        self._pixel_result: tuple[Literal["value", "error", "running"], str] = ("value", "--")
+        self._render_pixel_result()
+        px_layout.addWidget(self.pixel_result_label)
+        return px_group
 
     def menu_actions(self) -> list[tuple[str, Callable[[], object]]]:
         return [

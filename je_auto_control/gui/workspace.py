@@ -2,7 +2,7 @@
 import weakref
 from typing import Any, Callable, List, Optional
 
-from PySide6.QtCore import QPointF, Qt, QObject, QMetaObject, Signal, Slot
+from PySide6.QtCore import QEvent, QPointF, QSize, Qt, QObject, QMetaObject, Signal, Slot
 from PySide6.QtGui import QPaintEvent, QPainter, QPen
 from PySide6.QtWidgets import QAbstractButton, QScrollArea, QTabBar, QTabWidget, QWidget, QSplitter, QVBoxLayout
 
@@ -43,6 +43,47 @@ class _CloseButton(QAbstractButton):
                 painter.drawRoundedRect(2, 2, 16, 16, 3, 3)
         finally:
             painter.end()
+
+
+class PageScrollArea(QScrollArea):
+    """Give a page the whole viewport, and scroll only when the page cannot shrink that far.
+
+    ``QScrollArea.setWidgetResizable(True)`` sizes a page whose layout reports
+    height-for-width (any word-wrapped label does) from every item's
+    *preferred* height, so a page with a table or text box scrolled in windows
+    it fitted. Here the page gets the viewport's size, or its minimum size
+    where that is larger, and its layout shares the rest out as usual.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWidgetResizable(False)
+        self.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.viewport().installEventFilter(self)
+
+    def setWidget(self, widget: QWidget) -> None:  # noqa: N802  # reason: Qt override
+        """Hold ``widget`` and size it to the viewport."""
+        super().setWidget(widget)
+        widget.installEventFilter(self)
+        self.fit_page()
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802  # reason: Qt override
+        """Re-fit the page when the viewport is resized or the page's layout changes."""
+        if event.type() in (QEvent.Type.Resize, QEvent.Type.LayoutRequest) \
+                and (watched is self.viewport() or watched is self.widget()):
+            self.fit_page()
+        return False
+
+    def fit_page(self) -> None:
+        """Size the page to the viewport, never below the page's minimum."""
+        page = self.widget()
+        if page is None:
+            return
+        view = self.viewport().size()
+        minimum = page.minimumSizeHint().expandedTo(page.minimumSize())
+        target = QSize(max(view.width(), minimum.width()), max(view.height(), minimum.height()))
+        if page.size() != target:
+            page.resize(target)
 
 
 class ScrollableTabs(QTabWidget):
@@ -87,9 +128,7 @@ class ScrollableTabs(QTabWidget):
 
     def insertTab(self, index: int, widget: QWidget, *args: Any) -> int:  # noqa: N802  # reason: Qt overloads
         """Insert a scrollable page and a vector close button."""
-        container = QScrollArea(self)
-        container.setWidgetResizable(True)
-        container.setFrameShape(QScrollArea.Shape.NoFrame)
+        container = PageScrollArea(self)
         container.setWidget(widget)
         result = super().insertTab(index, container, *args)
         self._install_close_button(result, widget)

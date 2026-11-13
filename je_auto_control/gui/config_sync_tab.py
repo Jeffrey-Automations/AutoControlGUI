@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
 from je_auto_control.gui.config_sync_worker import ConfigSyncWorker, SyncUIOutcome, SyncUIRequest
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
@@ -70,11 +72,15 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
 
     def _build_form(self) -> QVBoxLayout:
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
         note = self._label('notice')
         note.setWordWrap(True)
+        set_role(note, 'hint')
         layout.addWidget(note)
         self._form = QWidget(self)
+        self._form.setProperty('role', 'bare')
         form = QFormLayout(self._form)
+        form.setContentsMargins(0, 0, 0, 0)
         self._configuration = QPlainTextEdit(self)
         self._configuration.setMaximumHeight(160)
         self._tr(self._configuration, 'config_sync_configuration_hint', 'setPlaceholderText')
@@ -95,12 +101,13 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
         self._kind = QComboBox(self)
         self._kind.addItems(sorted(KINDS))
         form.addRow(self._label('kind'), self._kind)
-        layout.addWidget(self._form)
         return layout
 
     def _build_profile_inputs(self, layout: QVBoxLayout) -> None:
         self._load_form = QWidget(self)
+        self._load_form.setProperty('role', 'bare')
         form = QFormLayout(self._load_form)
+        form.setContentsMargins(0, 0, 0, 0)
         self._generation_directory = QLineEdit(self)
         form.addRow(self._label('generation_directory'), self._generation_directory)
         self._manifest_digest = QLineEdit(self)
@@ -109,37 +116,40 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
         form.addRow(self._label('working_root'), self._working_root)
         self._loaded_scripts = QComboBox(self)
         form.addRow(self._label('loaded_script'), self._loaded_scripts)
-        layout.addWidget(self._load_form)
         notice = self._label('profile_notice')
         notice.setWordWrap(True)
-        layout.addWidget(notice)
+        set_role(notice, 'hint')
+        profile = Card().add(self._load_form).add(notice)
+        profile.body.addStretch(1)
+        layout.addWidget(ResponsiveBox(Card().add(self._form), profile))
 
     def _build_review(self, layout: QVBoxLayout) -> None:
         self._summary = QLabel(self)
         self._summary.setTextFormat(Qt.TextFormat.PlainText)
         self._summary.setWordWrap(True)
-        layout.addWidget(self._summary)
+        set_role(self._summary, 'hint')
+        review = Card().add(self._summary)
         self._heads = QTableWidget(0, 6, self)
         self._heads.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._heads.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._heads.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._heads.setMinimumHeight(140)
-        layout.addWidget(self._heads)
+        review.add(self._heads, stretch=1)
         self._value = QPlainTextEdit(self)
         self._value.setMaximumHeight(130)
-        layout.addWidget(self._label('resolution_value'))
-        layout.addWidget(self._value)
+        review.add(self._label('resolution_value')).add(self._value)
         self._deleted = QCheckBox(self)
         self._tr(self._deleted, 'config_sync_deleted')
-        layout.addWidget(self._deleted)
+        review.add(self._deleted)
+        layout.addWidget(review, stretch=1)
         self._status = QLabel(self)
         self._status.setTextFormat(Qt.TextFormat.PlainText)
         self._status.setWordWrap(True)
-        layout.addWidget(self._status)
+        set_role(self._status, 'hint')
         self._details = QPlainTextEdit(self)
         self._details.setReadOnly(True)
         self._details.setMaximumHeight(150)
-        layout.addWidget(self._details)
+        layout.addWidget(Card().add(self._status).add(self._details))
 
     def menu_actions(self) -> tuple[tuple[str, Callable[[], None]], ...]:
         """Expose explicit operations through the window's Actions menu."""

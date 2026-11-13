@@ -23,7 +23,7 @@ from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QGroupBox, QHBoxLayout, QHeaderView,
+    QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHeaderView,
     QLabel, QLineEdit, QMessageBox, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
@@ -32,6 +32,8 @@ from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui._worker_thread import CallWorker as _CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -127,11 +129,9 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
     def _build_layout(self) -> None:
         # Share/ACL/use/remote-fetch commands run from the Actions menu;
         # the panel keeps only the badge, tables, inputs, and status.
-        root = QHBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 16)
-        root.setSpacing(16)
-        root.addWidget(self._build_host_section(), stretch=1)
-        root.addWidget(self._build_viewer_section(), stretch=1)
+        root = QVBoxLayout(self)
+        root.setSpacing(12)
+        root.addWidget(ResponsiveBox(self._build_host_section(), self._build_viewer_section()), stretch=1)
 
     def menu_actions(self) -> list:
         """Expose tab commands to the window-level Actions menu."""
@@ -156,11 +156,8 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         layout.addWidget(self._host_badge)
         layout.addWidget(self._tr(QLabel(), "usb_share_local_devices"))
         layout.addWidget(self._local_table, stretch=1)
-        acl_row = QHBoxLayout()
         self._tr(self._auto_check, "usb_share_auto_refresh")
-        acl_row.addWidget(self._auto_check)
-        acl_row.addStretch(1)
-        layout.addLayout(acl_row)
+        layout.addWidget(self._auto_check)
         return group
 
     def _build_viewer_section(self) -> QWidget:
@@ -171,11 +168,12 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         intro = self._tr(QLabel(), "usb_share_intro")
         intro.setWordWrap(True)
         layout.addWidget(intro)
-        source_row = QHBoxLayout()
-        source_row.addWidget(self._tr(QLabel(), "usb_share_source_label"))
-        source_row.addWidget(self._source_combo, stretch=1)
-        layout.addLayout(source_row)
+        source_form = QFormLayout()
+        source_form.addRow(self._tr(QLabel(), "usb_share_source_label"), self._source_combo)
+        layout.addLayout(source_form)
         layout.addWidget(self._shared_table, stretch=1)
+        self._viewer_status.setWordWrap(True)
+        set_role(self._viewer_status, "hint")
         layout.addWidget(self._viewer_status)
         layout.addWidget(self._build_remote_box())
         return group
@@ -183,15 +181,9 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
     def _build_remote_box(self) -> QWidget:
         box = QGroupBox()
         self._tr(box, "usb_share_remote_group", setter="setTitle")
-        layout = QVBoxLayout(box)
-        url_row = QHBoxLayout()
-        url_row.addWidget(self._tr(QLabel(), "usb_share_remote_url"))
-        url_row.addWidget(self._remote_url, stretch=1)
-        layout.addLayout(url_row)
-        token_row = QHBoxLayout()
-        token_row.addWidget(self._tr(QLabel(), "usb_share_remote_token"))
-        token_row.addWidget(self._remote_token, stretch=1)
-        layout.addLayout(token_row)
+        layout = QFormLayout(box)
+        layout.addRow(self._tr(QLabel(), "usb_share_remote_url"), self._remote_url)
+        layout.addRow(self._tr(QLabel(), "usb_share_remote_token"), self._remote_token)
         return box
 
     def _apply_local_headers(self) -> None:

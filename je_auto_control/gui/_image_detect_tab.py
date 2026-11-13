@@ -5,13 +5,14 @@ import math
 from typing import Callable, Literal
 
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QGridLayout, QLabel, QLineEdit, QMessageBox,
+    QCheckBox, QComboBox, QFileDialog, QFormLayout, QLabel, QLineEdit, QMessageBox,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui._validators import double_validator
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.selector import crop_template_to_file
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -49,26 +50,24 @@ class ImageDetectionTab(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         layout = QVBoxLayout(self)
-        grid = QGridLayout()
-        grid.addWidget(self._tr(QLabel(), "template_image"), 0, 0)
+        layout.setSpacing(12)
+        form = QFormLayout()
         self.img_path_input = QLineEdit()
-        grid.addWidget(self.img_path_input, 0, 1)
-        grid.addWidget(self._tr(QLabel(), "threshold_label"), 1, 0)
+        form.addRow(self._tr(QLabel(), "template_image"), self.img_path_input)
         self.threshold_input = QLineEdit("0.8")
         self.threshold_input.setValidator(double_validator(0.0, 1.0, 2))
-        grid.addWidget(self.threshold_input, 1, 1)
-        self.draw_check = self._tr(QCheckBox(), "draw_image_check")
-        grid.addWidget(self.draw_check, 1, 2)
-        grid.addWidget(self._tr(QLabel(), "mouse_button"), 2, 0)
+        form.addRow(self._tr(QLabel(), "threshold_label"), self.threshold_input)
         self.mouse_button_combo = QComboBox()
         self.mouse_button_combo.addItems(list(mouse_keys_table))
         self.mouse_button_combo.setCurrentText("mouse_left")
-        grid.addWidget(self.mouse_button_combo, 2, 1)
-        layout.addLayout(grid)
-        layout.addWidget(self._tr(QLabel(), "detection_result"))
+        form.addRow(self._tr(QLabel(), "mouse_button"), self.mouse_button_combo)
+        self.draw_check = self._tr(QCheckBox(), "draw_image_check")
+        form.addRow(self.draw_check)
+        layout.addWidget(Card().add(form))
+        result_card = Card().add(set_role(self._tr(QLabel(), "detection_result"), "sectionTitle"))
         self.detect_result_text = QTextEdit()
         self.detect_result_text.setReadOnly(True)
-        layout.addWidget(self.detect_result_text)
+        layout.addWidget(result_card.add(self.detect_result_text, stretch=1), stretch=1)
         self._status_key = ""
         self._task = TabTask(self)
         self._task.result.connect(self._on_result)

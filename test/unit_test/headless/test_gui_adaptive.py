@@ -87,6 +87,57 @@ def test_a_flow_row_wraps_instead_of_widening(qapp):
     host.deleteLater()
 
 
+def test_a_page_with_a_flow_row_scrolls_only_below_its_minimum_height(qapp):
+    from PySide6.QtWidgets import QPlainTextEdit, QScrollArea, QVBoxLayout, QWidget
+    from je_auto_control.gui.adaptive.flow_layout import FlowLayout
+    page = QWidget()
+    layout = QVBoxLayout(page)
+    flow = FlowLayout(spacing=10)
+    for index in range(3):
+        flow.addWidget(_button(f"b{index}", 100))
+    layout.addLayout(flow)
+    editor = QPlainTextEdit()
+    editor.setMinimumHeight(60)
+    layout.addWidget(editor, 1)
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setWidget(page)
+    area.resize(420, 200)          # below the page's preferred height, above its minimum
+    area.show()
+    for _ in range(4):
+        qapp.processEvents()
+    assert page.sizeHint().height() > 200
+    assert area.verticalScrollBar().maximum() == 0, "a page that fits its minimum must not scroll"
+    one_row = page.minimumSizeHint().height()
+    area.resize(150, 400)          # 100 px buttons in ~130 px: one per row
+    for _ in range(4):
+        qapp.processEvents()
+    assert page.minimumSizeHint().height() >= one_row + 2 * 30, "the wrapped rows raise the minimum height"
+    assert all(flow.itemAt(i).geometry().bottom() < editor.geometry().top() for i in range(3)), \
+        "wrapped rows never overlap what comes after them"
+    area.deleteLater()
+
+
+def test_a_flow_line_gives_spare_width_to_fields_and_centres_short_items(qapp):
+    from PySide6.QtWidgets import QCheckBox, QLineEdit, QPlainTextEdit, QWidget
+    from je_auto_control.gui.adaptive.flow_layout import FlowLayout
+    host = QWidget()
+    flow = FlowLayout(host, spacing=10)
+    button, field, check = _button("fixed", 80), QLineEdit(), QCheckBox("Auto")
+    tall = QPlainTextEdit()
+    tall.setFixedSize(100, 80)
+    for widget in (button, field, check, tall):
+        flow.addWidget(widget)
+    host.resize(700, 120)
+    flow.setGeometry(host.rect())
+    used = sum(w.width() for w in (button, field, check, tall)) + 3 * 10
+    assert button.width() == 80, "a fixed item keeps its width"
+    assert field.width() > field.sizeHint().width(), "the line edit takes the spare width"
+    assert used == 700, used
+    assert abs(check.geometry().center().y() - tall.geometry().center().y()) <= 1, "short items are centred on the line"
+    host.deleteLater()
+
+
 def test_a_hidden_item_takes_no_room_in_a_flow(qapp):
     from PySide6.QtWidgets import QWidget
     from je_auto_control.gui.adaptive.flow_layout import FlowLayout

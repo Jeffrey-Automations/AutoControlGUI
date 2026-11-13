@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLabel, QSpinBox,
+    QFileDialog, QLabel, QSpinBox,
     QPlainTextEdit, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
 )
 # pylint: disable-next=no-name-in-module  # reason: compiled Qt export is exercised by offscreen batch-ID tests
@@ -16,6 +16,9 @@ from PySide6.QtWidgets import QLineEdit
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -142,23 +145,22 @@ class DagTab(TranslatableMixin, QWidget):
         # Load/validate/run commands run from the Actions menu; the tab
         # keeps only the editor, the parallel input, table, and status.
         root = QVBoxLayout(self)
-        controls = QHBoxLayout()
-        controls.addWidget(QLabel(_t("dag_parallel_label")))
-        controls.addWidget(self._max_parallel)
+        root.setSpacing(12)
         batch_label, batch_id = QLabel(), QLineEdit()
         batch_label.setObjectName("dag_batch_label")
         batch_id.setObjectName("dag_batch_id")
-        controls.addWidget(batch_label)
-        controls.addWidget(batch_id)
-        controls.addStretch()
-        root.addLayout(controls)
-        root.addWidget(self._editor, stretch=2)
+        root.addWidget(Card().add(flow_of(
+            field_pair(self._tr(QLabel(), "dag_parallel_label"), self._max_parallel),
+            field_pair(batch_label, batch_id))))
+        editor = Card().add(self._editor, stretch=1)
+        nodes = Card().add(self._table, stretch=1)
+        root.addWidget(ResponsiveBox(editor, nodes, stretches=(2, 3)), stretch=1)
+        self._status_label.setWordWrap(True)
+        set_role(self._status_label, "hint")
         root.addWidget(self._status_label)
-        root.addWidget(self._table, stretch=3)
-        root.addWidget(self._inspection_output)
         continuation = QPlainTextEdit("{}")
         continuation.setObjectName("dag_continuation_request")
-        root.addWidget(continuation)
+        root.addWidget(ResponsiveBox(Card().add(self._inspection_output), Card().add(continuation)))
         self._apply_translations()
 
     def dispose(self) -> None:

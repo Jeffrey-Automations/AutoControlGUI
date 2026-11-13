@@ -2,12 +2,13 @@
 from typing import Optional
 
 from PySide6.QtWidgets import (
-    QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget,
+    QFormLayout, QLabel, QLineEdit, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._worker_thread import CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -46,14 +47,14 @@ class VLMTab(TranslatableMixin, QWidget):
         # Locate/click commands run from the Actions menu; the tab keeps
         # only the description/model inputs and the result labels.
         root = QVBoxLayout(self)
-        desc_row = QHBoxLayout()
-        desc_row.addWidget(self._tr(QLabel(), "vlm_desc_label"))
-        desc_row.addWidget(self._description, stretch=1)
-        root.addLayout(desc_row)
-        model_row = QHBoxLayout()
-        model_row.addWidget(self._tr(QLabel(), "vlm_model_label"))
-        model_row.addWidget(self._model, stretch=1)
-        root.addLayout(model_row)
+        root.setSpacing(12)
+        form = QFormLayout()
+        form.addRow(self._tr(QLabel(), "vlm_desc_label"), self._description)
+        form.addRow(self._tr(QLabel(), "vlm_model_label"), self._model)
+        root.addWidget(Card().add(form))
+        self._last_result.setWordWrap(True)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._last_result)
         root.addWidget(self._status)
         root.addStretch()

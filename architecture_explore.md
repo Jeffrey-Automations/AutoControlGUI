@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,536 |
-| 程式碼總行數 | 235,073 |
+| 程式碼總行數 | 235,230 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1299,27 +1299,27 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `main_widget.py` | 86 | Configured application workspace preserving the embedded-widget entry point. `AutoControlGUIWidget` 以單一 registry 註冊既有分頁，保留 Remote Desktop factory 與嵌入相容入口。 |
 | `tab_registry.py` | 234 | 分頁表：每個分頁一筆 `TabSpec`（鍵、標題鍵、分類、模組與類別名），`TabEntry` 在第一次存取 `widget` 時才呼叫 factory。`TabRegistry.open/close` 快取或釋放 factory 面板，保留 metadata 與外部提供的 widget；不匯入 Qt。 |
 | `navigation.py` | 212 | `NavigationPanel`：品牌標題、搜尋框 + 依分類的功能樹，列出每個已註冊分頁（開啟中的以粗體標示），只回報被選的鍵，開啟分頁仍由視窗負責。停靠面板與窄視窗抽屜各有一個實例。 |
-| `theme.py` | 233 | 設計 token（`ThemeTokens`：顏色、狀態色、圓角、間距、字族）、深色與淺色兩組值、由 token 產生的樣式表（卡片、頁首、`role` 屬性）、隨字級縮放的標題字階（`type_scale_rules`）與對應的 `QPalette`；不載入圖檔或字型檔。 |
+| `theme.py` | 234 | 設計 token（`ThemeTokens`：顏色、狀態色、圓角、間距、字族）、深色與淺色兩組值、由 token 產生的樣式表（卡片、頁首、`role` 屬性）、隨字級縮放的標題字階（`type_scale_rules`）與對應的 `QPalette`；不載入圖檔或字型檔。 |
 | `adaptive/__init__.py` | 9 | Adaptive layout building blocks shared by the window and every page. 只匯出 Qt-free 的 `WidthClass`／`classify`。 |
 | `adaptive/breakpoints.py` | 46 | Width classes for the adaptive window, with hysteresis so a resize near a boundary does not flicker. compact（<800）／medium／expanded（≥1200），邊界前後 24 px 不反覆切換；不匯入 Qt。 |
-| `adaptive/flow_layout.py` | 105 | A layout that places items left to right and wraps them onto the next line when the row is full. 最小寬度只等於最寬的一項。 |
-| `adaptive/responsive.py` | 119 | Containers that rearrange by width, and the pass that stops a page's controls from forcing it wide. `ResponsiveBox`（窄時上下堆疊）、`fit_to_width`（下拉選單不再以最長項目定寬、表單窄時標籤移到欄位上方、長標籤換行），工作區放入每頁時跑一次。 |
+| `adaptive/flow_layout.py` | 166 | A layout that places items left to right and wraps them onto the next line when the row is full. 最小寬度只等於最寬的一項。 |
+| `adaptive/responsive.py` | 120 | Containers that rearrange by width, and the pass that stops a page's controls from forcing it wide. `ResponsiveBox`（窄時上下堆疊）、`fit_to_width`（下拉選單不再以最長項目定寬、表單窄時標籤移到欄位上方、長標籤換行），工作區放入每頁時跑一次。 |
 | `adaptive/surfaces.py` | 160 | Cards, page headers and empty states: the shared surfaces every page is built from. `Card`、`PageHeader`（標題＋`<title_key>_subtitle` 說明，缺字串時隱藏）、`EmptyState`、`add_page_header`、`retranslate_surfaces`。 |
 | `adaptive/style.py` | 102 | Fusion with check boxes and radio buttons drawn from the palette's accent. `AdaptiveStyle`：Fusion 的指示器外框在深色主題下幾乎看不見，改以向量繪製。 |
 | `adaptive/glyphs.py` | 52 | Small line icons drawn in code, so the navigation rail ships no image files and follows the theme. 選單、搜尋、詳情三個圖示，1x／2x／3x。 |
 | `adaptive/overlay.py` | 102 | A drawer that slides a panel over part of a host widget, dimming the rest until it is dismissed. `OverlayDrawer`：Escape 或點擊遮罩關閉。 |
 | `adaptive_window.py` | 179 | Rearrange the main window's navigation and details panes as the window's width class changes. `AdaptiveWindowLayout`：expanded 兩側停靠；medium 詳情改抽屜；compact 導覽改圖示欄＋抽屜。「想要停靠導覽」與寬度是否允許分開記錄，窄視窗不會改寫使用者偏好。 |
-| `workspace.py` | 528 | Registry-owned tab workspace with scrollable pages and passive execution details. `WorkspaceShell(registry, parent)` 保留分頁身分、弱關閉觀測、show/hide/close API 與右側詳情；每頁放入時加頁首並跑 `fit_to_width`；`set_details_overlay` 讓詳情在窄視窗改為右側抽屜。 |
+| `workspace.py` | 567 | Registry-owned tab workspace with scrollable pages and passive execution details. `WorkspaceShell(registry, parent)` 保留分頁身分、弱關閉觀測、show/hide/close API 與右側詳情；每頁放入時加頁首並跑 `fit_to_width`；`set_details_overlay` 讓詳情在窄視窗改為右側抽屜。 |
 | `workspace_details.py` | 97 | Immutable execution snapshots and a passive, scrollable workspace detail view. Diagnostics 提供第一個實際 publisher；僅訂閱目前頁面。 |
 | `workspace_settings.py` | 36 | 驗證與載入主題、字級、導覽面板顯示與寬度；QSettings 使用當次帳號家目錄的 `gui.ini`，測試可注入獨立檔案。 |
-| `agent_transfer_view.py` | 166 | Explicit transfer requests and consent preparation with revision-bound background observations. |
+| `agent_transfer_view.py` | 171 | Explicit transfer requests and consent preparation with revision-bound background observations. |
 | `config_sync_worker.py` | 131 | Run explicit workspace requests with immutable inputs, live authority and cooperative cancellation. |
-| `config_sync_tab.py` | 413 | Lazy Actions-menu workspace synchronization, causal review and explicit live preference application. |
-| `_auto_click_tab.py` | 326 | 獨立自動點擊分頁；快照工作參數，以 TabTask 執行與取消。 |
-| `_screenshot_tab.py` | 179 | 獨立延遲建立的截圖／像素分頁；背景讀取、輸入快照與關閉後結果丟棄。 |
-| `_image_detect_tab.py` | 159 | 獨立影像偵測分頁，擁有輸入、背景工作與關閉生命週期。 |
+| `config_sync_tab.py` | 423 | Lazy Actions-menu workspace synchronization, causal review and explicit live preference application. |
+| `_auto_click_tab.py` | 321 | 獨立自動點擊分頁；快照工作參數，以 TabTask 執行與取消。 |
+| `_screenshot_tab.py` | 180 | 獨立延遲建立的截圖／像素分頁；背景讀取、輸入快照與關閉後結果丟棄。 |
+| `_image_detect_tab.py` | 158 | 獨立影像偵測分頁，擁有輸入、背景工作與關閉生命週期。 |
 | `_script_tab.py` | 183 | 獨立腳本執行分頁；背景載入與執行，關閉取消並釋放控制項。 |
-| `_record_tab.py` | 162 | 獨立錄製／回放檢視；背景工作與共享錄製器狀態，關閉檢視不停止錄製器。 |
+| `_record_tab.py` | 166 | 獨立錄製／回放檢視；背景工作與共享錄製器狀態，關閉檢視不停止錄製器。 |
 | `_report_tab.py` | 106 | 報表分頁 mixin。 |
 | `_i18n_helpers.py` | 79 | 需要即時語言切換的分頁共用的翻譯註冊 mixin。 |
 | `_validators.py` | 29 | `int_validator()`／`double_validator()`：以 C locale 驗證的數字輸入框 validator，接受的正是 `int()`／`float()` 讀得懂的寫法（預設 locale 在法文、德文下只收小數逗號）。所有數字 `QLineEdit` 都用它。 |
@@ -1346,55 +1346,55 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 
 | 分頁 | 模組 | 行數 | 職責 |
 | --- | --- | ---: | --- |
-| auto_click | `_auto_click_tab.py` | 326 | 自動點擊：座標、間隔、熱鍵、`write`、捲動。 |
-| screenshot | `_screenshot_tab.py` | 179 | 截圖、選區、螢幕尺寸、取像素色。 |
-| image_detect | `_image_detect_tab.py` | 159 | 樣板裁切、定位、定位全部、定位並點擊。 |
-| record | `_record_tab.py` | 162 | 錄製／停止／回放／存檔／載入。 |
-| script_builder | `script_builder/` | 6,911 | **視覺化腳本編輯器**：`command_schema.py`（5,551 行 `AC_*` 參數綱要）、`step_model.py`（步驟模型與 AC JSON 序列化）、`step_list_view.py`（含巢狀 body 的樹狀檢視）、`step_form_view.py`（綱要驅動表單）、`builder_tab.py`（含日誌候選預覽與明確匯入，保留來源）。 |
-| flow_editor | `flow_editor/` | 490 | 節點式流程圖檢視：`layout.py`（純 Python 佈局演算法，可單測）、`scene.py`（Qt 場景繪製）、`tab.py`。 |
+| auto_click | `_auto_click_tab.py` | 321 | 自動點擊：座標、間隔、熱鍵、`write`、捲動。 |
+| screenshot | `_screenshot_tab.py` | 180 | 截圖、選區、螢幕尺寸、取像素色。 |
+| image_detect | `_image_detect_tab.py` | 158 | 樣板裁切、定位、定位全部、定位並點擊。 |
+| record | `_record_tab.py` | 166 | 錄製／停止／回放／存檔／載入。 |
+| script_builder | `script_builder/` | 6,928 | **視覺化腳本編輯器**：`command_schema.py`（5,551 行 `AC_*` 參數綱要）、`step_model.py`（步驟模型與 AC JSON 序列化）、`step_list_view.py`（含巢狀 body 的樹狀檢視）、`step_form_view.py`（綱要驅動表單）、`builder_tab.py`（含日誌候選預覽與明確匯入，保留來源）。 |
+| flow_editor | `flow_editor/` | 496 | 節點式流程圖檢視：`layout.py`（純 Python 佈局演算法，可單測）、`scene.py`（Qt 場景繪製）、`tab.py`。 |
 | script | `_script_tab.py` | 183 | 載入／執行單檔或整個目錄、內建編輯器執行。 |
-| recording_editor | `recording_editor_tab.py` | 262 | 裁切、過濾、重新縮放錄製內容；Actions 提供背景日誌候選審閱。 |
-| variables | `variables_tab.py` | 169 | 檢視、灌入、清除 executor 執行期作用域。 |
-| secrets | `secrets_tab.py` | 187 | 解鎖保險庫並管理 `${secrets.NAME}`。 |
-| vlm | `vlm_tab.py` | 125 | 用文字描述 UI 元素，交由模型定位。 |
-| self_healing | `self_healing_tab.py`、`healing_evaluation_panel.py`、`healing_evaluation_worker.py`、`template_candidate_panel.py`、`template_candidate_worker.py` | 941 | 執行時定位／記錄、固定影像版本比較、原始步驟與候選樣板生命週期；背景工作可取消並丟棄過期結果。 |
-| ocr_reader | `ocr_tab.py` | 195 | 傾印區域文字或以 regex 搜尋。 |
-| accessibility | `accessibility_tab.py` | 192 | 瀏覽 OS UI 樹並依 role/name 點擊。 |
-| live_hud | `live_hud_tab.py` | 136 | 即時 HUD：滑鼠位置、游標下像素色、log tail。 |
-| llm_planner | `llm_planner_tab.py` | 200 | 自然語言描述 → 預覽 → 執行。 |
-| computer_use | `computer_use_tab.py` | 179 | 從 GUI 啟動 Anthropic 閉環 agent。 |
-| agent_tasks | `agent_tasks_tab.py` | 609 | 受管任務輸入、狀態與 Actions menu；服務獨立於視圖生命週期。 |
-| scheduler | `scheduler_tab.py` | 173 | 註冊間隔式 action JSON 執行。 |
-| hotkeys | `hotkeys_tab.py` | 165 | 將全域熱鍵綁到 action 檔。 |
-| triggers | `triggers_tab.py` | 382 | 影像／視窗／像素／檔案事件監看。 |
-| webhooks | `webhooks_tab.py` | 229 | 將 HTTP 請求綁到 action 腳本。 |
-| email_triggers | `email_triggers_tab.py` | 257 | 將 IMAP 信箱綁到 action 腳本。 |
-| test_suite | `test_suite_tab.py` | 197 | 執行 QA 套件規格並管理易碎隔離區。 |
-| assertions | `assertions_tab.py` | 150 | 執行單一畫面狀態斷言並顯示通過／失敗。 |
-| data_source | `data_source_tab.py` | 136 | 預覽無頭資料層載入的資料列。 |
-| flakiness | `flakiness_tab.py` | 116 | 依執行歷史排序間歇失敗的腳本。 |
-| a11y_audit | `a11y_audit_tab.py` | 133 | 從即時樹找出無障礙／i18n 缺陷。 |
+| recording_editor | `recording_editor_tab.py` | 255 | 裁切、過濾、重新縮放錄製內容；Actions 提供背景日誌候選審閱。 |
+| variables | `variables_tab.py` | 170 | 檢視、灌入、清除 executor 執行期作用域。 |
+| secrets | `secrets_tab.py` | 190 | 解鎖保險庫並管理 `${secrets.NAME}`。 |
+| vlm | `vlm_tab.py` | 126 | 用文字描述 UI 元素，交由模型定位。 |
+| self_healing | `self_healing_tab.py`、`healing_evaluation_panel.py`、`healing_evaluation_worker.py`、`template_candidate_panel.py`、`template_candidate_worker.py` | 955 | 執行時定位／記錄、固定影像版本比較、原始步驟與候選樣板生命週期；背景工作可取消並丟棄過期結果。 |
+| ocr_reader | `ocr_tab.py` | 192 | 傾印區域文字或以 regex 搜尋。 |
+| accessibility | `accessibility_tab.py` | 193 | 瀏覽 OS UI 樹並依 role/name 點擊。 |
+| live_hud | `live_hud_tab.py` | 140 | 即時 HUD：滑鼠位置、游標下像素色、log tail。 |
+| llm_planner | `llm_planner_tab.py` | 203 | 自然語言描述 → 預覽 → 執行。 |
+| computer_use | `computer_use_tab.py` | 185 | 從 GUI 啟動 Anthropic 閉環 agent。 |
+| agent_tasks | `agent_tasks_tab.py` | 618 | 受管任務輸入、狀態與 Actions menu；服務獨立於視圖生命週期。 |
+| scheduler | `scheduler_tab.py` | 174 | 註冊間隔式 action JSON 執行。 |
+| hotkeys | `hotkeys_tab.py` | 166 | 將全域熱鍵綁到 action 檔。 |
+| triggers | `triggers_tab.py` | 384 | 影像／視窗／像素／檔案事件監看。 |
+| webhooks | `webhooks_tab.py` | 222 | 將 HTTP 請求綁到 action 腳本。 |
+| email_triggers | `email_triggers_tab.py` | 250 | 將 IMAP 信箱綁到 action 腳本。 |
+| test_suite | `test_suite_tab.py` | 200 | 執行 QA 套件規格並管理易碎隔離區。 |
+| assertions | `assertions_tab.py` | 148 | 執行單一畫面狀態斷言並顯示通過／失敗。 |
+| data_source | `data_source_tab.py` | 132 | 預覽無頭資料層載入的資料列。 |
+| flakiness | `flakiness_tab.py` | 115 | 依執行歷史排序間歇失敗的腳本。 |
+| a11y_audit | `a11y_audit_tab.py` | 138 | 從即時樹找出無障礙／i18n 缺陷。 |
 | device_matrix | `device_matrix_tab.py` | 139 | 一份 action list 跨多裝置平行執行。 |
-| mobile | `mobile_tab.py` | 216 | Android／iOS 裝置工作階段：設定報告、擷取、手勢、輸入與能力矩陣。 |
-| media_checks | `media_checks_tab.py` | 136 | 音訊活動與影片動態斷言。 |
-| run_history | `run_history_tab.py` + `run_history_timeline.py` + `journal_browser.py` + `journal_browser_worker.py` | 826 | 瀏覽已記錄的執行、時間軸、截圖與非擁有式日誌連結；內嵌背景快照查閱。 |
-| profiler | `profiler_tab.py` | 138 | 視覺化逐動作耗時熱點。 |
-| window_manager | `window_tab.py` | 137 | 列出、聚焦、關閉視窗。 |
-| plugins | `plugins_tab.py` | 82 | 從使用者目錄載入額外 `AC_` 指令。 |
-| webrunner | `webrunner_tab.py` | 204 | 從 GUI 驅動 `je_web_runner`。 |
-| dag_runner | `dag_tab.py` | 369 | 編輯、驗證、執行跨主機 DAG。 |
-| chatops | `chatops_tab.py` | 144 | 在接上 Slack 前先本機測試 slash 指令。 |
-| trace_replay | `trace_replay_tab.py` | 192 | 拖曳捲動時光回溯錄製內容。 |
-| remote_desktop | `remote_desktop/`（40 檔） | 8,353 | 見下。 |
-| presence | `presence_tab.py` | 164 | 多檢視者在場名單。 |
-| rest_api | `rest_api_tab.py` | 260 | 啟停 HTTP 前端並顯示 URL、實際驗證模式與可用 token。 |
-| admin_console | `admin_console_tab.py` | 318 | 管理多個遠端 AutoControl REST 端點。 |
-| audit_log | `audit_log_tab.py` | 191 | 瀏覽並驗證防竄改雜湊鏈。 |
-| inspector | `inspector_tab.py` | 128 | WebRTC 檢測器：即時摘要與近期統計取樣。 |
-| usb_devices | `usb_devices_tab.py` | 168 | 唯讀列舉 + 熱插拔監看控制。 |
-| usb_browser | `usb_browser_tab.py` | 290 | 檢視端 USB 裝置瀏覽器。 |
-| usb_share | `usb_passthrough_panel.py` + `usb_passthrough_prompt.py` | 778 | AnyDesk 風格 USB 直通面板與主機端 ACL 授權對話框。 |
-| diagnostics | `diagnostics_tab.py` | 232 | Actions 提供被動快照、背景主動診斷與停止；四語進度／重試、關閉後結果隔離；不自動取得授權。 |
+| mobile | `mobile_tab.py` | 222 | Android／iOS 裝置工作階段：設定報告、擷取、手勢、輸入與能力矩陣。 |
+| media_checks | `media_checks_tab.py` | 129 | 音訊活動與影片動態斷言。 |
+| run_history | `run_history_tab.py` + `run_history_timeline.py` + `journal_browser.py` + `journal_browser_worker.py` | 823 | 瀏覽已記錄的執行、時間軸、截圖與非擁有式日誌連結；內嵌背景快照查閱。 |
+| profiler | `profiler_tab.py` | 141 | 視覺化逐動作耗時熱點。 |
+| window_manager | `window_tab.py` | 139 | 列出、聚焦、關閉視窗。 |
+| plugins | `plugins_tab.py` | 85 | 從使用者目錄載入額外 `AC_` 指令。 |
+| webrunner | `webrunner_tab.py` | 203 | 從 GUI 驅動 `je_web_runner`。 |
+| dag_runner | `dag_tab.py` | 371 | 編輯、驗證、執行跨主機 DAG。 |
+| chatops | `chatops_tab.py` | 140 | 在接上 Slack 前先本機測試 slash 指令。 |
+| trace_replay | `trace_replay_tab.py` | 194 | 拖曳捲動時光回溯錄製內容。 |
+| remote_desktop | `remote_desktop/`（40 檔） | 8,335 | 見下。 |
+| presence | `presence_tab.py` | 168 | 多檢視者在場名單。 |
+| rest_api | `rest_api_tab.py` | 256 | 啟停 HTTP 前端並顯示 URL、實際驗證模式與可用 token。 |
+| admin_console | `admin_console_tab.py` | 326 | 管理多個遠端 AutoControl REST 端點。 |
+| audit_log | `audit_log_tab.py` | 193 | 瀏覽並驗證防竄改雜湊鏈。 |
+| inspector | `inspector_tab.py` | 133 | WebRTC 檢測器：即時摘要與近期統計取樣。 |
+| usb_devices | `usb_devices_tab.py` | 170 | 唯讀列舉 + 熱插拔監看控制。 |
+| usb_browser | `usb_browser_tab.py` | 288 | 檢視端 USB 裝置瀏覽器。 |
+| usb_share | `usb_passthrough_panel.py` + `usb_passthrough_prompt.py` | 770 | AnyDesk 風格 USB 直通面板與主機端 ACL 授權對話框。 |
+| diagnostics | `diagnostics_tab.py` | 234 | Actions 提供被動快照、背景主動診斷與停止；四語進度／重試、關閉後結果隔離；不自動取得授權。 |
 | report | `_report_tab.py` | 106 | 產生 HTML／JSON／XML 報表。 |
 
 #### 診斷顯示輔助
@@ -1403,7 +1403,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `gui/diagnostics_capabilities.py` | 60 | 只呈現既有不可變能力快照與四語狀態；不探測、不連線，不持有原生物件。 |
 
-#### 遠端桌面 GUI（`gui/remote_desktop/`，40 檔／8,353 行）
+#### 遠端桌面 GUI（`gui/remote_desktop/`，40 檔／8,335 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1415,17 +1415,17 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `folder_sync_io.py` | 130 | Bind confirmed folder sends, cancellation and frozen receipts to one captured GUI owner. |
 | `webrtc_panel_state.py` | 165 | 主機／檢視端 mixin 的具體 Qt 狀態與 slot 型別契約；不新增執行時預設值。 |
 | `webrtc_panel.py` | 422 | WebRTC 子分頁主體。 |
-| `webrtc_dialogs.py` | 520 | WebRTC GUI 用的自訂對話框與清單元件（待審檢視者、信任清單、通訊錄、遠端檔案表、稽核記錄、LAN 瀏覽）。 |
-| `advanced_group.py` | 104 | 兩個 WebRTC 面板共用的 Advanced STUN／TURN（含選用硬體編碼器）群組，含分離的 STUN／TURN 與選用主機硬體編碼器 Protocol。 |
-| `trusted_group.py` | 73 | WebRTC host 面板的信任 viewer 清單群組（移除／清空／匯入／匯出），含它寫回面板的 Protocol。 |
-| `connection_screen.py` | 667 | Quick Connect —— AnyDesk 風格單畫面入口。 |
-| `viewer_panel.py` | 599 | 「控制另一台機器」子分頁。 |
-| `webrtc_known_hosts.py` | 346 | TOFU 釘選庫瀏覽器：`KnownHostsDialog` 與帶外釘選用的小表單。由 `webrtc_dialogs` 再匯出。 |
-| `host_panel.py` | 437 | 「分享這台機器」子分頁。 |
+| `webrtc_dialogs.py` | 524 | WebRTC GUI 用的自訂對話框與清單元件（待審檢視者、信任清單、通訊錄、遠端檔案表、稽核記錄、LAN 瀏覽）。 |
+| `advanced_group.py` | 99 | 兩個 WebRTC 面板共用的 Advanced STUN／TURN（含選用硬體編碼器）群組，含分離的 STUN／TURN 與選用主機硬體編碼器 Protocol。 |
+| `trusted_group.py` | 75 | WebRTC host 面板的信任 viewer 清單群組（移除／清空／匯入／匯出），含它寫回面板的 Protocol。 |
+| `connection_screen.py` | 672 | Quick Connect —— AnyDesk 風格單畫面入口。 |
+| `viewer_panel.py` | 594 | 「控制另一台機器」子分頁。 |
+| `webrtc_known_hosts.py` | 339 | TOFU 釘選庫瀏覽器：`KnownHostsDialog` 與帶外釘選用的小表單。由 `webrtc_dialogs` 再匯出。 |
+| `host_panel.py` | 419 | 「分享這台機器」子分頁。 |
 | `frame_display.py` | 229 | 繪製 JPEG 影格並發出遠端輸入事件的元件。 |
 | `webrtc_workers.py` | 237 | 訊令流程的背景 worker（`DaemonThread`，長輪詢比面板或程式活得久也不會中止行程）。 |
 | `tab.py` | 179 | 外層容器分頁。 |
-| `_helpers.py` | 273 | 面板共用輔助：翻譯、Qt→AC 鍵滑鼠對應、TLS context、狀態徽章、指紋與時間格式化。 |
+| `_helpers.py` | 294 | 面板共用輔助：翻譯、Qt→AC 鍵滑鼠對應、TLS context、狀態徽章、指紋與時間格式化。 |
 | `remote_screen_window.py` | 140 | 檢視端的彈出視窗。 |
 | `tray_icon.py` | 106 | WebRTC 主機的系統匣圖示。 |
 | `annotation_overlay.py` | 174 | 主機端標註的透明最上層覆蓋。 |
@@ -1542,7 +1542,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 159 | 41,876 |
+| `gui/` | 159 | 42,033 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1563,7 +1563,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,153 |
-| **總計** | **1,524** | **234,328** |
+| **總計** | **1,524** | **234,485** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

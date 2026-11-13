@@ -23,13 +23,9 @@ pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 #: The most a page may need, in average characters of the label font (about 460 px in 10 pt Segoe UI):
 #: a compact window's width less the navigation rail and a scroll bar.
 BUDGET = 72
-#: Pages still over the budget, with the most each may need until it is reworked.
-WIDE_PAGES = {
-    "script_builder": 134,
-    "flakiness": 92,
-    "audit_log": 83,
-    "usb_share": 81,
-}
+#: Pages still over the budget, with the most each may need until it is reworked. Empty since the
+#: 2026-11-14 rework; a page that needs an entry again needs a reason in Progress.md.
+WIDE_PAGES: dict = {}
 
 _PROBE = r"""
 import json, os, sys

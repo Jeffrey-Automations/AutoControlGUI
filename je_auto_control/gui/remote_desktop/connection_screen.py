@@ -28,6 +28,8 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._weak_call import WeakCall
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
@@ -194,11 +196,11 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
     # --- layout -------------------------------------------------------
 
     def _build_layout(self) -> None:
-        root = QHBoxLayout(self)
-        root.setContentsMargins(20, 20, 20, 20)
-        root.setSpacing(20)
-        root.addWidget(self._build_host_section(), stretch=1)
-        root.addWidget(self._build_viewer_section(), stretch=1)
+        root = QVBoxLayout(self)
+        root.setSpacing(12)
+        # The two halves sit side by side on a wide window and stack on a narrow one.
+        root.addWidget(ResponsiveBox(self._build_host_section(), self._build_viewer_section(),
+                                     stretches=(1, 1)), stretch=1)
 
     def _build_host_section(self) -> QWidget:
         group = QGroupBox()
@@ -279,11 +281,14 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         return group
 
     def _build_recent_box(self) -> QWidget:
-        box = QGroupBox()
-        self._tr(box, "rd_quick_recent", setter="setTitle")
+        # A heading over the list rather than a box inside the section's box.
+        box = QWidget()
+        box.setProperty("role", "bare")
         layout = QVBoxLayout(box)
-        layout.setContentsMargins(8, 14, 8, 8)
-        layout.addWidget(self._recent)
+        layout.setContentsMargins(0, 6, 0, 0)
+        layout.setSpacing(6)
+        layout.addWidget(set_role(self._tr(QLabel(), "rd_quick_recent"), "sectionTitle"))
+        layout.addWidget(self._recent, stretch=1)
         return box
 
     # --- hosting ------------------------------------------------------

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.healing_evaluation_panel import HealingEvaluationPanel
 from je_auto_control.gui.journal_browser import JournalBrowser
 from je_auto_control.gui.template_candidate_panel import TemplateCandidatePanel
@@ -88,13 +89,18 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         # Browse/locate/click/refresh/clear commands run from the Actions
         # menu; the tab keeps only the inputs, the log table, and the status.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         runtime = QWidget()
+        runtime.setProperty("role", "bare")
         runtime_layout = QVBoxLayout(runtime)
+        runtime_layout.setSpacing(12)
         runtime_layout.addWidget(self._build_form_group())
         views = QSplitter(Qt.Orientation.Vertical)
         views.addWidget(self._table)
         views.addWidget(self._details)
-        runtime_layout.addWidget(views, stretch=1)
+        runtime_layout.addWidget(Card().add(views, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         runtime_layout.addWidget(self._status)
         self._views = QTabWidget()
         self._evaluation = HealingEvaluationPanel(self)

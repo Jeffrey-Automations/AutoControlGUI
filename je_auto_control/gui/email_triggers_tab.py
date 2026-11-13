@@ -3,7 +3,7 @@ from typing import Optional
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QFileDialog, QGroupBox, QHBoxLayout,
+    QAbstractItemView, QCheckBox, QFileDialog, QGroupBox,
     QHeaderView, QLabel, QLineEdit, QMessageBox,
     QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui._worker_thread import CallWorker, WorkerHandle, start_worker
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -96,47 +98,38 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         # Actions menu; the tab keeps only the inputs, the table, and the
         # status line.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
 
         engine_box = self._tr(QGroupBox(), "eml_engine_group")
-        engine_layout = QHBoxLayout(engine_box)
+        engine_layout = QVBoxLayout(engine_box)
+        self._status_label.setWordWrap(True)
+        set_role(self._status_label, "hint")
         engine_layout.addWidget(self._status_label)
-        engine_layout.addStretch()
         root.addWidget(engine_box)
 
         add_box = self._tr(QGroupBox(), "eml_add_group")
         add_layout = QVBoxLayout(add_box)
-        host_row = QHBoxLayout()
-        host_row.addWidget(self._tr(QLabel(), "eml_host_label"))
-        host_row.addWidget(self._host_input)
-        host_row.addWidget(self._tr(QLabel(), "eml_port_label"))
-        host_row.addWidget(self._port_input)
-        host_row.addWidget(self._ssl_check)
-        add_layout.addLayout(host_row)
-        creds_row = QHBoxLayout()
-        creds_row.addWidget(self._tr(QLabel(), "eml_user_label"))
-        creds_row.addWidget(self._user_input)
-        creds_row.addWidget(self._tr(QLabel(), "eml_password_label"))
-        creds_row.addWidget(self._password_input)
-        add_layout.addLayout(creds_row)
-        mb_row = QHBoxLayout()
-        mb_row.addWidget(self._tr(QLabel(), "eml_mailbox_label"))
-        mb_row.addWidget(self._mailbox_input)
-        mb_row.addWidget(self._tr(QLabel(), "eml_search_label"))
-        mb_row.addWidget(self._search_input)
-        add_layout.addLayout(mb_row)
-        poll_row = QHBoxLayout()
-        poll_row.addWidget(self._tr(QLabel(), "eml_poll_label"))
-        poll_row.addWidget(self._poll_input)
-        poll_row.addWidget(self._mark_seen_check)
-        poll_row.addStretch()
-        add_layout.addLayout(poll_row)
-        script_row = QHBoxLayout()
-        script_row.addWidget(self._tr(QLabel(), "eml_script_label"))
-        script_row.addWidget(self._script_input)
-        add_layout.addLayout(script_row)
+        rows = (
+            (self._pair("eml_host_label", self._host_input, 280),
+             self._pair("eml_port_label", self._port_input), self._ssl_check),
+            (self._pair("eml_user_label", self._user_input, 280),
+             self._pair("eml_password_label", self._password_input, 280)),
+            (self._pair("eml_mailbox_label", self._mailbox_input),
+             self._pair("eml_search_label", self._search_input)),
+            (self._pair("eml_poll_label", self._poll_input), self._mark_seen_check),
+        )
+        for row in rows:
+            add_layout.addLayout(flow_of(*row))
+        add_layout.addWidget(self._pair("eml_script_label", self._script_input))
         root.addWidget(add_box)
 
-        root.addWidget(self._table, stretch=1)
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+
+    def _pair(self, label_key: str, field: QWidget, min_width: int = 0) -> QWidget:
+        """``field`` with its translated label kept beside it, at least ``min_width`` pixels wide."""
+        pair = field_pair(self._tr(QLabel(), label_key), field)
+        pair.setMinimumWidth(min_width)
+        return pair
 
     def menu_actions(self) -> list:
         """Expose tab commands to the window-level Actions menu."""

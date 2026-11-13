@@ -9,13 +9,15 @@ import functools
 from typing import Any, Optional
 
 from PySide6.QtWidgets import (
-    QCheckBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+    QCheckBox, QDoubleSpinBox, QFileDialog, QLabel, QLineEdit,
     QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -49,13 +51,13 @@ class MediaChecksTab(TranslatableMixin, QWidget):
         self._audio_threshold.setDecimals(4)
         self._audio_threshold.setRange(0.0, 1.0)
         self._audio_threshold.setValue(0.01)
-        self._audio_expect = QCheckBox(_t("media_audio_expect"))
+        self._audio_expect = self._tr(QCheckBox(), "media_audio_expect")
         self._audio_expect.setChecked(True)
         self._video_path = QLineEdit()
         self._video_threshold = QDoubleSpinBox()
         self._video_threshold.setRange(0.0, 255.0)
         self._video_threshold.setValue(1.0)
-        self._video_expect = QCheckBox(_t("media_video_expect"))
+        self._video_expect = self._tr(QCheckBox(), "media_video_expect")
         self._video_expect.setChecked(True)
         self._result = QLabel()
         self._result.setWordWrap(True)
@@ -68,27 +70,18 @@ class MediaChecksTab(TranslatableMixin, QWidget):
         # Audio/video check and browse commands run from the Actions menu;
         # the tab keeps only the inputs and the result label.
         root = QVBoxLayout(self)
-        root.addWidget(QLabel(_t("media_audio_label")))
-        arow = QHBoxLayout()
-        arow.addWidget(QLabel(_t("media_audio_duration")))
-        arow.addWidget(self._audio_duration)
-        arow.addWidget(QLabel(_t("media_audio_threshold")))
-        arow.addWidget(self._audio_threshold)
-        arow.addWidget(self._audio_expect)
-        arow.addStretch()
-        root.addLayout(arow)
+        root.setSpacing(12)
+        audio = Card("media_audio_label")
+        audio.add(flow_of(field_pair(self._tr(QLabel(), "media_audio_duration"), self._audio_duration),
+                          field_pair(self._tr(QLabel(), "media_audio_threshold"), self._audio_threshold),
+                          self._audio_expect))
+        root.addWidget(audio)
 
-        root.addWidget(QLabel(_t("media_video_label")))
-        vrow = QHBoxLayout()
-        vrow.addWidget(QLabel(_t("media_video_path")))
-        vrow.addWidget(self._video_path, stretch=1)
-        root.addLayout(vrow)
-        vrow2 = QHBoxLayout()
-        vrow2.addWidget(QLabel(_t("media_video_threshold")))
-        vrow2.addWidget(self._video_threshold)
-        vrow2.addWidget(self._video_expect)
-        vrow2.addStretch()
-        root.addLayout(vrow2)
+        video = Card("media_video_label")
+        video.add(field_pair(self._tr(QLabel(), "media_video_path"), self._video_path))
+        video.add(flow_of(field_pair(self._tr(QLabel(), "media_video_threshold"), self._video_threshold),
+                          self._video_expect))
+        root.addWidget(video)
 
         root.addWidget(self._result)
         root.addStretch()
