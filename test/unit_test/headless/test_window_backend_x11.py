@@ -448,14 +448,46 @@ def test_posting_a_key_sends_a_press_and_a_release(backend, display):
                                                _X["KeyReleaseMask"]]
 
 
-def test_a_posted_key_is_addressed_by_keycode_not_by_character(backend,
-                                                               display):
-    # X11 has no "type this character" event; the character is Win32's idea
-    # and is dropped rather than guessed at.
+def test_a_character_the_keymap_does_not_bind_falls_back_to_the_keycode(backend,
+                                                                        display):
+    # X11 has no "type this character" event: the character only chooses a
+    # key, and with no key bound to it the given keycode is what is sent.
     backend.post_key(50, keycode=38, character="Z")
     press = display.window(50).sent[0][0]
-    assert press.fields["detail"] == 38
+    assert (press.fields["detail"], press.fields["state"]) == (38, 0)
     assert "character" not in press.fields
+
+
+def _us_keymap(display):
+    """The 5 key (keycode 14) types ``5`` / ``%``, the z key (52) ``z`` / ``Z``."""
+    display.keymap = {14: (0x35, 0x25), 52: (0x7A, 0x5A)}
+    display.keycodes = {0x35: 14, 0x25: 14, 0x7A: 52, 0x5A: 52}
+
+
+@pytest.mark.parametrize("character, detail, shifted", [
+    ("%", 14, True), ("5", 14, False), ("Z", 52, True), ("z", 52, False),
+])
+def test_a_character_is_sent_as_its_key_with_shift_when_it_is_the_shifted_level(
+        backend, display, character, detail, shifted):
+    # Before, "%" went out as the 5 key with no modifier and typed "5".
+    _us_keymap(display)
+    assert backend.post_key(50, keycode=0, character=character) is True
+    press, release = (event for event, _mask, _p in display.window(50).sent)
+    expected_state = _X["ShiftMask"] if shifted else 0
+    assert (press.fields["detail"], press.fields["state"]) == (detail, expected_state)
+    assert (release.fields["detail"], release.fields["state"]) == (detail, expected_state)
+
+
+def test_a_character_beyond_latin1_is_looked_up_by_its_unicode_keysym(backend, display):
+    display.keymap = {60: (0x010020AC, 0)}
+    display.keycodes = {0x010020AC: 60}
+    assert backend.post_key(50, keycode=0, character="€") is True
+    assert display.window(50).sent[0][0].fields["detail"] == 60
+
+
+def test_a_character_with_no_key_and_no_keycode_sends_nothing(backend, display):
+    assert backend.post_key(50, keycode=0, character="%") is False
+    assert display.window(50).sent == []
 
 
 def test_a_posted_key_is_marked_as_propagating(backend, display):

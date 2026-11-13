@@ -149,6 +149,25 @@ def test_an_unknown_key_name_is_still_refused(monkeypatch):
         w.post_key_to_window("Editor", "no_such_key")
 
 
+@pytest.mark.parametrize("name", ["%", "é", "中"])
+def test_a_character_the_table_has_no_key_for_is_posted_as_text(monkeypatch, name):
+    """Windows' table has no punctuation, so ``"%"`` raised although ``WM_CHAR`` types it."""
+    from je_auto_control.wrapper import platform_wrapper
+    backend = _PostBackend()
+    monkeypatch.setattr(w, "get_backend", lambda: backend)
+    monkeypatch.setattr(platform_wrapper, "keyboard_keys_table", {"return": 13}, raising=False)
+    assert w.post_key_to_window("Editor", name) is True
+    assert backend.posted == [(11, 0, name)]
+
+
+@windows_only
+def test_a_character_beyond_the_bmp_is_posted_as_its_two_utf16_units(queue):
+    from je_auto_control.windows.window import windows_window_manage as module
+    assert module.post_key(5, 0, "\U0001F600") is True
+    assert [(message, w_param) for message, w_param, _l in queue.messages] == [
+        (WM_CHAR, 0xD83D), (WM_CHAR, 0xDE00)]
+
+
 # --- focus / show / z-order --------------------------------------------------
 
 class _FocusBackend:

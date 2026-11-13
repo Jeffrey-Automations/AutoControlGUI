@@ -40,8 +40,8 @@
   `post_key` 每個字只到一次、DWM cloak 過濾與最大化視窗的還原都已驗；還沒驗的：另一個 DPI 的螢幕上的還原（只有一個螢幕）、
   WinUI（新版記事本）／Chromium 等非原生編輯控制項、零面積過濾（有標題列的視窗被系統夾到 202×56，到不了零）。
   `TODO`：版面檔不存最大化狀態，最大化時存下的視窗還原成螢幕大小的一般視窗；要恢復最大化就得啟用視窗，須先決定可否。
-  `TODO`：`post_key_to_window` 拒絕鍵表外的可列印字元（如 `%`），Windows 只送 `WM_CHAR` 其實能送；X11 以 keycode 送，須一起設計。
-- **X11／Wayland**：大寫與 Shift 標點的判斷假設 `keysym_to_keycode` 把大寫字母對到小寫的 keycode，沒有對著 X server 跑過。
+- **X11／Wayland**：大寫與 Shift 標點的判斷假設 `keysym_to_keycode` 把大寫字母對到小寫的 keycode，沒有對著 X server 跑過；
+  `post_key_to_window` 依 keymap 的 Shift 層加 `ShiftMask`（U-20261113-04）也只對 stub keymap 測過。
 
 ---
 

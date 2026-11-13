@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- `post_key_to_window` (`AC_post_key_to_window`, `ac_post_key_to_window`) accepts any
+  printable character, not only those in the platform's key table: on Windows `"%"` and other
+  punctuation used to raise `unknown key name`, and a character beyond the BMP is now posted
+  as its two UTF-16 units. On X11 a character is sent as the key the keymap binds it to, with
+  Shift when it is on the shifted level, so `"%"` and `"Z"` no longer arrive as `5` and `z`.
+
 - WebRTC cleanup that cancels a child task (viewer video retirement, peer teardown) no longer
   swallows its own cancellation when it is cancelled while waiting for that child.
 - The container image installs `libegl1`: PySide6 6.12's QtGui loads `libEGL.so.1` at import.
