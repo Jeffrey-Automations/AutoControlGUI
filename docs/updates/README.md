@@ -59,6 +59,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
 | U-20261114-03 | 2026-11-14 | PySide6 back to 6.11.2: 6.12.0 crashes every CI platform at exit | #decision #ci #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-02 | 2026-11-14 | GUI redesign, stage 1: adaptive building blocks, page headers, cards, window breakpoints and the width gate | #migration #gui | [2026-11-b](2026-11-b.md) |
 | U-20261114-01 | 2026-11-14 | PR #552: CI tested PySide6 6.11.2, the container crashes on 6.12.0, two test regressions | #incident #ci #gui | [2026-11-b](2026-11-b.md) |
 | U-20261113-05 | 2026-11-13 | Saved layouts keep the maximized state; restoring it is opt-in | #done #windows | [2026-11-b](2026-11-b.md) |
 | U-20261113-04 | 2026-11-13 | `post_key_to_window` takes any printable character | #done #windows #x11 | [2026-11-b](2026-11-b.md) |

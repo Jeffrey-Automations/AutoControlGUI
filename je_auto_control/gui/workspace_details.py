@@ -46,11 +46,13 @@ class ExecutionDetailsPane(QScrollArea):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("ExecutionDetails")
         self.setWidgetResizable(True)
         self.setMinimumWidth(0)
         content = QWidget()
         layout = QVBoxLayout(content)
         self.title = QLabel()
+        self.title.setProperty("role", "sectionTitle")
         self.state = QLabel()
         self.summary = QLabel()
         for label in (self.title, self.state, self.summary):

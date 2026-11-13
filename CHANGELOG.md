@@ -6,6 +6,19 @@
   the test process at interpreter exit on every CI platform (a double free while
   `destroyQCoreApplication` tears down Python-held widgets); Dependabot now skips 6.12.0.
 
+- GUI: `prepare_application` installs `AdaptiveStyle` (Fusion with check boxes and radio
+  buttons drawn from the palette) instead of plain Fusion, and the workspace inserts a
+  `PageHeader` at the top of every tab laid out by a vertical box layout and runs
+  `fit_to_width` on it, which changes its combo boxes' size-adjust policy and its form
+  layouts' row-wrap policy. Code that embeds a tab and reads its layout's first item, or
+  relies on a combo box sizing to its longest entry, sees the difference.
+- GUI: below 800 px the main window hides the docked navigation and shows a rail; between
+  800 and 1,199 px the execution details open as a drawer. `AutoControlGUIUI._sidebar_action`
+  (Ctrl+B) is now the window's own checkable action rather than the dock's `toggleViewAction()`,
+  and the dock's toggle is hidden from the dock area's context menu. The saved
+  `workspace/navigation_visible` is the user's preference, not whether the dock happened to be
+  shown when the window closed.
+
 - `save_window_layout` stores a maximized window with `"maximized": true` and its restored
   rectangle; it used to store the maximized rectangle, which restored as a screen-sized normal
   window. `restore_window_layout(..., maximize=True)` (`AC_restore_window_layout`'s

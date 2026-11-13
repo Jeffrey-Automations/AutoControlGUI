@@ -7,6 +7,9 @@ from PySide6.QtGui import QPaintEvent, QPainter, QPen
 from PySide6.QtWidgets import QAbstractButton, QScrollArea, QTabBar, QTabWidget, QWidget, QSplitter, QVBoxLayout
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.overlay import OverlayDrawer
+from je_auto_control.gui.adaptive.responsive import fit_to_width
+from je_auto_control.gui.adaptive.surfaces import add_page_header, retranslate_surfaces
 from je_auto_control.gui.tab_registry import MenuActions, TabEntry, TabRegistry, WidgetFactory
 from je_auto_control.gui.workspace_details import ExecutionDetails, ExecutionDetailsPane, ExecutionDetailsSource
 
@@ -172,6 +175,7 @@ class WorkspaceShell(TranslatableMixin, QWidget):
         self.tab_registry = registry
         self._unbuilt: dict[str, _UnbuiltPage] = {}
         self.tabs = ScrollableTabs()
+        self.tabs.setObjectName("WorkspaceTabs")
         self.tabs.setDocumentMode(True)
         self.tabs.setUsesScrollButtons(True)
         self.tabs.setMinimumSize(360, 240)
@@ -188,6 +192,10 @@ class WorkspaceShell(TranslatableMixin, QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._splitter)
+        # Narrow windows show the details over the tabs instead of beside them.
+        self._details_drawer = OverlayDrawer(self, Qt.Edge.RightEdge, "DetailsOverlay")
+        self._details_drawer.closed.connect(self._on_details_drawer_closed)
+        self._details_overlay = False
         owner = weakref.ref(self)
 
         def closed(page: QWidget) -> None:
@@ -203,10 +211,48 @@ class WorkspaceShell(TranslatableMixin, QWidget):
 
     def set_details_visible(self, visible: bool) -> None:
         """Expand or collapse execution details without starting any work."""
+        if self._details_overlay:
+            self.details.setVisible(True)
+            if visible:
+                self._details_drawer.open_drawer()
+            else:
+                self._details_drawer.hide()
+        else:
+            self.details.setVisible(visible)
+            if visible:
+                self._splitter.setSizes([max(360, self.width() - 260), 260])
+        self.details_visibility_changed.emit(visible)
+
+    def details_visible(self) -> bool:
+        """Whether execution details are on screen, docked or in their drawer."""
+        return self._details_drawer.is_open if self._details_overlay else not self.details.isHidden()
+
+    @property
+    def details_overlay(self) -> bool:
+        """Whether details open as a drawer over the tabs rather than as a column beside them."""
+        return self._details_overlay
+
+    def set_details_overlay(self, enabled: bool) -> None:
+        """Move execution details into a right-hand drawer (narrow window) or back beside the tabs."""
+        if enabled == self._details_overlay:
+            return
+        visible = self.details_visible()
+        self._details_overlay = enabled
+        if enabled:
+            self._details_drawer.set_content(self.details)
+            if visible:
+                self._details_drawer.open_drawer()
+            return
+        self._details_drawer.hide()
+        self._details_drawer.set_content(None)
+        self._splitter.addWidget(self.details)
         self.details.setVisible(visible)
         if visible:
             self._splitter.setSizes([max(360, self.width() - 260), 260])
-        self.details_visibility_changed.emit(visible)
+
+    def _on_details_drawer_closed(self) -> None:
+        """Escape or a click beside the drawer closed it: report the details as hidden."""
+        self.details_visibility_changed.emit(False)
 
     def _bind_details(self) -> None:
         if self._details_connection is not None:
@@ -258,17 +304,26 @@ class WorkspaceShell(TranslatableMixin, QWidget):
             self._unbuilt[key] = page = _UnbuiltPage(key)
             self.tabs.addTab(page, title)
         elif default_visible:
+            self._dress(key, entry.widget)
             self.tabs.addTab(entry.widget, title)
         elif isinstance(widget, QWidget):
             WorkspaceShell._adopt_hidden_tab(self, entry.widget)
 
     def _adopt_built_page(self, key: str, page: QWidget) -> None:
         """Seat a newly built page in its stand-in's tab, or keep it hidden and owned."""
+        self._dress(key, page)
         stand_in = self._unbuilt.pop(key, None)
         if stand_in is not None and self.tabs.replace_page(stand_in, page):
             stand_in.deleteLater()
             return
         self._adopt_hidden_tab(page)
+
+    def _dress(self, key: str, page: QWidget) -> None:
+        """Give a page its header and let its controls shrink with the window; repeat calls are no-ops."""
+        entry = self._find_entry(key)
+        if entry is not None:
+            add_page_header(page, entry.title_key, f"{entry.title_key}_subtitle")
+        fit_to_width(page)
 
     def _drop_unbuilt(self, key: str) -> bool:
         """Close a start-up tab that was never built; ``False`` when ``key`` has none."""
@@ -386,6 +441,7 @@ class WorkspaceShell(TranslatableMixin, QWidget):
                 target_index += 1
         title = language_wrapper.translate(entry.title_key, entry.title_key)
         page = self.tab_registry.open(key)
+        self._dress(key, page)
         self.tabs.insertTab(target_index, page, title)
         self.tabs.setCurrentWidget(page)
         self.tabs_changed.emit()
@@ -456,10 +512,16 @@ class WorkspaceShell(TranslatableMixin, QWidget):
                     index, language_wrapper.translate(entry.title_key, entry.title_key),
                 )
         TranslatableMixin.retranslate(self)
-        # Child class tabs get their own retranslate if they implement one.
+        self._retranslate_pages()
+
+    def _retranslate_pages(self) -> None:
+        """Re-read each built page's shared surfaces, then call its own ``retranslate`` if it has one."""
         for entry in self._built_entries():
+            if entry.widget is self:
+                continue
+            retranslate_surfaces(entry.widget)
             callback = getattr(entry.widget, "retranslate", None)
-            if callable(callback) and entry.widget is not self:
+            if callable(callback):
                 try:
                     callback()
                 except (RuntimeError, AttributeError):

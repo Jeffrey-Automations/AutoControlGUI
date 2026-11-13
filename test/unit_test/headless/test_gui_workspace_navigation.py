@@ -182,7 +182,12 @@ report["view_menu"] = [a.text() for a in view.actions() if a.text()]
 
 window.resize(640, 420)
 app.processEvents()
-report["small"] = [window.width(), window.height(), workspace.width(), navigation.isVisible()]
+report["small"] = [window.width(), window.height(), workspace.width(), navigation.isVisible(),
+                   window._adaptive.rail.isVisible()]
+window._search_action.trigger()
+app.processEvents()
+report["small_search"] = [window._adaptive.drawer.is_open, window._adaptive.panel.search.hasFocus()
+                          or window._adaptive.panel.search.isVisible(), window._sidebar_action.isChecked()]
 sys.stdout.write(json.dumps(report))
 sys.stdout.flush()
 os._exit(0)
@@ -226,8 +231,12 @@ def test_rebuilding_the_menus_for_a_language_switch_adds_no_shortcut(window):
                                    "Tabs", "Theme", "Text Size"]
 
 
-def test_the_window_shrinks_to_a_small_screen_with_both_panes_usable(window):
-    width, height, workspace_width, panel_visible = window["small"]
+def test_a_small_window_gives_the_tabs_the_width_and_keeps_the_features_one_key_away(window):
+    width, height, workspace_width, docked_visible, rail_visible = window["small"]
     assert (width, height) == (640, 420), "the window refused to shrink"
-    assert panel_visible
-    assert workspace_width >= 300
+    assert not docked_visible, "below 800 px the docked list gives its width to the tabs"
+    assert rail_visible
+    assert workspace_width >= 560
+    drawer_open, search_shown, action_checked = window["small_search"]
+    assert drawer_open and search_shown, "Ctrl+K opens the feature list as a drawer"
+    assert action_checked

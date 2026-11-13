@@ -79,6 +79,9 @@ class NavigationPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
+        self.brand = QLabel(self)
+        self.brand.setObjectName("NavigationBrand")
+        layout.addWidget(self.brand)
         layout.addWidget(self.search)
         layout.addWidget(self.tree, 1)
         layout.addWidget(self.empty, 1)
@@ -202,6 +205,7 @@ class NavigationPanel(QWidget):
 
     def retranslate(self) -> None:
         """Re-read every label from the language wrapper."""
+        self.brand.setText(_t("application_name", "AutoControlGUI"))
         self.search.setPlaceholderText(_t("nav_search_placeholder", "Search features (Ctrl+K)"))
         self.empty.setText(_t("nav_no_results", "No feature matches this search."))
         if self._entries:
