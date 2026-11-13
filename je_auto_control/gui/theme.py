@@ -136,6 +136,7 @@ QTableCornerButton::section {{ background-color: {surface_raised}; border: 0; }}
 
 QGroupBox {{ border: 1px solid {border}; border-radius: {radius_large}px; margin-top: 0;
     padding: 2.3em {spacing}px {spacing}px {spacing}px; background-color: {surface}; font-weight: 600; }}
+QGroupBox[collapsed="true"] {{ padding-bottom: 0; }}
 QGroupBox::title {{ subcontrol-origin: padding; subcontrol-position: top left; left: {wide}px; top: {spacing}px;
     padding: 0; color: {text}; background: transparent; }}
 QGroupBox QLabel, QGroupBox QCheckBox, QGroupBox QRadioButton, QGroupBox QPushButton,

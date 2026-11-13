@@ -169,20 +169,18 @@ class _ViewerUiMixin(_ViewerPanelPart):
                         title_key: str) -> _CollapsibleSection:
         """Wrap an existing groupbox in a collapsed-by-default container.
 
-        The inner group keeps its own translated title, so we just pass
-        it through the wrapper's body. Heavy / rarely-used groups
+        The section shows the title and the frame, so the inner group
+        loses both (see ``_CollapsibleSection.adopt``). Heavy / rarely-used groups
         (manual SDP, remote files, sync) hide their bodies by default
         so the panel doesn't scroll past the fold on a normal display.
         """
         section = _CollapsibleSection()
-        # Translate the wrapper title; the inner groupbox already has
-        # its own header so we strip its frame to avoid double chrome.
+        # The section carries the title; the inner group gives up its own
+        # (the same key, so it showed twice) and must not get it back on a
+        # language switch.
         self._tr(section, title_key, setter="setTitle")
-        inner.setStyleSheet("QGroupBox { border: none; margin-top: 0px; }")
-        body = QVBoxLayout()
-        body.setContentsMargins(0, 0, 0, 0)
-        body.addWidget(inner)
-        section.set_body_layout(body)
+        self._tr_registry = [entry for entry in self._tr_registry if entry[0] is not inner]
+        section.adopt(inner)
         return section
 
     def _build_address_book_group(self) -> QGroupBox:
