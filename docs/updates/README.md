@@ -58,6 +58,8 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261113-03 | 2026-11-13 | PR #552: container libEGL and three asyncio cancellation findings | #incident #ci #remote | [2026-11-b](2026-11-b.md) |
+| U-20261113-02 | 2026-11-13 | macos-15 grants what the capability gate expects | #done #macos #ci | [2026-11-b](2026-11-b.md) |
 | U-20261113-01 | 2026-11-13 | Windows desktop acceptance on a self-owned window; two fixes | #done #windows #accessibility | [2026-11-b](2026-11-b.md) |
 | U-20261112-14 | 2026-11-12 | Reading the iOS pasteboard needs an explicit allowance | #done #mobile #ios | [2026-11-b](2026-11-b.md) |
 | U-20261112-13 | 2026-11-12 | Bring the shared .venv to the pinned pillow and PySide6 | #done #tooling | [2026-11-b](2026-11-b.md) |

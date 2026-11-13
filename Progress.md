@@ -97,16 +97,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 
 ---
 
-## macos-15 上的 TCC 權限還沒被 gate 驗過
-
-`TODO` — 2026-11-01 把所有 macOS 方格從 `macos-14` 改成 `macos-15`（U-20261101-02），
-`test/verify/macos_verify.py` 的 `EXPECTED` 沿用 2026-08-19 在 macos-14 上的實測（螢幕錄製與輔助使用兩個
-TCC 權限都給）。`platform-smoke.yml` 的 `macos-capabilities` 只在推送到 `main` 與對 `main` 的 PR 上執行，所以下一個 dev→main
-PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 重新實測後更新 `EXPECTED` 與
-`docs/CAPABILITY_MATRIX.md`，不要直接放寬 gate。
-
----
-
 ## GUI：留下的缺口
 
 `TODO` — U-20261009-27、-28、-34、-36、-38、-40 之後還開著的

@@ -26,6 +26,12 @@ if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
     )
 
 
+
+def _being_cancelled() -> bool:
+    """Whether the running task itself has a pending cancellation (not just a child's)."""
+    task = asyncio.current_task()
+    return task is not None and task.cancelling() > 0
+
 class MediaNegotiationMixin:
     """Media-track half of :class:`WebRTCDesktopHost`.
 
@@ -241,7 +247,8 @@ class MediaNegotiationMixin:
             try:
                 await task
             except asyncio.CancelledError:
-                pass
+                if _being_cancelled():
+                    raise   # this task's own cancellation, not the child's
             finally:
                 if task.done() and self._viewer_video_task is task:
                     self._viewer_video_task = None

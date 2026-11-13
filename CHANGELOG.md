@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- WebRTC cleanup that cancels a child task (viewer video retirement, peer teardown) no longer
+  swallows its own cancellation when it is cancelled while waiting for that child.
+- The container image installs `libegl1`: PySide6 6.12's QtGui loads `libEGL.so.1` at import.
+
 - Windows: `move_window` (used by `restore_window_layout`, `snap_window`, the grid and
   cascade layouts, `ac_window_move` and the window backend) un-maximizes a maximized window
   first, without activating it. `MoveWindow` alone gave it the new rectangle but left it

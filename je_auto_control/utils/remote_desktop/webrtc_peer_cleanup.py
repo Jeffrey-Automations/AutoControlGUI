@@ -21,12 +21,24 @@ async def _wait_steps(*steps: Coroutine[Any, Any, object]) -> None:
             raise result
 
 
+def _being_cancelled() -> bool:
+    """Whether the running task itself has a pending cancellation (not just a child's)."""
+    task = asyncio.current_task()
+    return task is not None and task.cancelling() > 0
+
+
 async def _cancel_task(task: asyncio.Task[Any]) -> None:
+    """Cancel ``task`` and wait for it; a cancellation of the caller itself still propagates.
+
+    ``except CancelledError: pass`` alone also swallowed the caller's own
+    cancellation when it arrived during the wait.
+    """
     task.cancel()
     try:
         await task
     except asyncio.CancelledError:
-        pass
+        if _being_cancelled():
+            raise
 
 
 async def _close_peer(owner: WebRTCDesktopHost | WebRTCDesktopViewer,
