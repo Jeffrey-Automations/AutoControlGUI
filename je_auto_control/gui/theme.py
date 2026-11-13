@@ -213,11 +213,10 @@ def apply_theme(window: Any, tokens: ThemeTokens, point_size: Optional[int] = No
     ``point_size`` appends :func:`font_rule`, so the size is set on top of the
     theme instead of replacing it.
     """
+    from je_auto_control.gui._arrow_icons import arrow_rules
     from je_auto_control.gui._tab_close_icon import close_button_rules
-    sheet = build_stylesheet(tokens)
-    close_rules = close_button_rules(tokens)
-    if close_rules:
-        sheet = f"{sheet}\n{close_rules}"
+    sheet = "\n".join(part for part in (build_stylesheet(tokens), close_button_rules(tokens), arrow_rules(tokens))
+                      if part)
     palette = _palette(tokens)
     window.setPalette(palette)
     # A widget a style sheet styles starts from the *application* palette, not

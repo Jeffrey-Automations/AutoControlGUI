@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-08 | 2026-11-14 | Drop-down and spin box arrows drawn in theme colours, inset from the border | #done #gui | [2026-11-b](2026-11-b.md) |
 | U-20261114-07 | 2026-11-14 | Translate the 95 strings seven testing tabs shipped in English only | #done #gui #i18n | [2026-11-b](2026-11-b.md) |
 | U-20261114-06 | 2026-11-14 | GUI polish: theme colours in Remote Desktop, idle progress line, two strings that ignored a language switch | #done #gui | [2026-11-b](2026-11-b.md) |
 | U-20261114-05 | 2026-11-14 | GUI reviewed on the real Windows desktop at 150 %; check boxes took the system accent | #done #gui #windows | [2026-11-b](2026-11-b.md) |

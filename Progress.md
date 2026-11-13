@@ -538,7 +538,7 @@ F 還缺：
   - 已在本機真實桌面（Windows 11、單一螢幕 1920×1080、150% 縮放）審閱（U-20261114-05）；混合 DPI／多螢幕與 Linux／macOS 字型仍只有 offscreen 截圖。
   - 重排時看到、尚未處理的：Self-Healing 執行表在空表時 `resizeColumnsToContents()` 把欄名擠扁；
     Remote Desktop 收合中的區段仍畫出一條空卡片、展開後區段與內層群組標題重複；
-    下拉選單的箭頭貼齊右緣（`theme.py`）；Trace Replay 的畫面／動作改為 `ResponsiveBox` 後不能再拖曳分隔線。
+    Trace Replay 的畫面／動作改為 `ResponsiveBox` 後不能再拖曳分隔線。
   - Python 實作的 `FlowLayout` 在行程以 `os._exit` 結束時偶發印出 `pure virtual method 'QLayout.itemAt'`
     （Email Triggers 分頁單獨建立時 HEAD 三次兩次、改後三次零次；未崩潰）：結束時 Qt 呼叫到正在拆除的 Python 覆寫。來源未查。
 - **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移，

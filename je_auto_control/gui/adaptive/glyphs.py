@@ -22,7 +22,20 @@ def _details(painter: QPainter, side: float) -> None:
     painter.drawLine(QPointF(side * 0.58, side * 0.22), QPointF(side * 0.58, side * 0.78))
 
 
-GLYPHS: Dict[str, _Painter] = {"menu": _menu, "search": _search, "details": _details}
+def _chevron_down(painter: QPainter, side: float) -> None:
+    painter.drawPolyline([QPointF(side * 0.25, side * 0.38), QPointF(side * 0.5, side * 0.63),
+                          QPointF(side * 0.75, side * 0.38)])
+
+
+def _chevron_up(painter: QPainter, side: float) -> None:
+    painter.drawPolyline([QPointF(side * 0.25, side * 0.62), QPointF(side * 0.5, side * 0.37),
+                          QPointF(side * 0.75, side * 0.62)])
+
+
+GLYPHS: Dict[str, _Painter] = {
+    "menu": _menu, "search": _search, "details": _details,
+    "chevron_down": _chevron_down, "chevron_up": _chevron_up,
+}
 
 
 def glyph_pixmap(name: str, colour: str, side: int = 20, scale: float = 1.0) -> QPixmap:
@@ -33,6 +46,7 @@ def glyph_pixmap(name: str, colour: str, side: int = 20, scale: float = 1.0) -> 
     pixmap.fill(Qt.GlobalColor.transparent)
     pen = QPen(QColor(colour), max(1.5, side / 12))
     pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
     painter = QPainter(pixmap)
     try:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)

@@ -474,6 +474,7 @@ module = [
     "je_auto_control.gui.adaptive",
     "je_auto_control.gui.adaptive.*",
     "je_auto_control.gui.adaptive_window",
+    "je_auto_control.gui._arrow_icons",
     "je_auto_control_pytest",
 ]
 disallow_untyped_defs = true

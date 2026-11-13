@@ -10,8 +10,10 @@ from typing import Any, Optional, Tuple
 
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import QProxyStyle, QStyle, QStyleOption, QWidget
+from PySide6.QtWidgets import QAbstractSpinBox, QLineEdit, QProxyStyle, QStyle, QStyleOption, QWidget
 
+# The theme pads fields by 8 px inside a 1 px border; a spin box editor starts under the border.
+SPIN_TEXT_INSET = 9
 _INDICATORS = (QStyle.PrimitiveElement.PE_IndicatorCheckBox, QStyle.PrimitiveElement.PE_IndicatorRadioButton)
 
 
@@ -92,6 +94,19 @@ class AdaptiveStyle(QProxyStyle):
             paint_indicator(painter, option, element == QStyle.PrimitiveElement.PE_IndicatorRadioButton)
             return
         super().drawPrimitive(element, option, painter, widget)
+
+    def polish(self, target: Any) -> None:
+        """Inset a spin box's text as the theme pads every other field.
+
+        A style sheet's padding moves the text of a line edit or combo box, but
+        a spin box places its inner editor over the left border regardless, so
+        its digits touched the frame.
+        """
+        super().polish(target)
+        if isinstance(target, QAbstractSpinBox):
+            editor = target.findChild(QLineEdit)
+            if editor is not None:
+                editor.setTextMargins(SPIN_TEXT_INSET, 0, 0, 0)
 
     def pixelMetric(self, metric: QStyle.PixelMetric, option: Any = None,  # noqa: N802  # reason: Qt override
                     widget: Optional[QWidget] = None) -> int:

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- GUI: drop-down lists and spin boxes draw theme-coloured chevrons, inset from the rounded
+  border, and spin boxes inset their digits like every other field. The chevrons are drawn
+  once per theme colour into `~/.je_auto_control/gui_cache/`, next to the tab close cross;
+  when that folder cannot be written the controls keep the style's own arrows.
+
 - GUI: Remote Desktop's host-ID labels, stats line, sparklines and missing-extras message take
   their colours from the theme instead of fixed values (the sparkline's `background` now
   defaults to the palette's base colour; pass a colour to keep a fixed one). A new `accent`
