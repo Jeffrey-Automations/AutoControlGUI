@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- `save_window_layout` stores a maximized window with `"maximized": true` and its restored
+  rectangle; it used to store the maximized rectangle, which restored as a screen-sized normal
+  window. `restore_window_layout(..., maximize=True)` (`AC_restore_window_layout`'s
+  `maximize`) maximizes those windows again, activating each on Windows; without it nothing is
+  activated. A custom `mover` receives `maximize=True` for those entries only when it is set.
+
 - `post_key_to_window` (`AC_post_key_to_window`, `ac_post_key_to_window`) accepts any
   printable character, not only those in the platform's key table: on Windows `"%"` and other
   punctuation used to raise `unknown key name`, and a character beyond the BMP is now posted

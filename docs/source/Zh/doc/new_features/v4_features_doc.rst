@@ -103,8 +103,10 @@ Builder 項目。視覺與視窗功能的 geometry / IO 操作皆可注入,因�
   ``GetWindowRect``),所以視窗會回到原本的位置。舊版存的版面檔記的是可見
   外框,還原會右移 7 px、縮小 14 x 7 px,請重新儲存。還原時已最大化的視窗會先
   取消最大化(不啟用它),因此會停在存下的大小,而不是保留最大化狀態。最大化時存下
-  的視窗會以螢幕大小的一般視窗回來:最大化狀態本身沒有存。
-  ``AC_save_window_layout`` / ``AC_restore_window_layout``。
+  的視窗會記為 ``"maximized": true`` 並存它還原後的矩形,預設以該矩形的一般視窗
+  回來;``restore_window_layout(path, maximize=True)`` 會再把它們最大化,在 Windows
+  上會逐一啟用這些視窗,不加這個選項就不會啟用任何視窗。
+  ``AC_save_window_layout`` / ``AC_restore_window_layout``(``maximize``)。
 * **貼齊 / 平鋪** — ``snap_window(title, "left")`` 把視窗移到主螢幕\ *工作區*\
   (螢幕扣掉工作列)的一半(left / right / top / bottom)、四分之一(四個角)
   或 ``"max"``,貼齊後視窗底部不會被工作列蓋住。``arrange_grid`` 與

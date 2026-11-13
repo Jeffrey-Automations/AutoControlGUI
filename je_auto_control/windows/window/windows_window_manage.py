@@ -71,6 +71,29 @@ _user32.IsWindow.argtypes = [wintypes.HWND]
 _user32.IsWindow.restype = wintypes.BOOL
 _user32.MapVirtualKeyW.argtypes = [wintypes.UINT, wintypes.UINT]
 _user32.MapVirtualKeyW.restype = wintypes.UINT
+_user32.IsZoomed.argtypes = [wintypes.HWND]
+_user32.IsZoomed.restype = wintypes.BOOL
+
+
+class _WindowPlacement(ctypes.Structure):
+    _fields_ = [("length", wintypes.UINT), ("flags", wintypes.UINT), ("showCmd", wintypes.UINT),
+                ("ptMinPosition", wintypes.POINT), ("ptMaxPosition", wintypes.POINT),
+                ("rcNormalPosition", wintypes.RECT)]
+
+
+class _MonitorInfo(ctypes.Structure):
+    _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT),
+                ("rcWork", wintypes.RECT), ("dwFlags", wintypes.DWORD)]
+
+
+_user32.GetWindowPlacement.argtypes = [wintypes.HWND, ctypes.POINTER(_WindowPlacement)]
+_user32.GetWindowPlacement.restype = wintypes.BOOL
+_user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+_user32.MonitorFromWindow.restype = wintypes.HMONITOR
+_user32.GetMonitorInfoW.argtypes = [wintypes.HMONITOR, ctypes.POINTER(_MonitorInfo)]
+_user32.GetMonitorInfoW.restype = wintypes.BOOL
+_user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+_user32.GetWindowLongW.restype = wintypes.LONG
 
 
 def _load_dwmapi() -> Any:
@@ -94,6 +117,7 @@ _dwmapi = _load_dwmapi()
 WM_CLOSE = 0x0010
 SW_RESTORE = 9
 _SW_SHOWNOACTIVATE = 4
+_SW_MAXIMIZE = 3
 _DWMWA_CLOAKED = 14
 
 
@@ -187,6 +211,63 @@ def get_window_rect(hwnd: int) -> Optional[Tuple[int, int, int, int]]:
     if not _user32.GetWindowRect(hwnd, byref(rect)):
         return None
     return (int(rect.left), int(rect.top), int(rect.right), int(rect.bottom))
+
+
+def is_window_maximized(hwnd: int) -> bool:
+    """
+    視窗是否最大化
+    Whether the window is maximized
+    """
+    return bool(_user32.IsZoomed(int(hwnd)))
+
+
+_MONITOR_DEFAULTTONEAREST = 2
+_GWL_EXSTYLE = -20
+_WS_EX_TOOLWINDOW = 0x00000080
+
+
+def get_normal_window_rect(hwnd: int) -> Optional[Tuple[int, int, int, int]]:
+    """
+    視窗「還原」時的矩形（螢幕座標），查不到回 None
+    The rectangle the window has when restored, in screen coordinates; None if unavailable
+
+    最大化或最小化的視窗，``GetWindowRect`` 給的是目前的樣子；還原後的大小只在
+    ``WINDOWPLACEMENT.rcNormalPosition``。那是工作區座標（扣掉工作列等），除了
+    工具視窗以外都要加回所在螢幕工作區相對螢幕的位移。
+
+    For a maximized window ``GetWindowRect`` is the maximized rectangle; the
+    restored one is only in ``WINDOWPLACEMENT.rcNormalPosition``, which is in
+    workspace coordinates (the work area's origin, past a taskbar on the top or
+    left) for any window but a tool window, so the offset of its monitor's work
+    area is added back.
+
+    :return: (left, top, right, bottom)
+    """
+    placement = _WindowPlacement()
+    placement.length = ctypes.sizeof(_WindowPlacement)
+    if not _user32.GetWindowPlacement(int(hwnd), byref(placement)):
+        return None
+    normal = placement.rcNormalPosition
+    dx = dy = 0
+    if not _user32.GetWindowLongW(int(hwnd), _GWL_EXSTYLE) & _WS_EX_TOOLWINDOW:
+        info = _MonitorInfo()
+        info.cbSize = ctypes.sizeof(_MonitorInfo)
+        monitor = _user32.MonitorFromWindow(int(hwnd), _MONITOR_DEFAULTTONEAREST)
+        if monitor and _user32.GetMonitorInfoW(monitor, byref(info)):
+            dx = info.rcWork.left - info.rcMonitor.left
+            dy = info.rcWork.top - info.rcMonitor.top
+    return (int(normal.left) + dx, int(normal.top) + dy, int(normal.right) + dx, int(normal.bottom) + dy)
+
+
+def maximize_window(hwnd: int) -> bool:
+    """
+    最大化視窗；會啟用它（Windows 沒有不啟用的最大化）。回傳之後是否為最大化
+    Maximize a window, which activates it (Windows has no non-activating maximize)
+
+    :return: whether the window is maximized afterwards
+    """
+    show_window(int(hwnd), _SW_MAXIMIZE)
+    return is_window_maximized(hwnd)
 
 
 def get_window_process_id(hwnd: int) -> int:
@@ -318,7 +399,7 @@ def move_window(hwnd: int, x: int, y: int, width: int, height: int,
     therefore restored first with ``SW_SHOWNOACTIVATE``, which does not take
     the foreground.
     """
-    if _user32.IsZoomed(int(hwnd)):
+    if is_window_maximized(hwnd):
         _user32.ShowWindow(int(hwnd), _SW_SHOWNOACTIVATE)
     return bool(_user32.MoveWindow(int(hwnd), int(x), int(y),
                                    int(width), int(height),

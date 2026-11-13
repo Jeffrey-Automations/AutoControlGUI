@@ -29,6 +29,8 @@ Rect = Tuple[int, int, int, int]
 GeometryProvider = Callable[[str], Optional[Rect]]
 WindowLister = Callable[[], List[Tuple[int, str]]]
 WindowMover = Callable[[str, int, int, int, int], bool]
+#: A :data:`WindowMover` that also takes ``maximize=True`` (only ever passed for a maximized entry).
+LayoutMover = Callable[..., bool]
 SizeProvider = Callable[[], Tuple[int, int]]
 AreaProvider = Callable[[], Tuple[int, int, int, int]]
 
@@ -148,17 +150,24 @@ def save_window_layout(path: Optional[str | Path] = None, *,
     saving and restoring leaves a window exactly where it was. A layout file
     written before this held the visible frame instead and still restores
     7 px off; save it again.
+
+    A maximized window is saved with ``"maximized": true`` and its *restored*
+    rectangle, not the screen-sized one it has while maximized; an entry
+    without the key (every entry in an older file) is a normal window.
     """
     layout: List[Dict[str, Any]] = []
     for hwnd, title in (lister or _default_lister)():
         # By handle, which the lister already has: looking the window up
         # again by title substring read another window's geometry whenever
         # one title contained another or two windows shared a title.
-        rect = geometry(title) if geometry is not None else _handle_geometry(hwnd)
+        rect, maximized = (geometry(title), False) if geometry is not None else _handle_layout(hwnd)
         if rect is None:
             continue
-        layout.append({"title": title, "x": rect[0], "y": rect[1],
-                       "width": rect[2], "height": rect[3]})
+        entry: Dict[str, Any] = {"title": title, "x": rect[0], "y": rect[1],
+                                 "width": rect[2], "height": rect[3]}
+        if maximized:
+            entry["maximized"] = True
+        layout.append(entry)
     if path is not None:
         Path(path).write_text(json.dumps(layout, indent=2), encoding="utf-8")
     return layout
@@ -179,12 +188,27 @@ def _default_mover(title: str, x: int, y: int,
     return bool(wm.move_window(int(hit[0]), x, y, width, height))
 
 
-def _handle_geometry(hwnd: int) -> Optional[Rect]:
-    """The rectangle a layout stores for ``hwnd``: the one the mover takes."""
-    return _win32_window_rect(int(hwnd)) if sys.platform == "win32" else None
+def _handle_layout(hwnd: int) -> Tuple[Optional[Rect], bool]:
+    """What a layout stores for ``hwnd``: the rectangle the mover takes, and whether it is maximized.
+
+    For a maximized window that is its restored rectangle: ``GetWindowRect``
+    gives the maximized one, which restored as a screen-sized normal window.
+    """
+    if sys.platform != "win32":
+        return None, False
+    import ctypes
+    rect = _win32_window_rect(int(hwnd))
+    if rect is None or not ctypes.windll.user32.IsZoomed(int(hwnd)):  # type: ignore[attr-defined]  # reason: win32-only ctypes
+        return rect, False
+    from je_auto_control.windows.window import windows_window_manage as wm
+    normal = wm.get_normal_window_rect(int(hwnd))
+    if normal is None:
+        return rect, True
+    left, top, right, bottom = normal
+    return (left, top, right - left, bottom - top), True
 
 
-def _exact_title_mover() -> WindowMover:
+def _exact_title_mover() -> LayoutMover:
     """A mover that gives each saved entry a different window of that exact title.
 
     It matched by title substring, so every entry whose title another
@@ -193,7 +217,7 @@ def _exact_title_mover() -> WindowMover:
     """
     used: set = set()
 
-    def move(title: str, x: int, y: int, width: int, height: int) -> bool:
+    def move(title: str, x: int, y: int, width: int, height: int, maximize: bool = False) -> bool:
         if sys.platform != "win32":
             return False
         from je_auto_control.wrapper.auto_control_window import list_windows
@@ -201,18 +225,25 @@ def _exact_title_mover() -> WindowMover:
         for hwnd, name in list_windows(titled_only=True):
             if name == title and hwnd not in used:
                 used.add(hwnd)
-                return bool(wm.move_window(int(hwnd), x, y, width, height))
+                moved = bool(wm.move_window(int(hwnd), x, y, width, height))
+                return moved and (not maximize or wm.maximize_window(int(hwnd)))
         return False
 
     return move
 
 
 def restore_window_layout(layout: List[Dict[str, Any]] | str | Path, *,
-                          mover: Optional[WindowMover] = None) -> int:
+                          mover: Optional[LayoutMover] = None, maximize: bool = False) -> int:
     """Move each window back to its saved geometry; return the count moved.
 
     ``layout`` is a list from :func:`save_window_layout`, or a path to the
     JSON it wrote. ``mover`` is injectable for tests.
+
+    Nothing is activated by default: a window saved maximized is put back at
+    its restored rectangle as a normal window. With ``maximize=True`` it is
+    maximized again after the move, which on Windows also activates it, one
+    window at a time -- there is no maximize that leaves the foreground alone.
+    A ``mover`` is then called with ``maximize=True`` for those entries.
     """
     entries: List[Dict[str, Any]] = (
         json.loads(Path(layout).read_text(encoding="utf-8"))
@@ -222,9 +253,13 @@ def restore_window_layout(layout: List[Dict[str, Any]] | str | Path, *,
     restored = 0
     for entry in entries:
         title = entry.get("title")
-        if title and move(title, int(entry["x"]), int(entry["y"]),
-                          int(entry["width"]), int(entry["height"])):
-            restored += 1
+        if not title:
+            continue
+        rect = (int(entry["x"]), int(entry["y"]), int(entry["width"]), int(entry["height"]))
+        if maximize and entry.get("maximized"):
+            restored += bool(move(title, *rect, maximize=True))
+        else:
+            restored += bool(move(title, *rect))
     return restored
 
 

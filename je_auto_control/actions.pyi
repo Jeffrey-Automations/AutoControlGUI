@@ -2946,7 +2946,7 @@ def AC_rest_api_status() -> Dict[str, Any]:
 def AC_rest_api_stop() -> Dict[str, Any]:
     ...
 
-def AC_restore_window_layout(layout: Union[List[Dict[str, Any]], str]) -> Dict[str, Any]:
+def AC_restore_window_layout(layout: Union[List[Dict[str, Any]], str], maximize: bool = ...) -> Dict[str, Any]:
     """Executor adapter: move windows back to a saved layout (list or path)."""
 
 def AC_retry_after(response: Any) -> Dict[str, Any]:

@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261113-05 | 2026-11-13 | Saved layouts keep the maximized state; restoring it is opt-in | #done #windows | [2026-11-b](2026-11-b.md) |
 | U-20261113-04 | 2026-11-13 | `post_key_to_window` takes any printable character | #done #windows #x11 | [2026-11-b](2026-11-b.md) |
 | U-20261113-03 | 2026-11-13 | PR #552: container libEGL and three asyncio cancellation findings | #incident #ci #remote | [2026-11-b](2026-11-b.md) |
 | U-20261113-02 | 2026-11-13 | macos-15 grants what the capability gate expects | #done #macos #ci | [2026-11-b](2026-11-b.md) |

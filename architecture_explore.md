@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,527 |
-| 程式碼總行數 | 233,730 |
+| 程式碼總行數 | 233,851 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -202,7 +202,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.3 平台後端
 
-#### Windows（`windows/`，24 檔／2,282 行）
+#### Windows（`windows/`，24 檔／2,363 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -214,7 +214,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `record/win32_input_hook.py` | 258 | 單一一組低階鍵鼠 hook（`WH_KEYBOARD_LL`／`WH_MOUSE_LL`）＋訊息迴圈，產生帶時間戳的事件時間軸；停止時以 `PostThreadMessageW(WM_QUIT)` 收掉執行緒，不會每錄一次就漏一條。 |
 | `record/win32_record.py` | 41 | 把 `win32_input_hook` 的時間軸轉成 action list（含按鍵放開、滾輪與間隔）；整形本體與 macOS 共用 `utils/input_macro/recorder_base.py`。 |
 | `screen/win32_screen.py` | 171 | 螢幕尺寸與像素讀取。**每支 Win32 函式都明寫 argtypes/restype**（HDC 是指標寬度，走預設的 c_int 會截斷，錯誤會沉默地擴散到 GetPixel／ReleaseDC），並持有自己的 user32／gdi32 handle。import 時呼叫 `SetProcessDPIAware()`——**行程層級且不可還原**，實體↔邏輯座標換算請走 `utils/monitor_layout`。 |
-| `window/windows_window_manage.py` | 485 | 視窗列舉／聚焦／關閉／最小化／幾何／所屬行程 PID／投遞式輸入（`auto_control_window` 的實作）。**每支 Win32 函式都明寫 argtypes/restype**，並持有自己的 user32 handle，避免把原型外溢到別的模組；hwnd 一律是 int。 |
+| `window/windows_window_manage.py` | 566 | 視窗列舉／聚焦／關閉／最小化／幾何／所屬行程 PID／投遞式輸入（`auto_control_window` 的實作）。**每支 Win32 函式都明寫 argtypes/restype**，並持有自己的 user32 handle，避免把原型外溢到別的模組；hwnd 一律是 int。 |
 | `message/window_message.py` | 97 | 直接對視窗送 `WM_*` 訊息（背景輸入）。 |
 | `interception/_dll.py` | 232 | `interception.dll` 的延遲 ctypes 載入與結構定義。 |
 | `interception/keyboard.py` | 70 | 經 Interception 驅動的鍵盤輸入（繞過部分反自動化偵測）。 |
@@ -292,7 +292,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 19,543 行。
+> 25 個套件、約 19,546 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -304,7 +304,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/decision_table/` | 112 | DMN 風格決策表：規則 + 命中策略，把分支外部化 |
 | `utils/deterministic/` | 116 | 決定性執行控制：固定亂數種子 + 凍結時鐘 |
 | `utils/action_journal/` | 856 | 結構化動作日誌：schema v1、寫入前遮罩、跨行程排序／尾端復原、executor 明確 scope 擷取與本機 parallel／DAG parent 傳遞；門面、AC／MCP、Script Builder 與 CLI 擷取／有界查閱；observer／路徑政策隨巢狀根與 workers 保留，Run History 查閱與手動 history 關聯共用相同來源。 |
-| `utils/executor/` | 10,749 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
+| `utils/executor/` | 10,752 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
 | `utils/flow_debugger/` | 166 | action list 的單步除錯器與追蹤器 |
 | `utils/input_macro/` | 477 | 定時輸入事件：錄製結果的整形（`timeline`／`InputRecorder`，Windows 與 macOS 共用）、重播與宣告式輸入序列 DSL |
 | `utils/json/` | 99 | action JSON 檔讀寫與正規化格式化（`fmt --check` 的後端） |
@@ -706,7 +706,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.16 系統、視窗與剪貼簿
 
-> 16 個套件、約 2,710 行。
+> 16 個套件、約 2,745 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -722,7 +722,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/shell_open/` | 99 | Open files with their registered applications and delegate URLs to WebRunner. |
 | `utils/system_volume/` | 212 | 讀取與控制系統主音量與靜音狀態 |
 | `utils/trash/` | 93 | 把檔案移到系統資源回收筒（可復原刪除） |
-| `utils/window_capture/` | 379 | 逐視窗截圖、視窗版面儲存／還原、貼齊與排列 |
+| `utils/window_capture/` | 414 | 逐視窗截圖、視窗版面儲存／還原、貼齊與排列 |
 | `utils/window_geometry/` | 87 | 視窗客戶區幾何（外框內縮、client→screen 對映） |
 | `utils/window_layout/` | 137 | 視窗拼貼／版面規劃器（左右半、四象限、網格、層疊） |
 | `utils/window_zorder/` | 77 | 視窗 z 序控制（最上層／移到最前／送到最後） |
@@ -744,11 +744,11 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_image_native.py` | 62 | Typed process-image filename and read-only file acquisition calls. |
 | `windows_native.py` | 103 | Typed Win32 query/read bindings and caller-sized memory information layouts. |
 
-#### `utils/executor/`（10,749 行）— 執行核心
+#### `utils/executor/`（10,752 行）— 執行核心
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
-| `action_executor.py` | 8,676 | `Executor` 類別與 `event_dict` 分派表（774 個指令），另含數百個把 utils 能力接成指令的 adapter 函式；全域單例 `executor` 與 `add_command_to_executor()` 擴充點。 |
+| `action_executor.py` | 8,679 | `Executor` 類別與 `event_dict` 分派表（774 個指令），另含數百個把 utils 能力接成指令的 adapter 函式；全域單例 `executor` 與 `add_command_to_executor()` 擴充點。 |
 | `flow_control.py` | 726 | 真正的流程控制：`AC_loop`／`AC_for_each`／`AC_while_*`／`AC_if_*`／`AC_try`／`AC_retry`／`AC_parallel`／`AC_define_macro`／`AC_call_macro`／變數指令（`AC_set_var`／`AC_get_var`／`AC_inc_var`）。`LoopBreak`／`LoopContinue` 以例外實作。34 個區塊指令的分派表 `BLOCK_COMMANDS` 也在這裡，含下一列匯入的資料來源指令。 |
 | `flow_data_commands.py` | 272 | `AC_*_to_var` 資料來源與轉換指令：shell、時鐘、亂數、PDF、TOTP、SQL、檔案、HTTP、OCR，加上 `AC_assert_var`／`AC_assert_db`／`AC_assert_duration`／`AC_transform_var`。都不執行巢狀 action list，所以沒有迴圈／分支語意。 |
 | `action_schema.py` | 225 | action list 的結構驗證：形狀、參數型別、未知指令拒絕。單一走訪同時支援兩種消費方式：`validate_actions()` 遇到第一個問題就拋、`unknown_command_names()` 收齊全部不認得的名字（REST `/execute` 用它回 400）。 |
@@ -1341,7 +1341,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | screenshot | `_screenshot_tab.py` | 179 | 截圖、選區、螢幕尺寸、取像素色。 |
 | image_detect | `_image_detect_tab.py` | 159 | 樣板裁切、定位、定位全部、定位並點擊。 |
 | record | `_record_tab.py` | 162 | 錄製／停止／回放／存檔／載入。 |
-| script_builder | `script_builder/` | 6,909 | **視覺化腳本編輯器**：`command_schema.py`（5,549 行 `AC_*` 參數綱要）、`step_model.py`（步驟模型與 AC JSON 序列化）、`step_list_view.py`（含巢狀 body 的樹狀檢視）、`step_form_view.py`（綱要驅動表單）、`builder_tab.py`（含日誌候選預覽與明確匯入，保留來源）。 |
+| script_builder | `script_builder/` | 6,911 | **視覺化腳本編輯器**：`command_schema.py`（5,551 行 `AC_*` 參數綱要）、`step_model.py`（步驟模型與 AC JSON 序列化）、`step_list_view.py`（含巢狀 body 的樹狀檢視）、`step_form_view.py`（綱要驅動表單）、`builder_tab.py`（含日誌候選預覽與明確匯入，保留來源）。 |
 | flow_editor | `flow_editor/` | 490 | 節點式流程圖檢視：`layout.py`（純 Python 佈局演算法，可單測）、`scene.py`（Qt 場景繪製）、`tab.py`。 |
 | script | `_script_tab.py` | 183 | 載入／執行單檔或整個目錄、內建編輯器執行。 |
 | recording_editor | `recording_editor_tab.py` | 262 | 裁切、過濾、重新縮放錄製內容；Actions 提供背景日誌候選審閱。 |
@@ -1533,15 +1533,15 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 150 | 40,657 |
+| `gui/` | 150 | 40,659 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
-| `utils/executor/` | 11 | 10,749 |
+| `utils/executor/` | 11 | 10,752 |
 | `utils/usb/` | 20 | 5,060 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,167 |
 | `utils/accessibility/` | 16 | 3,374 |
 | `wrapper/` | 25 | 6,044 |
-| `windows/` | 24 | 2,282 |
+| `windows/` | 24 | 2,363 |
 | `utils/rest_api/` | 8 | 2,226 |
 | `utils/agent/` | 13 | 2,253 |
 | `linux_with_x11/` | 19 | 1,382 |
@@ -1553,8 +1553,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,113 |
-| **總計** | **1,515** | **232,985** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,148 |
+| **總計** | **1,515** | **233,106** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
