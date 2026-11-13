@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.responsive import fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.healing_evaluation_worker import HealingEvaluationOutcome, HealingEvaluationWorker
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
@@ -44,7 +45,7 @@ def _populate(table: QTableWidget, rows: list[list[str]]) -> None:
     for index, row in enumerate(rows):
         for column, value in enumerate(row):
             table.setItem(index, column, QTableWidgetItem(value))
-    table.resizeColumnsToContents()
+    fit_columns(table)
 
 
 def _ratio(ratio: EvaluationRatio) -> str:

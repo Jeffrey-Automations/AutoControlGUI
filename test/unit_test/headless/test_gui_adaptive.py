@@ -316,3 +316,39 @@ def test_applying_a_theme_sets_the_application_palette_so_styled_widgets_follow_
     finally:
         qapp.setPalette(previous)
         window.deleteLater()
+
+
+def test_the_fit_pass_stretches_a_tables_last_column(qapp):
+    from PySide6.QtWidgets import QTableWidget, QTreeWidget, QVBoxLayout, QWidget
+    from je_auto_control.gui.adaptive.responsive import fit_to_width
+    page = QWidget()
+    table, tree = QTableWidget(0, 3), QTreeWidget()
+    layout = QVBoxLayout(page)
+    layout.addWidget(table)
+    layout.addWidget(tree)
+    table.verticalHeader().setStretchLastSection(False)
+    fit_to_width(page)
+    assert table.horizontalHeader().stretchLastSection()
+    assert not table.verticalHeader().stretchLastSection(), "rows keep their height"
+    page.deleteLater()
+
+
+def test_fit_columns_caps_the_named_columns_then_refills_the_table(qapp):
+    from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
+    from je_auto_control.gui.adaptive.responsive import fit_columns
+    table = QTableWidget(1, 3)
+    table.horizontalHeader().setStretchLastSection(True)
+    table.resize(900, 200)
+    table.show()
+    qapp.processEvents()
+    for column, text in enumerate(("a", "bb", "tail")):
+        table.setItem(0, column, QTableWidgetItem(text))
+    header = table.horizontalHeader()
+    fit_columns(table)   # sizing the last column by hand would otherwise hold it until the next resize
+    assert header.length() == table.viewport().width(), "the last column takes the width the others leave"
+    table.setItem(0, 1, QTableWidgetItem("x" * 120))
+    fit_columns(table, capped=(1,), cap=150)
+    assert table.columnWidth(1) == 150
+    assert header.length() == table.viewport().width()
+    table.hide()
+    table.deleteLater()

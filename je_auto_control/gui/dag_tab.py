@@ -17,7 +17,7 @@ from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
-from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox, fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -365,7 +365,7 @@ class DagTab(TranslatableMixin, QWidget):
                 item = QTableWidgetItem(str(text))
                 item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                 self._table.setItem(row, col, item)
-        self._table.resizeColumnsToContents()
+        fit_columns(self._table)
 
 
 __all__ = ["DagTab"]

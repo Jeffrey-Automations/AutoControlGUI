@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox, fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -188,7 +188,7 @@ class TraceReplayTab(TranslatableMixin, QWidget):
                 item = QTableWidgetItem(text)
                 item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                 self._actions_table.setItem(row, col, item)
-        self._actions_table.resizeColumnsToContents()
+        fit_columns(self._actions_table)
 
 
 __all__ = ["TraceReplayTab"]

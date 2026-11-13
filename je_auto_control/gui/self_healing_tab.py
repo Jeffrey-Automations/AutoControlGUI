@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.responsive import fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.healing_evaluation_panel import HealingEvaluationPanel
 from je_auto_control.gui.journal_browser import JournalBrowser
@@ -251,10 +252,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
                 item = QTableWidgetItem(str(text))
                 item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                 self._table.setItem(row, col, item)
-        self._table.resizeColumnsToContents()
-        for name in ("template_path", "description"):
-            column = _COLUMNS.index(name)
-            self._table.setColumnWidth(column, min(self._table.columnWidth(column), 240))
+        fit_columns(self._table, capped=(_COLUMNS.index("template_path"), _COLUMNS.index("description")))
         self._show_event()
 
     def _show_event(self) -> None:

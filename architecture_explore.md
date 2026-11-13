@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,537 |
-| 程式碼總行數 | 235,653 |
+| 程式碼總行數 | 235,677 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1303,7 +1303,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `adaptive/__init__.py` | 9 | Adaptive layout building blocks shared by the window and every page. 只匯出 Qt-free 的 `WidthClass`／`classify`。 |
 | `adaptive/breakpoints.py` | 46 | Width classes for the adaptive window, with hysteresis so a resize near a boundary does not flicker. compact（<800）／medium／expanded（≥1200），邊界前後 24 px 不反覆切換；不匯入 Qt。 |
 | `adaptive/flow_layout.py` | 166 | A layout that places items left to right and wraps them onto the next line when the row is full. 最小寬度只等於最寬的一項。 |
-| `adaptive/responsive.py` | 120 | Containers that rearrange by width, and the pass that stops a page's controls from forcing it wide. `ResponsiveBox`（窄時上下堆疊）、`fit_to_width`（下拉選單不再以最長項目定寬、表單窄時標籤移到欄位上方、長標籤換行），工作區放入每頁時跑一次。 |
+| `adaptive/responsive.py` | 145 | Containers that rearrange by width, and the pass that stops a page's controls from forcing it wide. `ResponsiveBox`（窄時上下堆疊）、`fit_to_width`（下拉選單不再以最長項目定寬、表單窄時標籤移到欄位上方、長標籤換行、表格最後一欄延展填滿），工作區放入每頁時跑一次；`fit_columns` 依內容定欄寬後重新延展最後一欄。 |
 | `adaptive/surfaces.py` | 160 | Cards, page headers and empty states: the shared surfaces every page is built from. `Card`、`PageHeader`（標題＋`<title_key>_subtitle` 說明，缺字串時隱藏）、`EmptyState`、`add_page_header`、`retranslate_surfaces`。 |
 | `adaptive/style.py` | 117 | Fusion with check boxes and radio buttons drawn from the palette's accent. `AdaptiveStyle`：Fusion 的指示器外框在深色主題下幾乎看不見，改以向量繪製。 |
 | `adaptive/glyphs.py` | 66 | Small line icons drawn in code, so the navigation rail ships no image files and follows the theme. 選單、搜尋、詳情三個圖示，1x／2x／3x。 |
@@ -1358,7 +1358,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | variables | `variables_tab.py` | 170 | 檢視、灌入、清除 executor 執行期作用域。 |
 | secrets | `secrets_tab.py` | 190 | 解鎖保險庫並管理 `${secrets.NAME}`。 |
 | vlm | `vlm_tab.py` | 126 | 用文字描述 UI 元素，交由模型定位。 |
-| self_healing | `self_healing_tab.py`、`healing_evaluation_panel.py`、`healing_evaluation_worker.py`、`template_candidate_panel.py`、`template_candidate_worker.py` | 955 | 執行時定位／記錄、固定影像版本比較、原始步驟與候選樣板生命週期；背景工作可取消並丟棄過期結果。 |
+| self_healing | `self_healing_tab.py`、`healing_evaluation_panel.py`、`healing_evaluation_worker.py`、`template_candidate_panel.py`、`template_candidate_worker.py` | 954 | 執行時定位／記錄、固定影像版本比較、原始步驟與候選樣板生命週期；背景工作可取消並丟棄過期結果。 |
 | ocr_reader | `ocr_tab.py` | 192 | 傾印區域文字或以 regex 搜尋。 |
 | accessibility | `accessibility_tab.py` | 193 | 瀏覽 OS UI 樹並依 role/name 點擊。 |
 | live_hud | `live_hud_tab.py` | 140 | 即時 HUD：滑鼠位置、游標下像素色、log tail。 |
@@ -1543,7 +1543,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 160 | 42,456 |
+| `gui/` | 160 | 42,480 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1564,7 +1564,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,153 |
-| **總計** | **1,525** | **234,908** |
+| **總計** | **1,525** | **234,932** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

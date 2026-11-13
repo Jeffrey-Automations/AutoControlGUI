@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox, fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
 from je_auto_control.gui.config_sync_worker import ConfigSyncWorker, SyncUIOutcome, SyncUIRequest
@@ -378,7 +378,7 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
                       entry['is_deleted'], json.dumps(entry['value'], ensure_ascii=False))
             for column, value in enumerate(values):
                 self._heads.setItem(row, column, QTableWidgetItem(str(value)[:1000]))
-        self._heads.resizeColumnsToContents()
+        fit_columns(self._heads)
         if heads:
             self._heads.selectRow(0)
 

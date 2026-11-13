@@ -1,9 +1,12 @@
 """Containers that rearrange by width, and the pass that stops a page's controls from forcing it wide."""
-from typing import Callable, Optional, Tuple
+from typing import Callable, Iterable, Optional, Tuple
 
-from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSize
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSize, Qt
 from PySide6.QtGui import QResizeEvent
-from PySide6.QtWidgets import QBoxLayout, QComboBox, QFormLayout, QLabel, QLayout, QSizePolicy, QTabWidget, QWidget
+from PySide6.QtWidgets import (
+    QBoxLayout, QComboBox, QFormLayout, QHeaderView, QLabel, QLayout, QSizePolicy, QTableView, QTabWidget,
+    QWidget,
+)
 
 #: Below this many logical pixels a :class:`ResponsiveBox` stacks its parts.
 DEFAULT_STACK_BELOW = 720
@@ -82,27 +85,49 @@ def fit_to_width(root: QWidget) -> int:
     """Let every control under ``root`` shrink with the window; return how many were adjusted.
 
     Combo boxes stop sizing themselves to their longest entry, form layouts
-    move a label above its field when both do not fit, long labels wrap and
-    nested tab widgets scroll their tab bar. Run once, after the page is
-    built; a control already fitted is left alone, so calling it again is cheap.
+    move a label above its field when both do not fit, long labels wrap,
+    nested tab widgets scroll their tab bar and a table's last column takes
+    the width its columns leave over. Run once, after the page is built; a
+    control already fitted is left alone, so calling it again is cheap.
     """
     adjusted = 0
-    widgets = [root, *root.findChildren(QWidget)]
-    for widget in widgets:
+    for widget in (root, *root.findChildren(QWidget)):
         if widget.property(_FITTED):
             continue
         widget.setProperty(_FITTED, True)
         _fit_layout(widget.layout())
-        if isinstance(widget, QComboBox):
-            _fit_combo(widget)
-        elif isinstance(widget, QLabel) and not widget.wordWrap() and len(widget.text()) > 40:
-            widget.setWordWrap(True)
-        elif isinstance(widget, QTabWidget):
-            widget.setUsesScrollButtons(True)
-        else:
-            continue
-        adjusted += 1
+        adjusted += _fit_widget(widget)
     return adjusted
+
+
+def _fit_widget(widget: QWidget) -> bool:
+    if isinstance(widget, QComboBox):
+        _fit_combo(widget)
+    elif isinstance(widget, QLabel) and not widget.wordWrap() and len(widget.text()) > 40:
+        widget.setWordWrap(True)
+    elif isinstance(widget, QTabWidget):
+        widget.setUsesScrollButtons(True)
+    elif (isinstance(widget, QHeaderView) and widget.orientation() == Qt.Orientation.Horizontal
+          and not widget.stretchLastSection()):
+        # Columns sized to their contents stopped short of the table's right
+        # edge, leaving a strip with no header above it.
+        widget.setStretchLastSection(True)
+    else:
+        return False
+    return True
+
+
+def fit_columns(table: QTableView, capped: Iterable[int] = (), cap: int = 240) -> None:
+    """Size ``table``'s columns to their contents, hold the ``capped`` ones to ``cap`` pixels, then refill the width.
+
+    Sizing a column by hand keeps a stretched last column at its new width
+    until the table is next resized, so a refreshed table stopped short of its
+    right edge. The header re-applies the stretch here instead.
+    """
+    table.resizeColumnsToContents()
+    for column in capped:
+        table.setColumnWidth(column, min(table.columnWidth(column), cap))
+    table.horizontalHeader().resizeSections()
 
 
 class WidthWatcher(QObject):
