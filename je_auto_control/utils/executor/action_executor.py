@@ -2469,7 +2469,7 @@ def _restore_window_layout(layout: List[Dict[str, Any]] | str, maximize: bool = 
     ``maximize`` re-maximizes windows saved maximized, which activates each one.
     """
     from je_auto_control.utils.window_capture import restore_window_layout
-    return {"restored": restore_window_layout(layout, maximize=bool(maximize))}
+    return {"restored": restore_window_layout(layout, maximize=_as_bool(maximize))}
 
 
 def _region_color_stats(region: Optional[List[int] | str] = None,

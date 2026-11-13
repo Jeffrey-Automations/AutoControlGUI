@@ -208,6 +208,19 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 
 ---
 
+## PySide6 6.12 在容器（Python 3.12）的 headless 測試間歇 segfault
+
+`TODO` — `docker.yml` 的「Headless pytest inside the image」在 PySide6 6.12.0 上 4 次跑 3 次 SIGSEGV（U-20261114-01）。
+同一個 6.12.0 在 Ubuntu 3.11／3.14 的 pytest-headless（也在 gdb 下）都沒有；Windows 本機 3.14 也沒有。
+- 兩次在測試全部跑完後的直譯器結束：`Py_FinalizeEx` → `PySide::runCleanupFunctions` → `destroyQCoreApplication`
+  → `BindingManager::visitAllPyObjects` → `QObject::~QObject`，前一行是 Qt 的 `shared QObject was deleted directly`。
+- 一次在測試中段（約 46%）主執行緒的 `Shiboken::BindingManager::runDeletionInMainThread()` → QtWidgets。
+- 還不知道：是 Python 3.12 本身還是映像（slim、`dev_requirements.txt` 的套件組合）造成；是哪個測試留下了被兩邊刪除的物件。
+  上游查無相同回報。`docker.yml` 現在以 gdb 跑、`-X faulthandler`、`-v`，下次中段崩潰會有測試名稱。
+- 可選的處置（須維護者決定）：繼續定位；容器暫時固定 PySide6 6.11.2；或把映像換成 3.11／3.14。
+
+---
+
 ## Agent 電腦接管與任務自動化
 
 `WIP` — **依使用者恢復目標繼續交付；個別原生／真機／24 小時驗收仍暫緩。**

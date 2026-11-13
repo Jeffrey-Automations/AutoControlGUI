@@ -60,6 +60,7 @@ def test_a_saved_layout_reads_each_window_by_its_handle(monkeypatch):
     monkeypatch.setattr(sys, "platform", "win32")
     real = {1: (0, 0, 800, 600), 2: (900, 50, 400, 300)}
     monkeypatch.setattr(window_capture, "_win32_window_rect", lambda hwnd: real[hwnd])
+    monkeypatch.setattr(window_capture, "_win32_is_maximized", lambda hwnd: False)
     layout = window_capture.save_window_layout(lister=lambda: [(1, "Editor - a"), (2, "Editor")])
     assert [(entry["title"], entry["x"]) for entry in layout] == [("Editor - a", 0), ("Editor", 900)]
 
@@ -72,8 +73,14 @@ def test_restoring_duplicate_titles_moves_each_window_once(monkeypatch):
     moved = []
     fake_wm = types.SimpleNamespace(move_window=lambda hwnd, *rect: moved.append(hwnd) or True)
     monkeypatch.setitem(sys.modules, "je_auto_control.windows.window.windows_window_manage", fake_wm)
-    monkeypatch.setattr(sys.modules["je_auto_control.windows.window"], "windows_window_manage",
-                        fake_wm, raising=False)
+    # Run alone (or first) nothing has imported the package yet, and on
+    # Linux / macOS it cannot be: stand one in rather than depend on order.
+    package = sys.modules.get("je_auto_control.windows.window")
+    if package is None:
+        package = types.ModuleType("je_auto_control.windows.window")
+        package.__path__ = []
+        monkeypatch.setitem(sys.modules, "je_auto_control.windows.window", package)
+    monkeypatch.setattr(package, "windows_window_manage", fake_wm, raising=False)
     count = window_capture.restore_window_layout([
         {"title": "Editor", "x": 0, "y": 0, "width": 1, "height": 1},
         {"title": "Editor", "x": 5, "y": 5, "width": 1, "height": 1},

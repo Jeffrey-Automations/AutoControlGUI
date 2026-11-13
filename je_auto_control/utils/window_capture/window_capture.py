@@ -87,6 +87,12 @@ def _win32_window_rect(hwnd: int) -> Optional[Rect]:
             rect.right - rect.left, rect.bottom - rect.top)
 
 
+def _win32_is_maximized(hwnd: int) -> bool:
+    """``IsZoomed``: whether the window is maximized."""
+    import ctypes
+    return bool(ctypes.windll.user32.IsZoomed(hwnd))  # type: ignore[attr-defined]  # reason: win32-only ctypes
+
+
 def _win32_work_area() -> Optional[Rect]:
     """The primary monitor's work area as ``(x, y, width, height)``, or ``None``."""
     import ctypes
@@ -196,9 +202,8 @@ def _handle_layout(hwnd: int) -> Tuple[Optional[Rect], bool]:
     """
     if sys.platform != "win32":
         return None, False
-    import ctypes
     rect = _win32_window_rect(int(hwnd))
-    if rect is None or not ctypes.windll.user32.IsZoomed(int(hwnd)):  # type: ignore[attr-defined]  # reason: win32-only ctypes
+    if rect is None or not _win32_is_maximized(int(hwnd)):
         return rect, False
     from je_auto_control.windows.window import windows_window_manage as wm
     normal = wm.get_normal_window_rect(int(hwnd))

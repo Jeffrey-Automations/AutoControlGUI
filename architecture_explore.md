@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,527 |
-| 程式碼總行數 | 233,851 |
+| 程式碼總行數 | 233,856 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -706,7 +706,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.16 系統、視窗與剪貼簿
 
-> 16 個套件、約 2,745 行。
+> 16 個套件、約 2,750 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -722,7 +722,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/shell_open/` | 99 | Open files with their registered applications and delegate URLs to WebRunner. |
 | `utils/system_volume/` | 212 | 讀取與控制系統主音量與靜音狀態 |
 | `utils/trash/` | 93 | 把檔案移到系統資源回收筒（可復原刪除） |
-| `utils/window_capture/` | 414 | 逐視窗截圖、視窗版面儲存／還原、貼齊與排列 |
+| `utils/window_capture/` | 419 | 逐視窗截圖、視窗版面儲存／還原、貼齊與排列 |
 | `utils/window_geometry/` | 87 | 視窗客戶區幾何（外框內縮、client→screen 對映） |
 | `utils/window_layout/` | 137 | 視窗拼貼／版面規劃器（左右半、四象限、網格、層疊） |
 | `utils/window_zorder/` | 77 | 視窗 z 序控制（最上層／移到最前／送到最後） |
@@ -1553,8 +1553,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,148 |
-| **總計** | **1,515** | **233,106** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,153 |
+| **總計** | **1,515** | **233,111** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
