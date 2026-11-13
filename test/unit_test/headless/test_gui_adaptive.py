@@ -187,6 +187,29 @@ def test_a_responsive_box_stacks_below_its_threshold(qapp):
     box.deleteLater()
 
 
+def test_a_responsive_splitter_stacks_like_a_box_and_keeps_its_divider(qapp):
+    from PySide6.QtWidgets import QLabel
+    from je_auto_control.gui.adaptive.responsive import ResponsiveSplitter
+    left, right = QLabel("frame"), QLabel("actions")
+    left.setMinimumWidth(300)
+    right.setMinimumWidth(200)
+    splitter = ResponsiveSplitter(left, right, stack_below=600, stretches=(3, 2))
+    assert splitter.minimumSizeHint().width() == 300, "never more than the widest part"
+    assert not splitter.childrenCollapsible()
+    splitter.resize(900, 300)
+    splitter.show()
+    qapp.processEvents()
+    assert not splitter.stacked
+    before = splitter.sizes()
+    splitter.moveSplitter(before[0] - 100, 1)
+    assert splitter.sizes()[0] == before[0] - 100, "the user can still drag the divider"
+    splitter.resize(500, 600)
+    qapp.processEvents()
+    assert splitter.stacked
+    splitter.hide()
+    splitter.deleteLater()
+
+
 def test_the_fit_pass_stops_a_long_combo_from_widening_its_page(qapp):
     from PySide6.QtWidgets import QComboBox, QFormLayout, QLabel, QVBoxLayout, QWidget
     from je_auto_control.gui.adaptive.responsive import fit_to_width

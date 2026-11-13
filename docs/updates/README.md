@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-11 | 2026-11-14 | Trace Replay and Run History get their draggable divider back | #done #gui | [2026-11-b](2026-11-b.md) |
 | U-20261114-10 | 2026-11-14 | Remote Desktop's collapsed sections shrink to their title; wrapped groups show one title | #done #gui #remote-desktop | [2026-11-b](2026-11-b.md) |
 | U-20261114-09 | 2026-11-14 | Tables fill their width: a stretched last column, re-applied after a refresh | #done #gui | [2026-11-b](2026-11-b.md) |
 | U-20261114-08 | 2026-11-14 | Drop-down and spin box arrows drawn in theme colours, inset from the border | #done #gui | [2026-11-b](2026-11-b.md) |

@@ -4,7 +4,7 @@ from typing import Callable, Iterable, Optional, Tuple
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSize, Qt
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
-    QBoxLayout, QComboBox, QFormLayout, QHeaderView, QLabel, QLayout, QSizePolicy, QTableView, QTabWidget,
+    QBoxLayout, QComboBox, QFormLayout, QHeaderView, QLabel, QLayout, QSizePolicy, QSplitter, QTableView, QTabWidget,
     QWidget,
 )
 
@@ -58,6 +58,50 @@ class ResponsiveBox(QWidget):
             else QBoxLayout.Direction.LeftToRight
         if self._layout.direction() != direction:
             self._layout.setDirection(direction)
+
+
+class ResponsiveSplitter(QSplitter):
+    """A :class:`ResponsiveBox` whose divider can be dragged.
+
+    Side by side when there is room, one above the other when there is not; in
+    both, the user moves the divider. A plain ``QSplitter`` asks for the sum of
+    its parts' minimum widths even where stacking would fit, which is why pages
+    had swapped theirs for a box and lost the divider.
+    """
+
+    def __init__(self, *parts: QWidget, stack_below: int = DEFAULT_STACK_BELOW,
+                 stretches: Tuple[int, ...] = (), parent: Optional[QWidget] = None) -> None:
+        super().__init__(Qt.Orientation.Horizontal, parent)
+        self.stack_below = stack_below
+        self.setChildrenCollapsible(False)
+        # The theme draws this role's handle as a card gap that lights up on hover.
+        self.setProperty("role", "cards")
+        for index, part in enumerate(parts):
+            self.addWidget(part)
+            self.setStretchFactor(index, stretches[index] if index < len(stretches) else 1)
+
+    @property
+    def stacked(self) -> bool:
+        """Whether the parts are currently one above the other."""
+        return self.orientation() == Qt.Orientation.Vertical
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802  # reason: Qt override
+        """Never ask for more width than the widest part needs on its own."""
+        hint = super().minimumSizeHint()
+        parts = (self.widget(index) for index in range(self.count()))
+        hint.setWidth(max((part.minimumSizeHint().width() for part in parts if part is not None), default=0))
+        return hint
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802  # reason: Qt override
+        """Switch between side by side and stacked as the width crosses ``stack_below``."""
+        self.arrange(event.size().width())
+        super().resizeEvent(event)
+
+    def arrange(self, width: int) -> None:
+        """Lay the parts out for ``width`` pixels."""
+        orientation = Qt.Orientation.Vertical if width < self.stack_below else Qt.Orientation.Horizontal
+        if self.orientation() != orientation:
+            self.setOrientation(orientation)
 
 
 def _fit_combo(combo: QComboBox) -> None:

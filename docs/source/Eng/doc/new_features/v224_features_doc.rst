@@ -59,7 +59,8 @@ What every page gets
 * **Controls that shrink.** When a page is first shown it goes through a fit
   pass: drop-down lists stop sizing themselves to their longest entry (Mobile
   needed 1,464 px for one command label), form labels move above their field
-  when both do not fit, and long notes wrap.
+  when both do not fit, long notes wrap, and a table's last column takes the
+  width its other columns leave.
 
 Building blocks
 ---------------
@@ -77,6 +78,12 @@ They live in ``je_auto_control.gui.adaptive``:
 ``responsive.ResponsiveBox``
     Two or more parts side by side when there is room, stacked below a width
     you choose.
+``responsive.ResponsiveSplitter``
+    The same, with a divider the user can drag in either arrangement (Trace
+    Replay, Run History).
+``responsive.fit_columns``
+    Sizes a table's columns to their contents, caps the ones you name, then
+    lets the last column fill the table again.
 ``responsive.fit_to_width``
     The fit pass described above. The workspace runs it on every page it
     shows; a control already fitted is left alone.

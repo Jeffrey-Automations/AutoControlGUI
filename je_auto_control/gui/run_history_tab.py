@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
-from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.responsive import ResponsiveSplitter
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -160,7 +160,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         preview.add(self._thumb_label, stretch=1).add(self._thumb_caption)
         # Stacked under a narrow window the table would otherwise shrink to its header.
         self._table.setMinimumHeight(200)
-        runs = ResponsiveBox(Card().add(self._table, stretch=1), preview, stretches=(3, 1))
+        runs = ResponsiveSplitter(Card().add(self._table, stretch=1), preview, stretches=(3, 1))
         # The journal browser is shared with Self-Healing; tag it so it shows the card behind it.
         self._journal.setProperty("role", "bare")
         sections = QSplitter(Qt.Orientation.Vertical)

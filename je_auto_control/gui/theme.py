@@ -164,6 +164,10 @@ QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
 QSplitter::handle {{ background-color: {border}; }}
 QSplitter::handle:horizontal {{ width: 1px; }}
 QSplitter::handle:vertical {{ height: 1px; }}
+QSplitter[role="cards"]::handle {{ background-color: transparent; border-radius: {small}px; }}
+QSplitter[role="cards"]::handle:horizontal {{ width: 12px; }}
+QSplitter[role="cards"]::handle:vertical {{ height: 12px; }}
+QSplitter[role="cards"]::handle:hover {{ background-color: {hover}; }}
 QProgressBar {{ background-color: {surface_raised}; border: 0; border-radius: {small}px; text-align: center; }}
 QProgressBar::chunk {{ background-color: {accent}; border-radius: {small}px; }}
 QStatusBar {{ background-color: {window}; border-top: 1px solid {border}; color: {text_muted}; }}

@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui.adaptive.responsive import ResponsiveBox, fit_columns
+from je_auto_control.gui.adaptive.responsive import ResponsiveSplitter, fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -68,7 +68,7 @@ class TraceReplayTab(TranslatableMixin, QWidget):
         root.addWidget(Card().add(self._slider))
         frame = Card().add(self._frame_label, stretch=1)
         actions = Card().add(self._actions_table, stretch=1)
-        root.addWidget(ResponsiveBox(frame, actions, stretches=(3, 2)), stretch=1)
+        root.addWidget(ResponsiveSplitter(frame, actions, stretches=(3, 2)), stretch=1)
         self._status.setWordWrap(True)
         set_role(self._status, "hint")
         root.addWidget(self._status)
