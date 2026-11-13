@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- GUI: Remote Desktop's host-ID labels, stats line, sparklines and missing-extras message take
+  their colours from the theme instead of fixed values (the sparkline's `background` now
+  defaults to the palette's base colour; pass a colour to keep a fixed one). A new `accent`
+  label role carries the theme's accent. Diagnostics hides its progress line while idle, and the
+  Assertions kind list and the Email Triggers password placeholder follow a language switch.
+
 - GUI: applying a theme to a top-level window also sets the application palette. Widgets a
   style sheet styles start from the application palette, which on Windows carries the system
   accent colour, so checked boxes were drawn in the user's accent instead of the theme's.

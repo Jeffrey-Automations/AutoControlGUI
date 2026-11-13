@@ -149,6 +149,7 @@ QLabel[role="emptyMessage"] {{ color: {text_muted}; }}
 QLabel[role="danger"] {{ color: {danger}; }}
 QLabel[role="success"] {{ color: {success}; }}
 QLabel[role="warning"] {{ color: {warning}; }}
+QLabel[role="accent"] {{ color: {accent}; }}
 QPushButton[role="primary"] {{ background-color: {accent}; color: {accent_text}; border-color: {accent}; }}
 QPushButton[role="primary"]:hover {{ background-color: {accent_hover}; }}
 

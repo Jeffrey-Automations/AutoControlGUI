@@ -110,9 +110,8 @@ class _ViewerUiMixin(_ViewerPanelPart):
         self._quality_dot.setToolTip(_t("rd_webrtc_quality_unknown"))
         stats_row.addWidget(self._quality_dot)
         self._stats_label = QLabel(_t("rd_webrtc_stats_idle"))
-        self._stats_label.setStyleSheet(
-            "color: #ccaa55; font-family: 'Consolas', monospace;",
-        )
+        self._stats_label.setStyleSheet("font-family: 'Consolas', monospace;")
+        set_role(self._stats_label, "hint")
         self._stats_label.setWordWrap(True)
         stats_row.addWidget(self._stats_label, stretch=1)
         card.add(stats_row)

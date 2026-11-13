@@ -81,9 +81,10 @@ class _HostPanel(TranslatableMixin, QWidget):
         self._host_id_label = QLabel("---")
         self._host_id_label.setStyleSheet(
             "font-family: 'Consolas', 'Menlo', 'Courier New', monospace; "
-            "font-size: 26pt; font-weight: bold; color: #2070d0; "
+            "font-size: 26pt; font-weight: bold; "
             "letter-spacing: 2px;"
         )
+        set_role(self._host_id_label, "accent")
         self._badge = _StatusBadge()
         self._token = QLineEdit()
         self._bind = QLineEdit("127.0.0.1")

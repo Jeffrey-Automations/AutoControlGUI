@@ -94,6 +94,12 @@ class AssertionsTab(TranslatableMixin, QWidget):
             ("assert_run", self._on_run),
         ]
 
+    def retranslate(self) -> None:
+        """Re-read every registered label, then the kind list's entries in place (the selection stays)."""
+        TranslatableMixin.retranslate(self)
+        for index, kind in enumerate(_KINDS):
+            self._kind.setItemText(index, _t(f"assert_kind_{kind}"))
+
     def _current_kind(self) -> str:
         return _KINDS[self._kind.currentIndex()]
 

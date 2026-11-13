@@ -45,7 +45,7 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         self._user_input.setPlaceholderText("user@example.com")
         self._password_input = QLineEdit()
         self._password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self._password_input.setPlaceholderText(_t("eml_password_placeholder"))
+        self._tr(self._password_input, "eml_password_placeholder", "setPlaceholderText")
         self._mailbox_input = QLineEdit("INBOX")
         self._search_input = QLineEdit("UNSEEN")
         self._poll_input = QSpinBox()

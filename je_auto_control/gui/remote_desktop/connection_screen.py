@@ -63,7 +63,7 @@ from je_auto_control.utils.remote_desktop.registry import (
 
 _HOST_ID_CSS = (
     "font-family: 'Consolas', 'Menlo', 'Courier New', monospace; "
-    "font-size: 40pt; font-weight: bold; color: #2070d0; "
+    "font-size: 40pt; font-weight: bold; "
     "letter-spacing: 4px;"
 )
 _BIG_INPUT_CSS = (
@@ -120,6 +120,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._displaced.connect(self._on_displaced)
         self._host_id_label = QLabel("---")
         self._host_id_label.setStyleSheet(_HOST_ID_CSS)
+        set_role(self._host_id_label, "accent")
         self._host_id_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._host_badge = _StatusBadge()
         self._viewer_badge = _StatusBadge()

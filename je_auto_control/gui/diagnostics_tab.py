@@ -191,6 +191,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         if self._active_task is not None and self._view.total:
             progress = _t('diag_progress').format(completed=self._view.completed, total=self._view.total)
         self._progress_label.setText(progress)
+        self._progress_label.setVisible(bool(progress))   # an empty line took a row while idle
         phase: ExecutionPhase
         if self._view.kind == 'result':
             phase = 'succeeded' if report is not None and report.ok else 'error'

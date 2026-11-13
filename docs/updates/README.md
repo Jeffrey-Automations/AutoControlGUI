@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-06 | 2026-11-14 | GUI polish: theme colours in Remote Desktop, idle progress line, two strings that ignored a language switch | #done #gui | [2026-11-b](2026-11-b.md) |
 | U-20261114-05 | 2026-11-14 | GUI reviewed on the real Windows desktop at 150 %; check boxes took the system accent | #done #gui #windows | [2026-11-b](2026-11-b.md) |
 | U-20261114-04 | 2026-11-14 | GUI redesign, stage 2: every tab rebuilt on the adaptive layout | #migration #gui | [2026-11-b](2026-11-b.md) |
 | U-20261114-03 | 2026-11-14 | PySide6 back to 6.11.2: 6.12.0 crashes every CI platform at exit | #decision #ci #gui | [2026-11-b](2026-11-b.md) |
