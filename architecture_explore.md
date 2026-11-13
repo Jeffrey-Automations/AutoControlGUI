@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,536 |
-| 程式碼總行數 | 235,249 |
+| 程式碼總行數 | 235,549 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1335,7 +1335,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `journal_browser.py` | 250 | Run History 與 Self-Healing 共用的唯讀日誌檢視：來源連結／路徑／run／step 篩選、有界快照表與明細，舊結果以 request ID 隔離。 |
 | `journal_browser_worker.py` | 85 | 背景查閱與逐筆取消；帶入 context 並在開檔前重查 deferred 擁有者，以 queued counts 回報進度。 |
 | `manual_run_controls.py` | 72 | 手動執行的 history 勾選與獨立 journal 路徑；以共用無頭 scope 包住既有 GUI 執行，不改結果與變數。 |
-| `language_wrapper/` | 8,195 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
+| `language_wrapper/` | 8,495 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
 | `selector/` | 216 | 拖曳選取螢幕區域的半透明全螢幕覆蓋層與樣板裁切工具（互動式，但都有對應的程式化 API）。 |
 
 > **分頁指令一律走 Actions 選單**：分頁本身只放輸入、表格與結果檢視，指令由視窗層選單暴露。
@@ -1542,7 +1542,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 159 | 42,052 |
+| `gui/` | 159 | 42,352 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1563,7 +1563,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,153 |
-| **總計** | **1,524** | **234,504** |
+| **總計** | **1,524** | **234,804** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
