@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- The `gui` extra and the development and CI pins are back on `PySide6==6.11.2`. 6.12.0 crashed
+  the test process at interpreter exit on every CI platform (a double free while
+  `destroyQCoreApplication` tears down Python-held widgets); Dependabot now skips 6.12.0.
+
 - `save_window_layout` stores a maximized window with `"maximized": true` and its restored
   rectangle; it used to store the maximized rectangle, which restored as a screen-sized normal
   window. `restore_window_layout(..., maximize=True)` (`AC_restore_window_layout`'s
