@@ -219,6 +219,12 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 須在 PR 上以 6.12 跑完整矩陣（含 `docker.yml`）確認每一格結束時都不再崩潰；其他平台與完整套件尚未以 6.12 重驗。
   試驗分支 `trial/pyside6-6.12`（2026-11-15，維護者決定）：草稿 PR #554 進 dev（`dev.yml`，並手動觸發 `quality.yml`）、
   只跑 CI 的草稿 PR #555 進 main（`docker.yml`、`stable.yml`，看完結果即關閉）。全部格子都正常結束才合併 #554。
+  `quality.yml`（run 43599637920）結果：所有 3.12／3.13／3.14 格子（Windows、Ubuntu、macOS）通過，結束時不再崩潰；
+  兩個 3.11 格子仍失敗——Ubuntu 3.11 的 `test_gui_page_widths.py` 探針子程序在建構 `flakiness_tab` 時
+  `Fatal Python error: none_dealloc`（None 的參考計數被多減一次；3.12 起 None 是 immortal，所以只有 3.11 會死），
+  Windows 3.11 在 `test_gui_offthread_sites.py::test_a_failed_upload_is_reported_and_a_disconnect_is_not` 中段 abort。
+  本機 Windows 3.11.9 + 6.12.0 單獨重跑這兩個檔案（含 webrtc）各 3～5 次都通過，逐一建構所有分頁、Qt 訊息處理器與常用 API
+  也量不到 None 參考計數漂移；尚未找到減少 None 的呼叫。可選：維持 6.11.2；或只對 Python ≥ 3.12 改用 6.12（3.11 留在 6.11.2）。
 
 ---
 
