@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,537 |
-| 程式碼總行數 | 235,909 |
+| 程式碼總行數 | 235,914 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1314,8 +1314,8 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `workspace_details.py` | 97 | Immutable execution snapshots and a passive, scrollable workspace detail view. Diagnostics 提供第一個實際 publisher；僅訂閱目前頁面。 |
 | `workspace_settings.py` | 36 | 驗證與載入主題、字級、導覽面板顯示與寬度；QSettings 使用當次帳號家目錄的 `gui.ini`，測試可注入獨立檔案。 |
 | `agent_transfer_view.py` | 171 | Explicit transfer requests and consent preparation with revision-bound background observations. |
-| `config_sync_worker.py` | 131 | Run explicit workspace requests with immutable inputs, live authority and cooperative cancellation. |
-| `config_sync_tab.py` | 423 | Lazy Actions-menu workspace synchronization, causal review and explicit live preference application. |
+| `config_sync_worker.py` | 130 | Run explicit workspace requests with immutable inputs, live authority and cooperative cancellation. |
+| `config_sync_tab.py` | 429 | Lazy Actions-menu workspace synchronization, causal review and explicit live preference application. |
 | `_auto_click_tab.py` | 321 | 獨立自動點擊分頁；快照工作參數，以 TabTask 執行與取消。 |
 | `_screenshot_tab.py` | 180 | 獨立延遲建立的截圖／像素分頁；背景讀取、輸入快照與關閉後結果丟棄。 |
 | `_image_detect_tab.py` | 158 | 獨立影像偵測分頁，擁有輸入、背景工作與關閉生命週期。 |
@@ -1543,7 +1543,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 160 | 42,642 |
+| `gui/` | 160 | 42,647 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1564,7 +1564,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,207 |
-| **總計** | **1,525** | **235,164** |
+| **總計** | **1,525** | **235,169** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

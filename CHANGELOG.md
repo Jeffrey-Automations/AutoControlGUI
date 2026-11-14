@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- GUI internals: the Config Sync tab runs on `TabTask.start_until_stopped`. `ConfigSyncWorker`
+  is no longer a `QObject`: it is called with the stop event and returns its `SyncUIOutcome`;
+  the tab keeps it for `deliver` (`run`, `finished` and the tab's `_handle` are gone; `_task`
+  is the task). No GUI module outside the task controllers calls `start_worker` any more.
+
 - GUI internals: the template candidate panel (Self-Healing) runs on
   `TabTask.start_until_stopped(..., reports=True)`. `TemplateCandidateWorker` is no longer a
   `QObject`: it is called with the stop event and a report of `(request_id, count)` and returns

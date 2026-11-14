@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox, fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
-from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.config_sync_worker import ConfigSyncWorker, SyncUIOutcome, SyncUIRequest
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.config_sync.adapter_schema import AdapterKind, KINDS
@@ -45,7 +45,11 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
         self._policy = path_policy
         self._generation = 0
         self._worker: Optional[ConfigSyncWorker] = None
-        self._handle: Optional[WorkerHandle] = None
+        # Cancel and the tab's destruction stop the request at its next checkpoint; it stays busy until then.
+        self._task = TabTask(self)
+        self._task.result.connect(self._received)
+        self._task.error.connect(self._task_failed)
+        self._task.finished.connect(self._thread_done)
         self._reviewed: Optional[dict[str, dict[str, object]]] = None
         self._row_ids: list[str] = []
         self._last_sync: object = None
@@ -230,7 +234,7 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
 
     def begin(self, operation: str) -> None:
         """Snapshot one explicit menu operation and run it outside the GUI thread."""
-        if self._handle is not None:
+        if self._task.running:
             self._set_status('busy')
             return
         try:
@@ -245,15 +249,14 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
             self._value.setEnabled(False)
             self._deleted.setEnabled(False)
             self._set_status('running')
-            self._handle = start_worker(self, self._worker, on_done=self._received,
-                                        on_thread_done=self._thread_done, on_fail=self._failed)
+            self._task.start_until_stopped(self._worker)
         except (AutoControlException, ValueError, TypeError, RuntimeError) as error:
             self._failed(scrub_secret_text(str(error)))
 
     def cancel(self) -> None:
         """Request cooperative stop; durable completed operations keep their result."""
-        if self._worker is not None:
-            self._worker.request_stop()
+        if self._task.running:
+            self._task.stop()
             self._set_status('cancelling')
 
     def _received(self, outcome: SyncUIOutcome) -> None:
@@ -324,7 +327,7 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
         self._set_status('done')
 
     def _use_loaded_profile(self, operation: Callable[[LoadedSyncProfile], None]) -> None:
-        if self._handle is not None:
+        if self._task.running:
             self._set_status('busy')
             return
         try:
@@ -405,8 +408,11 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
         self._details.clear()
         self._set_status('error', scrub_secret_text(error))
 
+    def _task_failed(self, error: object) -> None:
+        self._failed(str(error))
+
     def _thread_done(self) -> None:
-        self._handle = self._worker = None
+        self._worker = None
         for control in (self._form, self._load_form, self._heads, self._value, self._deleted):
             control.setEnabled(True)
         if self._status_key in {'running', 'cancelling'}:

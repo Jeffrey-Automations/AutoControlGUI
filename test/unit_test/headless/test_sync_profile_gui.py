@@ -36,8 +36,7 @@ def window(app, tmp_path, monkeypatch):
     yield view
     panel = view.auto_control_gui_widget.tab_registry.open('config_sync')
     panel.cancel()
-    if panel._handle is not None:
-        assert panel._handle.wait(5)
+    idle(app, panel)
     view.close()
     view.deleteLater()
     app.processEvents()
@@ -177,13 +176,10 @@ def test_worker_keeps_committed_native_load_success_after_a_late_stop(app, tmp_p
         return profile
 
     monkeypatch.setattr(config_sync_worker, 'load_sync_profile', committed)
-    try:
-        outcome = run(worker)
-        assert outcome.status == 'ok'
-        assert outcome.profile.directory.is_dir()
-        assert outcome.profile.hotkeys[0].enabled is False
-    finally:
-        worker.deleteLater()
+    outcome = run(worker)
+    assert outcome.status == 'ok'
+    assert outcome.profile.directory.is_dir()
+    assert outcome.profile.hotkeys[0].enabled is False
 
 
 @pytest.mark.parametrize('command,parameters', [('AC_<b>literal</b>', {}),

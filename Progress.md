@@ -536,17 +536,9 @@ F 還缺：
 - **F2 GUI 重製（`WIP`，維護者 2026-11-14 決定：全面視覺改版；窄視窗時導覽與詳情改為浮層）**：
   設計系統、視窗斷點（U-20261114-02）與 51 個分頁的版面重排（U-20261114-04）已交付，`WIDE_PAGES` 已清空。仍缺：
   - 已在本機真實桌面（Windows 11、單一螢幕 1920×1080、150% 縮放）審閱（U-20261114-05）；混合 DPI／多螢幕與 Linux／macOS 字型仍只有 offscreen 截圖。
-- **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移，
-  包含 Quick Connect 的同步啟停、已進入傳輸的取消與同頁 session generation 隔離。
-  AI Locator 與 LLM Planner 的 Plan（U-20261114-13）、兩個 USB 裝置列舉（U-20261114-14）、
-  Email Triggers 的 Poll Now（U-20261114-15）、Admin Console 的 broadcast（U-20261114-16，維護者 2026-11-14 決定：
-  停止時逐台回報已執行或未送出）、USB Browser 的 Fetch／Open（U-20261114-17）、
-  USB passthrough 面板的 List／Open／遠端抓取（U-20261114-18）、Computer Use 的執行（U-20261114-19，
-  `TabTask.start_until_stopped`：Stop 後等工作真的結束才空出分頁）、DAG Runner（U-20261114-20）、
-  Admin Console 的健康輪詢與縮圖（U-20261114-21）、自我修復比對面板（U-20261114-22）、
-  journal browser（U-20261114-23，`TabTask` 加上進度通道）、journal candidate 面板（U-20261114-24）、
-  template candidate 面板（U-20261114-25）已遷移。仍直接使用 `start_worker` 的面板都已有自己的取消
-  （Cancel 動作、關閉時 `request_stop`、generation 擋掉舊結果），只差改用共用 controller：`config_sync_tab`。
+- **F3** 還缺 backend timeout／cancel 傳遞與關閉生命週期遷移，包含 Quick Connect 的同步啟停、
+  已進入傳輸的取消與同頁 session generation 隔離。分頁的背景工作已全部改走共用 `TaskController`
+  （`TabTask`，U-20261114-13～26），GUI 內除兩個 controller 本身外已無 `start_worker` 呼叫。
 - **F3 關閉失敗恢復**：`gui/_slow_op.py` 的 StopQueue／stop_each 目前只記錄停止失敗，
   尚未保留失敗資源的明確重試所有權。須接上應用程式生命週期的資源保管、原授權下的 Diagnostics 查詢／重試，
   並遷移一般停止及頁面銷毀後的 discard 路徑，包含 `_drop_offer` 與廣播清理；不能把背景排程等同原生資源已釋放。
