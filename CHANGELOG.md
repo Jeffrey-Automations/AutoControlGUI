@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- GUI: Quick Connect and the Viewer tab tag each viewer session's callbacks with a session
+  number; frames, cursor moves, audio and errors from a session already replaced or closed are
+  dropped instead of reaching the next session (a late error used to disconnect it).
+  `ViewLifetime.tagged` / `tagged_error` deliver `method(tag, *arguments)`. `_viewer_callbacks()`
+  now starts a new session each time it is called.
+
 - Remote desktop: `file_transfer.send_file` and `RemoteDesktopViewer.send_file` take a
   keyword `cancelled=` callable and otherwise follow the calling thread's cancellation scope.
   A transfer stopped mid-file sends a `FILE_END` with status `cancelled` (the receiver discards

@@ -180,3 +180,67 @@ def test_the_viewer_panels_disconnect_closes_on_a_worker_too(monkeypatch):
     finally:
         viewer.release.set()
         panel.deleteLater()
+
+
+def test_a_replaced_sessions_late_events_do_not_reach_the_next_session(screen, monkeypatch):
+    # The old session closes on a worker while the new one connects; its last
+    # frames and its error (a closed socket) used to land on the new session,
+    # and the error's Disconnect closed it.
+    from headless._qt_settle import pump_until
+    from je_auto_control.gui.remote_desktop import connection_screen
+    seen = []
+    screen_cls = connection_screen.QuickConnectScreen
+    monkeypatch.setattr(screen_cls, "_on_frame", lambda self, payload: seen.append(("frame", payload)))
+    monkeypatch.setattr(screen_cls, "_on_error", lambda self, message: seen.append(("error", message)))
+    monkeypatch.setattr(screen_cls, "_on_remote_cursor", lambda self, x, y: seen.append(("cursor", x, y)))
+    old = screen._viewer_callbacks()
+    new = screen._viewer_callbacks()                 # a connect replaced the first session
+    old["on_frame"](b"old frame")
+    old["on_cursor"](1, 1)
+    old["on_error"](ConnectionResetError("socket closed"))
+    new["on_frame"](b"new frame")
+    new["on_cursor"](2, 2)
+    assert pump_until(lambda: len(seen) >= 2)
+    assert seen == [("frame", b"new frame"), ("cursor", 2, 2)]
+
+
+def test_a_disconnected_sessions_error_is_not_reported(screen, monkeypatch):
+    from headless._qt_settle import pump_until
+    from je_auto_control.gui.remote_desktop import connection_screen
+    warnings = []
+    monkeypatch.setattr(connection_screen.QMessageBox, "warning", lambda *args: warnings.append(args))
+    callbacks = screen._viewer_callbacks()
+    screen._disconnect()
+    callbacks["on_error"](ConnectionResetError("socket closed"))
+    assert pump_until(lambda: bool(warnings), timeout=0.5) is False
+
+
+def test_the_viewer_tab_drops_a_replaced_sessions_events(monkeypatch):
+    pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    try:
+        from je_auto_control.gui.remote_desktop import viewer_panel
+    except ImportError:
+        pytest.skip("the remote desktop GUI needs the webrtc extra")
+    from headless._qt_settle import pump_until
+    monkeypatch.setattr(viewer_panel, "is_audio_backend_available", lambda: False)
+    seen = []
+    panel_cls = viewer_panel._ViewerPanel
+    monkeypatch.setattr(panel_cls, "_on_frame_main", lambda self, payload: seen.append(("frame", payload)))
+    monkeypatch.setattr(panel_cls, "_on_error_main", lambda self, message: seen.append(("error", message)))
+    panel = panel_cls()
+    try:
+        old_session = panel._session
+        late_error = panel._view.tagged_error("_on_session_error", old_session)
+        late_frame = panel._view.tagged("_on_session_frame", old_session)
+        panel._disconnect()                          # or a new connect: either starts a new session
+        late_error(ConnectionResetError("socket closed"))
+        late_frame(b"old frame")
+        current = panel._view.tagged("_on_session_frame", panel._session)
+        current(b"new frame")
+        assert pump_until(lambda: bool(seen))
+        assert seen == [("frame", b"new frame")]
+    finally:
+        panel.deleteLater()

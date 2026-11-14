@@ -535,8 +535,8 @@ F 還缺：
 - **F2 GUI 重製（`WIP`，維護者 2026-11-14 決定：全面視覺改版；窄視窗時導覽與詳情改為浮層）**：
   設計系統、視窗斷點（U-20261114-02）與 51 個分頁的版面重排（U-20261114-04）已交付，`WIDE_PAGES` 已清空。仍缺：
   - 已在本機真實桌面（Windows 11、單一螢幕 1920×1080、150% 縮放）審閱（U-20261114-05）；混合 DPI／多螢幕與 Linux／macOS 字型仍只有 offscreen 截圖。
-- **F3** 還缺 backend timeout／cancel 傳遞與關閉生命週期遷移，包含同頁 session generation 隔離
-  （Quick Connect 與 Viewer 分頁的啟停／中斷連線已移出 GUI 執行緒，U-20261114-32；傳送中的檔案傳輸會在下一個區塊停止，U-20261114-33）。分頁的背景工作已全部改走共用 `TaskController`
+- **F3** 還缺 backend timeout／cancel 傳遞與關閉生命週期遷移（Quick Connect 與 Viewer 分頁的啟停／中斷連線已移出 GUI 執行緒，
+  U-20261114-32；傳送中的檔案傳輸會在下一個區塊停止，U-20261114-33；同頁 session generation 已隔離，U-20261114-34）。分頁的背景工作已全部改走共用 `TaskController`
   （`TabTask`，U-20261114-13～26），GUI 內除兩個 controller 本身外已無 `start_worker` 呼叫。
 - **F3 關閉失敗恢復**：`gui/_slow_op.py` 的 StopQueue／stop_each 目前只記錄停止失敗，
   尚未保留失敗資源的明確重試所有權。須接上應用程式生命週期的資源保管、原授權下的 Diagnostics 查詢／重試，

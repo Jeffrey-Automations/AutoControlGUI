@@ -60,6 +60,16 @@ class ViewLifetime(Generic[_Owner]):
             self.post(method, str(exc))
         return error
 
+    def tagged(self, method: str, tag: object) -> Callable[..., None]:
+        """Like :meth:`callback`, delivering ``method(tag, *arguments)``: the tag says which session sent it."""
+        return functools.partial(self.post, method, tag)
+
+    def tagged_error(self, method: str, tag: object) -> Callable[[Exception], None]:
+        """Like :meth:`error_callback`, delivering ``method(tag, message)``."""
+        def error(exc: Exception) -> None:
+            self.post(method, tag, str(exc))
+        return error
+
     def post(self, method: str, *arguments: object) -> None:
         with self._lock:
             relay = self._relay()

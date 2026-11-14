@@ -154,6 +154,10 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._host_op = SlowOp(self)
         self._stops = StopQueue(self)
         self._host_pending = ""
+        # Which viewer session the window shows: a session being replaced or
+        # closed keeps closing on a worker, and its late frames, cursor moves
+        # or errors must not reach the session that followed it.
+        self._session = 0
         self._uploads = TabTask(self)                      # dropped files going to the host, off-thread
         self._uploads.error.connect(self._on_upload_failed)
         self._uploads.finished.connect(self._refresh_status)
@@ -475,9 +479,23 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._refresh_status()
 
     def _viewer_callbacks(self) -> dict:
-        return {"on_frame": self._view.callback("_on_frame"),
-                "on_error": self._view.error_callback("_on_error"),
-                "on_cursor": self._view.callback("_on_remote_cursor")}
+        """Callbacks for a new viewer session; they carry its number, and only the current session's land."""
+        self._session += 1
+        return {"on_frame": self._view.tagged("_on_session_frame", self._session),
+                "on_error": self._view.tagged_error("_on_session_error", self._session),
+                "on_cursor": self._view.tagged("_on_session_cursor", self._session)}
+
+    def _on_session_frame(self, session: int, payload: bytes) -> None:
+        if session == self._session:
+            self._on_frame(payload)
+
+    def _on_session_cursor(self, session: int, x: int, y: int) -> None:
+        if session == self._session:
+            self._on_remote_cursor(x, y)
+
+    def _on_session_error(self, session: int, message: str) -> None:
+        if session == self._session:        # an error from a session already replaced or closed is not news
+            self._on_error(message)
 
     def _begin_connect(self, slot: str, build, on_live) -> None:
         """Take ``slot``, build the viewer, and connect it off the GUI thread (see ``_connect_task``).
@@ -559,6 +577,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
 
     def _disconnect(self) -> None:
         # Either transport, and only a session this screen opened.
+        self._session += 1                  # whatever the closed session still sends is dropped
         self._cancel_pending_connect()
         self._uploads.stop()    # its socket is about to close; the failure is not news
         # The slots are free at once; closing the sockets (a join) runs off the GUI thread.

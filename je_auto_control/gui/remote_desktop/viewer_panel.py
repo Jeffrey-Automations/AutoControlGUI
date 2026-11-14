@@ -63,6 +63,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         self._view = ViewLifetime(self)
+        self._session = 0                   # which connect the window shows; see _on_session_frame
         self._stops = StopQueue(self)
         # This panel's name in the registry: it only ever reads, drives and
         # disconnects the viewer it opened itself.
@@ -266,12 +267,16 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         clipboard_receiver = ClipboardReceiver(authority, self._view.callback("_on_clipboard_main"))
         viewer: RemoteDesktopViewer
         self._early_frame = None            # a frame of the session being replaced
+        # The replaced session closes on a worker: its late frames, audio and
+        # error carry its number and are dropped once this one has begun.
+        self._session += 1
+        session = self._session
         try:
             viewer = viewer_cls(
                 host=host, port=port, token=token,
-                on_frame=self._view.callback("_on_frame_main"),
-                on_error=self._view.error_callback("_on_error_main"),
-                on_audio=self._view.callback("_on_audio_main"),
+                on_frame=self._view.tagged("_on_session_frame", session),
+                on_error=self._view.tagged_error("_on_session_error", session),
+                on_audio=self._view.tagged("_on_session_audio", session),
                 on_clipboard=clipboard_receiver,
                 expected_host_id=expected_id,
                 ssl_context=ssl_context,
@@ -382,6 +387,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         self._status.setText(_t("rd_viewer_displaced"))
 
     def _disconnect(self) -> None:
+        self._session += 1                  # whatever the closed session still sends is dropped
         self._clipboard_authority = None
         self._cancel_pending_connect()
         close = registry.detach(SLOT_VIEWER, self._owner, only_own=True)
@@ -446,6 +452,18 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             self._action_row.setVisible(live)
 
     # --- slot handlers (run on GUI thread) -----------------------------
+
+    def _on_session_frame(self, session: int, payload: bytes) -> None:
+        if session == self._session:
+            self._on_frame_main(payload)
+
+    def _on_session_audio(self, session: int, payload: bytes) -> None:
+        if session == self._session:
+            self._on_audio_main(payload)
+
+    def _on_session_error(self, session: int, message: str) -> None:
+        if session == self._session:        # an error from a session already replaced or closed is not news
+            self._on_error_main(message)
 
     def _on_frame_main(self, payload: bytes) -> None:
         image = QImage.fromData(payload, "JPEG")  # type: ignore[arg-type]  # reason: the stub says bytes; PySide6 raises ValueError for bytes
