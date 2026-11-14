@@ -213,6 +213,14 @@ sys.stdout.write(json.dumps(report))
 sys.stdout.flush()
 # Skip Qt/native-thread teardown entirely -- that teardown is the whole
 # reason this runs out of process. The report is already on stdout.
+if sys.platform == "win32":
+    # os._exit still runs every DLL's detach on Windows, where Qt's teardown
+    # races the helper threads tabs start and can fault (0xC0000005) after the
+    # report is written. TerminateProcess ends the process without it.
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+    kernel32.TerminateProcess(ctypes.c_void_p(kernel32.GetCurrentProcess()), 0)
 os._exit(0)
 """
 

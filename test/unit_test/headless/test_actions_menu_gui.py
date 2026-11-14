@@ -95,6 +95,14 @@ sys.stdout.flush()
 # Skip Qt/native-thread teardown entirely: some tabs start helper threads
 # at construction and interpreter shutdown can abort. The report is
 # already on stdout, so a hard exit is the safe end for this probe.
+if sys.platform == "win32":
+    # os._exit still runs every DLL's detach on Windows, where Qt's teardown
+    # races the helper threads tabs start and can fault (0xC0000005) after the
+    # report is written. TerminateProcess ends the process without it.
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+    kernel32.TerminateProcess(ctypes.c_void_p(kernel32.GetCurrentProcess()), 0)
 os._exit(0)
 """
 

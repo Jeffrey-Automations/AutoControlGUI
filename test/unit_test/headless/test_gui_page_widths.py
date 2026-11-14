@@ -52,6 +52,14 @@ for spec in TAB_SPECS:
     widths[spec.key] = page.minimumSizeHint().width() / unit if workspace.current_tab_key() == spec.key else -1
 sys.stdout.write(json.dumps({"unit": unit, "widths": widths}))
 sys.stdout.flush()
+if sys.platform == "win32":
+    # os._exit still runs every DLL's detach on Windows, where Qt's teardown
+    # races the helper threads tabs start and can fault (0xC0000005) after the
+    # report is written. TerminateProcess ends the process without it.
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+    kernel32.TerminateProcess(ctypes.c_void_p(kernel32.GetCurrentProcess()), 0)
 os._exit(0)
 """
 
