@@ -101,7 +101,7 @@ def test_the_tabs_run_their_job_and_clear_the_guard(monkeypatch, which):
         monkeypatch.setattr(mod, "result_to_dict", lambda result: {"succeeded": True})
         tab = mod.ComputerUseTab()
         tab._spawn_worker({"goal": "g"})  # noqa: SLF001
-        guard = "_thread"
+        guard = "task"
     elif which == "dag":
         from je_auto_control.gui import dag_tab as mod
 
@@ -120,7 +120,8 @@ def test_the_tabs_run_their_job_and_clear_the_guard(monkeypatch, which):
         tab._description.setPlainText("do it")  # noqa: SLF001
         tab._on_plan()  # noqa: SLF001
         guard = "task"
-    holder = tab._plans if which == "llm_planner" else tab  # noqa: SLF001
+    holder = {"llm_planner": getattr(tab, "_plans", None), "computer_use": getattr(tab, "_run", None)}.get(
+        which, tab)  # noqa: SLF001
     assert getattr(holder, guard) is not None
     assert _pump_until(app, lambda: getattr(holder, guard) is None), "the guard never cleared"
     assert seen

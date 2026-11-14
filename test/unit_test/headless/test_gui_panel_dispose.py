@@ -275,7 +275,7 @@ def test_a_released_computer_use_tab_stops_its_run_and_drops_the_outcome(monkeyp
     before = tab._status.text()
     tab.dispose()
     assert seen[0].is_set()
-    assert pump_until(lambda: tab._thread is None)      # the thread's end is still booked
+    assert pump_until(lambda: not tab._run.running)      # the run's end is still booked
     assert tab._status.text() == before
     assert tab._output.toPlainText() == ""
     tab.dispose()

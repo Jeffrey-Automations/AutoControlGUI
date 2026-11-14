@@ -541,8 +541,9 @@ F 還缺：
   AI Locator 與 LLM Planner 的 Plan（U-20261114-13）、兩個 USB 裝置列舉（U-20261114-14）、
   Email Triggers 的 Poll Now（U-20261114-15）、Admin Console 的 broadcast（U-20261114-16，維護者 2026-11-14 決定：
   停止時逐台回報已執行或未送出）、USB Browser 的 Fetch／Open（U-20261114-17）、
-  USB passthrough 面板的 List／Open／遠端抓取（U-20261114-18）已遷移。仍直接使用 `start_worker` 的面板分兩類：
-  - 已有自己的取消（stop event 或 Cancel 動作），只差改用共用 controller：`computer_use_tab`、`config_sync_tab`、
+  USB passthrough 面板的 List／Open／遠端抓取（U-20261114-18）、Computer Use 的執行（U-20261114-19，
+  `TabTask.start_until_stopped`：Stop 後等工作真的結束才空出分頁）已遷移。仍直接使用 `start_worker` 的面板分兩類：
+  - 已有自己的取消（stop event 或 Cancel 動作），只差改用共用 controller：`config_sync_tab`、
     `dag_tab`、`healing_evaluation_panel`、`journal_browser`、`journal_candidate_panel`、`template_candidate_panel`。
   - 沒有 Stop／期限：`admin_console_tab` 的健康輪詢與縮圖（每台 3 秒 HTTP 期限，結果在分頁關閉後丟棄）。
 - **F3 關閉失敗恢復**：`gui/_slow_op.py` 的 StopQueue／stop_each 目前只記錄停止失敗，
