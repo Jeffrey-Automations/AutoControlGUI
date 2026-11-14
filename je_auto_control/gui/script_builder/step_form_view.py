@@ -146,12 +146,19 @@ class StepFormView(QWidget):
         line.setPlaceholderText(spec.placeholder)
         browse = QPushButton("...")
         browse.setMaximumWidth(30)
-        browse.clicked.connect(lambda: self._browse_file(line))
+        browse.setProperty("line_edit", line)
+        browse.clicked.connect(self._on_browse_clicked)     # a method, not a lambda over self
         line.textChanged.connect(self._commit_field)
         row.addWidget(line)
         row.addWidget(browse)
         container.setProperty("line_edit", line)
         return container
+
+    def _on_browse_clicked(self) -> None:
+        button = self.sender()
+        line = button.property("line_edit") if button is not None else None
+        if isinstance(line, QLineEdit):
+            self._browse_file(line)
 
     def _build_rgb(self, spec: FieldSpec) -> QWidget:
         editor = QLineEdit()

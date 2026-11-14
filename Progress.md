@@ -208,17 +208,15 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 
 ---
 
-## PySide6 6.12：headless 測試跑完後直譯器結束時崩潰（全平台）
+## PySide6 6.12：升級回 6.12 前須在 CI 全矩陣重驗
 
-`TODO` — 維護者 2026-11-14 決定全面固定回 PySide6 6.11.2（U-20261114-03；dependabot 忽略 6.12.0），待之後的 6.12.x 或找出 closure 後再升級並重驗。先在容器看到（U-20261114-01：`docker.yml` 4 次 3 次 SIGSEGV）；到 `1d372dba`（PR #552，2026-11-14）已是**每一格**：全部測試通過後，Ubuntu 3.14 exit 255（glibc `malloc_consolidate` abort）、macOS 3.11 `Fatal Python error: Aborted`、Windows 3.11／3.14 access violation、3.13 `Aborted`，Windows 3.12 在 `test_gui_offthread_sites.py` 中段 abort。本機 Windows 3.14 的完整套件沒有重現。
-- Ubuntu 的 gdb 堆疊（dev run 43484575781）：`destroyQCoreApplication` → `visitAllPyObjects` → 某個 QObject 的 `~QObject` 釋放接在它訊號上的 Python 函式 → `func_dealloc` → closure cell → 一個 widget 的 wrapper 歸零 → `~QWidget` → `~QScrollBar` → `free()` 重複釋放；前一行是 `shared QObject was deleted directly`。即 closure 握有最後一個參考的 widget，在結束時被 shiboken 與 Qt 各刪一次。是哪個 closure 還不知道。
-- 試過把分頁關閉鈕的 lambda（握住頁面）換成 bound method，或改用 Qt 內建關閉鈕：`test_gui_lazy_registry.py` 的探針在 `os._exit` 10／10 崩潰（HEAD 13／13 正常），已還原；這條路徑本身就是「把 Python 建的 widget 放進分頁列在結束時崩潰」那一項。
-- 兩次在測試全部跑完後的直譯器結束：`Py_FinalizeEx` → `PySide::runCleanupFunctions` → `destroyQCoreApplication`
-  → `BindingManager::visitAllPyObjects` → `QObject::~QObject`，前一行是 Qt 的 `shared QObject was deleted directly`。
-- 一次在測試中段（約 46%）主執行緒的 `Shiboken::BindingManager::runDeletionInMainThread()` → QtWidgets。
-- 不是 Python 3.12 或容器映像特有（每個平台與版本都有）；還不知道是哪個測試留下了被兩邊刪除的物件。
-  上游查無相同回報。`docker.yml` 現在以 gdb 跑、`-X faulthandler`、`-v`，下次中段崩潰會有測試名稱。
-- 升級回 6.12 前要做的：在 PR 上跑完整矩陣（含 `docker.yml`）確認結束時不再崩潰；或先找出握住 widget 的 closure（上面的分頁關閉鈕實驗顯示改動它會改變崩潰點，不是單純移除）。
+`DECIDE` — 結束時崩潰的 closure 已找到並修正（U-20261114-44）：Qt 連線從 C++ 端持有 slot，
+`ScriptBuilderTab` 每個 Add-step 動作一個捕捉 `self` 的 lambda（714 個）、Triggers 的兩個瀏覽 lambda，
+以及 Live HUD 與 Presence 連到 `destroyed` 的 closure，讓分頁一直活到結束，Qt 拆除時在 C++ 解構子裡放掉最後一個參考、
+把分頁刪第二次。本機 PySide6 6.12.0 的 GUI 子集（742 個測試）修正前每次結束都 access violation，修正後兩次都正常結束；
+`test_gui_tab_not_kept_alive.py` 守住每個分頁都能被回收且直譯器正常結束。
+維護者 2026-11-14 固定在 PySide6 6.11.2（U-20261114-03；dependabot 忽略 6.12.0）。是否升級回 6.12：
+須在 PR 上以 6.12 跑完整矩陣（含 `docker.yml`）確認每一格結束時都不再崩潰；其他平台與完整套件尚未以 6.12 重驗。
 
 ---
 

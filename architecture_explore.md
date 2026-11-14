@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,543 |
-| 程式碼總行數 | 237,281 |
+| 程式碼總行數 | 237,357 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1356,7 +1356,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | screenshot | `_screenshot_tab.py` | 180 | 截圖、選區、螢幕尺寸、取像素色。 |
 | image_detect | `_image_detect_tab.py` | 158 | 樣板裁切、定位、定位全部、定位並點擊。 |
 | record | `_record_tab.py` | 166 | 錄製／停止／回放／存檔／載入。 |
-| script_builder | `script_builder/` | 6,928 | **視覺化腳本編輯器**：`command_schema.py`（5,551 行 `AC_*` 參數綱要）、`step_model.py`（步驟模型與 AC JSON 序列化）、`step_list_view.py`（含巢狀 body 的樹狀檢視）、`step_form_view.py`（綱要驅動表單）、`builder_tab.py`（含日誌候選預覽與明確匯入，保留來源）。 |
+| script_builder | `script_builder/` | 6,956 | **視覺化腳本編輯器**：`command_schema.py`（5,551 行 `AC_*` 參數綱要）、`step_model.py`（步驟模型與 AC JSON 序列化）、`step_list_view.py`（含巢狀 body 的樹狀檢視）、`step_form_view.py`（綱要驅動表單）、`builder_tab.py`（含日誌候選預覽與明確匯入，保留來源）。 |
 | flow_editor | `flow_editor/` | 496 | 節點式流程圖檢視：`layout.py`（純 Python 佈局演算法，可單測）、`scene.py`（Qt 場景繪製）、`tab.py`。 |
 | script | `_script_tab.py` | 183 | 載入／執行單檔或整個目錄、內建編輯器執行。 |
 | recording_editor | `recording_editor_tab.py` | 255 | 裁切、過濾、重新縮放錄製內容；Actions 提供背景日誌候選審閱。 |
@@ -1366,13 +1366,13 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | self_healing | `self_healing_tab.py`、`healing_evaluation_panel.py`、`healing_evaluation_worker.py`、`template_candidate_panel.py`、`template_candidate_worker.py` | 952 | 執行時定位／記錄、固定影像版本比較、原始步驟與候選樣板生命週期；背景工作可取消並丟棄過期結果。 |
 | ocr_reader | `ocr_tab.py` | 192 | 傾印區域文字或以 regex 搜尋。 |
 | accessibility | `accessibility_tab.py` | 193 | 瀏覽 OS UI 樹並依 role/name 點擊。 |
-| live_hud | `live_hud_tab.py` | 140 | 即時 HUD：滑鼠位置、游標下像素色、log tail。 |
+| live_hud | `live_hud_tab.py` | 155 | 即時 HUD：滑鼠位置、游標下像素色、log tail。 |
 | llm_planner | `llm_planner_tab.py` | 196 | 自然語言描述 → 預覽 → 執行。 |
 | computer_use | `computer_use_tab.py` | 164 | 從 GUI 啟動 Anthropic 閉環 agent。 |
 | agent_tasks | `agent_tasks_tab.py` | 618 | 受管任務輸入、狀態與 Actions menu；服務獨立於視圖生命週期。 |
 | scheduler | `scheduler_tab.py` | 174 | 註冊間隔式 action JSON 執行。 |
 | hotkeys | `hotkeys_tab.py` | 166 | 將全域熱鍵綁到 action 檔。 |
-| triggers | `triggers_tab.py` | 384 | 影像／視窗／像素／檔案事件監看。 |
+| triggers | `triggers_tab.py` | 401 | 影像／視窗／像素／檔案事件監看。 |
 | webhooks | `webhooks_tab.py` | 222 | 將 HTTP 請求綁到 action 腳本。 |
 | email_triggers | `email_triggers_tab.py` | 254 | 將 IMAP 信箱綁到 action 腳本。 |
 | test_suite | `test_suite_tab.py` | 200 | 執行 QA 套件規格並管理易碎隔離區。 |
@@ -1385,14 +1385,14 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | media_checks | `media_checks_tab.py` | 129 | 音訊活動與影片動態斷言。 |
 | run_history | `run_history_tab.py` + `run_history_timeline.py` + `journal_browser.py` + `journal_browser_worker.py` | 836 | 瀏覽已記錄的執行、時間軸、截圖與非擁有式日誌連結；內嵌背景快照查閱。 |
 | profiler | `profiler_tab.py` | 141 | 視覺化逐動作耗時熱點。 |
-| window_manager | `window_tab.py` | 139 | 列出、聚焦、關閉視窗。 |
+| window_manager | `window_tab.py` | 152 | 列出、聚焦、關閉視窗。 |
 | plugins | `plugins_tab.py` | 85 | 從使用者目錄載入額外 `AC_` 指令。 |
 | webrunner | `webrunner_tab.py` | 203 | 從 GUI 驅動 `je_web_runner`。 |
 | dag_runner | `dag_tab.py` | 366 | 編輯、驗證、執行跨主機 DAG。 |
 | chatops | `chatops_tab.py` | 140 | 在接上 Slack 前先本機測試 slash 指令。 |
 | trace_replay | `trace_replay_tab.py` | 194 | 拖曳捲動時光回溯錄製內容。 |
 | remote_desktop | `remote_desktop/`（40 檔） | 8,564 | 見下。 |
-| presence | `presence_tab.py` | 168 | 多檢視者在場名單。 |
+| presence | `presence_tab.py` | 171 | 多檢視者在場名單。 |
 | rest_api | `rest_api_tab.py` | 256 | 啟停 HTTP 前端並顯示 URL、實際驗證模式與可用 token。 |
 | admin_console | `admin_console_tab.py` | 330 | 管理多個遠端 AutoControl REST 端點。 |
 | audit_log | `audit_log_tab.py` | 193 | 瀏覽並驗證防竄改雜湊鏈。 |
@@ -1549,7 +1549,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 166 | 43,830 |
+| `gui/` | 166 | 43,906 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,898 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1570,7 +1570,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,229 |
-| **總計** | **1,531** | **236,536** |
+| **總計** | **1,531** | **236,612** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

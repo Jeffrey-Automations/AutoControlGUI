@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- GUI: no tab keeps itself alive any more. Lambdas over `self` connected to Qt signals -- one per
+  Script Builder Add-step action (714), the Triggers tab's two Browse buttons, the step form's
+  Browse and the one-time-values dialog's Copy -- and closures connected to `destroyed` that
+  reached the tab (Live HUD's log filter, Presence's registry listener) held every tab built
+  until exit, where Qt's teardown deleted it a second time: the exit crash under PySide6 6.12.
+  They are now methods of the widget, weak references, or (Window Manager) a child timer;
+  `WindowManagerTab` gains `dispose()`.
+
 - `http_client.perform_call` observes a bound cancellation scope: once it is cancelled the request
   is not sent, and a reply that arrives after the cancellation raises `CancelledError` instead of
   being returned; unscoped calls are unchanged. `signaling_client.wait_for_answer` /

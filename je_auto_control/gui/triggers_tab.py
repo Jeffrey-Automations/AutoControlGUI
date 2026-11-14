@@ -194,7 +194,8 @@ class TriggersTab(TranslatableMixin, QWidget):
         path_input = QLineEdit()
         threshold_input = QLineEdit("0.8")
         browse = self._tr(QPushButton(), "browse")
-        browse.clicked.connect(lambda: self._browse_image(path_input))
+        browse.setProperty("line_edit", path_input)
+        browse.clicked.connect(self._on_browse_image)     # a method: a lambda over self kept the tab alive
         threshold = QWidget()
         threshold.setProperty("role", "bare")
         threshold.setLayout(flow_of(field_pair(self._tr(QLabel(), "tr_threshold_label"), threshold_input)))
@@ -225,9 +226,25 @@ class TriggersTab(TranslatableMixin, QWidget):
     def _build_file_form(self) -> dict:
         path_input = QLineEdit()
         browse = self._tr(QPushButton(), "browse")
-        browse.clicked.connect(lambda: self._browse_watch(path_input))
+        browse.setProperty("line_edit", path_input)
+        browse.clicked.connect(self._on_browse_watch)
         self._add_page(self._field_row("tr_watch_label", path_input, browse))
         return {"path": path_input}
+
+    def _browse_target(self) -> Optional[QLineEdit]:
+        button = self.sender()
+        line = button.property("line_edit") if button is not None else None
+        return line if isinstance(line, QLineEdit) else None
+
+    def _on_browse_image(self) -> None:
+        line = self._browse_target()
+        if line is not None:
+            self._browse_image(line)
+
+    def _on_browse_watch(self) -> None:
+        line = self._browse_target()
+        if line is not None:
+            self._browse_watch(line)
 
     def _browse_script(self) -> None:
         path, _ = QFileDialog.getOpenFileName(

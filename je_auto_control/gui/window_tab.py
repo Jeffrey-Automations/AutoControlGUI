@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
@@ -32,6 +33,12 @@ class WindowManagerTab(TranslatableMixin, QWidget):
         self._filter = QLineEdit()
         self._apply_filter_placeholder()
         self._filter.textChanged.connect(self._apply_filter)
+        # A child timer, deleted with the tab: ``QTimer.singleShot(0, self, ...)`` kept
+        # the bound method -- and the tab's wrapper -- after the tab was deleted first.
+        self._filter_timer = QTimer(self)
+        self._filter_timer.setSingleShot(True)
+        self._filter_timer.setInterval(0)
+        self._filter_timer.timeout.connect(self._apply_filter)
         self._status_count: Optional[int] = None
         self._status_error: Optional[str] = None
         self._status = QLabel("")
@@ -69,6 +76,13 @@ class WindowManagerTab(TranslatableMixin, QWidget):
         set_role(self._status, "hint")
         root.addWidget(self._status)
 
+    def dispose(self) -> None:
+        """Release what the tab holds beyond its widgets: its pending filter timer.
+
+        Called by ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
+        """
+        release_resources(self)
+
     def menu_actions(self) -> list:
         """Expose tab commands to the window-level Actions menu."""
         return [
@@ -93,9 +107,8 @@ class WindowManagerTab(TranslatableMixin, QWidget):
             self._table.setItem(row, 1, QTableWidgetItem(title))
         self._status_count = len(windows)
         self._apply_status()
-        # With the tab as context: cancelled if the tab is deleted first, where
-        # it read the deleted filter box.
-        QTimer.singleShot(0, self, self._apply_filter)
+        # A child of the tab, so it never fires on a deleted filter box.
+        self._filter_timer.start()
 
     def _apply_filter(self) -> None:
         needle = self._filter.text().strip().lower()

@@ -1,8 +1,9 @@
 """Live HUD: mouse position, pixel colour under cursor and log tail."""
-from typing import Optional
+from typing import Callable, Optional
 
 import logging
 import threading
+import weakref
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
@@ -23,6 +24,17 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
+class _WeakFilter:
+    """A logging filter that calls a method without keeping its object alive; a record passes once it is gone."""
+
+    def __init__(self, method: Callable[[logging.LogRecord], bool]) -> None:
+        self._method = weakref.WeakMethod(method)
+
+    def __call__(self, record: logging.LogRecord) -> bool:
+        method = self._method()
+        return True if method is None else method(record)
+
+
 class LiveHUDTab(TranslatableMixin, QWidget):
     """Poll watchers and render a readable HUD."""
 
@@ -36,7 +48,10 @@ class LiveHUDTab(TranslatableMixin, QWidget):
         # at 4 ticks a second they were every line in the pane.
         self._sampling = False
         self._gui_thread = threading.get_ident()
-        self._log_tail.addFilter(self._not_own_sampling)
+        # Held weakly: the tail outlives the tab on the global logger, and the closure
+        # connected to ``destroyed`` below reaches the tail, so a strong filter kept the
+        # tab alive until Qt's teardown released it -- and deleted it a second time.
+        self._log_tail.addFilter(_WeakFilter(self._not_own_sampling))
         self._pos_suffix = " --"
         self._color_suffix = " --"
         self._pos_label = QLabel()

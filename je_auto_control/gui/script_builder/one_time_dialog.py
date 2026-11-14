@@ -106,11 +106,18 @@ class OneTimeValueDialog(QDialog):
         field = QLineEdit(value.value)
         field.setReadOnly(True)
         copy = QPushButton(_t("sb_one_time_copy"))
-        copy.clicked.connect(lambda _checked=False, index=row: self.copy_value(index))
+        copy.setProperty("row_index", row)
+        copy.clicked.connect(self._on_copy_clicked)       # a method, not a lambda over self
         grid.addWidget(QLabel(value_label(value)), row, 0)
         grid.addWidget(field, row, 1)
         grid.addWidget(copy, row, 2)
         self._fields.append(field)
+
+    def _on_copy_clicked(self) -> None:
+        button = self.sender()
+        index = button.property("row_index") if button is not None else None
+        if isinstance(index, int):
+            self.copy_value(index)
 
     def labels(self) -> List[str]:
         """The label of each value still held, in the order shown."""

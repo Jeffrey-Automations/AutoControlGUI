@@ -139,8 +139,8 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
         edit_buttons: List[QWidget] = [self._add_button()]
         for key, handler in (
             ("sb_delete", self._on_delete),
-            ("sb_up", lambda: self._tree.move_selected(-1)),
-            ("sb_down", lambda: self._tree.move_selected(1)),
+            ("sb_up", self._move_up),
+            ("sb_down", self._move_down),
         ):
             btn = self._tr(QPushButton(), key)
             btn.clicked.connect(handler)
@@ -170,13 +170,27 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
             submenu = menu.addMenu(category)
             for spec in specs_in_category(category):
                 action = QAction(spec.label, submenu)
-                action.triggered.connect(
-                    lambda _checked=False, cmd=spec.command: self._add_step_from_command(cmd)
-                )
+                # The command rides on the action and the slot is a method of this tab: a
+                # lambda over ``self`` per action kept every tab alive until exit, where
+                # Qt's teardown dropped the last reference and deleted it a second time.
+                action.setData(spec.command)
+                action.triggered.connect(self._on_add_action)
                 submenu.addAction(action)
         button.setMenu(menu)
         self._add_btn = button
         return button
+
+    def _move_up(self) -> None:
+        self._tree.move_selected(-1)
+
+    def _move_down(self) -> None:
+        self._tree.move_selected(1)
+
+    def _on_add_action(self) -> None:
+        action = self.sender()
+        command = action.data() if isinstance(action, QAction) else None
+        if isinstance(command, str):
+            self._add_step_from_command(command)
 
     def _wire_signals(self) -> None:
         self._tree.selected_step_changed.connect(self._form.load_step)
