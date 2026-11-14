@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- `list_usb_devices` starts its command-line tool (PowerShell `Get-PnpDevice`, `lsusb`,
+  `system_profiler`) through `run_capture_helper`: inside a cancellation scope, cancelling ends
+  the tool's process and raises `CancelledError` instead of waiting out the 10 s timeout. Its
+  output is decoded with `errors="replace"`. Failures and timeouts are still `result.error`.
+  GUI: the USB Devices tab and the USB passthrough panel list devices as cancellable tasks,
+  so closing them ends a listing still running (`_list_thread` is gone; `_listing` is the task).
+
 - `locate_by_description` and `click_by_description` observe a bound cancellation scope:
   cancelled before the model request, they raise `concurrent.futures.CancelledError` without
   sending it, and `click_by_description` checks again before it moves the mouse, so an answer

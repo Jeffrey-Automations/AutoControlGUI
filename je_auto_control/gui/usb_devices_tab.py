@@ -1,4 +1,9 @@
-"""USB devices tab: read-only enumeration + hotplug watcher controls."""
+"""USB devices tab: read-only enumeration + hotplug watcher controls.
+
+The enumeration runs as a :class:`~je_auto_control.gui._tab_task.TabTask`:
+closing the tab cancels it, which ends the enumeration tool's process
+(PowerShell, ``lsusb``, ``system_profiler``) instead of leaving it to time out.
+"""
 from typing import Optional
 
 from PySide6.QtCore import QTimer
@@ -9,7 +14,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
@@ -47,7 +52,9 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
         self._last_seen_seq = 0
         # Enumerated off the GUI thread, first when the tab is shown: the
         # PowerShell query took ~5 s and ran at start-up for a hidden tab.
-        self._list_thread: Optional[WorkerHandle] = None
+        self._listing = TabTask(self)
+        self._listing.result.connect(self._apply_devices)
+        self._listing.error.connect(self._show_list_error)
         self._listed = False
         self._hold = _WatcherHold()
         self.destroyed.connect(self._hold.release)
@@ -70,7 +77,8 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
             root.addWidget(label)
 
     def dispose(self) -> None:
-        """Release what the tab holds beyond its widgets: its hotplug timer and its share of the USB watcher.
+        """Release what the tab holds beyond its widgets: its hotplug timer, its share of the USB watcher
+        and an enumeration still running, whose tool process is ended.
 
         Called by ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
         """
@@ -104,15 +112,12 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
         ])
 
     def _refresh(self) -> None:
-        if self._list_thread is not None:
-            return          # one enumeration at a time; a tick during one is skipped
-        self._listed = True
-        self._list_thread = start_worker(
-            self, CallWorker(list_usb_devices), on_done=self._apply_devices,
-            on_fail=self._error_label.setText, on_thread_done=self._on_list_done)
+        # One enumeration at a time; a tick during one is skipped.
+        if self._listing.start(list_usb_devices):
+            self._listed = True
 
-    def _on_list_done(self) -> None:
-        self._list_thread = None
+    def _show_list_error(self, error: object) -> None:
+        self._error_label.setText(str(error))
 
     def _apply_devices(self, result) -> None:
         self._backend_label.setText(result.backend)

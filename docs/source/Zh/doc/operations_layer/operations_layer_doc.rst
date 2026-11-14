@@ -485,6 +485,9 @@ pyusb 不存在則退回平台特定指令。
 - macOS：``system_profiler -json SPUSBDataType``\ （遞迴走訪）
 - Linux：``/sys/bus/usb/devices``\ （讀取 sysfs）
 
+命令列工具有 10 秒期限（``SUBPROCESS_TIMEOUT_S``），失敗或逾時會放在 ``result.error``。
+在取消範圍內呼叫時，取消會結束該工具的行程並拋出 ``CancelledError``。
+
 Headless::
 
    from je_auto_control.utils.usb import list_usb_devices
@@ -503,7 +506,7 @@ Executor 指令::
    AC_list_usb_devices
 
 GUI：*USB Devices* 分頁 — 後端標籤、裝置表格（VID/PID/廠商/產品/
-序號/位置）、重新整理按鈕。
+序號/位置）、重新整理按鈕。列舉在 GUI 執行緒之外執行；關閉分頁會結束仍在執行的列舉。
 
 Phase 2（真正的 USB passthrough）分階段發布 — 協定與 backend ABC 見
 :doc:`usb_passthrough_design`\ ，端到端使用方式見

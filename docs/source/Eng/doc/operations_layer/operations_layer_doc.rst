@@ -543,6 +543,10 @@ Backends:
 - macOS: ``system_profiler -json SPUSBDataType`` (recursive walk)
 - Linux: ``/sys/bus/usb/devices`` (sysfs read)
 
+A command-line tool gets 10 seconds (``SUBPROCESS_TIMEOUT_S``); a failure or
+timeout comes back as ``result.error``. Called inside a cancellation scope,
+cancelling ends the tool's process and raises ``CancelledError``.
+
 Headless::
 
    from je_auto_control.utils.usb import list_usb_devices
@@ -561,7 +565,8 @@ Executor command::
    AC_list_usb_devices
 
 GUI: *USB Devices* tab — backend label, devices table (VID/PID/
-manufacturer/product/serial/location), refresh button.
+manufacturer/product/serial/location), refresh button. The listing runs off
+the GUI thread; closing the tab ends a listing still running.
 
 Phase 2 (actual USB passthrough) ships in stages — see
 :doc:`usb_passthrough_design` for the protocol + backend ABCs and

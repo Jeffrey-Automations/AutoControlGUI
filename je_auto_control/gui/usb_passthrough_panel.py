@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui._worker_thread import CallWorker as _CallWorker, WorkerHandle, start_worker
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import set_role
@@ -112,7 +113,10 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         self._apply_local_headers()
         self._apply_shared_headers()
         # Listed off the GUI thread when first shown (see UsbDevicesTab).
-        self._list_thread: Optional[WorkerHandle] = None
+        # Local enumeration; closing the panel ends the enumeration tool's process.
+        self._listing = TabTask(self)
+        self._listing.result.connect(self._show_local_devices)
+        self._listing.error.connect(self._show_list_error)
         self._listed = False
         self._refresh_host_badge()
 
@@ -274,15 +278,11 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
             self._refresh_local_devices()
 
     def _refresh_local_devices(self) -> None:
-        if self._list_thread is not None:
-            return
-        self._listed = True
-        self._list_thread = start_worker(
-            self, _CallWorker(list_usb_devices), on_done=self._show_local_devices,
-            on_fail=self._viewer_status.setText, on_thread_done=self._on_list_done)
+        if self._listing.start(list_usb_devices):
+            self._listed = True
 
-    def _on_list_done(self) -> None:
-        self._list_thread = None
+    def _show_list_error(self, error: object) -> None:
+        self._viewer_status.setText(str(error))
 
     def _show_local_devices(self, result) -> None:
         devices = result.devices

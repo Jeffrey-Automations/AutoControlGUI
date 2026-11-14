@@ -14,6 +14,7 @@ to satisfy CLAUDE.md's injection-prevention policy.
 from __future__ import annotations
 
 import json
+import locale
 import platform
 import re
 import subprocess  # nosec B404  # reason: needed for platform-specific enumeration tools
@@ -21,6 +22,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from je_auto_control.utils.cancellable_process import run_capture_helper
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 
@@ -208,25 +210,32 @@ def _linux_node_to_device(node: Path) -> Optional[UsbDevice]:
 
 
 def _run_capture(cmd: List[str], backend: str) -> Any:
+    """Run one enumeration tool; return its decoded stdout, or a result carrying the failure.
+
+    Runs through :func:`run_capture_helper`, so a caller inside a cancellation
+    scope (a GUI tab that was closed, a task that was stopped) ends the tool's
+    process instead of waiting out its timeout; the ``CancelledError`` propagates.
+    """
     try:
-        completed = subprocess.run(  # nosec B603 B607  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit  # reason: argv list (never shell=True); cmd is built from project-controlled allowlists in _enumerate_via_lsusb / _enumerate_via_system_profiler — no user input flows in
-            cmd, capture_output=True, text=True,
-            encoding="utf-8" if backend == "windows" else None,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            timeout=SUBPROCESS_TIMEOUT_S, check=False,
+        completed = run_capture_helper(cmd, SUBPROCESS_TIMEOUT_S)
+    except subprocess.CalledProcessError as error:
+        return UsbEnumerationResult(
+            backend=backend, devices=[],
+            error=f"{cmd[0]} exit {error.returncode}: "
+                  f"{_decode(error.stderr, backend).strip()[:200]}",
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         return UsbEnumerationResult(
             backend=backend, devices=[],
             error=f"{cmd[0]}: {error}",
         )
-    if completed.returncode != 0:
-        return UsbEnumerationResult(
-            backend=backend, devices=[],
-            error=f"{cmd[0]} exit {completed.returncode}: "
-                  f"{completed.stderr.strip()[:200]}",
-        )
-    return completed.stdout
+    return _decode(completed.stdout, backend)
+
+
+def _decode(data: Optional[bytes], backend: str) -> str:
+    """The tools' bytes as text: UTF-8 from the PowerShell query (it sets that), else the locale's."""
+    encoding = "utf-8" if backend == "windows" else locale.getpreferredencoding(False)
+    return (data or b"").decode(encoding, errors="replace")
 
 
 def _read_sys_file(path: Path) -> Optional[str]:
