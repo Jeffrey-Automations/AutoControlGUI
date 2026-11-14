@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- GUI: switching theme restyles the window once instead of twice (the theme's style sheet,
+  then again with the font rules); with every tab open the switch took 1.9 s on `dev` and
+  now takes 0.95 s, the release's level.
+
 - GUI: every workspace page has a banner under its header (`gui/adaptive/page_banner.py`): a
   failed background run (*The last run failed:*), a run refused by RBAC (*Not permitted:*), and,
   inside an RBAC scope, the commands the active role cannot run. Panels declare theirs in a

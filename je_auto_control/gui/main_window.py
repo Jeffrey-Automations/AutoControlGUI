@@ -253,8 +253,10 @@ class AutoControlGUIUI(QMainWindow):
         """Switch to the theme called ``name`` (``dark`` or ``light``), keeping the text size."""
         tokens = theme_named(name)
         self._theme_name = tokens.name
-        self._theme_stylesheet = apply_theme(self, tokens)
-        self._apply_font_pt(self._user_font_pt)
+        # One style sheet with the font rules already appended: setting the theme
+        # and then the font restyled every widget on every open page twice.
+        point_size = self._user_font_pt if self._user_font_pt > 0 else self._detect_auto_font_pt()
+        self._theme_stylesheet = apply_theme(self, tokens, point_size=point_size)
         self._adaptive.set_glyph_colour(tokens.text)
 
     def apply_workspace_preferences(self, values: dict[str, object]) -> None:

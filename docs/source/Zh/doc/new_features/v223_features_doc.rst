@@ -112,6 +112,9 @@ GUI 設定檔):
 時間,``theme_deferred_longest_turn_ms`` 是其中最長的一輪。``--compare`` 把兩份
 報告並排,工作量或環境不同時拒絕比較。
 
+要用同一個直譯器比較另一份 checkout,從那份 checkout 執行它自己的腳本,並把 ``PYTHONPATH``
+設為它的根目錄:editable 安裝的 finder 排在路徑項目之後,所以載入的是那份 checkout 的套件。
+
 分頁裡的背景工作
 ----------------
 

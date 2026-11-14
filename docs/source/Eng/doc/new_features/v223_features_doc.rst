@@ -117,6 +117,11 @@ restyled afterwards and ``theme_deferred_longest_turn_ms`` the longest single
 turn of that. ``--compare`` sets two reports side by side and refuses
 when the workload or the environment differs.
 
+To compare against another checkout with the same interpreter, run that
+checkout's copy of the scripts with ``PYTHONPATH`` set to its root: the
+editable install's finder comes after the path entries, so the checkout's
+package is the one imported.
+
 Background work in a tab
 ------------------------
 

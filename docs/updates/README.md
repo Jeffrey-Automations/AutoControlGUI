@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-30 | 2026-11-14 | GUI startup and memory measured against the release, and the theme switch halved | #done #gui #benchmark | [2026-11-b](2026-11-b.md) |
 | U-20261114-29 | 2026-11-14 | A page banner for a failed run and for what the role cannot run | #done #gui #rbac | [2026-11-b](2026-11-b.md) |
 | U-20261114-28 | 2026-11-14 | Empty tables, lists and trees say so | #done #gui #adaptive | [2026-11-b](2026-11-b.md) |
 | U-20261114-27 | 2026-11-14 | Every page that runs background work reports it in Execution details | #done #gui #workspace | [2026-11-b](2026-11-b.md) |

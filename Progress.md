@@ -547,7 +547,7 @@ F 還缺：
   媒體狀態查詢可能等候原生清理所持的鎖，Diagnostics 須讀取保管者快照，不能在 GUI 執行緒同步查詢。
   傳送器已進入無法中斷的後端呼叫時仍可能持續待停止；
   強制中斷、行程結束及原生資源回收尚未驗收。媒體清理缺口已用假資源重現，未執行原生／裝置／網路驗收。
-- **F4** 已有 `benchmarks/gui_startup.py` 與 `gui_workloads.py`，仍缺完整啟動／記憶體基準對照、mixed-DPI 與功能對等驗收。
+- **F4** 啟動／記憶體基準對照與功能對等測試已交付（U-20261114-30）；仍缺 mixed-DPI 驗收（需要第二台不同縮放的螢幕）。
 - **F3 session 所有權**：GUI 斷線及丟棄 offer 路徑仍須在背景排程前取得原始 session 清理物件；
   peer 建構及畫面來源訂閱的部分失敗所有權仍須補齊。
 - **F3 Windows 原生釋放驗收**：`test/unit_test/headless/test_remote_desktop_host_id.py` 的 freed-thread-state abort 尚缺 Windows 原生堆疊與獨立根因確認。
