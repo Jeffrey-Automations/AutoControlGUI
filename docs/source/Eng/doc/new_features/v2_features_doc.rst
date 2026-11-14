@@ -656,7 +656,9 @@ returns. Native compositor/dialog, restore and restart acceptance remain open.
 
 The repository's dev/main headless jobs retain merged test output and runtime
 versions even after a native failure. Linux runs under GDB for all-thread
-native backtraces; other platforms retain Python faulthandler output. The
+native backtraces; Windows has Windows Error Reporting write a minidump of a
+crashed ``python.exe`` (every thread's native stack) into the same artifact;
+macOS retains Python faulthandler output. The
 ``native-<os>-<python>`` artifacts expire after seven days. Failed child exits
 still fail CI. Linux first checks the runner outside the suite's debugger;
 literal argv and handled SIGINT are preserved. See
