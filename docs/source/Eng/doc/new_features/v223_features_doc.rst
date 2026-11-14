@@ -205,7 +205,7 @@ executing may finish. This does not close the remote session itself.
 Remote Desktop lifetime
 -----------------------
 
-Closing Remote Desktop releases its page. Reopening creates fresh controls without reattaching shared sessions. Registry TCP/WebSocket sessions remain available to scripts; page-owned WebRTC sessions and audio retire in the background. Pending approvals are denied, and late callbacks are discarded. An already-entered file transfer is not interrupted by closing the page.
+Closing Remote Desktop releases its page. Reopening creates fresh controls without reattaching shared sessions. Registry TCP/WebSocket sessions remain available to scripts; page-owned WebRTC sessions and audio retire in the background. Pending approvals are denied, and late callbacks are discarded. A file transfer already sending stops at its next chunk when the page closes: ``send_file`` takes ``cancelled=`` and otherwise follows the calling thread's cancellation scope, and once stopped sends a ``cancelled`` end so the host discards the part file.
 
 Execution details
 ~~~~~~~~~~~~~~~~~

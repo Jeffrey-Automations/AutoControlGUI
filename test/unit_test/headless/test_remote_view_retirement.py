@@ -165,7 +165,7 @@ def test_blocked_upload_outlives_view_without_holding_it(qapp):
     calls = []
 
     class Viewer:
-        def send_file(self, source, dest, on_progress):
+        def send_file(self, source, dest, on_progress, cancelled=None):
             calls.append((source, dest))
             entered.set()
             assert finish.wait(3)

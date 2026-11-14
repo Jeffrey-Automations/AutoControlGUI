@@ -71,7 +71,7 @@ Wayland NORMAL 输入通过受管理的子进程执行 libei 与 portal 调用�
 
 [MIT](../LICENSE) © JE-Chen. [第三方许可](../Third_Party_License.md).
 
-关闭 Remote Desktop 会释放页面；重新打开会创建新控件，不自动接回共享连接。Registry 的 TCP／WebSocket 连接仍可供脚本使用；页面拥有的 WebRTC 连接与音频在后台停止。待处理批准会拒绝，延迟回调会丢弃。已进入发送阶段的文件传输须依后端的协作式取消停止。
+关闭 Remote Desktop 会释放页面；重新打开会创建新控件，不自动接回共享连接。Registry 的 TCP／WebSocket 连接仍可供脚本使用；页面拥有的 WebRTC 连接与音频在后台停止。待处理批准会拒绝，延迟回调会丢弃。正在发送的文件传输会在页面关闭、连接被放掉或上传取消时于下一个区块停止，主机会丢弃未完成的文件（TCP、WebSocket 与 WebRTC 皆同）。
 
 WebRTC host/viewer 的 `stop()` 最多等待三秒完成软件清理。`PeerStopPending` 保留同一个尚未完成的操作；显式重试只会继续等待。`PeerStopFailed` 保留清理失败的资源供显式重试，成功前禁止重新启动。Multi-viewer host 保留失败的 session 与共享来源。`FolderSyncEngine.stop_confirmed()` 在原工作线程仍存活时返回 `False`。这些结果不代表原生设备已释放；页面销毁后的恢复仍需持久资源保管与重试整合。
 

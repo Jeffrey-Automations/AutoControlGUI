@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Remote desktop: `file_transfer.send_file` and `RemoteDesktopViewer.send_file` take a
+  keyword `cancelled=` callable and otherwise follow the calling thread's cancellation scope.
+  A transfer stopped mid-file sends a `FILE_END` with status `cancelled` (the receiver discards
+  the part file) and raises `concurrent.futures.CancelledError`; one stopped before its first
+  byte sends nothing. GUI: the Viewer tab's upload, Quick Connect's dropped files and the
+  WebRTC panel's uploads stop at the next chunk when their task is cancelled (the page closes or
+  the session is dropped). A test double replacing `send_file` must accept `cancelled`.
+
 - Remote desktop: `remote_desktop_registry.detach(slot, by, only_own=False)` frees a slot at
   once and returns the blocking shutdown of what it held (or `None`), for a caller that must
   not block. GUI: Quick Connect starts and stops its host off the GUI thread (*Starting…* /

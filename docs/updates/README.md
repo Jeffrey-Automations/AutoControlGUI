@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-33 | 2026-11-14 | A file transfer already sending stops at the next chunk when cancelled | #done #remote-desktop #files | [2026-11-b](2026-11-b.md) |
 | U-20261114-32 | 2026-11-14 | Quick Connect starts, stops and disconnects off the GUI thread | #done #gui #remote-desktop | [2026-11-b](2026-11-b.md) |
 | U-20261114-31 | 2026-11-14 | Windows CI keeps a minidump of a crashed python.exe | #done #ci #native-diagnostics | [2026-11-b](2026-11-b.md) |
 | U-20261114-30 | 2026-11-14 | GUI startup and memory measured against the release, and the theme switch halved | #done #gui #benchmark | [2026-11-b](2026-11-b.md) |

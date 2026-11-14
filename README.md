@@ -71,7 +71,7 @@ Managed agent tasks and cross-host transfers include experimental features. See 
 
 [MIT](LICENSE) © JE-Chen. [Third-party licenses](Third_Party_License.md).
 
-Closing Remote Desktop releases its page. Reopening creates fresh controls without reattaching shared sessions. Registry TCP/WebSocket sessions remain available to scripts; page-owned WebRTC sessions and audio retire in the background. Pending approvals are denied, and late callbacks are discarded. Stopping an entered file transfer depends on the backend's cooperative cancellation.
+Closing Remote Desktop releases its page. Reopening creates fresh controls without reattaching shared sessions. Registry TCP/WebSocket sessions remain available to scripts; page-owned WebRTC sessions and audio retire in the background. Pending approvals are denied, and late callbacks are discarded. A file transfer already sending stops at its next chunk when the page closes, the session is dropped or the upload is cancelled, and the host discards the partial file (TCP, WebSocket and WebRTC alike).
 
 WebRTC host/viewer `stop()` waits up to three seconds for software teardown. `PeerStopPending` retains the same running attempt; explicit retry waits on it. `PeerStopFailed` retains failed resources for explicit retry, and restarting is blocked until cleanup succeeds. Multi-viewer hosts retain failed sessions and their shared source. `FolderSyncEngine.stop_confirmed()` returns `False` while the original worker remains alive. These outcomes do not prove native device release; recovery after page destruction still needs durable ownership and retry integration.
 
