@@ -23,7 +23,7 @@ from je_auto_control.gui.remote_desktop._helpers import (
 from je_auto_control.gui.remote_desktop.webrtc_workers import (
     HostPublishLoopWorker, generate_host_id, retire_worker,
 )
-from je_auto_control.gui._slow_op import stop_each
+from je_auto_control.gui._slow_op import hold_failed_stop, stop_each
 from je_auto_control.gui._weak_call import weak_slot
 from je_auto_control.gui.tab_task_controller import CancellationToken, task_controller
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -50,11 +50,17 @@ def _create_offer(host: MultiViewerHostT, _token: CancellationToken) -> Any:
 
 
 def _retire_quietly(retirement: Any, *_token: object) -> None:
-    """Worker thread: stop a session nobody will use; one already gone is not an error."""
+    """Worker thread: stop a session nobody will use; one already gone is not an error.
+
+    A stop that fails is kept by the stop custody for a retry from Diagnostics:
+    the session's peer may still be open.
+    """
     try:
         retirement.stop()
-    except (KeyError, RuntimeError, OSError) as error:
+    except KeyError as error:
         autocontrol_logger.debug("dropping an unused offer: %r", error)
+    except (RuntimeError, OSError) as error:
+        hold_failed_stop(retirement.stop, error)
 
 
 def _drop_offer(offer: Any) -> None:

@@ -154,7 +154,7 @@ class SchedulerTab(TranslatableMixin, QWidget):
         # stop() joins the engine thread (up to 2 s), which used to hold the
         # GUI thread; a second Stop while it is out is ignored.
         if self._engine_op.run(default_scheduler.stop, on_done=self._on_engine_stopped,
-                               on_error=self._on_engine_stopped):
+                               on_error=self._on_engine_stopped, retain_failure=True):
             self.sync_with_engine()
 
     def _on_engine_stopped(self, _outcome: object = None) -> None:

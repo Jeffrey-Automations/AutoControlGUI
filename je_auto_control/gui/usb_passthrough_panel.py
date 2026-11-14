@@ -262,7 +262,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         loop, self._share.loopback = self._share.loopback, None
         self._shared_table.setRowCount(0)
         self._share_op.run(functools.partial(_close_sharing, loop), on_done=self._on_sharing_closed,
-                           on_error=self._on_sharing_closed)
+                           on_error=self._on_sharing_closed, retain_failure=True)
         self._refresh_host_badge()
 
     def _on_sharing_closed(self, _outcome: object = None) -> None:

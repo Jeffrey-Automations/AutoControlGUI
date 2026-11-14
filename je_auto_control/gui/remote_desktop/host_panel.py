@@ -343,7 +343,7 @@ class _HostPanel(TranslatableMixin, QWidget):
             return
         self._pending_key = "gui_op_stopping"
         self._host_op.run(functools.partial(stop_host, self._owner), on_done=self._on_stopped,
-                          on_error=self._on_stop_failed)
+                          on_error=self._on_stop_failed, retain_failure=True)
         self._refresh_status()
 
     def _on_stopped(self, _evicted: object = None) -> None:

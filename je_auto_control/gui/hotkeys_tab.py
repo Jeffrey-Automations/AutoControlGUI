@@ -150,7 +150,7 @@ class HotkeysTab(TranslatableMixin, QWidget):
         # stop() joins the daemon thread, which used to hold the GUI thread
         # for up to 2 s; a second Stop while it is out is ignored.
         if self._engine_op.run(default_hotkey_daemon.stop, on_done=self._on_daemon_stopped,
-                               on_error=self._on_daemon_stopped):
+                               on_error=self._on_daemon_stopped, retain_failure=True):
             self.sync_with_engine()
 
     def _on_daemon_stopped(self, _outcome: object = None) -> None:

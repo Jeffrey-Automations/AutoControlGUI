@@ -207,7 +207,7 @@ class RestApiTab(TranslatableMixin, QWidget):
             return
         self._pending_key = "gui_op_stopping"
         self._server_op.run(rest_api_registry.stop, on_done=self._on_server_op_done,
-                            on_error=self._on_server_op_done)
+                            on_error=self._on_server_op_done, retain_failure=True)
         self._refresh_status()
 
     def _on_server_op_done(self, _outcome: object = None) -> None:

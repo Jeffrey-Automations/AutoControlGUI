@@ -164,7 +164,7 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         # A Poll Now in flight stops before its next trigger.
         self._polls.stop()
         if self._watcher_op.run(default_email_trigger_watcher.stop, on_done=self._on_watcher_stopped,
-                                on_error=self._on_watcher_stopped):
+                                on_error=self._on_watcher_stopped, retain_failure=True):
             self._refresh()
 
     def _on_watcher_stopped(self, _outcome: object = None) -> None:

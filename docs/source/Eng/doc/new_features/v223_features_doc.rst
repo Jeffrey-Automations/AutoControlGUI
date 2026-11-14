@@ -186,7 +186,12 @@ still be open. ``stop_each`` still runs every stop and then raises
 Diagnostics tab lists them from the custody's snapshot (which runs nothing and
 waits on no native lock); **Retry failed stops** runs each again on a worker
 under its original authority and releases the ones that succeed, and **Forget
-selected failed stop** lets one go.
+selected failed stop** lets one go. A stop run through ``SlowOp`` joins the custody with
+``run(..., retain_failure=True)`` -- the Scheduler, Triggers, Hotkeys, E-mail
+Triggers, Webhooks, REST API and USB Sharing stops and both Remote Desktop host
+stops pass it; a start never does -- and the WebRTC host's dropped offers and
+disconnected sessions keep a stop that failed (a session already gone is not a
+failure).
 
 This is a GUI-internal API (it imports ``PySide6``) and is not re-exported by
 the package facade; the headless functions a tab calls stay usable without it.

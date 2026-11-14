@@ -397,7 +397,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
     def _stop_hosting(self) -> None:
         # Stops the host the badge shows, whoever started it; see _HostPanel._stop.
         if self._host_op.run(functools.partial(stop_host, self._owner), on_done=self._on_host_changed,
-                             on_error=self._on_host_stop_failed):
+                             on_error=self._on_host_stop_failed, retain_failure=True):
             self._host_pending = "gui_op_stopping"
         self._refresh_status()
 

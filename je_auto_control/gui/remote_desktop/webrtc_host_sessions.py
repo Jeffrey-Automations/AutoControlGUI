@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from je_auto_control.gui._slow_op import hold_failed_stop
 from je_auto_control.gui.remote_desktop._webrtc_types import MultiViewerHostT
 from je_auto_control.gui.remote_desktop._helpers import (
     _t,
@@ -32,8 +33,10 @@ def _stop_session(retirement: Any) -> None:
     """Worker thread: close the session ``retirement`` captured; one that is already gone is not an error."""
     try:
         retirement.stop()
-    except (KeyError, RuntimeError, OSError) as error:
-        autocontrol_logger.warning("disconnect session: %r", error)
+    except (RuntimeError, OSError) as error:
+        hold_failed_stop(retirement.stop, error)    # its peer may still be open: retry from Diagnostics
+    except KeyError as error:
+        autocontrol_logger.debug("disconnect session: already gone: %r", error)
 
 
 class _HostSessionsMixin(_HostPanelPart):

@@ -104,7 +104,7 @@ class SlowOp(QObject):
     def run(self, work: Callable[[], Any], *,   # noqa: PLR0913  # reason: keyword-only options of one call
             on_done: Callback = None, on_error: Callback = None, args: Tuple[Any, ...] = (),
             discard: Optional[Callable[[Any], object]] = None,
-            timeout_s: Optional[float] = None) -> bool:
+            timeout_s: Optional[float] = None, retain_failure: bool = False) -> bool:
         """Run ``work()`` off the GUI thread; return ``False`` (and do nothing) while busy.
 
         ``on_done(*args, result)`` or ``on_error(*args, exception)`` runs on
@@ -112,7 +112,9 @@ class SlowOp(QObject):
         false. Neither runs when the owner was destroyed meanwhile; the work
         itself still runs to its end, and what it returned then goes to
         ``discard`` (stop the server nobody is left to show). An error nobody
-        handles is logged.
+        handles is logged. With ``retain_failure`` -- for a stop, never a start
+        -- a failure is also kept by the stop custody, under the authority
+        captured now, so it can be retried from the Diagnostics tab.
         """
         if self._busy:
             return False
@@ -125,6 +127,9 @@ class SlowOp(QObject):
         self._on_error = _WeakCall(on_error, args)
         handle.result.connect(self._deliver_result)
         handle.error.connect(self._deliver_error)
+        if retain_failure:
+            handle.error.connect(functools.partial(hold_failed_stop, work,
+                                                   authority=DeferredAuthorization.capture()))
         handle.finished.connect(self._settle)
         self.busy_changed.emit(True)
         return True

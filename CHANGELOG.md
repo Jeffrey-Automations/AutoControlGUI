@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- GUI: `SlowOp.run(..., retain_failure=True)` also hands a failed stop to the stop custody; the
+  Scheduler, Triggers, Hotkeys, E-mail Triggers, Webhooks, REST API and USB Sharing stops and
+  both Remote Desktop host stops pass it. The WebRTC host's dropped offers and disconnected
+  sessions keep a stop that failed instead of logging it; a session already gone is not kept.
+
 - GUI: a shutdown handed to `StopQueue` that raises is kept by the new
   `gui/_stop_custody.py` (`stop_custody()`: `snapshot`, `retry`, `retry_all`, `forget`) with
   its error and the caller's authority captured when it was queued, instead of only being

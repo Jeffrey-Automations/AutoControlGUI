@@ -147,7 +147,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
         # stop() shuts the HTTP server down and joins its thread (up to 2 s),
         # which used to hold the GUI thread; a second Stop is ignored.
         if self._server_op.run(default_webhook_server.stop, on_done=self._on_server_stopped,
-                               on_error=self._on_server_stopped):
+                               on_error=self._on_server_stopped, retain_failure=True):
             self._refresh()
 
     def _on_server_stopped(self, _outcome: object = None) -> None:

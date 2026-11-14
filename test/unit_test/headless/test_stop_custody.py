@@ -150,3 +150,43 @@ def test_the_diagnostics_view_lists_retries_and_forgets_held_stops(custody):
         assert custody.snapshot() == []
     finally:
         view.deleteLater()
+
+
+def test_a_slow_op_stop_that_fails_is_kept_and_still_reported(custody):
+    owner, reported = QWidget(), []
+    try:
+        op = _slow_op.SlowOp(owner)
+        flaky = _Flaky(message="port still bound")
+        assert op.run(flaky.stop, on_error=lambda error: reported.append(str(error)) or True, retain_failure=True)
+        assert pump_until(lambda: not op.busy and bool(custody.snapshot()))
+        assert [held.error for held in custody.snapshot()] == ["OSError: port still bound"]
+        assert reported == ["port still bound"]              # the panel is still told
+    finally:
+        owner.deleteLater()
+
+
+def test_a_slow_op_start_that_fails_is_not_kept(custody):
+    owner = QWidget()
+    try:
+        op = _slow_op.SlowOp(owner)
+        assert op.run(_Flaky(message="cannot bind").stop, on_error=lambda error: True)   # a start: no retain_failure
+        assert pump_until(lambda: not op.busy)
+        assert custody.snapshot() == []
+    finally:
+        owner.deleteLater()
+
+
+def test_the_webrtc_host_keeps_a_session_whose_stop_failed_but_not_one_already_gone(custody):
+    pytest.importorskip("aiortc", exc_type=ImportError)
+    import types
+    from je_auto_control.gui.remote_desktop import webrtc_host_connection, webrtc_host_sessions
+
+    def gone():
+        raise KeyError("session-1")
+
+    failing = _Flaky(message="peer close timed out")
+    webrtc_host_connection._retire_quietly(types.SimpleNamespace(stop=gone))
+    webrtc_host_sessions._stop_session(types.SimpleNamespace(stop=gone))
+    assert custody.snapshot() == []
+    webrtc_host_sessions._stop_session(types.SimpleNamespace(stop=failing.stop))
+    assert [held.error for held in custody.snapshot()] == ["OSError: peer close timed out"]
