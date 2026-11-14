@@ -1,9 +1,15 @@
-"""Email Triggers tab: bind IMAP mailboxes to action scripts."""
+"""Email Triggers tab: bind IMAP mailboxes to action scripts.
+
+Poll Now runs as a :class:`~je_auto_control.gui._tab_task.TabTask`. Stop (or
+closing the tab) cancels it: the pass ends before the next trigger's server,
+and a trigger already being polled finishes, so no message is marked seen
+without its script having fired.
+"""
 from typing import Optional
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QFileDialog, QGroupBox, QHBoxLayout,
+    QAbstractItemView, QCheckBox, QFileDialog, QGroupBox,
     QHeaderView, QLabel, QLineEdit, QMessageBox,
     QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
@@ -11,7 +17,9 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
-from je_auto_control.gui._worker_thread import CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -33,7 +41,9 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
-        self._poll_thread: Optional[WorkerHandle] = None
+        self._polls = TabTask(self)       # Poll Now, off the GUI thread; one at a time
+        self._polls.result.connect(self._on_polled)
+        self._polls.error.connect(self._on_poll_failed)
         self._host_input = QLineEdit()
         self._host_input.setPlaceholderText("imap.example.com")
         self._port_input = QSpinBox()
@@ -43,7 +53,7 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         self._user_input.setPlaceholderText("user@example.com")
         self._password_input = QLineEdit()
         self._password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self._password_input.setPlaceholderText(_t("eml_password_placeholder"))
+        self._tr(self._password_input, "eml_password_placeholder", "setPlaceholderText")
         self._mailbox_input = QLineEdit("INBOX")
         self._search_input = QLineEdit("UNSEEN")
         self._poll_input = QSpinBox()
@@ -73,7 +83,9 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         self._refresh()
 
     def dispose(self) -> None:
-        """Release what the tab holds beyond its widgets: its refresh timer (the watcher itself keeps running).
+        """Release what the tab holds beyond its widgets: its refresh timer and a Poll Now still running.
+
+        The poll stops before the next trigger; the watcher itself keeps running.
 
         Called by ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
         """
@@ -96,47 +108,38 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         # Actions menu; the tab keeps only the inputs, the table, and the
         # status line.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
 
         engine_box = self._tr(QGroupBox(), "eml_engine_group")
-        engine_layout = QHBoxLayout(engine_box)
+        engine_layout = QVBoxLayout(engine_box)
+        self._status_label.setWordWrap(True)
+        set_role(self._status_label, "hint")
         engine_layout.addWidget(self._status_label)
-        engine_layout.addStretch()
         root.addWidget(engine_box)
 
         add_box = self._tr(QGroupBox(), "eml_add_group")
         add_layout = QVBoxLayout(add_box)
-        host_row = QHBoxLayout()
-        host_row.addWidget(self._tr(QLabel(), "eml_host_label"))
-        host_row.addWidget(self._host_input)
-        host_row.addWidget(self._tr(QLabel(), "eml_port_label"))
-        host_row.addWidget(self._port_input)
-        host_row.addWidget(self._ssl_check)
-        add_layout.addLayout(host_row)
-        creds_row = QHBoxLayout()
-        creds_row.addWidget(self._tr(QLabel(), "eml_user_label"))
-        creds_row.addWidget(self._user_input)
-        creds_row.addWidget(self._tr(QLabel(), "eml_password_label"))
-        creds_row.addWidget(self._password_input)
-        add_layout.addLayout(creds_row)
-        mb_row = QHBoxLayout()
-        mb_row.addWidget(self._tr(QLabel(), "eml_mailbox_label"))
-        mb_row.addWidget(self._mailbox_input)
-        mb_row.addWidget(self._tr(QLabel(), "eml_search_label"))
-        mb_row.addWidget(self._search_input)
-        add_layout.addLayout(mb_row)
-        poll_row = QHBoxLayout()
-        poll_row.addWidget(self._tr(QLabel(), "eml_poll_label"))
-        poll_row.addWidget(self._poll_input)
-        poll_row.addWidget(self._mark_seen_check)
-        poll_row.addStretch()
-        add_layout.addLayout(poll_row)
-        script_row = QHBoxLayout()
-        script_row.addWidget(self._tr(QLabel(), "eml_script_label"))
-        script_row.addWidget(self._script_input)
-        add_layout.addLayout(script_row)
+        rows = (
+            (self._pair("eml_host_label", self._host_input, 280),
+             self._pair("eml_port_label", self._port_input), self._ssl_check),
+            (self._pair("eml_user_label", self._user_input, 280),
+             self._pair("eml_password_label", self._password_input, 280)),
+            (self._pair("eml_mailbox_label", self._mailbox_input),
+             self._pair("eml_search_label", self._search_input)),
+            (self._pair("eml_poll_label", self._poll_input), self._mark_seen_check),
+        )
+        for row in rows:
+            add_layout.addLayout(flow_of(*row))
+        add_layout.addWidget(self._pair("eml_script_label", self._script_input))
         root.addWidget(add_box)
 
-        root.addWidget(self._table, stretch=1)
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+
+    def _pair(self, label_key: str, field: QWidget, min_width: int = 0) -> QWidget:
+        """``field`` with its translated label kept beside it, at least ``min_width`` pixels wide."""
+        pair = field_pair(self._tr(QLabel(), label_key), field)
+        pair.setMinimumWidth(min_width)
+        return pair
 
     def menu_actions(self) -> list:
         """Expose tab commands to the window-level Actions menu."""
@@ -158,8 +161,10 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
     def _on_stop(self) -> None:
         # stop() joins the poll thread for up to 5 s (an IMAP round in
         # flight), which used to hold the GUI thread; a second Stop is ignored.
+        # A Poll Now in flight stops before its next trigger.
+        self._polls.stop()
         if self._watcher_op.run(default_email_trigger_watcher.stop, on_done=self._on_watcher_stopped,
-                                on_error=self._on_watcher_stopped):
+                                on_error=self._on_watcher_stopped, retain_failure=True):
             self._refresh()
 
     def _on_watcher_stopped(self, _outcome: object = None) -> None:
@@ -168,12 +173,7 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
     def _on_poll_now(self) -> None:
         # Off the GUI thread: an IMAP server that never greets froze the
         # window for the full 30 s socket timeout.
-        if self._poll_thread is not None:
-            return
-        self._poll_thread = start_worker(
-            self, CallWorker(default_email_trigger_watcher.poll_once),
-            on_done=self._on_polled, on_fail=self._on_poll_failed,
-            on_thread_done=self._on_poll_thread_done)
+        self._polls.start(default_email_trigger_watcher.poll_once)   # False while one runs
 
     def _on_polled(self, fired: int) -> None:
         # Per-trigger errors too: a timeout was reported as "Fired 0".
@@ -184,11 +184,8 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         QMessageBox.information(self, _t("eml_poll_now"), "\n".join([text, *errors]))
         self._refresh()
 
-    def _on_poll_failed(self, message: str) -> None:
-        QMessageBox.warning(self, _t("eml_poll_now"), message)
-
-    def _on_poll_thread_done(self) -> None:
-        self._poll_thread = None
+    def _on_poll_failed(self, error: object) -> None:
+        QMessageBox.warning(self, _t("eml_poll_now"), str(error))
 
     def _on_browse(self) -> None:
         path, _ = QFileDialog.getOpenFileName(

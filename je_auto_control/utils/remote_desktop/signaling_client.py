@@ -13,8 +13,10 @@ from __future__ import annotations
 import json
 import time
 import urllib.parse
-from typing import Optional
+from concurrent.futures import CancelledError
+from typing import Callable, Optional
 
+from je_auto_control.utils.exception.cancellation import current_cancellation_token
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -116,32 +118,60 @@ def fetch_answer(server_url: str, host_id: str, *,
                          secret=secret, timeout=timeout))
 
 
+#: How often a wait looks at ``cancelled()`` while it sleeps between polls.
+_STOP_CHECK_S = 0.1
+
+
+def _stop_check(cancelled: Optional[Callable[[], bool]]) -> Callable[[], bool]:
+    """``cancelled``, or the calling thread's cancellation scope when none is given."""
+    if cancelled is not None:
+        return cancelled
+    token = current_cancellation_token()
+    return (lambda: token.is_cancelled) if token is not None else (lambda: False)
+
+
+def _wait_for(fetch: Callable[[], Optional[str]], what: str, host_id: str, timeout_s: float,
+              poll_interval_s: float, cancelled: Optional[Callable[[], bool]]) -> str:
+    """Poll ``fetch`` until it answers, ``timeout_s`` passes, or the wait is cancelled."""
+    stopped = _stop_check(cancelled)
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if stopped():
+            raise CancelledError()
+        value = fetch()
+        if value is not None:
+            return value
+        pause_until = min(deadline, time.monotonic() + poll_interval_s)
+        while time.monotonic() < pause_until:
+            if stopped():
+                raise CancelledError()
+            time.sleep(min(_STOP_CHECK_S, max(0.0, pause_until - time.monotonic())))
+    raise SignalingError(f"no {what} for host_id={host_id} within {timeout_s}s")
+
+
 def wait_for_answer(server_url: str, host_id: str, *,
                     secret: Optional[str] = None,
                     timeout_s: float = 60.0,
-                    poll_interval_s: float = _POLL_INTERVAL_S) -> str:
-    """Host: block until viewer posts an answer or ``timeout_s`` elapses."""
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        answer = fetch_answer(server_url, host_id, secret=secret)
-        if answer is not None:
-            return answer
-        time.sleep(poll_interval_s)
-    raise SignalingError(f"no answer for host_id={host_id} within {timeout_s}s")
+                    poll_interval_s: float = _POLL_INTERVAL_S,
+                    cancelled: Optional[Callable[[], bool]] = None) -> str:
+    """Host: block until viewer posts an answer or ``timeout_s`` elapses.
+
+    Raises :class:`concurrent.futures.CancelledError` within about 0.1 s once
+    ``cancelled()`` is true -- by default, once the caller's cancellation
+    scope is cancelled.
+    """
+    return _wait_for(lambda: fetch_answer(server_url, host_id, secret=secret), "answer", host_id,
+                     timeout_s, poll_interval_s, cancelled)
 
 
 def wait_for_offer(server_url: str, host_id: str, *,
                    secret: Optional[str] = None,
                    timeout_s: float = 60.0,
-                   poll_interval_s: float = _POLL_INTERVAL_S) -> str:
-    """Viewer: block until host posts an offer or ``timeout_s`` elapses."""
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        offer = fetch_offer(server_url, host_id, secret=secret)
-        if offer is not None:
-            return offer
-        time.sleep(poll_interval_s)
-    raise SignalingError(f"no offer for host_id={host_id} within {timeout_s}s")
+                   poll_interval_s: float = _POLL_INTERVAL_S,
+                   cancelled: Optional[Callable[[], bool]] = None) -> str:
+    """Viewer: block until host posts an offer or ``timeout_s`` elapses; cancellable as :func:`wait_for_answer`."""
+    return _wait_for(lambda: fetch_offer(server_url, host_id, secret=secret), "offer", host_id,
+                     timeout_s, poll_interval_s, cancelled)
 
 
 def delete_session(server_url: str, host_id: str, *,

@@ -9,16 +9,12 @@ rebuilds for the active tab.
 The Actions menu
 ----------------
 
-Two ways a tab surfaces its commands:
+Independent tabs, including Auto Click, Record, Script Executor, Screenshot,
+Image Detection and Report, expose ``menu_actions()`` returning
+``[(label_key, handler), ...]``. The menu bar queries the active page and
+renders its commands. Registry-supplied actions remain supported for embedders.
 
-* **Registry actions** — core tabs (Auto Click, Screenshot, Image Detection,
-  Record, Script Executor, Report) declare ``(label_key, handler)`` pairs when
-  they are registered in ``gui/main_widget.py``.
-* **The** ``menu_actions()`` **hook** — feature tabs expose a
-  ``menu_actions()`` method returning the same ``[(label_key, handler), ...]``
-  shape; the menu bar queries the active tab and renders whatever it returns.
-
-46 of 48 registered tabs surface their commands this way. **Script Builder**
+49 of 51 registered tabs surface their commands this way. **Script Builder**
 and **Remote Desktop** intentionally keep their interactive panel layouts, and
 the Actions menu shows a placeholder there. Controls a window-level menu cannot
 replace stay in place: per-page browse buttons inside stacked trigger forms,
@@ -27,6 +23,15 @@ checkboxes.
 
 The navigation panel
 --------------------
+
+Image Detection is built only when opened and owns its template, threshold,
+draw option and mouse-button selection. Matching runs through ``TabTask`` with
+an input snapshot. **Actions > Stop run** cancels pending work. Closing the page
+discards late results; reopening creates fresh inputs. Hiding the page preserves
+them. Cancellation is checked before detection and before each move/click step
+in ``locate_and_click``. An entered native call may still finish. Cropping remains
+interactive, and the draw option retains the backend's visualization behavior.
+
 
 Every registered tab is listed on the left of the window, grouped by the same
 five categories, whether it is open or not; open tabs are shown in bold.
@@ -112,6 +117,11 @@ restyled afterwards and ``theme_deferred_longest_turn_ms`` the longest single
 turn of that. ``--compare`` sets two reports side by side and refuses
 when the workload or the environment differs.
 
+To compare against another checkout with the same interpreter, run that
+checkout's copy of the scripts with ``PYTHONPATH`` set to its root: the
+editable install's finder comes after the path entries, so the checkout's
+package is the one imported.
+
 Background work in a tab
 ------------------------
 
@@ -139,7 +149,12 @@ What it adds to a plain worker:
   ``CancellationToken``: it polls ``raise_if_cancelled()`` / ``wait()``, hands
   ``remaining()`` to a backend that takes a timeout, and registers how to let
   go of what it holds with ``on_cancel()``. ``handle.cancel()`` runs those at
-  once, on the cancelling thread.
+  once, on the cancelling thread. Work started through ``TabTask`` runs in a
+  cancellation scope that a Stop or a deadline cancels, and the network
+  helpers follow it: ``http_client.perform_call`` sends nothing once it is
+  cancelled and does not hand on a reply that arrived afterwards, and the
+  signaling waits (``wait_for_answer`` / ``wait_for_offer``, which also take
+  ``cancelled=``) end within about 0.1 s.
 * **Typed outcomes.** ``result`` carries the return value, ``error`` the
   exception, ``progress`` whatever ``token.report_progress()`` was given. A
   timeout is reported as ``TaskTimeout``, a cancellation as ``TaskCancelled``.
@@ -157,11 +172,90 @@ outcome arrives -- the tab shows "Stopping…" meanwhile -- and ``on_done`` runs
 on the GUI thread once it is false again, which is where the code that used to
 follow the blocking call goes. The Scheduler, Triggers, Hotkeys, E-mail
 Triggers, Webhooks, REST API and USB Sharing tabs and the Remote Desktop host
-panel stop (and, where a start first stops, start) this way. The WebRTC panels
-let go of their session at once and hand its shutdown to a ``StopQueue``, so
-the next session can start while the old one closes. Callbacks are held
+panel stop (and, where a start first stops, start) this way, and so does Quick
+Connect's *Start hosting* / *Stop*, whose badge reads *Starting…* / *Stopping…*
+meanwhile. The WebRTC panels let go of their session at once and hand its
+shutdown to a ``StopQueue``, so the next session can start while the old one
+closes; Quick Connect's and the Viewer tab's *Disconnect* now do the same
+through ``registry.detach``, and a new connect closes the session it replaces
+on its own worker before connecting. Callbacks are held
 weakly: pass a method and ``args=``, not a ``functools.partial`` or a lambda
 that closes over the tab.
 
+A shutdown handed to a ``StopQueue`` that raises is not only logged:
+``je_auto_control.gui._stop_custody.stop_custody()`` keeps it, with its error
+and the authority captured when it was queued, for the life of the
+application -- the object is out of the panel's hands, but what it held may
+still be open. ``stop_each`` still runs every stop and then raises
+``StopsFailed`` naming each failed one, so each is kept on its own. The
+Diagnostics tab lists them from the custody's snapshot (which runs nothing and
+waits on no native lock); **Retry failed stops** runs each again on a worker
+under its original authority and releases the ones that succeed, and **Forget
+selected failed stop** lets one go. A stop run through ``SlowOp`` joins the custody with
+``run(..., retain_failure=True)`` -- the Scheduler, Triggers, Hotkeys, E-mail
+Triggers, Webhooks, REST API and USB Sharing stops and both Remote Desktop host
+stops pass it; a start never does -- and the WebRTC host's dropped offers and
+disconnected sessions keep a stop that failed (a session already gone is not a
+failure).
+
 This is a GUI-internal API (it imports ``PySide6``) and is not re-exported by
 the package facade; the headless functions a tab calls stay usable without it.
+
+Core panel ownership
+--------------------
+
+Auto Click owns its timer and snapshots each background input request. Pending
+work does not accumulate across timer ticks. Closing cancels future ticks and
+checks cancellation between double-click inputs; an entered native call may finish.
+Script Executor owns its editor, file/directory settings and cancellable runs.
+Opening a script from elsewhere routes through the registered Script page.
+
+Record owns playback, loaded data and background start/stop/file operations.
+Closing stops page-owned work but does not stop the shared recorder. Reopening
+reads existing backend capture state; unsupported/custom backends show unknown.
+The read-only state does not prove hook health or native input acceptance.
+Hiding preserves page state; closing and reopening creates a fresh page.
+
+WebRTC statistics
+-----------------
+
+Statistics polling starts without waiting for the network loop. Stopping it
+discards late samples and releases the callback owner; a callback already
+executing may finish. This does not close the remote session itself.
+
+Remote Desktop lifetime
+-----------------------
+
+Closing Remote Desktop releases its page. Reopening creates fresh controls without reattaching shared sessions. Registry TCP/WebSocket sessions remain available to scripts; page-owned WebRTC sessions and audio retire in the background. Pending approvals are denied, and late callbacks are discarded. A file transfer already sending stops at its next chunk when the page closes: ``send_file`` takes ``cancelled=`` and otherwise follows the calling thread's cancellation scope, and once stopped sends a ``cancelled`` end so the host discards the part file.
+
+Execution details
+~~~~~~~~~~~~~~~~~
+
+**View → Execution details** (``Ctrl+Shift+D``) expands a scrollable right pane.
+It starts collapsed. Diagnostics publishes actual run progress, stop requests,
+results and errors, and so does every page that runs background work through a
+``TabTask`` (``je_auto_control.gui._tab_task``) -- also when the work belongs to
+a panel inside the page: *Running*, *Stopping* while a stopped run unwinds,
+then *Completed*, *Cancelled* or *Error* with the error text (a deadline reads
+*Took too long and was stopped.*), and progress where the work reports it.
+Periodic refreshes, such as the Admin Console's thumbnails, do not publish. A
+page that has not run anything shows an explicit unavailable state.
+Switching or closing a page disconnects its updates, including queued old results.
+The pane does not start work or own cancellation. Use the page's Actions menu.
+
+Embedders can construct ``WorkspaceShell(registry, parent)`` from
+``je_auto_control.gui.workspace``. The supplied ``TabRegistry`` remains authoritative,
+including direct registry closes. ``AutoControlGUIWidget(parent)`` keeps its import
+path, default features and show/hide/list APIs. Hiding retains a page; closing an
+owned page rebuilds it on reopening. A registry outliving its shell forgets pages
+when Qt destroys them.
+
+Internal Windows image-file observations
+--------------------------------------------------------------------------------
+
+The internal process-memory foundation can measure the selected process's current
+image file using retained query/read-only leases, bounded hashing and retryable
+cleanup. Native process facts and file metadata are rechecked. This produces
+observed file evidence, not loaded-code, fixture or launch attestation. No public
+memory command is added. Native acceptance and runtime authorization integration
+remain pending; injected tests do not establish those guarantees.

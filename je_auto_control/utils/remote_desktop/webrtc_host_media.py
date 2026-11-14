@@ -9,19 +9,28 @@ re-subscription that runs after each answer are the whole of this mixin.
 from __future__ import annotations
 
 import asyncio
+import threading
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Mapping, Optional
 
+from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.remote_desktop.webrtc_media_owners import PeerMediaOwners
 from je_auto_control.utils.remote_desktop.webrtc_transport import (
     get_bridge, wait_for_ice_gathering,
 )
 
 if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
-    from je_auto_control.utils.remote_desktop.webrtc_audio import OpusMicReceiver
+    from je_auto_control.utils.remote_desktop.webrtc_audio import OpusMicReceiver, OpusMicAudioTrack
     from je_auto_control.utils.remote_desktop.webrtc_transport import (
         RTCPeerConnection, WebRTCConfig,
     )
 
+
+
+def _being_cancelled() -> bool:
+    """Whether the running task itself has a pending cancellation (not just a child's)."""
+    task = asyncio.current_task()
+    return task is not None and task.cancelling() > 0
 
 class MediaNegotiationMixin:
     """Media-track half of :class:`WebRTCDesktopHost`.
@@ -36,6 +45,9 @@ class MediaNegotiationMixin:
         # every one of these. The block is stripped at runtime, so nothing
         # here can shadow what the host actually binds.
         _pc: Optional["RTCPeerConnection"]
+        _media_owners: PeerMediaOwners
+        _closed: threading.Event
+        _host_voice_track: Optional["OpusMicAudioTrack"]
         _config: "WebRTCConfig"
         _viewer_video_task: Optional[asyncio.Task]
         _opus_audio_receiver: Optional["OpusMicReceiver"]
@@ -43,6 +55,26 @@ class MediaNegotiationMixin:
         _spawn_bg: Callable[[Any], asyncio.Task]
         _consume_viewer_video: Callable[[Any], Coroutine[Any, Any, None]]
         _start_opus_audio_receive: Callable[[Any], None]
+
+    def _attach_host_voice(self) -> None:
+        from je_auto_control.utils.remote_desktop.webrtc_audio import OpusMicAudioTrack
+        self._media_owners.require_available("host voice")
+        if self._host_voice_track is not None or self._pc is None:
+            return
+        track = self._media_owners.create("host voice", OpusMicAudioTrack)
+        if track is not None:
+            self._host_voice_track = track
+            self._pc.addTrack(track)
+
+    def _current_media_peer(self, peer: object) -> bool:
+        return peer is not None and self._pc is peer and not self._closed.is_set()
+
+    def _queue_for_media_peer(self, action: Callable[[], object]) -> None:
+        peer = self._pc
+        def run() -> None:
+            if peer is not None and self._pc is peer and not self._closed.is_set():
+                action()
+        get_bridge().call_soon(run)
 
     def _maybe_resubscribe_viewer_video(self) -> None:
         if not (self._config.accept_viewer_video
@@ -83,30 +115,30 @@ class MediaNegotiationMixin:
         receiver = transceiver.receiver
         return receiver.track if receiver is not None else None
 
-    async def _async_renegotiate(self) -> None:
-        """Host-initiated renegotiation: new offer → viewer over ctrl channel."""
-        if self._pc is None:
+    def _async_renegotiate(self) -> Coroutine[Any, Any, None]:
+        return self._renegotiate_peer(self._pc)
+
+    async def _renegotiate_peer(self, peer: Optional["RTCPeerConnection"]) -> None:
+        if peer is None or not self._current_media_peer(peer):
             return
         try:
-            offer = await self._pc.createOffer()
-            await self._pc.setLocalDescription(offer)
-            await wait_for_ice_gathering(self._pc)
+            offer = await peer.createOffer()
+            if not self._current_media_peer(peer):
+                return
+            await peer.setLocalDescription(offer)
+            await wait_for_ice_gathering(peer)
         except (RuntimeError, OSError) as error:
+            raise_caused_run_interruption(error)
             autocontrol_logger.warning("renegotiate offer: %r", error)
             return
-        self._send_ctrl({
-            "type": "renegotiate_offer",
-            "sdp": self._pc.localDescription.sdp,
-        })
-        autocontrol_logger.info("webrtc host: sent renegotiate offer")
+        if self._current_media_peer(peer):
+            self._send_ctrl({"type": "renegotiate_offer", "sdp": peer.localDescription.sdp})
 
     def request_renegotiation(self) -> None:
         """Public sync entry: kick off a fresh SDP exchange over ctrl channel."""
         if self._pc is None:
             return
-        get_bridge().call_soon(
-            lambda: self._spawn_bg(self._async_renegotiate()),
-        )
+        self._queue_for_media_peer(lambda: self._spawn_bg(self._async_renegotiate()))
 
     def enable_accept_viewer_video(self) -> None:
         """Live-add a recvonly video transceiver and renegotiate.
@@ -116,15 +148,17 @@ class MediaNegotiationMixin:
         """
         if self._pc is None:
             return
+        self._media_owners.require_available("viewer video task")
         self._config.accept_viewer_video = True
-        get_bridge().call_soon(self._add_recvonly_video_and_renegotiate)
+        self._queue_for_media_peer(self._add_recvonly_video_and_renegotiate)
 
     def enable_accept_viewer_audio_opus(self) -> None:
         """Live-add a recvonly audio transceiver and renegotiate."""
         if self._pc is None:
             return
+        self._media_owners.require_available("opus receiver")
         self._config.accept_viewer_audio_opus = True
-        get_bridge().call_soon(self._add_recvonly_audio_and_renegotiate)
+        self._queue_for_media_peer(self._add_recvonly_audio_and_renegotiate)
 
     def _add_recvonly_video_and_renegotiate(self) -> None:
         if self._pc is None:
@@ -151,14 +185,18 @@ class MediaNegotiationMixin:
         if self._pc is None:
             return
         self._config.accept_viewer_video = False
-        get_bridge().call_soon(self._deactivate_recvonly_video)
+        task = self._viewer_video_task
+        self._queue_for_media_peer(
+            lambda: self._deactivate_recvonly_video() if self._viewer_video_task is task else None)
 
     def disable_accept_viewer_audio_opus(self) -> None:
         """Mark the recvonly audio slot inactive + stop the Opus receiver."""
         if self._pc is None:
             return
         self._config.accept_viewer_audio_opus = False
-        get_bridge().call_soon(self._deactivate_recvonly_audio)
+        receiver = self._opus_audio_receiver
+        self._queue_for_media_peer(
+            lambda: self._deactivate_recvonly_audio() if self._opus_audio_receiver is receiver else None)
 
     def _deactivate_recvonly_video(self) -> None:
         if self._pc is None:
@@ -171,10 +209,8 @@ class MediaNegotiationMixin:
                 video_ts[1].direction = "inactive"
             except (RuntimeError, OSError) as error:
                 autocontrol_logger.debug("inactivate video: %r", error)
-        if self._viewer_video_task is not None:
-            self._viewer_video_task.cancel()
-            self._viewer_video_task = None
-        self._spawn_bg(self._async_renegotiate())
+        peer, task = self._pc, self._viewer_video_task
+        self._media_owners.schedule("viewer video task", lambda: self._retire_live_video(peer, task))
 
     def _deactivate_recvonly_audio(self) -> None:
         if self._pc is None:
@@ -188,10 +224,34 @@ class MediaNegotiationMixin:
                 audio_ts[0].direction = "sendonly" if sending else "inactive"
             except (RuntimeError, OSError) as error:
                 autocontrol_logger.debug("inactivate audio: %r", error)
-        if self._opus_audio_receiver is not None:
-            try:
-                self._opus_audio_receiver.stop()
-            except (RuntimeError, OSError) as error:
-                autocontrol_logger.debug("opus receiver stop: %r", error)
+        peer, receiver = self._pc, self._opus_audio_receiver
+        if receiver is None:
+            self._spawn_bg(self._async_renegotiate())
+            return
+        self._media_owners.schedule("opus receiver", lambda: self._retire_live_audio(peer, receiver))
+
+    async def _retire_live_audio(self, peer, receiver) -> None:
+        if self._pc is not peer or self._opus_audio_receiver is not receiver:
+            return
+        await self._media_owners.stop_field_async("opus receiver", receiver)
+        if self._opus_audio_receiver is receiver:
             self._opus_audio_receiver = None
-        self._spawn_bg(self._async_renegotiate())
+        if self._pc is peer and not self._closed.is_set():
+            self._spawn_bg(self._async_renegotiate())
+
+    async def _retire_live_video(self, peer, task) -> None:
+        if self._pc is not peer or self._viewer_video_task is not task:
+            return
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                if _being_cancelled():
+                    raise   # this task's own cancellation, not the child's
+            finally:
+                if task.done() and self._viewer_video_task is task:
+                    self._viewer_video_task = None
+        self._media_owners.settled("viewer video task")
+        if self._pc is peer and not self._closed.is_set():
+            self._spawn_bg(self._async_renegotiate())

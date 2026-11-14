@@ -20,11 +20,13 @@ from typing import Callable, ContextManager, List, Optional, Sequence
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QMenu, QMessageBox, QPushButton, QSplitter,
+    QFileDialog, QMenu, QMessageBox, QPushButton, QSplitter,
     QTextEdit, QToolButton, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui.adaptive.flow_layout import FlowLayout, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.manual_run_controls import ManualRunControls, _requested_manual_run
 from je_auto_control.gui._tab_task import TabTask, was_stopped
@@ -61,6 +63,15 @@ def _run_actions(actions: list, collector: OneTimeCollector,
     """
     with capture():
         return execute_action(actions, result_callback=collector.note)
+
+
+def _button_group(buttons: Sequence[QWidget]) -> QWidget:
+    """A bare container whose buttons wrap onto further lines when the row is too narrow."""
+    group = QWidget()
+    group.setProperty("role", "bare")
+    flow = flow_of(*buttons, spacing=8)
+    group.setLayout(flow)
+    return group
 
 
 class ScriptBuilderTab(TranslatableMixin, QWidget):
@@ -111,19 +122,21 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
             self._form.retranslate()
 
     def _build_layout(self) -> None:
+        # The step list and the step form keep their user-resizable splitter;
+        # each side may shrink small, so the page fits a compact window.
         root = QVBoxLayout(self)
-        root.addLayout(self._build_toolbar())
-        root.addWidget(self._capture)
+        root.setSpacing(12)
+        root.addWidget(Card().add(self._build_toolbar()).add(self._capture))
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self._tree)
         splitter.addWidget(self._form)
         splitter.setSizes([320, 480])
-        root.addWidget(splitter, stretch=1)
-        root.addWidget(self._result)
+        root.addWidget(Card().add(splitter, stretch=1), stretch=1)
+        root.addWidget(Card().add(self._result))
 
-    def _build_toolbar(self) -> QHBoxLayout:
-        bar = QHBoxLayout()
-        bar.addWidget(self._add_button())
+    def _build_toolbar(self) -> FlowLayout:
+        """Two wrapping button groups: editing the steps, and the file and run commands."""
+        edit_buttons: List[QWidget] = [self._add_button()]
         for key, handler in (
             ("sb_delete", self._on_delete),
             ("sb_up", lambda: self._tree.move_selected(-1)),
@@ -131,8 +144,8 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
         ):
             btn = self._tr(QPushButton(), key)
             btn.clicked.connect(handler)
-            bar.addWidget(btn)
-        bar.addStretch()
+            edit_buttons.append(btn)
+        run_buttons: List[QWidget] = []
         for key, handler in (
             ("sb_load_json", self._on_load),
             ("sb_save_json", self._on_save),
@@ -141,12 +154,12 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
         ):
             btn = self._tr(QPushButton(), key)
             btn.clicked.connect(handler)
-            bar.addWidget(btn)
+            run_buttons.append(btn)
         self._tr(self._reveal_btn, "sb_one_time_show")
         self._reveal_btn.setEnabled(False)
         self._reveal_btn.clicked.connect(self._on_reveal)
-        bar.addWidget(self._reveal_btn)
-        return bar
+        run_buttons.append(self._reveal_btn)
+        return flow_of(_button_group(edit_buttons), _button_group(run_buttons), spacing=16)
 
     def _add_button(self) -> QToolButton:
         button = QToolButton()

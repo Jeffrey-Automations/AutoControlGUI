@@ -441,13 +441,18 @@ def test_disabling_a_microphone_that_was_never_enabled_is_a_no_op(viewer):
     assert viewer.mic_active is False
 
 
-def test_a_microphone_that_fails_to_close_is_still_forgotten(viewer,
-                                                             mic_sender):
+def test_a_microphone_that_fails_to_close_is_retained_and_reported(viewer,
+                                                                   mic_sender):
+    # Since U-20261111-32 a failed close keeps its original owner instead of
+    # forgetting it (docs/media_retirement_contract.md).
     viewer._mic_channel = Channel("mic")
     viewer.enable_mic_send()
-    viewer._mic_sender.stop_error = OSError("stream already closed")
-    viewer.disable_mic_send()
-    assert viewer._mic_sender is None
+    sender = viewer._mic_sender
+    sender.stop_error = OSError("stream already closed")
+    with pytest.raises(OSError, match="stream already closed"):
+        viewer.disable_mic_send()
+    assert viewer._mic_sender is sender
+    assert viewer.media_failures
 
 
 def test_a_sender_that_stopped_on_its_own_is_not_active(viewer, mic_sender):

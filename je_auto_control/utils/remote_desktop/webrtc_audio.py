@@ -21,7 +21,8 @@ import threading
 from typing import Any, Optional
 
 try:
-    import av  # type: ignore
+    import av
+    from av.error import FFmpegError
     import numpy as np
     from aiortc import MediaStreamTrack
 except ImportError as exc:  # pragma: no cover - optional dep
@@ -29,7 +30,11 @@ except ImportError as exc:  # pragma: no cover - optional dep
         "Opus audio uplink requires the 'webrtc' extra (aiortc + av).",
     ) from exc
 
+from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.remote_desktop.media_retirement import (
+    Completion, MediaRetirementError, RetirementStatus, require_retired, raise_cleanup_failures,
+)
 from je_auto_control.utils.remote_desktop.audio import (
     AudioBackendError, AudioCapture, AudioPlayer, is_audio_backend_available,
 )
@@ -61,7 +66,7 @@ class OpusMicAudioTrack(MediaStreamTrack):
         self._channels = channels
         self._device = device
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=50)
-        self._loop = asyncio.get_running_loop()
+        self._loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         self._timestamp = 0
         self._capture: Optional[AudioCapture] = None
         self._lock = threading.Lock()
@@ -84,13 +89,17 @@ class OpusMicAudioTrack(MediaStreamTrack):
         )
 
     def _on_block(self, pcm_bytes: bytes) -> None:
+        if self.readyState == "ended":
+            return
         # Called from the sounddevice thread.
         try:
             self._loop.call_soon_threadsafe(self._enqueue, pcm_bytes)
-        except RuntimeError:
-            pass  # loop closed; drop block silently
+        except RuntimeError as error:
+            raise_caused_run_interruption(error)
 
     def _enqueue(self, pcm_bytes: bytes) -> None:
+        if self.readyState == "ended":
+            return
         if self._queue.full():
             try:
                 self._queue.get_nowait()  # drop oldest to keep latency bounded
@@ -102,7 +111,12 @@ class OpusMicAudioTrack(MediaStreamTrack):
             pass
 
     async def recv(self) -> "av.AudioFrame":
+        from aiortc.mediastreams import MediaStreamError
+        if self.readyState == "ended":
+            raise MediaStreamError
         pcm_bytes = await self._queue.get()
+        if pcm_bytes is None or self.readyState == "ended":
+            raise MediaStreamError
         samples = np.frombuffer(pcm_bytes, dtype=np.int16)
         # av.AudioFrame.from_ndarray expects shape (channels, samples) for
         # planar layouts; for "s16" (interleaved) it expects (1, total).
@@ -116,17 +130,37 @@ class OpusMicAudioTrack(MediaStreamTrack):
         self._timestamp += samples.shape[0] // self._channels
         return frame
 
+    def _end_queue(self) -> None:
+        while not self._queue.empty():
+            self._queue.get_nowait()
+        self._queue.put_nowait(None)
+
+    @property
+    def retirement_status(self) -> RetirementStatus:
+        if self._capture is not None:
+            return self._capture.retirement_status
+        return RetirementStatus(self.readyState == "ended", Completion.CONFIRMED,
+                                Completion.CONFIRMED)
+
     def stop(self) -> None:
+        failures: list[BaseException] = []
         try:
             super().stop()
-        finally:
+        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+            failures.append(error)
+        try:
+            if not self._loop.is_closed():
+                self._loop.call_soon_threadsafe(self._end_queue)
+        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+            failures.append(error)
+        try:
             with self._lock:
                 if self._capture is not None:
-                    try:
-                        self._capture.stop()
-                    except (RuntimeError, OSError) as error:
-                        autocontrol_logger.debug("opus mic stop: %r", error)
+                    self._capture.stop()
                     self._capture = None
+        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+            failures.append(error)
+        raise_cleanup_failures(failures)
 
 
 class OpusMicReceiver:
@@ -147,10 +181,13 @@ class OpusMicReceiver:
         self._player.start()
         self._task: Optional[asyncio.Task] = None
         self._stopped = False
+        self._player_retired = False
         self._resampler: Optional[Any] = None
 
     def consume(self, track) -> None:
         """Spawn a background task that drains ``track.recv()`` into the player."""
+        if self._stopped:
+            raise AudioBackendError("audio receiver is stopped")
         if self._task is not None:
             return
         self._task = asyncio.ensure_future(self._loop(track))
@@ -160,13 +197,14 @@ class OpusMicReceiver:
         try:
             while not self._stopped:
                 frame = await track.recv()
-                if not bool(self._player.is_running):
+                if self._stopped or not bool(self._player.is_running):
                     return
                 for chunk in self._to_player_pcm(frame):
                     self._player.play(chunk)
         except (asyncio.CancelledError, MediaStreamError):
             autocontrol_logger.info("opus mic receiver ended")
         except (OSError, RuntimeError) as error:
+            raise_caused_run_interruption(error)
             autocontrol_logger.info("opus mic receiver ended: %r", error)
 
     def _to_player_pcm(self, frame) -> list:
@@ -182,7 +220,8 @@ class OpusMicReceiver:
             )
         try:
             converted = self._resampler.resample(frame)
-        except (TypeError, ValueError, RuntimeError, av.FFmpegError) as error:  # TypeError: not an AudioFrame
+        except (TypeError, ValueError, RuntimeError, FFmpegError) as error:  # TypeError: not an AudioFrame
+            raise_caused_run_interruption(error)
             autocontrol_logger.debug("audio frame resample: %r", error)
             return []
         chunks = []
@@ -193,15 +232,65 @@ class OpusMicReceiver:
             chunks.append(arr.tobytes())
         return chunks
 
+    async def stop_confirmed(self) -> None:
+        """Observe the original drain task on its loop before acknowledging stop."""
+        failures: list[BaseException] = []
+        try:
+            self.stop()
+        except MediaRetirementError as error:
+            if error.owner is not self or not error.status.retryable:
+                failures.append(error)
+        except BaseException as error:  # reason: observe the task despite an independent player or scheduling failure
+            failures.append(error)
+        task = self._task
+        try:
+            if task is not None and not task.done() and not task.get_loop().is_closed():
+                await asyncio.wait({task})
+            self.stop()
+        except BaseException as error:  # reason: preserve earlier controls after observing actual task completion
+            failures.append(error)
+        raise_cleanup_failures(failures)
+
+    @property
+    def retirement_status(self) -> RetirementStatus:
+        if not self._player_retired:
+            return self._player.retirement_status
+        pending = self._task is not None and not self._task.done()
+        closed_loop = pending and self._task is not None and self._task.get_loop().is_closed()
+        resources = Completion.CONFIRMED
+        if pending:
+            resources = Completion.UNCERTAIN if closed_loop else Completion.PENDING
+        return RetirementStatus(self._stopped, resources,
+                                Completion.CONFIRMED, pending and not closed_loop,
+                                ("audio.task_pending",) if pending else ())
+
     def stop(self) -> None:
         self._stopped = True
-        if self._task is not None:
-            self._task.cancel()
-            self._task = None
+        failures: list[BaseException] = []
         try:
-            self._player.stop()
-        except (RuntimeError, OSError) as error:
-            autocontrol_logger.debug("audio player stop: %r", error)
+            self._cancel_task()
+        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+            failures.append(error)
+        try:
+            if not self._player_retired:
+                self._player.stop()
+                self._player_retired = True
+        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+            failures.append(error)
+        raise_cleanup_failures(failures)
+        require_retired(self)
+
+    def _cancel_task(self) -> None:
+        if self._task is None:
+            return
+        if self._task.done():
+            task, self._task = self._task, None
+            if not task.cancelled():
+                task.result()
+            return
+        loop = self._task.get_loop()
+        if not loop.is_closed():
+            loop.call_soon_threadsafe(self._task.cancel)
 
 
 __all__ = ["OpusMicAudioTrack", "OpusMicReceiver"]

@@ -119,3 +119,9 @@ def test_ci_workflows_keep_native_diagnostics_after_failure(name):
     assert upload['with']['path'] in runner['run']
     assert ('python -m coverage run -m pytest' if name == 'quality.yml' else 'python -m pytest') in runner['run']
     assert any('gdb' in step.get('run', '') and step.get('if') == "runner.os == 'Linux'" for step in steps)
+    # Windows: crash minidumps land inside the retained folder, configured before the suite starts.
+    dumps = next(step for step in steps if step.get('name') == 'Keep native crash dumps (Windows)')
+    assert dumps['if'] == "runner.os == 'Windows'"
+    assert steps.index(dumps) < steps.index(runner)
+    assert 'LocalDumps\python.exe' in dumps['run'] and 'DumpFolder' in dumps['run']
+    assert "autocontrol-native\dumps" in dumps['run'] and upload['with']['path'].endswith('autocontrol-native')

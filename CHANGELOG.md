@@ -1,5 +1,350 @@
 # Changelog
 
+## [Unreleased]
+
+- `http_client.perform_call` observes a bound cancellation scope: once it is cancelled the request
+  is not sent, and a reply that arrives after the cancellation raises `CancelledError` instead of
+  being returned; unscoped calls are unchanged. `signaling_client.wait_for_answer` /
+  `wait_for_offer` take `cancelled=` (default: the caller's scope) and raise `CancelledError`
+  within about 0.1 s. GUI: the WebRTC signaling workers and the host's publish loop pass their
+  interruption, so stopping the host ends a wait of up to ten minutes and drops the session it
+  had published.
+
+- Remote desktop: `close_admission()` on `AudioCapture` / `AudioPlayer` (and `AudioLease`),
+  `HostBrowser` and `MultiViewerHost` stops taking anything new at once -- audio blocks and
+  writes, discovery reports, new sessions, answers and viewer input -- without the owner's
+  native-cleanup lock or a native call; `stop()` still closes what was admitted. After it,
+  `MultiViewerHost.create_owned_session_offer` and `accept_session_answer` raise
+  `PeerStopPending`. GUI: `StopQueue.retire` closes admission on every owner a stop refers to
+  before queuing it (`close_admission_of` in `gui/_slow_op.py`).
+
+- GUI: a held failed stop whose error is a `MediaRetirementError` records the owner's retirement
+  state from the snapshot the error carries (`FailedStop.detail`: admission, resources,
+  finalization, failed steps); the custody never asks the owner, whose live status may wait on
+  its native cleanup's lock. Diagnostics shows it beside the error.
+
+- GUI: `hold_failed_stop` also keeps each original owner an interruption signal carries
+  (`interrupted_retirement_owners`) -- a cancellation that cut a media cleanup short -- with its
+  own `stop`, so its resources have a keeper; one that is the stop already kept is not doubled.
+
+- GUI: the WebRTC *Browse LAN* dialog closes its zeroconf browser on a worker instead of the GUI
+  thread, through the new application-owned `app_stop_queue()` (in `gui/_slow_op.py`), so a stop
+  that fails after the dialog closed still reaches the stop custody; the browser reports through
+  a `ViewLifetime` lease and no longer keeps the dialog alive (`_services_changed` is gone). A
+  WebRTC offer dropped on the GUI thread is retired through the same queue.
+
+- GUI: `StopQueue.retire` takes `on_error=`. A WebRTC recording whose finalising fails re-enables
+  Record and says it may be incomplete instead of leaving the button disabled on *Stopping…*;
+  it is never reported saved. A LAN broadcast (zeroconf advertiser) whose stop fails -- a
+  `MediaRetirementError` included -- is kept, with that advertiser, by the stop custody instead
+  of being logged at debug level. New catalogue key `rd_webrtc_recording_unconfirmed`.
+
+- GUI: `SlowOp.run(..., retain_failure=True)` also hands a failed stop to the stop custody; the
+  Scheduler, Triggers, Hotkeys, E-mail Triggers, Webhooks, REST API and USB Sharing stops and
+  both Remote Desktop host stops pass it. The WebRTC host's dropped offers and disconnected
+  sessions keep a stop that failed instead of logging it; a session already gone is not kept.
+
+- GUI: a shutdown handed to `StopQueue` that raises is kept by the new
+  `gui/_stop_custody.py` (`stop_custody()`: `snapshot`, `retry`, `retry_all`, `forget`) with
+  its error and the caller's authority captured when it was queued, instead of only being
+  logged. `stop_each` now raises `StopsFailed` (with `failures`) after running every stop when
+  any failed -- a caller outside `StopQueue` sees that error. The Diagnostics tab lists held
+  stops and has **Retry failed stops** and **Forget selected failed stop** in the Actions menu
+  (new `gui/failed_stops_view.py`; new catalogue keys `failed_stops_*`).
+
+- Remote desktop: a WebRTC session whose peer fails to build (`MultiViewerHost.create_owned_session_offer`)
+  no longer leaves its session token, its relay subscription, or a screen source no other session
+  uses. GUI: the WebRTC host panel makes owned offers and disconnects through
+  `session_retirement`, so a dropped offer or a disconnect stops the session it captured -- never
+  one that reused the id -- and a dropped offer no longer stops its session on the GUI thread.
+
+- GUI: Quick Connect and the Viewer tab tag each viewer session's callbacks with a session
+  number; frames, cursor moves, audio and errors from a session already replaced or closed are
+  dropped instead of reaching the next session (a late error used to disconnect it).
+  `ViewLifetime.tagged` / `tagged_error` deliver `method(tag, *arguments)`. `_viewer_callbacks()`
+  now starts a new session each time it is called.
+
+- Remote desktop: `file_transfer.send_file` and `RemoteDesktopViewer.send_file` take a
+  keyword `cancelled=` callable and otherwise follow the calling thread's cancellation scope.
+  A transfer stopped mid-file sends a `FILE_END` with status `cancelled` (the receiver discards
+  the part file) and raises `concurrent.futures.CancelledError`; one stopped before its first
+  byte sends nothing. GUI: the Viewer tab's upload, Quick Connect's dropped files and the
+  WebRTC panel's uploads stop at the next chunk when their task is cancelled (the page closes or
+  the session is dropped). A test double replacing `send_file` must accept `cancelled`.
+
+- Remote desktop: `remote_desktop_registry.detach(slot, by, only_own=False)` frees a slot at
+  once and returns the blocking shutdown of what it held (or `None`), for a caller that must
+  not block. GUI: Quick Connect starts and stops its host off the GUI thread (*Starting…* /
+  *Stopping…* meanwhile); Quick Connect's and the Viewer tab's Disconnect, and a connect that
+  replaces a session, close the old one on a worker. `connect_viewer` takes `before=`, run on
+  its worker ahead of the connect. The Host panel's start/stop helpers moved to
+  `gui/remote_desktop/_host_ops.py`.
+
+- GUI: switching theme restyles the window once instead of twice (the theme's style sheet,
+  then again with the font rules); with every tab open the switch took 1.9 s on `dev` and
+  now takes 0.95 s, the release's level.
+
+- GUI: every workspace page has a banner under its header (`gui/adaptive/page_banner.py`): a
+  failed background run (*The last run failed:*), a run refused by RBAC (*Not permitted:*), and,
+  inside an RBAC scope, the commands the active role cannot run. Panels declare theirs in a
+  `REQUIRED_COMMANDS` class attribute (journal browser, self-healing comparison, journal and
+  template candidates, Config Sync, Diagnostics, MCP discovery). New
+  `utils.rbac.policy.refused_commands(names, context=None)`; four new catalogue keys
+  (`page_banner_*`).
+
+- GUI: every table, list and tree on a workspace page shows an empty state (*Nothing to show
+  yet.*) while it has no rows. New `gui/adaptive/empty_views.py` (`show_empty_states`,
+  `NO_EMPTY_STATE` to opt a view out); two new catalogue keys, `empty_view` and
+  `empty_view_hint`. Each such view gains an `EmptyState` child named `EmptyViewState` on its
+  viewport.
+
+- GUI: every page that runs background work through `TabTask` publishes it to **View →
+  Execution details**: running, stopping, then succeeded, cancelled or error (with the error
+  text, or the timeout message), with reported progress. `TabTask(owner, details=False)` opts
+  out (the Admin Console's thumbnail timer does). New `gui/_task_details.py`;
+  `workspace_details.details_sources()` announces sources created after a view bound to a page,
+  and `WorkspaceShell` rebinds to them.
+
+- GUI internals: the Config Sync tab runs on `TabTask.start_until_stopped`. `ConfigSyncWorker`
+  is no longer a `QObject`: it is called with the stop event and returns its `SyncUIOutcome`;
+  the tab keeps it for `deliver` (`run`, `finished` and the tab's `_handle` are gone; `_task`
+  is the task). No GUI module outside the task controllers calls `start_worker` any more.
+
+- GUI internals: the template candidate panel (Self-Healing) runs on
+  `TabTask.start_until_stopped(..., reports=True)`. `TemplateCandidateWorker` is no longer a
+  `QObject`: it is called with the stop event and a report of `(request_id, count)` and returns
+  its `TemplateCandidateOutcome` (`run`, `finished`, `progress` and the panel's `_handle` /
+  `_worker` are gone; `_task` is the task). A committed acceptance still reports success.
+
+- GUI internals: the journal candidate panel (Script Builder › review from journal) runs on
+  `TabTask.start_until_stopped(..., reports=True)`. `JournalCandidateWorker` is no longer a
+  `QObject`: it is called with the stop event and a report of `(request_id, count)` and returns
+  its `JournalCandidateOutcome` (`run`, `finished`, `progress` and the panel's `_handle` /
+  `_worker` are gone; `_task` is the task). A committed export still reports success.
+
+- GUI internals: `TabTask` relays `progress`; `start_until_stopped(work, reports=True)` calls
+  `work(stop_event, report)`. The journal browser (Run History, Self-Healing) runs on it:
+  `JournalReadWorker` is no longer a `QObject` and is called with the stop event and a report
+  that receives `(request_id, scanned)` (`run`, `finished`, `progress` and the browser's
+  `_handle` / `_worker` are gone; `_task` is the task).
+
+- GUI internals: the self-healing comparison panel runs on `TabTask.start_until_stopped`.
+  `HealingEvaluationWorker` is no longer a `QObject`: it is called with the stop event and
+  returns its `HealingEvaluationOutcome` (`run`, `finished` and the `_handle` / `_worker`
+  attributes are gone; `_task` is the task). Cancel still publishes no partial comparison.
+
+- `AdminConsoleClient.poll_all` and `fetch_thumbnails` observe a bound cancellation scope: once
+  cancelled, hosts not reached yet are skipped and `CancelledError` is raised after the requests
+  already out return. Unscoped calls (`AC_admin_poll`, scripts) are unchanged. GUI: the Admin
+  Console tab's health poll and thumbnail round are cancellable tasks with a 60 s deadline
+  (`POLL_DEADLINE_S`) and **Stop polling** in the Actions menu; `_PollWorker`,
+  `_ThumbnailWorker`, `_poll_thread` and `_thumb_thread` are gone (`_polls`, `_thumbs`).
+
+- GUI internals: the DAG Runner tab runs on `TabTask.start_until_stopped`. `_DagWorker` is no
+  longer a `QObject`: it is built on the GUI thread (keeping that context) and called with the
+  stop event, returning the result instead of emitting `finished` / `failed`. `_thread` and
+  `_stop_event` are gone; `_run` is the task. A failure of any type reaches the status line.
+
+- GUI internals: `TabTask.start_until_stopped(work)` runs `work(stop_event)`; Stop sets the
+  event and the task stays running until the work returns, with its outcome. The Computer Use
+  tab runs on it (`_thread`, `_stop_event` and `_ComputerUseWorker` are gone; `_run` is the
+  task), and a failure of any type now reaches its status line as `Type: message`.
+
+- GUI: the USB passthrough panel's List shared, Open and remote REST fetch run as one
+  cancellable task with a 30 s deadline (`REQUEST_DEADLINE_S`) and **Stop run** in the Actions
+  menu, which also stops a local listing; a late answer is dropped and a second request says
+  *Already running*. `_thread`, `_run_async`, `_fail` and `_fail_remote` are gone; `_requests`
+  is the task.
+
+- GUI: the USB Browser tab's Fetch and Open run as one cancellable task with a 30 s deadline
+  (`REQUEST_DEADLINE_S`) and **Stop run** in the Actions menu; a stopped, timed-out or abandoned
+  request's answer is dropped, and a second request while one runs says *Already running*
+  instead of being ignored. `_fetch_thread` and `_open_thread` are gone; `_requests` is the task.
+
+- `AdminConsoleClient.broadcast_execute` rows carry `sent`: whether the actions went to that
+  host. It takes `stop_event` and observes the caller's cancellation scope: once stopped, hosts
+  not sent to yet are skipped with `sent: false` and `error` `NOT_SENT_STOPPED` (exported from
+  `utils.admin.admin_client`), and a host already being sent to finishes. Unknown labels are
+  `sent: false`; code that compared whole rows sees the new key. GUI: the Admin Console tab has
+  **Stop broadcast** and a line summarising how many hosts were sent to.
+
+- `EmailTriggerWatcher.poll_once` observes a bound cancellation scope between triggers: cancelled,
+  it raises `CancelledError` before the next trigger's server; a trigger already being read
+  finishes. Unscoped calls (`AC_email_trigger_poll_once`, the watcher's own loop) are unchanged.
+  GUI: the Email Triggers tab's Poll Now runs as a cancellable task, which Stop and closing the
+  tab cancel (`_poll_thread` is gone; `_polls` is the task).
+
+- `list_usb_devices` starts its command-line tool (PowerShell `Get-PnpDevice`, `lsusb`,
+  `system_profiler`) through `run_capture_helper`: inside a cancellation scope, cancelling ends
+  the tool's process and raises `CancelledError` instead of waiting out the 10 s timeout. Its
+  output is decoded with `errors="replace"`. Failures and timeouts are still `result.error`.
+  GUI: the USB Devices tab and the USB passthrough panel list devices as cancellable tasks,
+  so closing them ends a listing still running (`_list_thread` is gone; `_listing` is the task).
+
+- `locate_by_description` and `click_by_description` observe a bound cancellation scope:
+  cancelled before the model request, they raise `concurrent.futures.CancelledError` without
+  sending it, and `click_by_description` checks again before it moves the mouse, so an answer
+  that arrives after a stop or a deadline no longer clicks. Calls outside a scope are unchanged.
+  GUI: the AI Locator tab and the LLM Planner's Plan step run as cancellable tasks with a
+  **Stop run** action and a deadline (120 s and 200 s); `LLMPlannerTab._plan_thread` and
+  `VLMTab._vlm_thread` are gone (`_plans` and `_task` are their `TabTask`s).
+
+- GUI: drop-down lists and spin boxes draw theme-coloured chevrons, inset from the rounded
+  border, and spin boxes inset their digits like every other field. The chevrons are drawn
+  once per theme colour into `~/.je_auto_control/gui_cache/`, next to the tab close cross;
+  when that folder cannot be written the controls keep the style's own arrows.
+
+- GUI: Remote Desktop's host-ID labels, stats line, sparklines and missing-extras message take
+  their colours from the theme instead of fixed values (the sparkline's `background` now
+  defaults to the palette's base colour; pass a colour to keep a fixed one). A new `accent`
+  label role carries the theme's accent. Diagnostics hides its progress line while idle, and the
+  Assertions kind list and the Email Triggers password placeholder follow a language switch.
+
+- GUI: applying a theme to a top-level window also sets the application palette. Widgets a
+  style sheet styles start from the application palette, which on Windows carries the system
+  accent colour, so checked boxes were drawn in the user's accent instead of the theme's.
+
+- GUI: every tab's layout is rebuilt on cards, wrapping rows and side-by-side panes that stack
+  when narrow; widget objects, attributes, signals, Actions-menu entries and translation keys
+  are unchanged. Each page's scroll area no longer uses `setWidgetResizable(True)`
+  (`ScrollableTabs.scroll_area()` returns a `PageScrollArea`, which sizes the page to the
+  viewport or its minimum), `FlowLayout` no longer reports height-for-width, and group-box
+  titles are drawn inside the box. The WebRTC viewer's remote-files section showed the raw key
+  `rd_webrtc_files_group`; it uses `rd_webrtc_remote_files_group`. The English
+  "Publish & wait for viewer" button read "Publish _wait"; it is "Publish and wait for viewer".
+
+- The `gui` extra and the development and CI pins are back on `PySide6==6.11.2`. 6.12.0 crashed
+  the test process at interpreter exit on every CI platform (a double free while
+  `destroyQCoreApplication` tears down Python-held widgets); Dependabot now skips 6.12.0.
+
+- GUI: `prepare_application` installs `AdaptiveStyle` (Fusion with check boxes and radio
+  buttons drawn from the palette) instead of plain Fusion, and the workspace inserts a
+  `PageHeader` at the top of every tab laid out by a vertical box layout and runs
+  `fit_to_width` on it, which changes its combo boxes' size-adjust policy and its form
+  layouts' row-wrap policy. Code that embeds a tab and reads its layout's first item, or
+  relies on a combo box sizing to its longest entry, sees the difference.
+- GUI: below 800 px the main window hides the docked navigation and shows a rail; between
+  800 and 1,199 px the execution details open as a drawer. `AutoControlGUIUI._sidebar_action`
+  (Ctrl+B) is now the window's own checkable action rather than the dock's `toggleViewAction()`,
+  and the dock's toggle is hidden from the dock area's context menu. The saved
+  `workspace/navigation_visible` is the user's preference, not whether the dock happened to be
+  shown when the window closed.
+
+- `save_window_layout` stores a maximized window with `"maximized": true` and its restored
+  rectangle; it used to store the maximized rectangle, which restored as a screen-sized normal
+  window. `restore_window_layout(..., maximize=True)` (`AC_restore_window_layout`'s
+  `maximize`) maximizes those windows again, activating each on Windows; without it nothing is
+  activated. A custom `mover` receives `maximize=True` for those entries only when it is set.
+
+- `post_key_to_window` (`AC_post_key_to_window`, `ac_post_key_to_window`) accepts any
+  printable character, not only those in the platform's key table: on Windows `"%"` and other
+  punctuation used to raise `unknown key name`, and a character beyond the BMP is now posted
+  as its two UTF-16 units. On X11 a character is sent as the key the keymap binds it to, with
+  Shift when it is on the shifted level, so `"%"` and `"Z"` no longer arrive as `5` and `z`.
+
+- WebRTC cleanup that cancels a child task (viewer video retirement, peer teardown) no longer
+  swallows its own cancellation when it is cancelled while waiting for that child.
+- The container image installs `libegl1`: PySide6 6.12's QtGui loads `libEGL.so.1` at import.
+
+- Windows: `move_window` (used by `restore_window_layout`, `snap_window`, the grid and
+  cascade layouts, `ac_window_move` and the window backend) un-maximizes a maximized window
+  first, without activating it. `MoveWindow` alone gave it the new rectangle but left it
+  flagged maximized.
+- Windows accessibility: the first `comtypes` import initialises COM to match the importing
+  thread. Imported first on a worker it used to put that worker in an STA, and on a thread
+  already in the MTA it raised `OSError` (`RPC_E_CHANGED_MODE`).
+
+- Reading the iOS pasteboard (`WdaExtension.get_clipboard`, `AC_ios_get_clipboard`,
+  `ac_ios_get_clipboard`) now needs `allow_app_switch=True`: facebook-wda brings WebDriverAgent
+  to the front through Siri for about 3 s and relaunches the app that was in front. Without it
+  the call raises `DeviceUnsupportedError` and sends nothing. Android accepts and ignores the
+  flag; an adapter registered through `register_mobile_extension` is called without it unless
+  it is set.
+
+- `sync_assets` (and `AC_sync_assets`, `materialize` of `AC_sync_workspace`) refuses up front,
+  with a `ConfigSyncError` naming the length, a generation whose published paths would pass
+  259 characters on Windows without `LongPathsEnabled`; it used to fail on the first such file
+  with a generic "could not publish a complete generation".
+
+- The executor result hook (`result_callback`, `observe_results`) now follows `AC_parallel`
+  branches: a branch command is reported under the `AC_parallel` step with the branch's
+  1-based index as `run`, and branches never call the callback concurrently. The Script
+  Builder therefore offers a token a branch issued as that command's own value instead of
+  `AC_parallel` `results[0].…`.
+
+- Of the three GUI tabs open at start, only Record is built then: Script Builder and Remote
+  Desktop sit in the tab bar as empty stand-ins and are built in place the first time they
+  are selected or their widget is asked for (`TabEntry.widget`, `activate_tab`). Offscreen,
+  median start-up went from 3.2 s to 1.7 s and memory from 172 MB to 111 MB. Code that
+  expected those two widgets to exist right after `AutoControlGUIWidget()` now builds them
+  on first access.
+
+- iOS `swipe` (`Swipe` gestures, `AC_ios_swipe`, `ac_ios_swipe`) no longer presses for
+  `duration_s` before moving: facebook-wda's swipe duration is the start-point hold, so the
+  old mapping made swipes start as drags. WebDriverAgent sets the travel speed and
+  `duration_s` has no effect on iOS; a negative or NaN value is rejected. An Android pinch
+  whose fingers would reach past the left or top edge raises `DeviceError` instead of
+  uiautomator2's bare `AssertionError`.
+
+- Each MCP `tools/call` now runs as a stoppable executor run (`mcp-…`). `notifications/cancelled`
+  stops it: an action list from `ac_execute_actions` halts before its next action and
+  `ac_wait_for_image` / `ac_wait_for_pixel` wake mid-poll, answered `-32800` as before for a
+  cancelled call. `ac_stop_execution()` without a `run_id` (and any other `stop_execution()`
+  caller) now also stops MCP calls in progress, reported as an `ExecutionStopped` tool error,
+  and `ac_list_executions` lists them, excluding its own call.
+
+- WebRTC peers retain media constructor and disable failures, expose cached slot outcomes,
+  observe actual receiver/task completion, and guard deferred media operations against
+  peer replacement. GUI caretaker and Diagnostics integration remain pending.
+
+- Bind delayed MultiViewer session retirement to its original peer and screen source.
+  Owned offers preserve cleanup identity before delivery; existing tuple APIs remain compatible.
+
+- Retain unfinished HostBrowser cleanup, reject late publications, and observe the
+  original browser thread without replaying cancellation. One-shot browsing preserves
+  interruption identity and retained cleanup ownership. Dialog integration remains pending.
+
+- Require `read_data` for USB enumeration/events, retained inspector statistics and
+  process metrics over REST, and for the four matching registered AC reads.
+  Viewer denial happens before providers or metrics child queries execute;
+  operator/admin and legacy shared-token access remain supported. Session dashboard
+  refresh also clears a prior error after access is restored.
+
+- Retain original audio, recording and LAN advertisement cleanup outcomes. Reject unsafe
+  flush/close replay and report pending work or uncertain finalization through typed
+  errors. Application caretaker and GUI integration remain pending.
+
+- File-request cancellation retains the original sender worker and queue ownership
+  until actual completion, including repeated cancellation, without blocking the event loop.
+
+- Align audited REST host-data routes and registered status/diagnostic commands with
+  MCP `read_data` authority. Viewer requests are refused before providers execute;
+  operator/admin diagnostics and cancellation remain supported. Dashboard panels
+  report the missing capability without widening viewer access.
+
+- WebRTC stop now reports pending or failed software cleanup, retains failed resources,
+  and blocks peer replacement until cleanup succeeds. Retrying a pending stop reuses
+  the original future. Multi-viewer teardown retains failed sessions and their capture
+  source; FolderSync exposes actual worker completion through `stop_confirmed()`.
+  Native device retirement and durable GUI recovery remain separate work.
+
+- Add internal bounded Windows image-file measurements with retained read-only leases
+  and retryable cleanup. These observations do not grant loaded-code or fixture attestation.
+
+- Add an injectable WorkspaceShell and collapsible execution details under View.
+  Diagnostics publishes progress and outcomes; existing embedded-widget imports,
+  constructors and tab visibility/close behavior remain supported.
+
+- Closing Image Detection, Auto Click, Record, Script Executor or Remote Desktop now
+  releases its page controls. Hiding still preserves them. Reopening starts fresh
+  local state; the shared recorder and registry-owned TCP/WebSocket sessions survive
+  their views. Remote Desktop does not automatically reattach a reopened view, and
+  its page-owned WebRTC sessions are stopped in the background.
+
+- MCP read-only hints do not grant viewer access. Reviewed live-screen and caller-data tools use `read_screen`; stored files, device data and unknown tools require `read_data`. Aliases share canonical policy and stronger overrides take precedence. Optional image sources, environment-backed config fields and file open plans require `read_data`. Anchor locators permit live accessibility/OCR; image templates require `read_data` and VLM requests require `drive_input`. Read-only invocation rejects capture artifacts and VLM branches, and its catalogue excludes caller-selected ADB executables. MCP CI annotations return formatted lines without writing to stdout. Unreviewed plugin and WebRunner initialization tools are omitted from read-only catalogues and require dependency-specific review.
+
+- Host read-only mode applies the same restrictions to explicitly supplied registries and later registrations. Both admission and refreshed invocation check mixed arguments. Configured MCP failure screenshots require a writable tool and a refreshed caller with drive authority; readonly calls and viewers never trigger them. This does not promise that every dependency or diagnostic read has no initialization side effects.
+
 ## [1.2.0] - 2026-11-02
 
 Python 3.11 is now the minimum. Pillow 13.0.0 and dnspython 2.9.0, the releases that fix the advisories

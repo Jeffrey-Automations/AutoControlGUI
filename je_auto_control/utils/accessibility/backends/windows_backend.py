@@ -545,6 +545,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
 
     def wait_for_focus_change(self, timeout=5.0) -> Optional[Dict[str, Any]]:
         import queue
+        from je_auto_control.utils.accessibility.backends.windows_events import wait_for_event
         automation = self._ensure_automation()
         events: "queue.Queue" = queue.Queue()
         handler = self._make_focus_handler(events)
@@ -555,10 +556,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
                 automation.AddFocusChangedEventHandler(None, handler)
         except _UIA_ERRORS:
             return None
-        try:  # Queue.get(inf) raises OverflowError on Windows; None waits for good.
-            return events.get(timeout=None if float(timeout) == float("inf") else float(timeout))
-        except queue.Empty:
-            return None
+        try:
+            return wait_for_event(events, float(timeout))
         finally:
             with self._event_lock:
                 try:

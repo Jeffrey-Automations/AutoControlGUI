@@ -30,9 +30,20 @@ def long_press(x: int, y: int, duration_s: float = 1.0,
 def swipe(x1: int, y1: int, x2: int, y2: int,
           duration_s: float = 0.5,
           *, device: Optional[IOSDevice] = None) -> None:
-    """Linear swipe from ``(x1, y1)`` to ``(x2, y2)`` over ``duration_s``."""
+    """Swipe from ``(x1, y1)`` to ``(x2, y2)``; WebDriverAgent sets the travel speed.
+
+    facebook-wda's ``swipe(..., duration)`` is the press held at the start
+    point before moving (``/wda/dragfromtoforduration``), not the travel time,
+    and its own ``swipe_left`` and friends pass none. Handing ``duration_s``
+    over as a hold made every swipe press for half a second first, which iOS
+    can read as the start of a drag. So no hold is sent and ``duration_s`` is
+    accepted for the shared :class:`Swipe` gesture but has no effect here;
+    :func:`drag` is the gesture that holds.
+    """
+    if not float(duration_s) >= 0:   # NOSONAR S1940  # reason: also rejects NaN
+        raise ValueError("duration_s must be zero or positive")
     handle = (device or default_ios_device()).handle
-    handle.swipe(int(x1), int(y1), int(x2), int(y2), float(duration_s))
+    handle.swipe(int(x1), int(y1), int(x2), int(y2), 0)
 
 
 @translate_device_errors

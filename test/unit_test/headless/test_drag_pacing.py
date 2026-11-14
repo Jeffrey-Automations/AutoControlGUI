@@ -173,13 +173,13 @@ def test_the_executor_adapters_forward_the_pacing(timeline, monkeypatch):
 
 
 def test_the_mcp_handlers_forward_the_pacing(timeline, monkeypatch):
-    from je_auto_control.utils.mcp_server.tools import _handlers, _handlers_executor_bridge
+    from je_auto_control.utils.mcp_server.tools import _handlers, _handlers_desktop_executor
     monkeypatch.setattr(tween_module, "_default_sink", timeline.sink)
     monkeypatch.setattr(path_module, "_default_sink", timeline.sink)
     assert _handlers.tween_drag([0, 0], [10, 0], steps=1, settle_s=0.05) == {"points": 2}
     assert ("sleep", 0.05, None) in timeline.entries
     timeline.entries.clear()
-    _handlers_executor_bridge.drag_path([[0, 0], [5, 5]], per_segment_steps=1, step_delay_s=0.06)
+    _handlers_desktop_executor.drag_path([[0, 0], [5, 5]], per_segment_steps=1, step_delay_s=0.06)
     assert ("sleep", 0.06, None) in timeline.entries
 
 

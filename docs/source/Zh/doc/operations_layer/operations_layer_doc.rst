@@ -179,7 +179,7 @@ token 控制項。Python 伺服器的 ``token`` 屬性仍保留設定的共用 t
   結果掛鉤回報給 Script Builder，值則以路徑標示（``步驟 2 › Loop 第 3 次，步驟 1 ·
   User: Rotate Token · alice · token``）。一次執行最多保留 200 個值——保留最先
   產生的；超過時結果面板會註明。被停止或失敗的執行，仍可看到在那之前已經產生的值。
-  掛鉤只跟著執行本身的執行緒，所以 ``AC_parallel`` 分支裡的指令改由區塊的結果取得。
+  掛鉤也會跟到 ``AC_parallel`` 的分支，所以分支產生的 token 只會出現一次，並以分支標示。
   結果面板會遮蔽每個指令結果中、任何深度、名稱屬於機密的欄位（``token``、
   ``password``、``api_key``…）——``AC_lease_secret``／``AC_lease_active`` 的租約
   token、``AC_rest_api_start``／``AC_rest_api_status`` 回傳的共用 bearer token——
@@ -210,15 +210,14 @@ token 控制項。Python 伺服器的 ``token`` 屬性仍保留設定的共用 t
      - 端點
    * - ``read_screen``
      - viewer、operator、admin
-     - 觀察目前狀態的 ``GET`` 路由：``/screenshot``、``/mouse_position``、
-       ``/screen_size``、``/windows``、``/sessions``、``/commands``、``/jobs``、
-       ``/inspector/recent``、``/inspector/summary``、``/usb/devices``、
-       ``/usb/events``、``/usb/passthrough/status``、``/usb/loopback/devices``、
-       ``/usb/remote/devices``、``/diagnose``、``/metrics``、``/openapi.json``
+     - ``GET /screenshot``、``/mouse_position``、``/screen_size``、``/windows``、
+       ``/commands``、``/openapi.json``
    * - ``read_data``
      - operator、admin
-     - ``GET /history``、``GET /usb/acl``；以及回傳主機資料而非畫面的 MCP 工具
-       （見 MCP 章節）
+     - ``GET /history``、``/usb/acl``、``/jobs``、``/sessions``、
+       ``/usb/passthrough/status``、``/usb/loopback/devices``、
+       ``/usb/remote/devices``、``/diagnose``、``/usb/devices``、``/usb/events``、
+       ``/inspector/recent``、``/inspector/summary``、``/metrics``，及對應 MCP 主機資料讀取
    * - ``drive_input``
      - operator、admin
      - ``POST /execute``、``/execute_file``、``/usb/loopback/open``、
@@ -242,20 +241,30 @@ token 控制項。Python 伺服器的 ``token`` 屬性仍保留設定的共用 t
 ``{"error": "forbidden", "required_capability": "...", "role": "..."}``。
 同一個值也以 ``x-required-capability`` 列在 ``/openapi.json`` 的每個 operation 上。
 
-**保存的紀錄在 REST 與 MCP 都需要** ``read_data``\ **。** 回傳主機保存的紀錄或設定的
-路由需要 ``read_data``；觀察目前狀態的路由需要 ``read_screen``。``GET /history``\
-（執行歷史，與 MCP 工具 ``ac_list_run_history`` 相同）與 ``GET /usb/acl``\ （保存的
-USB ACL，與 ``ac_usb_acl_list`` 相同）以前只需要 ``read_screen``，所以\ **viewer 的
-token 現在在這兩個路由會得到 403**\ ；``operator`` 與 ``admin`` 不受影響，沒有使用者
-存放檔的伺服器也不受影響（共用 token 不受任何角色限制）。其餘 ``GET`` 的能力不變：
-有對應 MCP 工具的路由（``/jobs`` 與 ``ac_scheduler_list_jobs``、``/sessions`` 與
-``ac_remote_host_status``、``/usb/passthrough/status``、USB 裝置清單……）原本就與工具
-一致。有一個測試會把每個路由與讀取同一個來源的唯讀 MCP 工具配對，兩者不一致時失敗。
+**已審查的主機資料讀取在各入口都需要** ``read_data``。除了歷史與 USB ACL，
+還包括排程指令路徑、遠端 session 紀錄、USB passthrough 設定及 loopback／remote
+裝置清單。對應 REST 路由與讀取相同來源的 MCP 工具現在一致。``/diagnose`` 也需要
+``read_data``：檢查會讀取主機環境，並可能主動擷取畫面。viewer 在提供者執行前
+收到 403；operator／admin 及未使用使用者存放檔的共用 token 伺服器維持原存取權。
 
-內建的 dashboard 不會呼叫這兩個路由。token 的角色缺少某個面板需要的能力時——稽核
-面板需要 ``read_audit``——該面板現在顯示
-``not available to role '<角色>': needs the '<能力>' capability``，而不是
-``HTTP 403 on <路徑>``；其他面板照常更新。
+USB 列舉回傳裝置身分中繼資料，包括序號與 bus location；事件保留新增／移除紀錄。
+Inspector 端點回傳整個程序的 WebRTC 數值歷史與摘要，不依呼叫者區分。Metrics 回傳
+請求／驗證計數、稽核筆數、連線／排程數量及執行時間。這五個 REST 讀取需要
+``read_data``；metrics 的特殊文字回應入口會在查詢稽核、registry、scheduler 前檢查。
+``AC_list_usb_devices``、``AC_usb_recent_events``、``AC_inspector_recent`` 與
+``AC_inspector_summary`` 也會在執行提供者之前檢查相同資料權限。
+
+已註冊的 ``AC_probe_capabilities``、``AC_diagnose``、``AC_remote_host_status``、
+``AC_remote_viewer_status``、``AC_usb_passthrough_status``、``AC_usb_loopback_list``
+與 ``AC_usb_remote_list`` 也要求相同資料權限。被動能力探測仍讀取環境／PATH 與
+快取的後端中繼資料；不修改狀態不代表 viewer 有權讀取。授權 scope 外的可信 SDK
+直接呼叫維持原行為。本次審查沒有涵蓋所有未列入表格的 executor 指令；那些指令
+仍依賴接收請求入口的權限。
+
+Dashboard 保留功能，各面板分別顯示缺少的權限。診斷、session、inspector 與 USB 面板需要 ``read_data``，
+稽核需要 ``read_audit``；被拒面板清除舊資料，其他面板持續更新。
+session 重新整理成功後會清除先前的錯誤狀態。來源配對測試仍會
+拒絕 REST 與 MCP 的權限不一致。
 
 可以 ``POST /execute`` 代表可以執行動作，不代表可以執行每一個指令。替動作檔簽章
 （``sign_actions``）、讀取稽核紀錄（``read_audit``），以及管理主機本身的指令——
@@ -373,11 +382,18 @@ Headless::
 ``ok: false`` 附上錯誤回報；否則 ``ok`` 只代表主機有回應，動作失敗記在
 ``result`` 裡。DAG runner 的遠端節點與 Admin Console 分頁都會傳這個參數。
 
+每一列也以 ``sent`` 標明動作是否送到該主機。主機一次送 ``max_parallel`` 台；傳入
+``stop_event``\ （``threading.Event``）或在取消範圍內呼叫即可停止廣播：設定後尚未送出的主機
+會略過，該列為 ``sent: false``、``error`` 為 ``NOT_SENT_STOPPED``；已在傳送中的主機會執行完並回報結果。
+未知的標籤同樣是 ``sent: false``。
+
 持久化：主機儲存在 ``~/.je_auto_control/admin_hosts.json``\ （POSIX 上
 模式 0600）。建構時自動 reload。
 
 健康探測使用 ``/sessions``（已認證的端點），所以 token 錯誤的主機會
-顯示為 ``HTTP 401`` 不健康狀態，而非誤導性的「可達但無用」。
+顯示為 ``HTTP 401`` 不健康狀態，而非誤導性的「可達但無用」。``poll_all`` 與
+``fetch_thumbnails`` 也會遵守呼叫端的取消範圍：取消後尚未探測的主機會略過，
+已送出的請求回來後丟出 ``CancelledError``。
 
 Executor 指令::
 
@@ -385,7 +401,9 @@ Executor 指令::
    AC_admin_poll, AC_admin_broadcast_execute
 
 GUI：*Admin Console* 分頁 — 註冊主機表單、含健康/延遲/任務數欄位的
-主機表、廣播文字框。
+主機表、廣播文字框。\ **停止廣播**\ 會略過尚未送出的主機；結果仍列出每台主機，
+下方一行顯示「已送往 n／m 台主機；k 台未送出。」\ **停止輪詢**\ 會讓進行中的健康輪詢或縮圖更新
+停在正在處理的主機；兩者各有 60 秒期限，關閉分頁也會同樣結束它們。
 
 
 稽核紀錄雜湊鏈
@@ -476,6 +494,9 @@ pyusb 不存在則退回平台特定指令。
 - macOS：``system_profiler -json SPUSBDataType``\ （遞迴走訪）
 - Linux：``/sys/bus/usb/devices``\ （讀取 sysfs）
 
+命令列工具有 10 秒期限（``SUBPROCESS_TIMEOUT_S``），失敗或逾時會放在 ``result.error``。
+在取消範圍內呼叫時，取消會結束該工具的行程並拋出 ``CancelledError``。
+
 Headless::
 
    from je_auto_control.utils.usb import list_usb_devices
@@ -494,7 +515,7 @@ Executor 指令::
    AC_list_usb_devices
 
 GUI：*USB Devices* 分頁 — 後端標籤、裝置表格（VID/PID/廠商/產品/
-序號/位置）、重新整理按鈕。
+序號/位置）、重新整理按鈕。列舉在 GUI 執行緒之外執行；關閉分頁會結束仍在執行的列舉。
 
 Phase 2（真正的 USB passthrough）分階段發布 — 協定與 backend ABC 見
 :doc:`usb_passthrough_design`\ ，端到端使用方式見
@@ -673,3 +694,24 @@ Executor 指令::
 
 GUI：REST API 分頁的 *Export Config* / *Import Config* 兩顆按鈕，
 都帶檔案對話框與覆寫確認。
+
+WebRTC 軟體停止資源保管
+----------------------------------------------------------------------
+
+``WebRTCDesktopHost.stop()`` 與 ``WebRTCDesktopViewer.stop()`` 最多等待三秒。
+``utils.remote_desktop.webrtc_retirement`` 的 ``PeerStopPending`` 表示同一個保留的
+future 仍在執行；重試只會等待該 future，不另送 coroutine。``PeerStopFailed`` 表示
+操作已失敗；明確重試會處理剩餘資源。兩者都相容於 ``RuntimeError``。公開及非同步
+重新啟動入口會拒絕尚未完成的清理；延遲驗證關閉與 peer 回呼綁定原連線世代。
+
+一般資源錯誤不妨礙其他獨立清理步驟。失敗的子資源保留引用，影格工作必須真正
+結束才算軟體停止完成。``MultiViewerHost`` 保留失敗的 session 與共用畫面來源，
+直到停止呼叫成功；來源停止失敗期間禁止新增 session。
+``FolderSyncEngine.stop_confirmed()`` 請求取消、最多等待兩秒，再回報同一個工作
+執行緒是否已退出。``False`` 表示仍保留工作供後續觀測，不代表可啟動重疊工作。
+
+以上只承諾軟體操作完成，不證明所有底層原生資源已退出。媒體輔助類別仍可能吞掉
+內部裝置錯誤。取消檔案請求會通知原傳送器並等候工作執行緒實際退出；重複取消
+仍保留該工作及佇列名額。傳送器使用原呼叫情境，無法中斷的後端可能讓停止維持
+待完成；不保證強制中斷或行程結束時完成。後端尚未提供 GUI 頁面銷毀後的持久保管與明確重試；停止
+拋出例外時，呼叫端必須保留擁有者。

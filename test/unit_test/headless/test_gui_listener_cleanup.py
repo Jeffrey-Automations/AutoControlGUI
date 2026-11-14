@@ -42,8 +42,44 @@ def test_the_lan_browser_stops_however_the_dialog_ends(qapp, monkeypatch, ending
     dialog = LanBrowseDialog()
     getattr(dialog, ending)()
     assert _Browser.instances
-    assert _Browser.instances[0].stopped
     dialog.deleteLater()
+    # Closing joins zeroconf's thread, so it runs on a worker -- even once the dialog is gone.
+    from headless._qt_settle import pump_until
+    assert pump_until(lambda: _Browser.instances[0].stopped)
+
+
+def test_the_lan_browser_neither_keeps_the_dialog_alive_nor_loses_a_failed_stop(qapp, monkeypatch):
+    import gc
+    import weakref
+    from headless._qt_settle import pump_until
+    from je_auto_control.gui._stop_custody import stop_custody
+    from je_auto_control.utils.remote_desktop import lan_discovery
+    from je_auto_control.gui.remote_desktop.webrtc_dialogs import LanBrowseDialog
+
+    class _Stuck(_Browser):
+        def stop(self):
+            raise RuntimeError("media retirement incomplete: zeroconf close")
+
+    custody = stop_custody()
+    for record in custody.snapshot():
+        custody.forget(record.stop_id)
+    monkeypatch.setattr(lan_discovery, "HostBrowser", _Stuck)
+    monkeypatch.setattr(lan_discovery, "is_discovery_available", lambda: True)
+    _Browser.instances.clear()
+    dialog = LanBrowseDialog()
+    reference = weakref.ref(dialog)
+    browser = _Browser.instances[0]
+    dialog.reject()
+    dialog.deleteLater()
+    qapp.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+    del dialog
+    gc.collect()
+    assert reference() is None                       # the browser's callback did not hold it
+    browser.on_change({"late": {"host_id": "late"}})  # a report after the dialog is gone: dropped
+    assert pump_until(lambda: bool(custody.snapshot()))
+    assert "zeroconf close" in custody.snapshot()[0].error
+    for record in custody.snapshot():
+        custody.forget(record.stop_id)
 
 
 def test_a_destroyed_presence_tab_leaves_the_registry(qapp, monkeypatch):

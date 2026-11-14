@@ -161,6 +161,23 @@ jobs:
           python -m pytest -v --tb=short --timeout=30
           test/unit_test/headless/test_ci_native_diagnostics.py
 
+      # Windows leaves no core file, so a native crash (the freed-thread-state
+      # abort seen on 3.14.8) has shown only the Python lines faulthandler
+      # prints. Windows Error Reporting's LocalDumps writes a minidump of a
+      # crashed python.exe -- every thread's native stack -- into the folder
+      # the next steps retain, even when the suite fails.
+      - name: Keep native crash dumps (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dumps = Join-Path $env:RUNNER_TEMP 'autocontrol-native\dumps'
+          New-Item -ItemType Directory -Force -Path $dumps | Out-Null
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\python.exe'
+          New-Item -Path $key -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpFolder -PropertyType ExpandString -Value $dumps -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpType -PropertyType DWord -Value 1 -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpCount -PropertyType DWord -Value 5 -Force | Out-Null
+
       # Paths come from `testpaths` in pyproject.toml. Do NOT pass an explicit
       # path here: an argument overrides testpaths, which previously meant the
       # flow_control tests were configured to run but silently never did.

@@ -13,7 +13,7 @@ pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from je_auto_control.utils.remote_desktop.registry import registry  # noqa: E402
-from headless._qt_settle import settle  # noqa: E402
+from headless._qt_settle import settle, settle_op  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -88,11 +88,13 @@ def test_start_hosting_registers_host_and_refreshes_badge(qapp):
     try:
         screen._host_token.setText("ttt")  # noqa: SLF001
         screen._start_hosting()  # noqa: SLF001
+        assert settle_op(screen._host_op)  # noqa: SLF001  # the start / stop runs off the GUI thread
         assert registry.host is not None
         assert registry.host.is_running
         # Badge text updated from the idle placeholder to running text.
         assert "{port}" not in screen._host_badge.text()  # noqa: SLF001
         screen._stop_hosting()  # noqa: SLF001
+        assert settle_op(screen._host_op)  # noqa: SLF001  # the start / stop runs off the GUI thread
         assert registry.host is None
     finally:
         screen.deleteLater()
@@ -145,6 +147,7 @@ def test_publish_via_signaling_emits_host_handoff(qapp):
     try:
         screen._host_token.setText("ttt")  # noqa: SLF001
         screen._start_hosting()  # noqa: SLF001
+        assert settle_op(screen._host_op)  # noqa: SLF001  # the start / stop runs off the GUI thread
         captured = []
         screen.webrtc_host_handoff_requested.connect(
             lambda token, host_id: captured.append((token, host_id)),
@@ -158,6 +161,7 @@ def test_publish_via_signaling_emits_host_handoff(qapp):
         assert len(host_id) == 9
         assert host_id.isdigit()
         screen._stop_hosting()  # noqa: SLF001
+        assert settle_op(screen._host_op)  # noqa: SLF001  # the start / stop runs off the GUI thread
     finally:
         screen.deleteLater()
 
@@ -204,6 +208,7 @@ def test_approval_dialog_admits_when_operator_clicks_allow(qapp, monkeypatch):
     try:
         screen._host_token.setText("ttt")  # noqa: SLF001
         screen._start_hosting()  # noqa: SLF001
+        assert settle_op(screen._host_op)  # noqa: SLF001  # the start / stop runs off the GUI thread
         host = registry.host
         assert host is not None
         try:
@@ -235,6 +240,7 @@ def test_approval_dialog_admits_when_operator_clicks_allow(qapp, monkeypatch):
             viewer.disconnect(timeout=1.0)
         finally:
             screen._stop_hosting()  # noqa: SLF001
+            assert settle_op(screen._host_op)  # noqa: SLF001  # the start / stop runs off the GUI thread
     finally:
         screen.deleteLater()
     _ = cs_mod  # keep import for namespace stability
@@ -264,6 +270,7 @@ def test_approval_dialog_rejects_when_operator_clicks_deny(qapp, monkeypatch):
     try:
         screen._host_token.setText("ttt")  # noqa: SLF001
         screen._start_hosting()  # noqa: SLF001
+        assert settle_op(screen._host_op)  # noqa: SLF001  # the start / stop runs off the GUI thread
         host = registry.host
         assert host is not None
         try:
@@ -288,6 +295,7 @@ def test_approval_dialog_rejects_when_operator_clicks_deny(qapp, monkeypatch):
             assert "error" in captured
         finally:
             screen._stop_hosting()  # noqa: SLF001
+            assert settle_op(screen._host_op)  # noqa: SLF001  # the start / stop runs off the GUI thread
     finally:
         screen.deleteLater()
 

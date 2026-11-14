@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Sequence, Tuple, TypedDict
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 try:
-    import av  # type: ignore
+    import av
     import numpy as np
     from aiortc import (
         RTCConfiguration, RTCIceServer, RTCPeerConnection,
@@ -333,7 +333,7 @@ class ScreenVideoTrack(VideoStreamTrack):
         self._origin = (int(self._monitor.get("left", 0)), int(self._monitor.get("top", 0)))
         return self._monitor
 
-    def _timestamp(self) -> Tuple[int, fractions.Fraction]:
+    def _frame_timestamp(self) -> Tuple[int, fractions.Fraction]:
         """A 90 kHz timestamp from the wall clock.
 
         aiortc's ``next_timestamp()`` adds 1/30 s per frame and paces to 30
@@ -358,7 +358,7 @@ class ScreenVideoTrack(VideoStreamTrack):
             if sleep_for > 0:
                 await asyncio.sleep(sleep_for)
             self._last_emit = time.monotonic()
-        pts, time_base = self._timestamp()
+        pts, time_base = self._frame_timestamp()
         loop = asyncio.get_running_loop()
         monitor = self._resolve()
         frame_array = await loop.run_in_executor(

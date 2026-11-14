@@ -2,11 +2,12 @@
 from typing import Optional
 
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QMessageBox,
+    QFileDialog, QFormLayout, QLabel, QLineEdit, QListWidget, QMessageBox,
     QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -36,12 +37,14 @@ class PluginsTab(TranslatableMixin, QWidget):
         # Browse/load commands run from the Actions menu; the tab keeps
         # only the directory input, the command list, and the status.
         root = QVBoxLayout(self)
-        form = QHBoxLayout()
-        form.addWidget(self._tr(QLabel(), "pl_dir_label"))
-        form.addWidget(self._dir_input, stretch=1)
-        root.addLayout(form)
-        root.addWidget(self._tr(QLabel(), "pl_registered_label"))
-        root.addWidget(self._list, stretch=1)
+        root.setSpacing(12)
+        form = QFormLayout()
+        form.addRow(self._tr(QLabel(), "pl_dir_label"), self._dir_input)
+        root.addWidget(Card().add(form))
+        listing = Card().add(self._tr(QLabel(), "pl_registered_label")).add(self._list, stretch=1)
+        root.addWidget(listing, stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def menu_actions(self) -> list:

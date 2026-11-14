@@ -29,6 +29,7 @@ from je_auto_control.gui.remote_desktop._webrtc_types import MultiViewerHostT, S
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._slow_op import StopQueue
+from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui.remote_desktop._helpers import (
     _t,
 )
@@ -95,6 +96,7 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
+        self._view = ViewLifetime(self)
         self._multi_host: Optional[MultiViewerHostT] = None
         self._publish_loop: Optional[HostPublishLoopWorker] = None
         self._manual_session_id: Optional[str] = None
@@ -122,13 +124,13 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
             parent=self,
         )
         self._signals = _PanelSignals()
-        self._signals.state.connect(self._on_state)
-        self._signals.auth.connect(self._on_auth)
-        self._signals.pending_viewer.connect(self._on_pending_viewer)
-        self._signals.session_count.connect(self._on_session_count)
-        self._signals.viewer_video_frame.connect(self._on_viewer_video_image)
-        self._signals.annotation.connect(self._on_annotation_event)
-        self._signals.stats.connect(self._update_host_quality_dot)
+        self._signals.state.connect(self._view.callback("_on_state"))
+        self._signals.auth.connect(self._view.callback("_on_auth"))
+        self._signals.pending_viewer.connect(self._view.callback("_on_pending_viewer"))
+        self._signals.session_count.connect(self._view.callback("_on_session_count"))
+        self._signals.viewer_video_frame.connect(self._view.callback("_on_viewer_video_image"))
+        self._signals.annotation.connect(self._view.callback("_on_annotation_event"))
+        self._signals.stats.connect(self._view.callback("_update_host_quality_dot"))
         self._build_ui()
         self._refresh_trusted_list()
         self._update_availability()
@@ -146,7 +148,7 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         """Hand-off entry point used by the Quick Connect screen.
 
         Populates the signaling-flow fields so the operator can click
-        "Publish & wait for viewer" without retyping a token they
+        "Publish and wait for viewer" without retyping a token they
         already shared on the Quick Connect tab.
         """
         if token:
@@ -167,6 +169,7 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         for Stop, together with the signaling loop, the LAN advertiser, the
         offer or file push still out and the tray icon.
         """
+        self._view.retire()
         release_resources(self, self._stop_host_if_any, self._hide_tray)
 
     def _hide_tray(self) -> None:
@@ -241,6 +244,7 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
+        self._view = ViewLifetime(self)
         self._viewer: Optional[WebRTCDesktopViewerT] = None
         self._file_task: Optional[TaskHandle] = None       # the upload in progress, off-thread
         self._offer_worker: Optional[ViewerSignalingWorker] = None
@@ -269,13 +273,13 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
         # Set by _ensure_screen_window().
         self._screen_window: Optional[RemoteScreenWindow] = None
         self._signals = _PanelSignals()
-        self._signals.frame.connect(self._on_frame_image)
-        self._signals.state.connect(self._on_state)
-        self._signals.auth.connect(self._on_auth)
-        self._signals.stats.connect(self._on_stats)
-        self._signals.inbox_listing.connect(self._on_inbox_listing)
-        self._signals.inbox_op.connect(self._on_inbox_op_result)
-        self._signals.file_received.connect(self._on_file_received_ui)
+        self._signals.frame.connect(self._view.callback("_on_frame_image"))
+        self._signals.state.connect(self._view.callback("_on_state"))
+        self._signals.auth.connect(self._view.callback("_on_auth"))
+        self._signals.stats.connect(self._view.callback("_on_stats"))
+        self._signals.inbox_listing.connect(self._view.callback("_on_inbox_listing"))
+        self._signals.inbox_op.connect(self._view.callback("_on_inbox_op_result"))
+        self._signals.file_received.connect(self._view.callback("_on_file_received_ui"))
         self._build_ui()
         self._refresh_address_book()
         self._update_availability()
@@ -350,6 +354,7 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
         the pending reconnect, the signaling workers, the recording, the
         folder sync, the upload still out and the pop-out window go with it.
         """
+        self._view.retire()
         release_resources(self, self._end_session_for_good)
 
     def _end_session_for_good(self) -> None:

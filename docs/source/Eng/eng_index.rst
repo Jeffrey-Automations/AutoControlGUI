@@ -26,6 +26,7 @@ Comprehensive guides for all AutoControl features.
    doc/cli/cli_doc
    doc/create_project/create_project_doc
    doc/new_features/new_features_doc
+   doc/new_features/media_retirement_doc
    doc/new_features/v2_features_doc
    doc/new_features/healing_evaluation_doc
    doc/new_features/v3_features_doc
@@ -249,6 +250,7 @@ Comprehensive guides for all AutoControl features.
    doc/new_features/v221_features_doc
    doc/new_features/v222_features_doc
    doc/new_features/v223_features_doc
+   doc/new_features/v224_features_doc
    doc/mobile/mobile_doc
    doc/ocr_backends/ocr_backends_doc
    doc/observability/observability_doc

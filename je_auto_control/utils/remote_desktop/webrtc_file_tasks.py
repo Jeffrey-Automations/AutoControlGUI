@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 from concurrent.futures import CancelledError
+from contextvars import copy_context
 from dataclasses import dataclass, field
 from functools import partial
 from threading import Event
@@ -82,7 +83,9 @@ async def push_requested_file(sender: _Push, path: str, name: str, active: Calla
     try:
         if cancelled():
             return
-        await asyncio.to_thread(sender, path, remote_name=name, cancelled=cancelled)
+        work = partial(copy_context().run, sender, path, remote_name=name, cancelled=cancelled)
+        worker = asyncio.get_running_loop().run_in_executor(None, _sender_outcome, work, stop)
+        await _observe_sender(worker, stop)
     except CancelledError:
         return  # This owned background request has no separate caller waiting for its cancellation.
     except (OSError, RuntimeError, ValueError) as error:
@@ -91,6 +94,33 @@ async def push_requested_file(sender: _Push, path: str, name: str, active: Calla
             failed(str(error))
     finally:
         stop.set()
+
+
+def _sender_outcome(work: Callable[[], None], stop: Event) -> Optional[BaseException]:
+    """Carry provider failures as values so shield cancellation cannot lose their observation."""
+    try:
+        if not stop.is_set():
+            work()
+    except BaseException as error:  # reason: transfer the original worker outcome to its owning request
+        return error
+    return None
+
+
+async def _observe_sender(worker: asyncio.Future[Optional[BaseException]], stop: Event) -> None:
+    """Keep the original worker owned until it exits, even after repeated cancellation."""
+    interruption: Optional[asyncio.CancelledError] = None
+    while not worker.done():
+        try:
+            await asyncio.shield(worker)
+        except asyncio.CancelledError as error:  # NOSONAR python:S7497  # reason: re-raised below once the worker exits
+            if interruption is None:
+                interruption = error
+            stop.set()
+    if interruption is not None:
+        raise interruption
+    outcome = worker.result()
+    if outcome is not None:
+        raise outcome
 
 
 def file_request_failure(channel: Optional[_Channel], name: str,

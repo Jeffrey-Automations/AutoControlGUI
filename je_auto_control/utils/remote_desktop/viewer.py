@@ -398,16 +398,18 @@ class RemoteDesktopViewer:
         return self._file_receiver
 
     def send_file(self, source_path: str, dest_path: str,
-                  on_progress=None):
+                  on_progress=None, *, cancelled=None):
         """Stream ``source_path`` to ``dest_path`` on the host.
 
         Returns the :class:`FileSendResult`. Synchronous: callers wanting
-        a non-blocking upload should run this in a worker thread.
+        a non-blocking upload should run this in a worker thread. It stops at
+        the next chunk once ``cancelled()`` is true, or once the calling
+        thread's cancellation scope is cancelled (see :func:`send_file`).
         """
         if not self._connected or self._channel is None:
             raise ConnectionError(_NOT_CONNECTED_MESSAGE)
         return send_file(self._channel, source_path, dest_path,
-                         on_progress=on_progress)
+                         on_progress=on_progress, cancelled=cancelled)
 
     def _handle_file_payload(self, msg_type: MessageType,
                              payload: bytes) -> None:

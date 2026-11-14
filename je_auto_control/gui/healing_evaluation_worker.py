@@ -6,8 +6,6 @@ from dataclasses import dataclass
 from threading import Event
 from typing import Literal, Optional
 
-from PySide6.QtCore import QObject, Signal, Slot
-
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.secret_scope import scrub_secret_text
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
@@ -26,19 +24,15 @@ class HealingEvaluationOutcome:
     error: str = ""
 
 
-class HealingEvaluationWorker(QObject):
-    """Perform local comparison off the GUI thread with cooperative checkpoints."""
-
-    finished = Signal(object)
+class HealingEvaluationWorker:
+    """One local comparison: built on the GUI thread, called off it with cooperative checkpoints."""
 
     def __init__(self, request_id: int, path: str) -> None:
-        super().__init__()
         self._request_id, self._path = request_id, path
         self._stop = Event()
         self._context = copy_context()
         self._authority = DeferredAuthorization.capture()
 
-    @Slot()
     def request_stop(self) -> None:
         """Request stop between file reads and comparison pairs without blocking Qt."""
         self._stop.set()
@@ -47,10 +41,10 @@ class HealingEvaluationWorker(QObject):
         if self._stop.is_set():
             raise CancelledError()
 
-    @Slot()
-    def run(self) -> None:
-        """Emit a terminal outcome under the captured caller context."""
-        self.finished.emit(self._context.run(self._evaluate))
+    def __call__(self, stop_event: Event) -> HealingEvaluationOutcome:
+        """Return a terminal outcome under the captured caller context; ``stop_event`` stops it."""
+        self._stop = stop_event
+        return self._context.run(self._evaluate)
 
     def _evaluate(self) -> HealingEvaluationOutcome:
         try:

@@ -53,7 +53,7 @@ def test_a_zero_interval_is_refused(monkeypatch):
     monkeypatch.setattr(tab.QMessageBox, "warning", lambda *args: warned.append(args[-1]))
     stub = types.SimpleNamespace(interval_input=_Text("0"),
                                  timer=types.SimpleNamespace(start=lambda: started.append(1)))
-    tab.AutoClickTabMixin._start_auto_click(stub)
+    tab.AutoClickTab._start_auto_click(stub)
     assert warned
     assert not started
 
@@ -155,10 +155,13 @@ def test_a_recording_that_does_not_start_is_reported(monkeypatch):
     warned = []
     monkeypatch.setattr(tab.QMessageBox, "warning", lambda *args: warned.append(args[-1]))
     monkeypatch.setattr(tab, "record", lambda: False)
-    stub = types.SimpleNamespace(_record_status_key="record_idle", _apply_record_status_label=lambda: None)
-    tab.RecordTabMixin._start_record(stub)
+    _app()
+    stub = tab.RecordTab()
+    stub._start_record()
+    assert settle(stub._work, "task")
     assert warned
-    assert stub._record_status_key == "record_idle"
+    assert stub._record_status_key != "record_recording"
+    stub.deleteLater()
 
 
 def test_a_template_is_cropped_into_a_non_ascii_folder(monkeypatch, tmp_path):

@@ -205,8 +205,8 @@ surface, each of which needs the ``manage_users`` capability:
   Rotate Token · alice · token``). At most 200 values are kept for one run
   -- the first ones; the result pane says when a run issued more. A run
   that was stopped or failed still offers what it had issued by then. The
-  hook follows the run's own thread, so a command in an ``AC_parallel``
-  branch is offered from the block's result instead. The pane masks every
+  hook follows ``AC_parallel`` branches too, so a token a branch issued is
+  offered once, labelled by its branch. The pane masks every
   secret-named field (``token``, ``password``, ``api_key``...) of every
   command's result at any depth -- a lease token from ``AC_lease_secret`` /
   ``AC_lease_active``, the shared bearer token ``AC_rest_api_start`` /
@@ -241,16 +241,15 @@ rotated token or a changed role applies to the next request.
      - Endpoints
    * - ``read_screen``
      - viewer, operator, admin
-     - the ``GET`` routes that observe live state: ``/screenshot``,
-       ``/mouse_position``, ``/screen_size``, ``/windows``, ``/sessions``,
-       ``/commands``, ``/jobs``, ``/inspector/recent``, ``/inspector/summary``,
-       ``/usb/devices``, ``/usb/events``, ``/usb/passthrough/status``,
-       ``/usb/loopback/devices``, ``/usb/remote/devices``, ``/diagnose``,
-       ``/metrics``, ``/openapi.json``
+     - ``GET /screenshot``, ``/mouse_position``, ``/screen_size``, ``/windows``,
+       ``/commands``, ``/openapi.json``
    * - ``read_data``
      - operator, admin
-     - ``GET /history``, ``GET /usb/acl``; the MCP tools that return the
-       host's data rather than its screen (see the MCP chapter)
+     - ``GET /history``, ``/usb/acl``, ``/jobs``, ``/sessions``,
+       ``/usb/passthrough/status``, ``/usb/loopback/devices``,
+       ``/usb/remote/devices``, ``/diagnose``, ``/usb/devices``, ``/usb/events``,
+       ``/inspector/recent``, ``/inspector/summary``, ``/metrics``;
+       matching MCP host-data reads
    * - ``drive_input``
      - operator, admin
      - ``POST /execute``, ``/execute_file``, ``/usb/loopback/open``,
@@ -275,24 +274,36 @@ A role that lacks the capability gets ``403``
 The same value is published per operation as ``x-required-capability`` in
 ``/openapi.json``.
 
-**Stored records need** ``read_data`` **on REST as on MCP.** A route that
-returns records or configuration the host keeps needs ``read_data``; a route
-that observes live state needs ``read_screen``. ``GET /history`` (the run
-history, as the MCP tool ``ac_list_run_history``) and ``GET /usb/acl`` (the
-stored USB ACL, as ``ac_usb_acl_list``) needed only ``read_screen`` before, so
-**a viewer token is now answered 403 on those two routes**; ``operator`` and
-``admin`` are unaffected, and so is a server without a user store (the shared
-token is not restricted by any role). Every other ``GET`` keeps its
-capability: each one that has an MCP counterpart (``/jobs`` and
-``ac_scheduler_list_jobs``, ``/sessions`` and ``ac_remote_host_status``,
-``/usb/passthrough/status``, the USB device lists...) already needed what its
-tool needs. A test pairs each route with the read-only MCP tools whose
-handler reads the same source and fails when the two disagree.
+**Audited host-data reads require** ``read_data`` **across surfaces.** Besides
+history and the USB ACL, this includes scheduler job paths, remote-session records,
+USB passthrough configuration and loopback/remote device inventories. Their REST
+routes now match the MCP tools reading the same sources. ``/diagnose`` also requires
+``read_data``: its checks inspect the host environment and can actively capture.
+A viewer receives 403 before a provider runs; operator/admin and shared-token
+servers without a user store retain their existing access.
 
-The built-in dashboard calls neither route. With a token whose role lacks a
-panel's capability -- the audit panel needs ``read_audit`` -- that panel now
-says ``not available to role '<role>': needs the '<capability>' capability``
-instead of ``HTTP 403 on <path>``, and the other panels keep refreshing.
+USB enumeration returns device identity metadata, including serial and bus location;
+USB events retain add/remove records. Inspector endpoints return process-wide numeric
+WebRTC history and summaries, not a caller-scoped stream. Metrics expose aggregate
+request/authentication counters, audit-row count, active-session/job counts and uptime.
+These five REST reads require ``read_data``. Metrics checks authorization on its
+special text-response path before querying audit, registry or scheduler providers.
+``AC_list_usb_devices``, ``AC_usb_recent_events``, ``AC_inspector_recent`` and
+``AC_inspector_summary`` enforce the same data requirement before provider dispatch.
+
+The registered commands ``AC_probe_capabilities``, ``AC_diagnose``,
+``AC_remote_host_status``, ``AC_remote_viewer_status``, ``AC_usb_passthrough_status``,
+``AC_usb_loopback_list`` and ``AC_usb_remote_list`` enforce the same data authority.
+Passive capability probing still reads environment/PATH and cached backend metadata;
+being non-mutating does not make that metadata viewer-authorized. Direct trusted SDK
+calls outside an authorization scope retain their existing behavior. This audit does
+not classify all unlisted executor commands: those still rely on their entry surface.
+
+Dashboard panels retain their functionality and independently display missing
+capabilities. Diagnostics, sessions, inspector and USB panels require ``read_data``; audit requires
+``read_audit``. Refused panels clear their rows while other panels keep refreshing.
+A successful session refresh clears any previous error status.
+The source-pairing regression continues to reject REST/MCP policy disagreements.
 
 Being allowed to ``POST /execute`` is being allowed to run actions, not every
 command. Signing an action file (``sign_actions``), reading the audit log
@@ -422,12 +433,23 @@ action and report ``ok: false`` with the error; otherwise ``ok`` only means
 the host answered, and action failures are recorded inside ``result``. The
 DAG runner's remote nodes and the Admin Console tab both pass it.
 
+Every row also says in ``sent`` whether the actions went to that host. Hosts
+are sent to ``max_parallel`` at a time; pass ``stop_event`` (a
+``threading.Event``), or call inside a cancellation scope, to stop a
+broadcast: once it is set, a host not sent to yet is skipped with
+``sent: false`` and ``error`` ``NOT_SENT_STOPPED``, and a host already being
+sent to finishes and reports its result. An unknown label is ``sent: false`` as
+well.
+
 Persistence: hosts are saved to ``~/.je_auto_control/admin_hosts.json``
 (mode 0600 on POSIX). Reload happens automatically on construction.
 
 Health probe uses ``/sessions`` (an authenticated endpoint), so a host
 with the wrong token shows up as unhealthy with an ``HTTP 401`` error
-rather than a misleading "reachable but useless" status.
+rather than a misleading "reachable but useless" status. ``poll_all`` and
+``fetch_thumbnails`` observe the caller's cancellation scope too: once it is
+cancelled, the hosts not reached yet are skipped and ``CancelledError`` is
+raised when the requests already out have returned.
 
 Executor commands::
 
@@ -435,7 +457,11 @@ Executor commands::
    AC_admin_poll, AC_admin_broadcast_execute
 
 GUI: *Admin Console* tab — register host form, hosts table with
-health/latency/jobs columns, broadcast textarea.
+health/latency/jobs columns, broadcast textarea. **Stop broadcast** skips the
+hosts not sent to yet; the results still list every host, and the line under
+them reads *Sent to n of m hosts; k not sent.* **Stop polling** ends a health
+poll or a thumbnail round still out at the hosts in flight; each has a 60 s
+deadline, and closing the tab ends them the same way.
 
 
 Audit log hash chain
@@ -532,6 +558,10 @@ Backends:
 - macOS: ``system_profiler -json SPUSBDataType`` (recursive walk)
 - Linux: ``/sys/bus/usb/devices`` (sysfs read)
 
+A command-line tool gets 10 seconds (``SUBPROCESS_TIMEOUT_S``); a failure or
+timeout comes back as ``result.error``. Called inside a cancellation scope,
+cancelling ends the tool's process and raises ``CancelledError``.
+
 Headless::
 
    from je_auto_control.utils.usb import list_usb_devices
@@ -550,7 +580,8 @@ Executor command::
    AC_list_usb_devices
 
 GUI: *USB Devices* tab — backend label, devices table (VID/PID/
-manufacturer/product/serial/location), refresh button.
+manufacturer/product/serial/location), refresh button. The listing runs off
+the GUI thread; closing the tab ends a listing still running.
 
 Phase 2 (actual USB passthrough) ships in stages — see
 :doc:`usb_passthrough_design` for the protocol + backend ABCs and
@@ -742,3 +773,31 @@ Executor commands::
 
 GUI: *Export Config* / *Import Config* buttons on the REST API tab,
 both with file dialogs and overwrite-confirmation dialogs.
+
+WebRTC software stop ownership
+----------------------------------------------------------------------
+
+``WebRTCDesktopHost.stop()`` and ``WebRTCDesktopViewer.stop()`` wait up to three
+seconds. ``PeerStopPending`` (from ``utils.remote_desktop.webrtc_retirement``)
+means the same retained future is still running; retrying waits on that future
+without submitting another coroutine. ``PeerStopFailed`` means a terminal failure;
+explicit retry attempts remaining resources. Both are ``RuntimeError`` compatible.
+Public and asynchronous restart paths refuse unfinished retirement. Delayed auth
+shutdown and peer callbacks remain bound to the original peer generation.
+
+Independent cleanup steps still run after an ordinary resource error. Failed child
+references remain owned, and owned frame tasks must actually finish before the
+software stop completes. ``MultiViewerHost`` retains failed child sessions and the
+shared screen source until their stop calls succeed; source failure blocks new
+sessions. ``FolderSyncEngine.stop_confirmed()`` requests cancellation, waits at most
+two seconds and returns whether that exact worker has exited. ``False`` retains the
+worker for later observation; it is not permission to start an overlapping worker.
+
+These are software completion contracts, not proof that every underlying native
+resource has retired. Media helpers may still suppress internal device errors.
+File-request cancellation signals the original sender and waits for its actual worker
+completion. Repeated cancellation retains that worker and its queue slot until it exits.
+The sender runs with the original context; an uninterruptible backend can leave stop
+pending. This does not guarantee hard interruption or completion at process shutdown.
+Durable ownership and explicit retry after GUI page destruction are not yet supplied
+by these backend changes; callers must retain an owner when stop raises.

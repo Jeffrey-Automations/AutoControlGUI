@@ -9,6 +9,8 @@ import os
 from dataclasses import replace
 from typing import Callable, Dict, List, Optional
 
+from je_auto_control.utils.rbac.tool_classification import TOOL_ALIASES
+
 from je_auto_control.utils.mcp_server.tools._base import (
     MCPContent, MCPTool, MCPToolAnnotations, MCPToolDescriptor, MCPToolResult, read_only_env_flag,
 )
@@ -20,27 +22,7 @@ from je_auto_control.utils.mcp_server.tools.plugin_tools import (
 
 # Short, model-friendly aliases for the most-used tools. Each alias is
 # registered as an additional MCPTool entry pointing at the same handler.
-_DEFAULT_ALIASES: Dict[str, str] = {
-    "click": "ac_click_mouse",
-    "move_mouse": "ac_set_mouse_position",
-    "mouse_pos": "ac_get_mouse_position",
-    "scroll": "ac_mouse_scroll",
-    "type": "ac_type_text",
-    "press": "ac_press_key",
-    "hotkey": "ac_hotkey",
-    "screenshot": "ac_screenshot",
-    "screen_size": "ac_screen_size",
-    "find_image": "ac_locate_image_center",
-    "find_text": "ac_locate_text",
-    "click_text": "ac_click_text",
-    "drag": "ac_drag",
-    "list_windows": "ac_list_windows",
-    "focus_window": "ac_focus_window",
-    "wait_image": "ac_wait_for_image",
-    "wait_pixel": "ac_wait_for_pixel",
-    "diff_screens": "ac_diff_screenshots",
-    "shell": "ac_shell",
-}
+_DEFAULT_ALIASES = TOOL_ALIASES
 
 
 #: The canonical tools behind the aliases: the handful most sessions need.
@@ -99,7 +81,8 @@ def build_default_tool_registry(read_only: Optional[bool] = None,
         tools.extend(tool if tool.category else replace(tool, category=category)
                      for tool in factory())
     if enforce_read_only:
-        tools = [tool for tool in tools if tool.annotations.read_only]
+        from je_auto_control.utils.mcp_server.tools._readonly import readonly_tools
+        tools = readonly_tools(tools)
     if _aliases_enabled(aliases):
         tools.extend(_make_aliases(tools))
     return tools

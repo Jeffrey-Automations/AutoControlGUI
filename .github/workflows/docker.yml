@@ -68,6 +68,10 @@ jobs:
           cache-from: type=gha
 
       # Mount the repo so pytest can read tests + write the artifact.
+      # Under gdb through the same runner the pytest-headless jobs use, and
+      # with faulthandler on for the whole process: a crash after pytest has
+      # finished (interpreter shutdown) otherwise leaves nothing but
+      # "Segmentation fault" in the log. -v so a crash mid-suite names its test.
       - name: Run headless tests under Xvfb
         run: |
           docker run --rm \
@@ -76,8 +80,10 @@ jobs:
             --entrypoint /bin/sh \
             autocontrol:ci -c "
               pip install --no-cache-dir -r dev_requirements.txt &&
+              apt-get update && apt-get install -y --no-install-recommends gdb &&
               xvfb-run -a -s '-screen 0 1280x800x24' \
-                python -m pytest -q --tb=short
+                python scripts/ci_native_diagnostics.py --artifact-dir /tmp/autocontrol-native --native -- \
+                python -X faulthandler -m pytest -v --tb=short
             "
 
       - name: Smoke test the entrypoint (rest mode)

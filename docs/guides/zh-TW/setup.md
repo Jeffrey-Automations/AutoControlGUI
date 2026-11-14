@@ -13,7 +13,7 @@ pip install je_auto_control[gui]       # 加上 PySide6 桌面應用程式
 
 | Extra | 啟用的功能 |
 |---|---|
-| `gui` | PySide6 桌面應用程式（51 個分頁）：左側可搜尋的導覽面板（`Ctrl+K`）依分類列出全部功能，分頁在第一次開啟時才建立，**View → Theme** 切換深色／淺色。窄視窗的內容可捲動；關閉視窗時，主題、字級、導覽面板顯示（`Ctrl+B`）與寬度會存入 `~/.je_auto_control/gui.ini`。主題直接使用 Qt，不需要 `qt-material`。 |
+| `gui` | PySide6 桌面應用程式（51 個分頁）：左側可搜尋的導覽面板（`Ctrl+K`）依分類列出全部功能，分頁在第一次開啟時才建立（啟動時開著的三個分頁只先建立 Record；Script Builder 與 Remote Desktop 在第一次被選取時才建立），**View → Theme** 切換深色／淺色。窄視窗的內容可捲動；關閉視窗時，主題、字級、導覽面板顯示（`Ctrl+B`）與寬度會存入 `~/.je_auto_control/gui.ini`。主題直接使用 Qt，不需要 `qt-material`。 |
 | `webrtc` | WebRTC 遠端桌面、USB 直通（`aiortc`、`av`） |
 | `signaling` | 獨立的訊令／rendezvous 伺服器（`fastapi`、`uvicorn`） |
 | `discovery` | mDNS / Zeroconf 區網主機探索 |
@@ -21,7 +21,7 @@ pip install je_auto_control[gui]       # 加上 PySide6 桌面應用程式
 | `fuzzy` / `locale` | `rapidfuzz` 模糊比對、`babel` 地區解析 |
 | `s3` / `audio` | S3 產出物儲存、系統音量控制 |
 
-以分頁關閉鈕關閉 factory 建立的功能面板時，下一次 Qt event loop 會釋放 widget、訂閱與計時器；重新開啟會建立新面板。**View → Tabs** 與嵌入用的 `hide_tab` 只隱藏並保留狀態。`tab_registry.open/close` 與 `close_tab` 提供明確的生命週期介面。既有的擁有者表單與 Remote Desktop 在生命週期遷移完成前，關閉後仍保留以供重用。
+以分頁關閉鈕關閉 factory 建立的功能面板時，下一次 Qt event loop 會釋放 widget、訂閱與計時器；重新開啟會建立新面板。**View → Tabs** 與嵌入用的 `hide_tab` 只隱藏並保留狀態。`tab_registry.open/close` 與 `close_tab` 提供明確的生命週期介面。核心分頁與 Remote Desktop 也會在關閉時釋放。共用 registry 的 TCP／WebSocket 連線仍可供腳本使用；頁面擁有的 WebRTC 連線在背景停止。重開會建立新控制項，不自動接回既有連線；待處理核准與晚到頁面回呼會被拒絕。嵌入者直接提供的 widget 維持其既有所有權契約。
 
 **Windows arm64** 裝得起來也跑得起來，少的是上游在那裡發不出來的那些：
 `opencv-python` 與 `cryptography` 都沒發 `win_arm64` wheel。所以 `find_image*`、
@@ -292,3 +292,9 @@ AutoControl 讀取的每一個環境變數。這裡沒有任何一項是必填�
 | `JE_AUTOCONTROL_PYTEST_ARTIFACTS` | `./autocontrol_screenshots` | 測試沒有使用 `autocontrol_screenshot_dir` fixture 時，pytest 外掛寫入失敗截圖的目錄。 |
 
 ---
+
+Report 分頁在首次開啟時建立。關閉會釋放控制項與本機結果畫面；重新開啟會建立新頁面並讀取目前錄製狀態。關閉分頁不會停用共用 recorder。
+
+Screenshot 分頁同樣在首次開啟時建立，關閉時釋放。螢幕尺寸查詢、截圖與像素讀取會在背景執行，顯示執行中狀態，每次接受一項工作，並使用啟動時的輸入值。關閉後丟棄晚到結果；已開始的截圖仍可能寫入檔案。隱藏會保留頁面。選區與瀏覽檔案仍須由使用者明確操作。
+
+報表在背景產生並顯示執行中狀態。每個分頁一次接受一個產生工作，使用開始時輸入的名稱。關閉會丟棄晚到結果；已開始的檔案寫入仍可能完成。

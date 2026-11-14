@@ -35,7 +35,23 @@ python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 - 透過 MCP 連接 AI 用戶端，或透過 REST 與 Python 整合。
 - 在選配 GUI 中使用錄製、排程與遠端桌面工具。
 
+影像偵測分頁在背景執行比對，並有自己的滑鼠按鍵選擇。
+Actions 選單可停止待完成的搜尋；關閉分頁會丟棄晚到結果，重新開啟會重設輸入欄位。
+取消可阻止後續移動與點擊步驟，但無法中斷已進入的原生呼叫。
+
+自動點擊、錄製與腳本執行分頁各自持有控制項與背景工作；關閉會停止本頁工作，重開會建立新的輸入欄位。共用錄製器不隨分頁關閉，重開後會讀取後端狀態，不支援查詢時顯示未知；此狀態不代表原生掛鉤健康檢查。Ctrl+4 仍可停止腳本與自動點擊。
+
+啟動時開著的三個分頁只先建立 Record；Script Builder 與 Remote Desktop 在第一次被選取時才建立，啟動時間與記憶體約減半。
+
+View → 執行詳情（Ctrl+Shift+D）可展開右側詳情。診斷分頁會提供實際進度、停止、結果與錯誤狀態，其他在背景執行工作的分頁（模型請求、USB 列舉、廣播、DAG 執行、日誌讀取）也會：執行中、停止中，然後是完成、已取消或錯誤，工作有回報進度時一併顯示。尚未執行過工作的分頁會明確顯示沒有詳情。背景停止失敗時（頁面放開的連線、錄影或主機）會被保留而不只記錄日誌：診斷分頁列出每一個及其錯誤，Actions › 重試失敗的停止 會以排入時的權限再次執行。切換或關閉分頁會斷開其更新。嵌入程式可將 TabRegistry 傳入 WorkspaceShell；AutoControlGUIWidget(parent) 仍可使用。
+
+每個分頁開頭都有標題與一行用途說明，控制項依用途分組在卡片上；核取方塊與選項按鈕以主題強調色繪製，深色主題下也看得清楚。控制項會隨視窗縮小，不再撐寬頁面：下拉選單不再以最長項目決定寬度，表單欄位放不下時標籤移到欄位上方，長說明會自動換行。空的表格、清單或樹狀清單會顯示「目前沒有內容。」，直到第一筆資料出現，不再只顯示空白格線。頁面標題下方的橫幅會說明該頁上次執行失敗（下次執行時清除），GUI 在 RBAC 範圍內執行時也會說明目前角色無法執行該頁的哪些指令；橫幅附有關閉連結。視窗會依寬度重新排列：1,200 px 以上，導覽與執行詳情並排在分頁兩側；較窄時詳情改為覆蓋在分頁上的抽屜；800 px 以下導覽縮成窄圖示欄，按其選單鈕或 Ctrl+K 以抽屜開啟功能清單（Escape 或點擊旁邊即關閉）。因寬度隱藏導覽不會改動已儲存的偏好。
+
+WebRTC 統計輪詢在背景啟動，停止後會捨棄晚到的樣本。
+
 Windows、macOS、X11 與 Wayland 使用不同後端，實際功能取決於系統權限與選配依賴。Windows ARM64 另有限制，部署前請先閱讀安裝文件。
+
+Wayland NORMAL 輸入透過受管理的子程序執行 libei 與 portal 呼叫。逾時、取消或回覆不確定時會退役該程序，不重播輸入或自動切換供應者。直接使用 `LibeiBackend` 仍在呼叫端程序內執行；子程序退役不代表合成器已釋放輸入，原生驗收仍待執行。
 
 受管理的 Agent 任務與跨主機傳輸包含實驗性功能；採用前請查看實作紀錄與專案進度中的驗收狀態。
 
@@ -54,3 +70,25 @@ Windows、macOS、X11 與 Wayland 使用不同後端，實際功能取決於系�
 ## License
 
 [MIT](../LICENSE) © JE-Chen. [Third-party licenses](../Third_Party_License.md).
+
+關閉 Remote Desktop 會釋放頁面；重新開啟會建立新控制項，不自動接回共用連線。Registry 的 TCP／WebSocket 連線仍可供腳本使用；頁面擁有的 WebRTC 連線與音訊在背景停止。待處理核准會拒絕，延遲回呼會丟棄。已在傳送中的檔案傳輸會在頁面關閉、連線被放掉或上傳取消時於下一個區塊停止，主機會丟棄未完成的檔案（TCP、WebSocket 與 WebRTC 皆同）。
+
+WebRTC host/viewer 的 `stop()` 最多等待三秒完成軟體清理。`PeerStopPending` 保留同一個尚未完成的操作；明確重試只會繼續等待。`PeerStopFailed` 保留清理失敗的資源供明確重試，成功前禁止重新啟動。Multi-viewer host 保留失敗的 session 與共用來源。`FolderSyncEngine.stop_confirmed()` 在原工作執行緒仍存活時回傳 `False`。這些結果不代表原生裝置已釋放；頁面銷毀後的復原仍需持久資源保管與重試整合。
+
+主機檔案請求會保留原傳送工作，直到工作執行緒退出，重複停止也不會提前釋放所有權。停止會通知取消並等候原工作；無法中斷的後端操作仍可能讓停止維持待完成。
+
+MCP 唯讀標記不授予 viewer 存取權。已審查的即時畫面與呼叫者資料運算使用 `read_screen`；檔案、裝置資料及未知工具需要 `read_data`。別名共用標準名稱的權限，較強的明確設定優先。提供影像來源、從環境變數讀取設定欄位或規劃開啟本機檔案時需要 `read_data`。Anchor locator 的 accessibility／OCR 允許觀測即時畫面，影像範本需要 `read_data`，VLM 請求需要 `drive_input`。唯讀呼叫拒絕擷取產物及 VLM 分支，目錄排除可自選 ADB 執行檔的工具。MCP CI annotations 只回傳格式化文字，不寫入 stdout。未審查的 plugin 與 WebRunner 初始化工具不列入唯讀目錄，等待相依版本的個別審查。
+
+MCP 的 `tools/call` 以可停止的執行進行，列為 `mcp-…`。`notifications/cancelled` 會停掉它：`ac_execute_actions` 的動作清單在下一個動作前停下，`ac_wait_for_image`／`ac_wait_for_pixel` 在輪詢中途醒來；該次呼叫以 `-32800` 回覆。`ac_stop_execution` 與其他停止請求以同樣方式結束它，回報為工具錯誤。已經進到後端的單一指令仍會先跑完。
+
+REST 主機資料讀取與對應 MCP 權限一致：排程、遠端 session、USB passthrough 狀態、loopback／remote 裝置清單及診斷需要 `read_data`。對應已註冊的狀態指令、`AC_probe_capabilities` 與 `AC_diagnose` 會在執行提供者之前檢查權限。唯讀標記不授予 viewer 存取權；operator／admin 仍可使用。USB 列舉／事件、保留的 inspector 統計與程序 metrics 也需要 `read_data`；`AC_list_usb_devices`、`AC_usb_recent_events`、`AC_inspector_recent`、`AC_inspector_summary` 同樣檢查此權限。Dashboard 各面板分別顯示缺少的權限並清除舊資料；session 重新整理成功後也會清除先前的錯誤狀態。未列入權限表格的 executor 指令仍屬另一項審查範圍。
+
+主機唯讀模式對外部提供的目錄及後續註冊套用相同限制，接收請求及重新核對身分後的呼叫都檢查混合用途參數。MCP 設定的失敗截圖需要可寫入的工具及重新核對後具輸入操作權限的呼叫者；唯讀呼叫與 viewer 不會觸發截圖。這不表示所有相依套件或診斷讀取均無初始化副作用。
+
+內部 Windows 行程記憶體準備工作新增映像檔量測，透過保留的唯讀 handle 執行有界雜湊並保留失敗清理供重試。這只是觀測到的檔案證據，不是已載入程式碼或 fixture 的身分證明；原生驗收及公開記憶體工具仍未提供。詳見[契約](../docs/process_memory_contract.md)。
+
+WebRTC peer 也會保留媒體建構與清理失敗的原始資源，觀測即時停用完成，並將延後協商綁定原 peer。媒體 producer 關閉會回報待完成或不確定的清理結果，並保留原始資源。音訊與錄影不會透過不安全的 close／flush 重播宣稱成功；LAN close 可明確重試。應用程式 caretaker 與 GUI 整合仍待完成。詳見[清理契約](../docs/media_retirement_contract.md)。
+
+HostBrowser 亦會拒絕晚到發布，並保留未完成的執行緒與關閉所有權；對話框整合仍待完成。
+
+MultiViewerHost 可回傳含原始 session 清理物件的 offer，延後清理不會停止替換後的連線或畫面來源；GUI 接入仍待完成。

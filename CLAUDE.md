@@ -5,7 +5,7 @@
 AutoControl (`je_auto_control`) is a cross-platform GUI automation framework: mouse and keyboard control, image recognition, OCR, accessibility-tree and VLM element location, action scripting, and report generation behind one API. Backends: Windows (Win32 ctypes), macOS (pyobjc/Quartz), Linux X11 (python-Xlib), Linux Wayland (libei / ydotool), Android (adb), iOS (WebDriverAgent).
 
 - **Package**: `je_auto_control` · **Python** ≥ 3.11 · **License**: MIT · **Author**: JE-Chen
-- **[architecture_explore.md](architecture_explore.md)** is the per-module map — read it before changing structure; it lists all 312 `utils/` subpackages, every GUI tab, and file-level tables for the large subsystems.
+- **[architecture_explore.md](architecture_explore.md)** is the per-module map — read it before changing structure; it lists all 313 `utils/` subpackages, every GUI tab, and file-level tables for the large subsystems.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ AutoControl (`je_auto_control`) is a cross-platform GUI automation framework: mo
 | Template Method | `utils/generate_report/` | HTML / JSON / XML share collect → format → write. |
 | Backend seam | `backends/` under `accessibility`, `ocr`, `vision`, `llm`, `agent`, `hotkey`, `usb`, `usbip` | Abstract base + concrete impls + null fallback, so dependency-free environments still import. |
 
-Layering: entry points (`cli.py`, `gui/`, socket / REST / MCP servers) → executor → `utils/` (312 headless subpackages) → `wrapper/` → per-OS backend.
+Layering: entry points (`cli.py`, `gui/`, socket / REST / MCP servers) → executor → `utils/` (313 headless subpackages) → `wrapper/` → per-OS backend.
 
 ## Development Commands
 
@@ -94,7 +94,7 @@ The map is only useful while it matches the tree, so **update it in the same cha
 
   Never adjust one by hand: the counts are `len(text.splitlines())` (what `wc -l` reports), and hand-editing is how the document ended up quoting the same subsystem at two sizes at once — most tables had been counting a phantom trailing line per file while §1 and §8 counted correctly.
 
-- A new `utils/` subpackage needs a row in **exactly one** §5.4 theme table — the tables partition all 312 subpackages; appearing twice or not at all is a defect.
+- A new `utils/` subpackage needs a row in **exactly one** §5.4 theme table — the tables partition all 313 subpackages; appearing twice or not at all is a defect.
 - A new subsystem over ~1,000 lines also needs a file-level table in §5.4.17.
 - Keep the header's scan date, version, and branch current.
 - `README.md` and both translations under `README/` cite the same figures (command / subpackage / tab / MCP-tool / example counts) — update all three alongside the map.
@@ -222,3 +222,15 @@ Workspace rule shared by every repository under `D:\Codes` (full text: `D:\Codes
 - Platform backends are named `{platform}_{function}.py` (e.g. `win32_ctype_mouse_control.py`).
 - Virtual key mappings live in `core/utils/*_vk.py` per platform.
 - Two PyPI packages, both published by CI: a push to `main` releases `je_auto_control` (the `publish` job of `stable.yml`), and a push to `dev` that passes the headless suite and changes what the package ships releases `je_auto_control_dev` (the `publish-dev` job of `dev.yml`, `scripts/dev_release.py`). Never bump a patch version by hand: `scripts/stable_release.py` releases one patch above the version `pyproject.toml` declares whenever that version already has a `v*` tag. A minor or major release is the one exception — set the new version in `pyproject.toml` in the pull request that ships it, and the job releases that untagged version as written (`test/unit_test/headless/test_stable_release.py`). The version in `dev.toml` is only a floor. `dev.toml` must declare what `pyproject.toml` declares, so a change to dependencies, extras, scripts, entry points or `[tool.setuptools]` goes into both files (`test/unit_test/headless/test_dev_toml_parity.py` fails otherwise). Both publish jobs hold the PyPI token, so they install only the hash-locked `.github/requirements/publish.txt` and build with `python -m build --no-isolation`: a new tool, or a higher floor in `build-system.requires`, needs the lock regenerated with the command at the top of `.github/requirements/publish.in` (`test/unit_test/headless/test_publish_tooling_lock.py` fails otherwise).
+
+## Git worktrees: merge and remove
+
+- Every git worktree created for a task must be finished off: merge its branch back into the branch it was started from, then remove the worktree (`git worktree remove <path>`) and delete its branch (`git branch -d <branch>`).
+- Do not leave worktrees behind when the work is done; check `git worktree list` before ending the task.
+- If a worktree cannot be merged yet, say so explicitly instead of leaving it behind silently.
+
+## Test scope: run only what the change touches
+
+When a change needs testing, run only the tests related to it: the test files for the modules you edited, plus the tests that directly depend on them (for example a golden-file or docs-sync test that reads what you changed). Do not re-run the whole suite.
+
+This takes precedence over any other line in this file that asks for the whole suite to be run locally. Run the whole suite only when the user asks for it.

@@ -9,6 +9,8 @@ on a per-viewer basis.
 from __future__ import annotations
 
 import secrets
+from dataclasses import dataclass
+from functools import partial
 import threading
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
@@ -24,6 +26,7 @@ from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop.input_dispatch import dispatcher_at
 from je_auto_control.utils.remote_desktop.permissions import SessionPermissions
 from je_auto_control.utils.remote_desktop.trust_list import TrustList
+from je_auto_control.utils.remote_desktop.webrtc_retirement import CleanupAttempt, PeerLifecycleError, PeerStopPending
 from je_auto_control.utils.remote_desktop.webrtc_host import WebRTCDesktopHost
 from je_auto_control.utils.remote_desktop.webrtc_transport import (
     ScreenVideoTrack, WebRTCConfig,
@@ -59,6 +62,32 @@ class _ScreenSource:
         self._track.stop()
 
 
+@dataclass(frozen=True)
+class SessionRetirement:
+    """Retain the original peer and shared source for delayed retirement."""
+
+    session_id: str
+    _coordinator: MultiViewerHost
+    _peer: WebRTCDesktopHost
+    _source: _ScreenSource
+
+    def stop(self) -> None:
+        self._coordinator._stop_owned_session(self.session_id, self._peer)
+        self._coordinator._maybe_release_source(self._source)
+
+
+@dataclass(frozen=True)
+class OwnedSessionOffer:
+    """Offer whose cleanup identity was captured before delivery."""
+
+    retirement: SessionRetirement
+    sdp: str
+
+    @property
+    def session_id(self) -> str:
+        return self.retirement.session_id
+
+
 class MultiViewerHost:
     """Runs N concurrent ``WebRTCDesktopHost`` instances over one capture.
 
@@ -90,7 +119,7 @@ class MultiViewerHost:
             else SessionPermissions.from_read_only(read_only)
         )
         # The sessions relay one shared track, so they map input by its origin.
-        self._dispatch = input_dispatcher or dispatcher_at(self._capture_origin)
+        self._deliver_input = input_dispatcher or dispatcher_at(self._capture_origin)
         self._ip_whitelist = list(ip_whitelist) if ip_whitelist else []
         self._on_annotation = on_annotation
         self._on_session_state = on_session_state
@@ -98,8 +127,14 @@ class MultiViewerHost:
         self._on_pending_viewer = on_pending_viewer
         self._sessions: Dict[str, WebRTCDesktopHost] = {}
         self._session_meta: Dict[str, dict] = {}
+        self._session_tokens: Dict[str, object] = {}
+        self._retiring: Dict[str, WebRTCDesktopHost] = {}
+        self._creating: set[WebRTCDesktopHost] = set()
+        self._source_stopping = False
+        self._source_failed = False
         self._source: Optional[_ScreenSource] = None
         self._lock = threading.Lock()
+        self._admission_closed = False
 
     def _capture_origin(self) -> Tuple[int, int]:
         source = self._source
@@ -113,15 +148,83 @@ class MultiViewerHost:
         if self._on_annotation is not None:
             self._on_annotation({**data, "screen_origin": self._capture_origin()})
 
+    def _dispatch(self, action: Mapping[str, Any]) -> Any:
+        """Hand a viewer's input on, unless admission was closed."""
+        if self._admission_closed:
+            return None
+        return self._deliver_input(action)
+
+    def close_admission(self) -> None:
+        """Accept no new session, answer or viewer input, at once; :meth:`stop_all` still closes the peers.
+
+        Takes only this host's short lock and makes no native call, so it is
+        safe from any thread and for a caller whose authority was revoked.
+        """
+        with self._lock:
+            self._admission_closed = True
+
     # --- session lifecycle --------------------------------------------------
 
     def create_session_offer(self) -> Tuple[str, str]:
         """Mint a new session: returns ``(session_id, offer_sdp)``."""
+        offer = self.create_owned_session_offer()
+        return offer.session_id, offer.sdp
+
+    def create_owned_session_offer(self) -> OwnedSessionOffer:
+        """Mint an offer with original-resource ownership for delayed delivery."""
+        session_id, host, retirement = self._register_session()
+        try:
+            offer = host.create_offer(peer_label=f"viewer-{session_id[:6]}")
+        except BaseException:
+            with self._lock:
+                self._creating.discard(host)
+            retirement.stop()
+            raise
         with self._lock:
+            self._creating.discard(host)
+            retiring = self._retiring.get(session_id) is host
+        if retiring:
+            retirement.stop()
+            raise PeerLifecycleError("session stopped during offer creation")
+        return OwnedSessionOffer(retirement, offer)
+
+    def _register_session(self) -> Tuple[str, WebRTCDesktopHost, SessionRetirement]:
+        """Build and register one session's peer, or leave nothing behind and raise.
+
+        A peer that fails to build -- the screen subscription or the peer
+        itself -- leaves no session token, no relay subscription and, when no
+        other session uses it, no running screen source.
+        """
+        with self._lock:
+            if self._admission_closed:
+                raise PeerStopPending("admission is closed: the host is stopping")
+            if self._retiring or self._source_stopping or self._source_failed:
+                raise PeerStopPending("finish retiring previous sessions before creating another")
             if self._source is None:
                 self._source = _ScreenSource(self._config)
+            source = self._source
             session_id = secrets.token_hex(8)
-            host = WebRTCDesktopHost(
+            if session_id in self._sessions:
+                raise PeerLifecycleError("session identity collision")
+            token = object()
+            self._session_tokens[session_id] = token
+            try:
+                host = self._new_session_peer(session_id, token, source)
+            except BaseException as error:  # noqa: BLE001  # reason: re-raised below, after the source is released
+                self._session_tokens.pop(session_id, None)
+                failure = error
+            else:
+                self._sessions[session_id] = host
+                self._creating.add(host)
+                return session_id, host, SessionRetirement(session_id, self, host, source)
+        self._release_unused_source(source)
+        raise failure
+
+    def _new_session_peer(self, session_id: str, token: object, source: _ScreenSource) -> WebRTCDesktopHost:
+        """Subscribe to the shared screen and build one session's peer; a failed build drops its subscription."""
+        track = source.subscribe()
+        try:
+            return WebRTCDesktopHost(
                 token=self._token,
                 config=self._config,
                 trust_list=self._trust_list,
@@ -129,55 +232,93 @@ class MultiViewerHost:
                 input_dispatcher=self._dispatch,
                 ip_whitelist=self._ip_whitelist,
                 on_annotation=self._annotate if self._on_annotation is not None else None,
-                external_video_track=self._source.subscribe(),
-                on_state_change=self._wrap_state_callback(session_id),
-                on_authenticated=self._wrap_auth_callback(session_id),
-                on_pending_viewer=self._wrap_pending_callback(session_id),
+                external_video_track=track,
+                on_state_change=self._wrap_state_callback(session_id, token),
+                on_authenticated=self._wrap_auth_callback(session_id, token),
+                on_pending_viewer=self._wrap_pending_callback(session_id, token),
             )
-            self._sessions[session_id] = host
-        try:
-            offer = host.create_offer(peer_label=f"viewer-{session_id[:6]}")
         except BaseException:
-            # The caller never learns this session_id, so nobody else could
-            # stop it: it would hold its screen-source subscription forever.
-            self.stop_session(session_id)
+            stop = getattr(track, "stop", None)
+            if callable(stop):
+                stop()
             raise
-        return session_id, offer
+
+    def _release_unused_source(self, source: _ScreenSource) -> None:
+        """After a session failed to build: stop the screen source if no session uses it (it may be new)."""
+        try:
+            self._maybe_release_source(source)
+        except (RuntimeError, OSError) as error:   # the build's own error is the one to raise
+            autocontrol_logger.warning("releasing the screen source after a failed session: %r", error)
+
+    def session_retirement(self, session_id: str) -> SessionRetirement:
+        """Capture the currently registered generation before queuing cleanup."""
+        with self._lock:
+            host = self._sessions[session_id]
+            source = self._source
+            if source is None:
+                raise PeerLifecycleError("session has no owned screen source")
+            return SessionRetirement(session_id, self, host, source)
 
     def accept_session_answer(self, session_id: str, answer_sdp: str) -> None:
+        if self._admission_closed:
+            raise PeerStopPending("admission is closed: the host is stopping")
         host = self._require_session(session_id)
         host.accept_answer(answer_sdp)
 
     def stop_session(self, session_id: str) -> None:
         with self._lock:
-            host = self._sessions.pop(session_id, None)
-            self._session_meta.pop(session_id, None)
+            host = self._sessions.get(session_id)
+            source = self._source
         if host is not None:
-            try:
-                host.stop()
-            except (RuntimeError, OSError) as error:
-                autocontrol_logger.debug("stop session %s: %r", session_id, error)
-        self._maybe_release_source()
+            self._stop_owned_session(session_id, host)
+        self._maybe_release_source(source)
+
+    def _stop_owned_session(self, session_id: str, host: WebRTCDesktopHost) -> None:
+        with self._lock:
+            if self._sessions.get(session_id) is not host:
+                return
+            self._retiring[session_id] = host
+            if host in self._creating:
+                raise PeerStopPending("session offer creation is still running")
+        host.stop()
+        with self._lock:
+            if self._sessions.get(session_id) is host:
+                self._sessions.pop(session_id)
+                self._session_meta.pop(session_id, None)
+                self._session_tokens.pop(session_id, None)
+            if self._retiring.get(session_id) is host:
+                self._retiring.pop(session_id)
 
     def stop_all(self) -> None:
         with self._lock:
             sessions = list(self._sessions.items())
-            self._sessions.clear()
-            self._session_meta.clear()
-        for session_id, host in sessions:
-            try:
-                host.stop()
-            except (RuntimeError, OSError) as error:
-                autocontrol_logger.debug("stop_all %s: %r", session_id, error)
-        self._maybe_release_source()
-
-    def _maybe_release_source(self) -> None:
-        with self._lock:
-            if self._sessions or self._source is None:
-                return
+            self._retiring.update(sessions)
             source = self._source
-            self._source = None
-        source.stop()
+        attempt = CleanupAttempt()
+        for session_id, host in sessions:
+            attempt.run(partial(self._stop_owned_session, session_id, host), "session")
+        attempt.run(partial(self._maybe_release_source, source), "screen source")
+        attempt.finish()
+
+    def _maybe_release_source(self, expected: Optional[_ScreenSource]) -> None:
+        with self._lock:
+            if self._sessions or self._source is None or self._source is not expected:
+                return
+            if self._source_stopping:
+                raise PeerStopPending("screen source stop is still running")
+            source = self._source
+            self._source_stopping = True
+            self._source_failed = True
+        try:
+            source.stop()
+        except BaseException:
+            with self._lock:
+                self._source_stopping = False
+            raise
+        with self._lock:
+            if self._source is source:
+                self._source = None
+            self._source_stopping = self._source_failed = False
 
     # --- per-session controls -----------------------------------------------
 
@@ -289,6 +430,8 @@ class MultiViewerHost:
 
     def _require_session(self, session_id: str) -> WebRTCDesktopHost:
         with self._lock:
+            if session_id in self._retiring:
+                raise PeerStopPending("session is retiring")
             host = self._sessions.get(session_id)
         if host is None:
             raise KeyError(f"unknown session_id: {session_id}")
@@ -296,11 +439,13 @@ class MultiViewerHost:
 
     # --- callback wrappers --------------------------------------------------
 
-    def _wrap_state_callback(self, session_id: str):
+    def _wrap_state_callback(self, session_id: str, token: object = None):
         cb = self._on_session_state
         def _emit(state: str) -> None:
+            if token is not None and self._session_tokens.get(session_id) is not token:
+                return
             if state in _FINAL_STATES:
-                self._prune_later(session_id)
+                self._prune_later(session_id, token)
             if cb is None:
                 return
             try:
@@ -309,7 +454,7 @@ class MultiViewerHost:
                 autocontrol_logger.debug("session state cb: %r", error)
         return _emit
 
-    def _prune_later(self, session_id: str) -> None:
+    def _prune_later(self, session_id: str, token: object = None) -> None:
         """Drop a session whose peer connection ended, off the loop thread.
 
         A peer that fails, closes, or misses the auth deadline is stopped
@@ -318,13 +463,27 @@ class MultiViewerHost:
         on with nobody watching. ``stop_session`` blocks on the bridge, and
         this is called from the loop thread, hence the thread.
         """
-        threading.Thread(target=self.stop_session, args=(session_id,),
-                         name="webrtc-prune", daemon=True).start()
+        with self._lock:
+            if token is not None and self._session_tokens.get(session_id) is not token:
+                return
+            host = self._sessions.get(session_id)
+            source = self._source
+        if host is None:
+            return
+        def retire() -> None:
+            try:
+                self._stop_owned_session(session_id, host)
+                self._maybe_release_source(source)
+            except (RuntimeError, OSError):
+                autocontrol_logger.warning("session retirement remains pending")
+        threading.Thread(target=retire, name="webrtc-prune", daemon=True).start()
 
-    def _wrap_auth_callback(self, session_id: str):
+    def _wrap_auth_callback(self, session_id: str, token: object = None):
         cb = self._on_session_authenticated
         def _emit() -> None:
             with self._lock:
+                if token is not None and self._session_tokens.get(session_id) is not token:
+                    return
                 meta = self._session_meta.setdefault(session_id, {})
                 meta["connected_at"] = datetime.now(timezone.utc).isoformat()
             if cb is None:
@@ -335,13 +494,16 @@ class MultiViewerHost:
                 autocontrol_logger.debug("session auth cb: %r", error)
         return _emit
 
-    def _wrap_pending_callback(self, session_id: str):
+    def _wrap_pending_callback(self, session_id: str, token: object = None):
         cb = self._on_pending_viewer
         if cb is None:
             return None
         def _emit() -> None:
-            host = self._sessions.get(session_id)
-            viewer_id = host.pending_viewer_id if host is not None else None
+            with self._lock:
+                if token is not None and self._session_tokens.get(session_id) is not token:
+                    return
+                host = self._sessions.get(session_id)
+                viewer_id = host.pending_viewer_id if host is not None else None
             try:
                 cb(session_id, viewer_id)
             except (RuntimeError, OSError) as error:
@@ -354,4 +516,4 @@ class MultiViewerHost:
 _FINAL_STATES = frozenset({"failed", "closed"})
 
 
-__all__ = ["MultiViewerHost"]
+__all__ = ["MultiViewerHost", "OwnedSessionOffer", "SessionRetirement"]

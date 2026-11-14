@@ -1,5 +1,59 @@
 # AutoControl Architecture
 
+WebRTC statistics owns one submitted polling future. Start does not wait for
+the event loop; stop closes admission, cancels pending submission and drops
+the callback owner without acquiring a bridge. Late awaited samples are discarded.
+
+WebRTC host and viewer mixins share concrete typed state and slot contracts.
+Initialization remains in the composed panels. STUN/TURN controls use a common
+contract; the host supplies a separate optional hardware-codec owner.
+
+Wayland default EI input uses a bounded domain protocol over the existing owned
+helper channel. Native allocation, portal consent, emission and teardown stay in
+that child. Reply validation and emission acknowledgement share the request lock;
+uncertain outcomes retire the owner without replay. Passive cache inspection does
+not acquire consent. Raw LibeiBackend remains in-process, including its half-open
+teardown guard; process retirement does not establish compositor input release.
+
+MCP executor adapters are grouped by accessibility, automation, data, desktop,
+mobile and vision. Factories bind the same tool schemas to these strict modules;
+each adapter imports its executor function only when called.
+
+Navigation handles optional Qt tree items through one iterator. Script fields are
+read and written through their concrete editor types, and trigger actions retain
+typed common arguments while checking missing table cells before use.
+
+Remote media adapters validate PyAV video contexts and streams before assigning
+video properties, and close failed recording containers. ScreenVideoTrack uses a
+separate frame-clock helper so aiortc can retain its integer timestamp field.
+
+Auto Click, Record and Script are lazy independent widgets owning their background
+tasks and menu actions. Closing cancels page work and releases controls; the shared
+recorder survives the Record view. Reopening reads retained recorder state without
+probing native hook health. Ctrl+4 still delegates to the global stop path.
+
+Image Detection is a lazy independent widget. It owns its inputs and mouse-button
+selection, captures immutable worker arguments and runs matching through TabTask.
+Close cancels work and discards late results; reopen creates fresh controls.
+The shared locate-and-click path checks cancellation before detection and before
+moving or clicking. Calls already inside a native backend may still finish.
+
+The process-memory test fixture owns fixed payload and sequence buffers in a hidden
+child process. Bounded inherited pipes expose expected state and validated fixture
+updates. Bootstrap facts remain unverified until a native provider independently
+matches the retained process identity. This tooling adds no public memory API.
+The internal Windows provider owns read/query handles and measures native process
+facts before asking an explicit reviewed attestor for application identity. Its
+bindings are tested through injected calls; trusted attestation and native acceptance
+remain separate requirements.
+WindowsImageObserver separately owns a query/synchronize process handle and an
+image-file handle opened with read-only sharing. It measures file ID, size and
+SHA-256 from that same handle under caller byte/deadline/checkpoint limits, checking
+process and file metadata between chunks. Successful observations retain leases
+until close; failed cleanup remains owned for explicit retry. Shared native facts
+live in windows_facts.py. ObservedImageFile describes the file opened from the
+reported image path, not loaded code or a trusted fixture launch.
+
 The package facade resolves each public export from its existing source module. Concrete typing
 declarations generate runtime binding tables, checked by
 `python scripts/generate_facade_exports.py --check` in CI. Resolution obtains the real object
@@ -291,8 +345,22 @@ only its token; controller retirement also cleans jobs after the controller
 has gone. Context/identity are refreshed on dispatch, without prescribing
 one capability for every task. Each work function authorizes its operation.
 Qt-free cancellation/progress live in utils/exception/cancellation.py.
+Remote Desktop factory pages retire weak callback delivery before destruction.
+ViewLifetime gates queued delivery; ViewApprovals wakes pending requests with denial.
+Value-only upload tasks and frame conversion do not retain the page. Registry TCP/WS
+sessions survive close; page-owned WebRTC cleanup runs through the detached stop queue.
+Reopening creates a fresh page without reattaching those sessions. Stop failures are
+logged; explicit failed-resource retry ownership remains open in Progress.md.
 Legacy start_worker retains its API and now rolls back failed thread starts.
 Remaining panel/backend integration and WebRTC splitting remain open.
+WorkspaceShell accepts one authoritative TabRegistry. Weak close observers preserve
+external close callbacks and detach accepted closes before release. Identity-checked
+destruction clears cached pages without discarding a reopened replacement. Only the
+active page's direct-child ExecutionDetailsSource feeds the collapsible right pane;
+queued updates from old sources are rejected. Diagnostics publishes its existing
+progress and outcomes, while task and cancellation ownership stay with the page.
+AutoControlGUIWidget keeps its constructor and embedding API; MainWindow retains
+the navigation dock and owns the translated execution-details View action.
 
 Diagnostics now adopts TaskController with a plain-data runner snapshot and
 READ_SCREEN revalidation. Its run/stop Actions and cached four-language
@@ -541,7 +609,7 @@ safe source strings/references and masks resolved input strings/dynamic keys.
 | `je_auto_control/wrapper/` | Platform-neutral API (`auto_control_mouse/keyboard/screen/image/record/window.py`); `platform_wrapper.py` picks the backend; `backend_contract.py` types the seam; `window_backends/`. |
 | `je_auto_control/{windows,osx,linux_with_x11,linux_wayland}/` | Desktop OS backends; only the running OS's backend is imported. |
 | `je_auto_control/{android,ios}/` | Mobile device control (adb / uiautomator2, WebDriverAgent). |
-| `je_auto_control/gui/` | Optional PySide6 GUI (`[gui]` extra): `main_window.py` (menus, navigation dock, theme), `main_widget.py` (the tabbed workspace), `workspace.py` (scroll containers preserving original page identity, vector close buttons), `workspace_settings.py` (validated per-user QSettings, injectable in tests), the Qt-free `TabRegistry` in `tab_registry.py` (open caches panels; close detaches and schedules owned panels for destruction, retaining metadata and legacy forms), `navigation.py`, `theme.py`, `script_builder/`, `remote_desktop/`, `language_wrapper/`. |
+| `je_auto_control/gui/` | Optional PySide6 GUI (`[gui]` extra): `main_window.py` (menus, navigation dock, theme), `main_widget.py` (the configured compatibility subclass), `workspace.py` (injectable WorkspaceShell, identity-preserving scroll containers and vector close buttons), `workspace_details.py` (immutable execution snapshots and a passive details pane), `workspace_settings.py` (validated per-user QSettings, injectable in tests), the Qt-free `TabRegistry` in `tab_registry.py` (open caches panels; close detaches and schedules owned panels for destruction, retaining metadata and embedder-supplied widgets), `navigation.py`, `theme.py`, `script_builder/`, `remote_desktop/`, `language_wrapper/`. |
 | `autocontrol-lsp/` | Separate distribution: language server for `AC_*` action JSON, plus a `vscode/` client. |
 | `native/owner_service/` | Optional Linux owner service in C, not shipped in the wheel. A root guardian (epoch journal, cgroup v2 delegation, client verification, crash recovery) starts a service that authenticates every packet by pidfd, issues leases and runs each helper in its own protected cgroup tree. `build.sh` and an administrator-reviewed manifest build it; `tests/` holds the unprivileged and root acceptance. The Python side is `helper_owner_linux.py`, selected by `owned_channel_factory.py` through a root-owned binding file. |
 | `native/android_helper/` | Android device-side helper in Kotlin, not shipped in the wheel (stage 2 of 4): `core/` holds `FenceLedger` (the epoch fence and per-command settlement `AndroidCommandLease` requires) and `ProtocolHandler`, tested on the JVM; `app/` is the instrumentation (shell/root-only socket, fence-aware injector), built into an APK by `.github/workflows/android-helper.yml`. Not wired into the runtime yet; protocol in its `README.md`. |
@@ -622,6 +690,16 @@ microphone operations require operator authority at both listing and dispatch.
 TCP client authentication marks rejection terminal before writing AUTH_FAIL. Admission
 reaping therefore releases its client slot before an immediate retry can arrive, while
 the separate handshake semaphore bounds outstanding cleanup and authentication threads.
+
+MCP capability policy uses an explicit reviewed screen/caller-data catalogue in
+`utils/rbac/tool_classification.py`; unknown read-only hints require read_data.
+Canonical aliases and stronger overrides share base and argument requirements at
+admission and refreshed direct/nested invocation. The readonly variant builder
+applies equally to default, explicit and dynamically registered catalogues. It
+excludes executable selectors/unreviewed external initializers and rejects capture
+or VLM branches before handlers. Failure artifacts require writable host/tool
+ownership and refreshed drive authority. CI annotation formatting returns data
+without writing into the MCP stdio stream. External initializer review remains open.
 
 Delayed work captures registration authority through `utils/rbac/deferred.py`.
 Schedulers, triggers, hotkeys, watchdogs, webhooks, e-mail watchers and observers
@@ -726,7 +804,7 @@ wrapper/auto_control_record.record → OS listener (e.g. windows/record/win32_in
 5. Optional MCP tool: factory in `utils/mcp_server/tools/_factories.py`, adapter in the themed handler module —
    `_handlers_input.py`, `_handlers_screen.py`, `_handlers_system.py`, `_handlers_runs.py`,
    `_handlers_scheduling.py`, `_handlers_remote.py`, `_handlers_locators.py`, `_handlers_operations.py`,
-   `_handlers_qa.py`, `_handlers_executor_bridge.py` (a three-line delegation to an executor function), or
+   `_handlers_qa.py`, the six `_handlers_<domain>_executor.py` modules (lazy executor delegation), or
    `_handlers.py` for data, text and the WebRunner bridge.
 6. GUI: thin widget in `gui/`, registered by one `TabSpec` row in `gui/tab_registry.py` (module and class name, so
    it is imported only when opened) with commands exposed through `menu_actions()`; strings in every

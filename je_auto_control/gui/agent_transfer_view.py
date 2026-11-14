@@ -8,6 +8,7 @@ import json
 
 from PySide6 import QtWidgets
 
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.task_controller import TaskController, TaskOutcome
 from je_auto_control.utils.agent_runtime.api import manage_agent_transfer
@@ -55,7 +56,11 @@ class AgentTransferView(QtWidgets.QWidget):
         self._result.setReadOnly(True)
         self._notice = QtWidgets.QLabel()
         self._notice.setWordWrap(True)
+        set_role(self._notice, 'hint')
         self._status = QtWidgets.QLabel()
+        self._status.setWordWrap(True)
+        set_role(self._status, 'hint')
+        self.setProperty('role', 'bare')
         form = QtWidgets.QFormLayout()
         for key, control in (('operation', self._operation), ('request', self._request), ('result', self._result)):
             label = QtWidgets.QLabel()

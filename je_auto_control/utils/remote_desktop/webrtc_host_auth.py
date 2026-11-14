@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+from threading import Event
 from typing import (
     TYPE_CHECKING, Any, Callable, Coroutine, List, Mapping, Optional,
 )
@@ -34,13 +35,17 @@ class ViewerAuthMixin:
 
     Requires the host to provide ``_token``, ``_trust_list``,
     ``_ip_whitelist``, ``_authenticated``, ``_pending_viewer_id``,
-    ``_send_ctrl``, ``_spawn_bg`` and ``_async_stop``.
+    ``_send_ctrl``, ``_spawn_bg``, ``_async_stop``, ``_stop_generation``,
+    ``_pc`` and ``_closed``.
     """
 
     if TYPE_CHECKING:
         # Declared, never defined: the host class this is mixed into owns
         # every one of these. The block is stripped at runtime, so nothing
         # here can shadow what the host actually binds.
+        _pc: Any
+        _stop_generation: Callable[[object], Coroutine[Any, Any, None]]
+        _closed: Event
         _token: str
         _trust_list: Optional["TrustList"]
         _ip_whitelist: List[str]
@@ -102,7 +107,8 @@ class ViewerAuthMixin:
             )
         except (RuntimeError, OSError) as error:
             autocontrol_logger.debug("audit log auth_fail: %r", error)
-        get_bridge().call_soon(self._schedule_close_after_fail)
+        peer = self._pc
+        get_bridge().call_soon(lambda: self._for_peer(peer, self._schedule_close_after_fail))
 
     def _auto_approve_via_trust(self) -> bool:
         # The emptiness check is what `_is_trusted_viewer` does first anyway;
@@ -172,11 +178,13 @@ class ViewerAuthMixin:
 
     def approve_pending_viewer(self) -> None:
         """Thread-safe accept; call from GUI when user clicks Accept."""
-        get_bridge().call_soon(self._approve_pending_viewer)
+        peer = self._pc
+        get_bridge().call_soon(lambda: self._for_peer(peer, self._approve_pending_viewer))
 
     def reject_pending_viewer(self) -> None:
         """Thread-safe reject; call from GUI when user clicks Reject."""
-        get_bridge().call_soon(self._reject_pending_viewer)
+        peer = self._pc
+        get_bridge().call_soon(lambda: self._for_peer(peer, self._reject_pending_viewer))
 
     def _approve_pending_viewer(self) -> None:
         # Only a viewer that presented the token and is waiting on the user
@@ -189,6 +197,8 @@ class ViewerAuthMixin:
 
     def _grant(self) -> None:
         """Authenticate the viewer. Callers have verified its token."""
+        if self._closed.is_set():
+            return
         self._has_pending_viewer = False
         self._authenticated = True
         self._send_ctrl({
@@ -217,15 +227,21 @@ class ViewerAuthMixin:
     def _reject_pending_viewer(self) -> None:
         self._has_pending_viewer = False
         self._send_ctrl({"type": "auth_fail"})
-        get_bridge().call_soon(self._schedule_close_after_fail)
+        peer = self._pc
+        get_bridge().call_soon(lambda: self._for_peer(peer, self._schedule_close_after_fail))
 
     @property
     def has_pending_viewer(self) -> bool:
         return self._has_pending_viewer
 
+    def _for_peer(self, peer: object, action: Callable[[], None]) -> None:
+        if self._pc is peer:
+            action()
+
     def _schedule_close_after_fail(self) -> None:
+        peer = self._pc
         loop = asyncio.get_event_loop()
-        loop.call_later(0.5, lambda: self._spawn_bg(self._async_stop()))
+        loop.call_later(0.5, lambda: self._spawn_bg(self._stop_generation(peer)))
 
     def _enforce_auth_deadline(self) -> None:
         # A viewer with the right token that is waiting on the user's

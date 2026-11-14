@@ -110,11 +110,11 @@ def test_progress_and_report_stay_shared_with_read_only_executor_and_active_mcp(
     tool = next((item for item in build_default_tool_registry(read_only=True) if item.name == 'ac_diagnose'), None)
     assert tool is not None, 'the documented active diagnostic MCP entry point is absent'
     assert tool.input_schema.get('additionalProperties') is False
-    assert capability_for_command('AC_diagnose') == Capability.READ_SCREEN
+    assert capability_for_command('AC_diagnose') == Capability.READ_DATA
     expected = diagnostics.run_diagnostics().to_dict()
     progress = []
     ctx = ToolCallContext('diagnostic', progress_token='p', notifier=lambda _method, value: progress.append(value))
-    with authorization_scope(AuthorizationContext('reader', Role.VIEWER)):
+    with authorization_scope(AuthorizationContext('reader', Role.OPERATOR)):
         assert tool.invoke({}, ctx=ctx) == expected
         record = ac.execute_action([['AC_diagnose']])
         assert expected in record.values()
@@ -176,7 +176,7 @@ def test_real_jsonrpc_cancel_is_connection_scoped_and_never_becomes_an_error_scr
 
     def call(connection):
         with server.connection_scope(connection_id=connection):
-            with authorization_scope(AuthorizationContext(connection, Role.VIEWER)):
+            with authorization_scope(AuthorizationContext(connection, Role.OPERATOR)):
                 replies[connection] = json.loads(server.handle_line(json.dumps(request)))
 
     workers = {name: threading.Thread(target=call, args=(name,)) for name in entered}

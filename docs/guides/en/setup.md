@@ -13,7 +13,7 @@ Optional extras, installed only when you need them:
 
 | Extra | Enables |
 |---|---|
-| `gui` | PySide6 desktop application (51 tabs): a searchable navigation panel (`Ctrl+K`) lists every feature by category, tabs are built the first time they are opened, and **View → Theme** switches dark / light. Pages scroll in narrow windows; theme, text size, navigation visibility (`Ctrl+B`) and width are saved in `~/.je_auto_control/gui.ini` on close. Themes use Qt directly; `qt-material` is not required. |
+| `gui` | PySide6 desktop application (51 tabs): a searchable navigation panel (`Ctrl+K`) lists every feature by category, tabs are built the first time they are opened (of the three open at start, only Record is built then; Script Builder and Remote Desktop are built when first selected), and **View → Theme** switches dark / light. Pages scroll in narrow windows; theme, text size, navigation visibility (`Ctrl+B`) and width are saved in `~/.je_auto_control/gui.ini` on close. Themes use Qt directly; `qt-material` is not required. |
 | `webrtc` | WebRTC remote desktop, USB passthrough (`aiortc`, `av`) |
 | `signaling` | Standalone signaling / rendezvous server (`fastapi`, `uvicorn`) |
 | `discovery` | mDNS / Zeroconf LAN host discovery |
@@ -21,7 +21,7 @@ Optional extras, installed only when you need them:
 | `fuzzy` / `locale` | `rapidfuzz` matching, `babel` locale parsing |
 | `s3` / `audio` | S3 artifact store, system volume control |
 
-Closing a factory-built feature with the tab cross releases its widget, subscriptions and timers on the next Qt event-loop turn; reopening starts a new panel. **View → Tabs** and the embedding `hide_tab` API only hide it and preserve state. `tab_registry.open/close` and `close_tab` expose explicit lifecycle operations. Legacy owner-built forms and Remote Desktop remain reusable on close while their lifecycle migration is pending.
+Closing a factory-built feature with the tab cross releases its widget, subscriptions and timers on the next Qt event-loop turn; reopening starts a new panel. **View → Tabs** and the embedding `hide_tab` API only hide it and preserve state. `tab_registry.open/close` and `close_tab` expose explicit lifecycle operations. Core pages and Remote Desktop also release on close. Shared TCP/WebSocket registry sessions remain available to scripts; page-owned WebRTC sessions are stopped in the background. Reopening creates fresh controls without reattaching an existing session. Pending approvals and late page callbacks are rejected. Widgets explicitly supplied by embedders retain their existing ownership contract.
 
 **Windows on arm64** installs and runs, minus what upstream cannot ship
 there: neither `opencv-python` nor `cryptography` publishes a `win_arm64`
@@ -353,3 +353,9 @@ Every environment variable AutoControl reads. Nothing here is required: with no 
 | `JE_AUTOCONTROL_PYTEST_ARTIFACTS` | `./autocontrol_screenshots` | Directory the pytest plugin writes failure screenshots to when a test did not request the `autocontrol_screenshot_dir` fixture. |
 
 ---
+
+The Report page is created when first opened. Closing it releases its controls and local result view; reopening creates a fresh page and reads the current recording status. Closing the page does not disable the shared recorder.
+
+Report generation runs in the background and shows a running status. A page accepts one generation at a time and captures the name when you start it. Closing drops late results; an already-running file write may still finish.
+
+The Screenshot page is also created on first open and released on close. Screen-size queries, captures and pixel reads run in the background with a running status and one operation at a time. Inputs are captured when the operation starts. Closing discards late results; a capture already in progress may still write its file. Hiding preserves the page. Region picking and file browsing remain explicit interactive actions.

@@ -3,7 +3,7 @@ from typing import Optional
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QFileDialog, QFormLayout, QLabel, QLineEdit, QMessageBox,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -11,6 +11,7 @@ from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui._qt_typed import filled_item
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -44,14 +45,14 @@ class HotkeysTab(TranslatableMixin, QWidget):
         # Bind/remove/start/stop commands run from the Actions menu; the
         # tab keeps only the inputs, the bindings table, and the status.
         root = QVBoxLayout(self)
-        form = QHBoxLayout()
-        form.addWidget(self._tr(QLabel(), "hk_combo_label"))
-        form.addWidget(self._combo_input)
-        form.addWidget(self._tr(QLabel(), "hk_script_label"))
-        form.addWidget(self._script_input, stretch=1)
-        root.addLayout(form)
-
-        root.addWidget(self._table, stretch=1)
+        root.setSpacing(12)
+        form = QFormLayout()
+        form.addRow(self._tr(QLabel(), "hk_combo_label"), self._combo_input)
+        form.addRow(self._tr(QLabel(), "hk_script_label"), self._script_input)
+        root.addWidget(Card().add(form))
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def menu_actions(self) -> list:
@@ -149,7 +150,7 @@ class HotkeysTab(TranslatableMixin, QWidget):
         # stop() joins the daemon thread, which used to hold the GUI thread
         # for up to 2 s; a second Stop while it is out is ignored.
         if self._engine_op.run(default_hotkey_daemon.stop, on_done=self._on_daemon_stopped,
-                               on_error=self._on_daemon_stopped):
+                               on_error=self._on_daemon_stopped, retain_failure=True):
             self.sync_with_engine()
 
     def _on_daemon_stopped(self, _outcome: object = None) -> None:

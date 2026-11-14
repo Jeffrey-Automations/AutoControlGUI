@@ -19,8 +19,9 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
+from je_auto_control.utils.exception.cancellation import CancellationToken, current_cancellation_token
 from je_auto_control.utils.json_store.json_store import load_json_or_quarantine, quarantine_file
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -31,6 +32,16 @@ _DEFAULT_MAX_PARALLEL = 8
 #: Largest response body read from a host (a screenshot is the big one).
 _MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 _READ_CHUNK_BYTES = 65536
+#: The ``error`` of a broadcast row for a host that was skipped because the broadcast was stopped.
+NOT_SENT_STOPPED = "not sent: the broadcast was stopped"
+
+
+def _stop_requested(stop_event: Optional[threading.Event],
+                    token: Optional[CancellationToken]) -> Callable[[], bool]:
+    """Whether a broadcast should skip the hosts it has not sent to yet."""
+    def stopped() -> bool:
+        return (stop_event is not None and stop_event.is_set()) or (token is not None and token.is_cancelled)
+    return stopped
 
 
 class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
@@ -122,11 +133,16 @@ class AdminConsoleClient:
         return removed
 
     def poll_all(self, *, labels: Optional[List[str]] = None) -> List[HostStatus]:
+        """Probe every host (or ``labels``), ``max_parallel`` at a time; one status per host.
+
+        Inside a cancelled cancellation scope the hosts not probed yet are
+        skipped and :class:`concurrent.futures.CancelledError` is raised once
+        the probes already out have returned.
+        """
         targets = self._resolve_targets(labels)
         if not targets:
             return []
-        with ThreadPoolExecutor(max_workers=self._max_parallel) as pool:
-            return list(pool.map(self._poll_one, targets))
+        return self._map_unless_cancelled(self._poll_one, targets)
 
     def fetch_thumbnails(self, *, labels: Optional[List[str]] = None,
                          ) -> Dict[str, Optional[bytes]]:
@@ -134,7 +150,9 @@ class AdminConsoleClient:
 
         Returns ``label → png_bytes`` (or ``None`` on a host that
         errored). The Cross-host Dashboard polls this on a timer and
-        scales the resulting image down to a thumbnail tile.
+        scales the resulting image down to a thumbnail tile. A cancelled
+        cancellation scope skips the hosts not reached yet and raises
+        :class:`concurrent.futures.CancelledError`, as :meth:`poll_all` does.
         """
         import base64
         targets = self._resolve_targets(labels)
@@ -159,13 +177,26 @@ class AdminConsoleClient:
             except ValueError:  # binascii.Error is one
                 return host.label, None
 
+        return dict(self._map_unless_cancelled(grab, targets))
+
+    def _map_unless_cancelled(self, call: Callable[[AdminHost], Any], targets: List[AdminHost]) -> List[Any]:
+        """``call`` over ``targets`` in the pool; a cancelled scope skips the rest and raises ``CancelledError``."""
+        # Read in the caller's thread: the pool's threads do not see its scope.
+        token = current_cancellation_token()
+
+        def one(host: AdminHost) -> Any:
+            return None if token is not None and token.is_cancelled else call(host)
+
         with ThreadPoolExecutor(max_workers=self._max_parallel) as pool:
-            results = list(pool.map(grab, targets))
-        return dict(results)
+            results = list(pool.map(one, targets))
+        if token is not None:
+            token.checkpoint()
+        return results
 
     def broadcast_execute(self, actions: List[Any],
                           *, labels: Optional[List[str]] = None,
                           raise_on_error: bool = False,
+                          stop_event: Optional[threading.Event] = None,
                           ) -> List[Dict[str, Any]]:
         """Run ``actions`` on every host (or ``labels``); one row per host.
 
@@ -173,19 +204,36 @@ class AdminConsoleClient:
         and that host's row is ``ok: false`` with the error. Otherwise
         ``ok`` only means the host answered, and action failures sit inside
         ``result``. A host too old to know the flag ignores it.
+
+        Every row says in ``sent`` whether the actions went to that host.
+        Hosts are sent to in parallel, ``max_parallel`` at a time; once
+        ``stop_event`` is set, or the caller's cancellation scope is
+        cancelled, a host not yet sent to is skipped (``sent: false``,
+        ``error`` :data:`NOT_SENT_STOPPED`) and a host already being sent to
+        finishes and reports its result. An unknown label is ``sent: false`` too.
         """
         targets = self._resolve_targets(labels)
         # A label that names no host is a failure to report, not a host to
         # skip: a typo used to make the broadcast look complete.
         known = {host.label for host in targets}
-        missing = [{"label": label, "ok": False, "error": "unknown host"}
+        missing = [{"label": label, "ok": False, "sent": False, "error": "unknown host"}
                    for label in (labels or []) if label not in known]
         if not targets:
             return missing
+        # Read in the caller's thread: the pool's threads do not see its scope.
+        stopped = _stop_requested(stop_event, current_cancellation_token())
         with ThreadPoolExecutor(max_workers=self._max_parallel) as pool:
             return list(pool.map(
-                lambda host: self._execute_one(host, actions, raise_on_error), targets,
+                lambda host: self._execute_unless_stopped(host, actions, raise_on_error, stopped), targets,
             )) + missing
+
+    def _execute_unless_stopped(self, host: AdminHost, actions: List[Any], raise_on_error: bool,
+                                stopped: Callable[[], bool]) -> Dict[str, Any]:
+        if stopped():
+            return {"label": host.label, "ok": False, "sent": False, "error": NOT_SENT_STOPPED}
+        row = self._execute_one(host, actions, raise_on_error)
+        row["sent"] = True
+        return row
 
     def _resolve_targets(self, labels: Optional[List[str]]) -> List[AdminHost]:
         # None is "every host"; an empty list is no host -- it ran a
@@ -412,6 +460,6 @@ def default_admin_console() -> AdminConsoleClient:
 
 
 __all__ = [
-    "AdminConsoleClient", "AdminHost", "HostStatus",
+    "AdminConsoleClient", "AdminHost", "HostStatus", "NOT_SENT_STOPPED",
     "default_admin_console", "default_admin_hosts_path", "current_admin_hosts_path",
 ]

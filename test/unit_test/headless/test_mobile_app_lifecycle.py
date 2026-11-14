@@ -273,3 +273,44 @@ def test_registered_adapter_fills_what_wda_lacks():
     assert extension.capability("files").state == "needs_dependency"
     with pytest.raises(DeviceError):
         register_mobile_extension("windows", None)
+
+
+class _ReadableWda(FakeWda):
+    """facebook-wda 1.5.4 has get_clipboard: it switches to WebDriverAgent through Siri to read."""
+
+    def get_clipboard(self) -> str:
+        self.calls.append({"op": "get_clipboard"})
+        return "pasted 文字"
+
+
+def test_ios_pasteboard_read_needs_an_explicit_allowance():
+    wda = _ReadableWda()
+    extension = mobile_extension(_ios(wda))
+    with pytest.raises(DeviceUnsupportedError) as refused:
+        extension.get_clipboard()
+    assert "Siri" in refused.value.reason
+    assert "allow_app_switch=True" in refused.value.alternative
+    assert wda.calls == [], "nothing was sent to the device"
+    assert extension.get_clipboard(allow_app_switch=True) == "pasted 文字"
+    assert [call["op"] for call in wda.calls] == ["get_clipboard"]
+    assert "allow_app_switch" in extension.capability("clipboard").reason
+
+
+def test_the_clipboard_commands_offer_the_allowance_and_pass_it_only_when_set(monkeypatch):
+    from je_auto_control.wrapper import mobile_commands
+    for name in ("AC_ios_get_clipboard", "AC_android_get_clipboard"):
+        params = {param.name: param for param in mobile_commands._BY_NAME[name].params}
+        assert params["allow_app_switch"].kind == "bool"
+        assert params["allow_app_switch"].default is False
+    seen = []
+
+    class _OldAdapter:
+        """Registered before the flag existed: get_clipboard takes no keyword."""
+
+        def get_clipboard(self):
+            seen.append("plain")
+            return "old"
+
+    monkeypatch.setattr(mobile_commands.extensions, "mobile_extension", lambda _session: _OldAdapter())
+    assert mobile_commands._get_clipboard(object()) == "old"
+    assert seen == ["plain"]

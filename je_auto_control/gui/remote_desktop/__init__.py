@@ -11,11 +11,10 @@ from je_auto_control.gui.remote_desktop.frame_display import _FrameDisplay
 from je_auto_control.gui.remote_desktop.host_panel import _HostPanel
 from je_auto_control.gui.remote_desktop.tab import RemoteDesktopTab
 from je_auto_control.gui.remote_desktop.viewer_panel import (
-    _FileSendThread, _ViewerPanel,
+    _ViewerPanel,
 )
 
 __all__ = [
     "RemoteDesktopTab", "QuickConnectScreen",
     "_HostPanel", "_ViewerPanel", "_FrameDisplay",
-    "_FileSendThread",
 ]

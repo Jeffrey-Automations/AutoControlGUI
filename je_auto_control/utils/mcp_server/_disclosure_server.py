@@ -10,6 +10,7 @@ from je_auto_control.utils.mcp_server.discovery import ToolCatalogMixin, ToolDis
 from je_auto_control.utils.mcp_server.disclosure import CORE_TOOLS, ToolView, validate_tool_profile
 from je_auto_control.utils.mcp_server._protocol import _MCPError
 from je_auto_control.utils.mcp_server.tools._base import MCPTool, read_only_env_flag
+from je_auto_control.utils.mcp_server.tools._readonly import readonly_tools
 from je_auto_control.utils.rbac.authorization import AuthorizationContext, current_authorization
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
@@ -110,6 +111,14 @@ class DisclosureServerMixin(ToolCatalogMixin):
             raise _MCPError(-32602, str(error)) from error
         return view
 
+    def _tool_for_invocation(self, tool: MCPTool) -> MCPTool:
+        if not self._read_only_tools:
+            return tool
+        variants = readonly_tools([tool])
+        if not variants:
+            raise _MCPError(-32602, f"Tool unavailable in read-only mode: {tool.name}")
+        return variants[0]
+
     def _require_disclosed_tool(self, name: str, view: ToolView | None = None, tool: MCPTool | None = None) -> None:
         if self._disclosure_mode == "full" and not self._read_only_tools:
             return
@@ -124,7 +133,7 @@ class DisclosureServerMixin(ToolCatalogMixin):
 
     def _core_tool_available(self, tool: MCPTool | None) -> bool:
         return (tool is not None and tool.name in CORE_TOOLS
-                and (not self._read_only_tools or tool.annotations.read_only))
+                and (not self._read_only_tools or bool(readonly_tools([tool]))))
 
     def _handle_tools_list(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """List one availability snapshot, preserving full-mode and stateless response compatibility."""

@@ -10,13 +10,14 @@ from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QHBoxLayout, QLabel, QLineEdit,
+    QAbstractItemView, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -79,16 +80,20 @@ class A11yAuditTab(TranslatableMixin, QWidget):
         # Audit/contrast commands run from the Actions menu; the tab keeps
         # only the inputs, the issue table, and the summary line.
         root = QVBoxLayout(self)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(_t("audit_app")))
-        row.addWidget(self._app, stretch=1)
-        root.addLayout(row)
-        crow = QHBoxLayout()
-        crow.addWidget(QLabel(_t("audit_contrast_label")))
+        root.setSpacing(12)
+        colours = QWidget()
+        colours.setProperty("role", "bare")
+        crow = QHBoxLayout(colours)
+        crow.setContentsMargins(0, 0, 0, 0)
         crow.addWidget(self._fg)
         crow.addWidget(self._bg)
-        root.addLayout(crow)
-        root.addWidget(self._table, stretch=1)
+        form = QFormLayout()
+        form.addRow(self._tr(QLabel(), "audit_app"), self._app)
+        form.addRow(self._tr(QLabel(), "audit_contrast_label"), colours)
+        root.addWidget(Card().add(form))
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._summary.setWordWrap(True)
+        set_role(self._summary, "hint")
         root.addWidget(self._summary)
 
     def menu_actions(self) -> list:

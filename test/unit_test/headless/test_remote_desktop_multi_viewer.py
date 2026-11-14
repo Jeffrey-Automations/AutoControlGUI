@@ -26,6 +26,8 @@ session bookkeeping, which is the code under test.
 """
 from __future__ import annotations
 
+from je_auto_control.utils.remote_desktop.webrtc_retirement import PeerStopFailed, PeerStopPending
+
 import pytest
 
 from headless._webrtc_doubles import Track
@@ -119,6 +121,63 @@ def fake_webrtc(monkeypatch):
 def _host(**kwargs) -> MultiViewerHost:
     kwargs.setdefault("token", "shared-secret")
     return MultiViewerHost(**kwargs)
+
+
+def test_retirement_receipt_never_stops_reused_session_id(monkeypatch):
+    monkeypatch.setattr(mv.secrets, "token_hex", lambda _: "reused")
+    coordinator = _host()
+    original = coordinator.create_owned_session_offer()
+    receipt = coordinator.session_retirement(original.session_id)
+    original.retirement.stop()
+    replacement = coordinator.create_owned_session_offer()
+    replacement_peer = _FakeHost.instances[-1]
+    replacement_track = coordinator.screen_track()
+    receipt.stop()
+    assert not replacement_peer.stopped
+    assert not replacement_track.stopped
+    assert coordinator.session_count() == 1
+    replacement.retirement.stop()
+
+
+def test_old_receipt_cannot_retry_replacement_source_failure(monkeypatch):
+    coordinator = _host()
+    original = coordinator.create_owned_session_offer()
+    original.retirement.stop()
+    replacement = coordinator.create_owned_session_offer()
+    source_calls = []
+
+    def fail_close():
+        source_calls.append("close")
+        raise OSError("new source cleanup failed")
+
+    monkeypatch.setattr(coordinator.screen_track(), "stop", fail_close)
+    with pytest.raises(OSError):
+        replacement.retirement.stop()
+    assert coordinator.session_count() == 0
+    original.retirement.stop()
+    assert source_calls == ["close"]
+    with pytest.raises(OSError):
+        replacement.retirement.stop()
+    assert source_calls == ["close", "close"]
+
+
+def test_receipt_retries_original_peer_without_stopping_other_sessions():
+    coordinator = _host()
+    first = coordinator.create_owned_session_offer()
+    peer = _FakeHost.instances[-1]
+    second = coordinator.create_owned_session_offer()
+    other = _FakeHost.instances[-1]
+    track = coordinator.screen_track()
+    peer.raise_on.add("stop")
+    with pytest.raises(RuntimeError):
+        first.retirement.stop()
+    assert coordinator.session_count() == 2
+    peer.raise_on.clear()
+    first.retirement.stop()
+    assert coordinator.session_count() == 1
+    assert not other.stopped and not track.stopped
+    second.retirement.stop()
+    assert track.stopped
 
 
 # --- construction -------------------------------------------------------------
@@ -228,14 +287,20 @@ def test_stopping_an_unknown_session_is_a_no_op():
     assert host.session_count() == 1
 
 
-def test_a_session_that_fails_to_stop_is_still_forgotten():
-    # The PeerConnection may already be dead when the GUI asks to close the
-    # tab; the session must leave the table anyway, or the capture it holds
-    # a reference to never gets released.
+def test_a_session_that_fails_to_stop_is_retained_until_retry():
     host = _host()
     session_id, _ = host.create_session_offer()
     track = host.screen_track()
-    _FakeHost.instances[0].raise_on.add("stop")
+    child = _FakeHost.instances[0]
+    child.raise_on.add("stop")
+    with pytest.raises(RuntimeError):
+        host.stop_session(session_id)
+    assert host.session_count() == 1
+    assert host.screen_track() is track
+    assert not track.stopped
+    with pytest.raises(PeerStopPending):
+        host.create_session_offer()
+    child.raise_on.clear()
     host.stop_session(session_id)
     assert host.session_count() == 0
     assert track.stopped
@@ -257,9 +322,10 @@ def test_a_session_that_fails_to_stop_does_not_strand_the_others():
     host.create_session_offer()
     host.create_session_offer()
     _FakeHost.instances[0].raise_on.add("stop")
-    host.stop_all()
+    with pytest.raises(PeerStopFailed):
+        host.stop_all()
     assert _FakeHost.instances[1].stopped
-    assert host.screen_track() is None, "the capture is still released"
+    assert host.screen_track() is not None, "failed child retains its shared capture"
 
 
 def test_a_new_session_after_stop_all_builds_a_fresh_capture():
@@ -523,14 +589,14 @@ def test_a_pending_viewer_is_reported_with_the_id_read_at_fire_time(monkeypatch)
     assert seen == [(session_id, "viewer-9")]
 
 
-def test_a_pending_viewer_from_a_session_that_just_left_reports_none():
+def test_a_pending_viewer_from_a_session_that_just_left_is_ignored():
     seen = []
     host = _host(on_pending_viewer=lambda sid, vid: seen.append((sid, vid)))
     session_id, _ = host.create_session_offer()
     wrapper = _FakeHost.instances[0].kwargs["on_pending_viewer"]
     host.stop_session(session_id)
     wrapper()
-    assert seen == [(session_id, None)]
+    assert seen == []
 
 
 def test_no_pending_callback_means_no_wrapper_is_installed():
@@ -557,3 +623,107 @@ def test_a_raising_gui_callback_never_reaches_the_session(kwarg, wrapper_key):
         wrapper("connected")
     else:
         wrapper()
+
+
+def test_failed_source_is_retained_and_retry_does_not_admit_new_sessions(monkeypatch):
+    host = _host()
+    host.create_session_offer()
+    source = host._source
+    def fail():
+        raise OSError("capture stop failed")
+    monkeypatch.setattr(source, "stop", fail)
+    with pytest.raises(PeerStopFailed):
+        host.stop_all()
+    assert host.session_count() == 0
+    assert host._source is source
+    with pytest.raises(PeerStopPending):
+        host.create_session_offer()
+    monkeypatch.setattr(source, "stop", lambda: None)
+    host.stop_all()
+    assert host._source is None
+
+
+def test_retired_callbacks_cannot_prune_or_authenticate_reused_session_id(monkeypatch):
+    monkeypatch.setattr(mv.secrets, "token_hex", lambda _: "same-session")
+    observed = []
+    host = _host(on_pending_viewer=lambda *args: observed.append(args))
+    session_id, _ = host.create_session_offer()
+    old = _FakeHost.instances[-1]
+    host.stop_session(session_id)
+    host.create_session_offer()
+    replacement = _FakeHost.instances[-1]
+    replacement.pending_viewer_id = "new viewer"
+    old.kwargs["on_state_change"]("failed")
+    old.kwargs["on_authenticated"]()
+    old.kwargs["on_pending_viewer"]()
+    assert host._sessions[session_id] is replacement
+    assert not replacement.stopped
+    assert session_id not in host._session_meta
+    assert observed == []
+
+
+def test_stop_during_offer_creation_retains_source_until_original_child_finishes(monkeypatch):
+    host = _host()
+    observed = []
+    def create(child, peer_label):
+        source = host._source
+        with pytest.raises(PeerStopPending):
+            host.stop_all()
+        assert host._source is source
+        assert not source._track.stopped
+        assert host.session_count() == 1
+        observed.append(child)
+        return "offer completed after stop requested"
+    monkeypatch.setattr(_FakeHost, "create_offer", create)
+    with pytest.raises(RuntimeError, match="stopped during offer creation"):
+        host.create_session_offer()
+    assert observed[0].stopped
+    assert host.session_count() == 0
+    assert host._source is None
+
+
+class _BrokenHost(_FakeHost):
+    """A peer that cannot be built (an aiortc / codec error at construction)."""
+
+    def __init__(self, **kwargs) -> None:
+        raise RuntimeError("peer construction failed")
+
+
+class _TrackRelay(_FakeRelay):
+    """A relay whose subscriptions are real track stand-ins, so a stop can be seen."""
+
+    def subscribe(self, track):
+        proxy = Track()
+        self.subscribed.append(proxy)
+        return proxy
+
+
+def test_a_peer_that_fails_to_build_leaves_no_token_subscription_or_screen_source(monkeypatch):
+    monkeypatch.setattr(mv, "MediaRelay", _TrackRelay)
+    coordinator = _host()
+    monkeypatch.setattr(mv, "WebRTCDesktopHost", _BrokenHost)
+    with pytest.raises(RuntimeError, match="peer construction failed"):
+        coordinator.create_owned_session_offer()
+    assert coordinator._session_tokens == {}
+    assert coordinator._source is None                     # the source made for it is stopped again
+    assert coordinator.session_count() == 0
+    monkeypatch.setattr(mv, "WebRTCDesktopHost", _FakeHost)
+    offer = coordinator.create_owned_session_offer()        # nothing stuck: the next session builds
+    assert coordinator.session_count() == 1
+    offer.retirement.stop()
+
+
+def test_a_failed_build_drops_its_subscription_and_spares_a_source_others_use(monkeypatch):
+    monkeypatch.setattr(mv, "MediaRelay", _TrackRelay)
+    coordinator = _host()
+    first = coordinator.create_owned_session_offer()
+    source = coordinator._source
+    monkeypatch.setattr(mv, "WebRTCDesktopHost", _BrokenHost)
+    with pytest.raises(RuntimeError):
+        coordinator.create_owned_session_offer()
+    failed_subscription = source._relay.subscribed[-1]
+    assert failed_subscription.stopped                      # its own subscription is dropped
+    assert coordinator._source is source                    # the first session still shows the screen
+    assert not source._track.stopped
+    assert coordinator.session_count() == 1
+    first.retirement.stop()

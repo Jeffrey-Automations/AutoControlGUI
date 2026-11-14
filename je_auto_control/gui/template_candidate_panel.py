@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.template_candidate_worker import (
     CandidateOperation, TemplateCandidateOutcome, TemplateCandidateRequest, TemplateCandidateWorker,
@@ -30,14 +30,21 @@ def _t(key: str) -> str:
 class TemplateCandidatePanel(TranslatableMixin, QWidget):
     """Operate only through Actions, with a concrete reviewed revision before file transitions."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ("AC_template_candidate_preview",)
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
         self._generation = 0
         self._updating = False
         self._operation: CandidateOperation = "preview"
-        self._handle: Optional[WorkerHandle] = None
-        self._worker: Optional[TemplateCandidateWorker] = None
+        # Cancel and the view's destruction stop the work at its next checkpoint; it stays busy until then.
+        self._task = TabTask(self)
+        self._task.result.connect(self._received)
+        self._task.error.connect(self._task_failed)
+        self._task.progress.connect(self._progress)
+        self._task.finished.connect(self._thread_done)
         self._template, self._candidate, self._bundle, self._dataset = (QLineEdit() for _ in range(4))
         self._revision = QLineEdit()
         self._revision.setReadOnly(True)
@@ -122,7 +129,7 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
             self._set_status("idle")
 
     def _browse(self, name: str) -> None:
-        if self._handle is not None:
+        if self._task.running:
             return
         try:
             authorize_command("AC_template_candidate_preview")
@@ -141,7 +148,7 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
             control.setText(path)
 
     def _start(self, operation: CandidateOperation) -> None:
-        if self._handle is not None:
+        if self._task.running:
             return
         if operation in ("accept", "revert") and not self._revision.text():
             self._set_status("review_required")
@@ -153,28 +160,25 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
                                              self._candidate.text().strip(), self._bundle.text().strip(),
                                              self._dataset.text().strip(), self._revision.text(),
                                              float(self._threshold.value()))
-        worker = TemplateCandidateWorker(request)
-        self._worker = worker
-        worker.progress.connect(self._progress)
-        # pylint: disable-next=no-member  # reason: PySide binds this signal at runtime
-        self.destroyed.connect(worker.request_stop)
         self._set_busy(True)
         self._set_status("running")
-        self._handle = start_worker(self, worker, on_done=self._received,
-                                    on_thread_done=self._thread_done, on_fail=self._failed)
+        self._task.start_until_stopped(TemplateCandidateWorker(request), reports=True)
 
     def cancel(self) -> None:
         """Request cooperative stop; an already committed transition remains committed."""
-        if self._worker is not None:
-            self._worker.request_stop()
+        if self._task.running:
+            self._task.stop()
             self._set_status("cancelling")
 
     def _set_busy(self, busy: bool) -> None:
         for control in (self._template, self._candidate, self._bundle, self._dataset, self._threshold):
             control.setEnabled(not busy)
 
-    @Slot(int, int)
-    def _progress(self, request_id: int, count: int) -> None:
+    @Slot(object)
+    def _progress(self, value: object) -> None:
+        if not isinstance(value, tuple) or len(value) != 2:   # the worker reports (request_id, count)
+            return
+        request_id, count = value
         if request_id == self._generation and self._status_key != "cancelling":
             self._set_status("progress", str(count))
 
@@ -220,8 +224,10 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
             label.setPixmap(image.scaled(400, 240, Qt.AspectRatioMode.KeepAspectRatio,
                                           Qt.TransformationMode.SmoothTransformation))
 
+    def _task_failed(self, error: object) -> None:
+        self._failed(str(error))
+
     def _thread_done(self) -> None:
-        self._handle = self._worker = None
         self._set_busy(False)
         if self._status_key in ("running", "progress", "cancelling"):
             self._set_status("interrupted")

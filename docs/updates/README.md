@@ -58,6 +58,111 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-43 | 2026-11-14 | Network calls and signaling waits stop with their task | #done #remote-desktop #network | [2026-11-b](2026-11-b.md) |
+| U-20261114-42 | 2026-11-14 | close_admission(): media owners stop taking anything new at once | #done #remote-desktop #lifecycle | [2026-11-b](2026-11-b.md) |
+| U-20261114-41 | 2026-11-14 | Diagnostics shows a held media stop's retirement state from its snapshot | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
+| U-20261114-40 | 2026-11-14 | An interruption's attached cleanup owners join the stop custody | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
+| U-20261114-39 | 2026-11-14 | The LAN browse dialog closes its browser off the GUI thread and is not kept alive by it | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
+| U-20261114-38 | 2026-11-14 | A failed LAN broadcast stop keeps its advertiser; a failed recording is never reported saved | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
+| U-20261114-37 | 2026-11-14 | SlowOp stops and the WebRTC host's session stops join the stop custody | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
+| U-20261114-36 | 2026-11-14 | A failed background stop is kept for a retry from Diagnostics | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
+| U-20261114-35 | 2026-11-14 | The WebRTC host panel stops the session it captured; a failed peer build leaves nothing | #done #gui #webrtc | [2026-11-b](2026-11-b.md) |
+| U-20261114-34 | 2026-11-14 | A replaced viewer session's late events no longer reach the next one | #done #gui #remote-desktop | [2026-11-b](2026-11-b.md) |
+| U-20261114-33 | 2026-11-14 | A file transfer already sending stops at the next chunk when cancelled | #done #remote-desktop #files | [2026-11-b](2026-11-b.md) |
+| U-20261114-32 | 2026-11-14 | Quick Connect starts, stops and disconnects off the GUI thread | #done #gui #remote-desktop | [2026-11-b](2026-11-b.md) |
+| U-20261114-31 | 2026-11-14 | Windows CI keeps a minidump of a crashed python.exe | #done #ci #native-diagnostics | [2026-11-b](2026-11-b.md) |
+| U-20261114-30 | 2026-11-14 | GUI startup and memory measured against the release, and the theme switch halved | #done #gui #benchmark | [2026-11-b](2026-11-b.md) |
+| U-20261114-29 | 2026-11-14 | A page banner for a failed run and for what the role cannot run | #done #gui #rbac | [2026-11-b](2026-11-b.md) |
+| U-20261114-28 | 2026-11-14 | Empty tables, lists and trees say so | #done #gui #adaptive | [2026-11-b](2026-11-b.md) |
+| U-20261114-27 | 2026-11-14 | Every page that runs background work reports it in Execution details | #done #gui #workspace | [2026-11-b](2026-11-b.md) |
+| U-20261114-26 | 2026-11-14 | Config Sync runs on the shared task; no panel uses a bare worker | #done #gui #sync | [2026-11-b](2026-11-b.md) |
+| U-20261114-25 | 2026-11-14 | The template candidate panel runs on the shared task | #done #gui #healing | [2026-11-b](2026-11-b.md) |
+| U-20261114-24 | 2026-11-14 | The journal candidate panel runs on the shared task | #done #gui #codegen | [2026-11-b](2026-11-b.md) |
+| U-20261114-23 | 2026-11-14 | The journal browser runs on the shared task, which now relays progress | #done #gui #journal | [2026-11-b](2026-11-b.md) |
+| U-20261114-22 | 2026-11-14 | The self-healing comparison panel runs on the shared task | #done #gui #healing | [2026-11-b](2026-11-b.md) |
+| U-20261114-21 | 2026-11-14 | The admin console's poll and thumbnails stop at the hosts not reached yet | #done #gui #admin | [2026-11-b](2026-11-b.md) |
+| U-20261114-20 | 2026-11-14 | The DAG Runner runs on the shared task and stays busy until a stopped run ends | #done #gui #dag | [2026-11-b](2026-11-b.md) |
+| U-20261114-19 | 2026-11-14 | Computer Use runs on the shared task and stays busy until a stopped run ends | #done #gui #agent | [2026-11-b](2026-11-b.md) |
+| U-20261114-18 | 2026-11-14 | The USB passthrough panel's use requests get a Stop and a deadline | #done #gui #usb | [2026-11-b](2026-11-b.md) |
+| U-20261114-17 | 2026-11-14 | The USB Browser's Fetch and Open get a Stop and a deadline | #done #gui #usb | [2026-11-b](2026-11-b.md) |
+| U-20261114-16 | 2026-11-14 | A stopped admin broadcast reports per host whether it was sent | #done #gui #admin | [2026-11-b](2026-11-b.md) |
+| U-20261114-15 | 2026-11-14 | Stop and closing the tab cancel an email Poll Now between mailboxes | #done #gui #triggers | [2026-11-b](2026-11-b.md) |
+| U-20261114-14 | 2026-11-14 | Closing a USB tab ends the enumeration tool it started | #done #gui #usb | [2026-11-b](2026-11-b.md) |
+| U-20261114-13 | 2026-11-14 | AI Locator and LLM Planner requests get Stop, a deadline and no late click | #done #gui #vision | [2026-11-b](2026-11-b.md) |
+| U-20261114-12 | 2026-11-14 | Whole-window probes end without Windows DLL teardown | #done #gui #test | [2026-11-b](2026-11-b.md) |
+| U-20261114-11 | 2026-11-14 | Trace Replay and Run History get their draggable divider back | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-10 | 2026-11-14 | Remote Desktop's collapsed sections shrink to their title; wrapped groups show one title | #done #gui #remote-desktop | [2026-11-b](2026-11-b.md) |
+| U-20261114-09 | 2026-11-14 | Tables fill their width: a stretched last column, re-applied after a refresh | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-08 | 2026-11-14 | Drop-down and spin box arrows drawn in theme colours, inset from the border | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-07 | 2026-11-14 | Translate the 95 strings seven testing tabs shipped in English only | #done #gui #i18n | [2026-11-b](2026-11-b.md) |
+| U-20261114-06 | 2026-11-14 | GUI polish: theme colours in Remote Desktop, idle progress line, two strings that ignored a language switch | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-05 | 2026-11-14 | GUI reviewed on the real Windows desktop at 150 %; check boxes took the system accent | #done #gui #windows | [2026-11-b](2026-11-b.md) |
+| U-20261114-04 | 2026-11-14 | GUI redesign, stage 2: every tab rebuilt on the adaptive layout | #migration #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-03 | 2026-11-14 | PySide6 back to 6.11.2: 6.12.0 crashes every CI platform at exit | #decision #ci #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-02 | 2026-11-14 | GUI redesign, stage 1: adaptive building blocks, page headers, cards, window breakpoints and the width gate | #migration #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-01 | 2026-11-14 | PR #552: CI tested PySide6 6.11.2, the container crashes on 6.12.0, two test regressions | #incident #ci #gui | [2026-11-b](2026-11-b.md) |
+| U-20261113-05 | 2026-11-13 | Saved layouts keep the maximized state; restoring it is opt-in | #done #windows | [2026-11-b](2026-11-b.md) |
+| U-20261113-04 | 2026-11-13 | `post_key_to_window` takes any printable character | #done #windows #x11 | [2026-11-b](2026-11-b.md) |
+| U-20261113-03 | 2026-11-13 | PR #552: container libEGL and three asyncio cancellation findings | #incident #ci #remote | [2026-11-b](2026-11-b.md) |
+| U-20261113-02 | 2026-11-13 | macos-15 grants what the capability gate expects | #done #macos #ci | [2026-11-b](2026-11-b.md) |
+| U-20261113-01 | 2026-11-13 | Windows desktop acceptance on a self-owned window; two fixes | #done #windows #accessibility | [2026-11-b](2026-11-b.md) |
+| U-20261112-14 | 2026-11-12 | Reading the iOS pasteboard needs an explicit allowance | #done #mobile #ios | [2026-11-b](2026-11-b.md) |
+| U-20261112-13 | 2026-11-12 | Bring the shared .venv to the pinned pillow and PySide6 | #done #tooling | [2026-11-b](2026-11-b.md) |
+| U-20261112-12 | 2026-11-12 | Move the finished on_enter note out of Progress | #docs #executor | [2026-11-b](2026-11-b.md) |
+| U-20261112-11 | 2026-11-12 | Refuse asset paths Windows cannot create before staging | #done #config-sync #windows | [2026-11-b](2026-11-b.md) |
+| U-20261112-10 | 2026-11-12 | The capability-probe Progress item described deleted code | #snapshot #capabilities #macos | [2026-11-b](2026-11-b.md) |
+| U-20261112-09 | 2026-11-12 | The result hook follows AC_parallel branches | #done #executor #gui | [2026-11-b](2026-11-b.md) |
+| U-20261112-08 | 2026-11-12 | Strict tier for the two new MCP modules; Windows Qt stub nulls | #incident #typing #ci | [2026-11-b](2026-11-b.md) |
+| U-20261112-07 | 2026-11-12 | Build only the first start-up tab; the others when first selected | #done #gui #performance | [2026-11-b](2026-11-b.md) |
+| U-20261112-06 | 2026-11-12 | Split the tools/call path out of the MCP server module | #done #mcp #quality | [2026-11-b](2026-11-b.md) |
+| U-20261112-05 | 2026-11-12 | Four WebRTC tests still asserted the pre-retention contract | #incident #remote #ci | [2026-11-b](2026-11-b.md) |
+| U-20261112-04 | 2026-11-12 | Mobile SDK calls checked against uiautomator2 and facebook-wda source | #done #mobile | [2026-11-b](2026-11-b.md) |
+| U-20261112-03 | 2026-11-12 | MCP tool calls are stoppable runs; a cancel stops them | #done #mcp #executor | [2026-11-b](2026-11-b.md) |
+| U-20261112-02 | 2026-11-12 | minimatch 5.1.9 is outside the revised advisory range | #done #deps #security | [2026-11-b](2026-11-b.md) |
+| U-20261112-01 | 2026-11-12 | Remove the stale dev package from the shared .venv | #done #tooling | [2026-11-b](2026-11-b.md) |
+| U-20261111-32 | 2026-11-11 | Retain peer media failures and observe live cleanup | #done #remote | [2026-11-b](2026-11-b.md) |
+| U-20261111-31 | 2026-11-11 | Bind delayed session retirement to original resources | #done #remote | [2026-11-b](2026-11-b.md) |
+| U-20261111-30 | 2026-11-11 | Retain LAN browser cleanup and interruption ownership | #done #remote | [2026-11-b](2026-11-b.md) |
+| U-20261111-29 | 2026-11-11 | Protect remaining REST operational records and restore dashboard status | #done #security | [2026-11-b](2026-11-b.md) |
+| U-20261111-28 | 2026-11-11 | Preserve media producer retirement outcomes and original resources | #done #remote | [2026-11-b](2026-11-b.md) |
+| U-20261111-27 | 2026-11-11 | Await actual file sender completion after cancellation | #done #remote | [2026-11-b](2026-11-b.md) |
+| U-20261111-26 | 2026-11-11 | Enforce host-data authority across REST and executor reads | #done #security | [2026-11-b](2026-11-b.md) |
+| U-20261111-25 | 2026-11-11 | Align remote GUI tests with queued page ownership | #done #tests | [2026-11-b](2026-11-b.md) |
+| U-20261111-24 | 2026-11-11 | Record fixed-source full-suite failures and coverage | #snapshot #verification | [2026-11-b](2026-11-b.md) |
+| U-20261111-23 | 2026-11-11 | Retain unfinished WebRTC software teardown | #done #remote | [2026-11-b](2026-11-b.md) |
+| U-20261111-22 | 2026-11-11 | Measure image-file evidence through retained Windows handles | #done #memory | [2026-11-b](2026-11-b.md) |
+| U-20261111-21 | 2026-11-11 | Verify integrated types, HTML and distribution source bytes | #snapshot #verification | [2026-11-b](2026-11-b.md) |
+| U-20261111-20 | 2026-11-11 | Enforce reviewed MCP capabilities at every invocation | #done #security | [2026-11-b](2026-11-b.md) |
+| U-20261111-19 | 2026-11-11 | Add an injectable workspace and live execution details | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261111-18 | 2026-11-11 | Release remote pages without retaining callback owners | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261111-17 | 2026-11-11 | Start and stop WebRTC statistics without waiting | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261111-16 | 2026-11-11 | Reconcile historical coverage comparison and file budgets | #snapshot #progress | [2026-11-b](2026-11-b.md) |
+| U-20261111-15 | 2026-11-11 | Reconcile signing and RBAC transport verification | #snapshot #security | [2026-11-b](2026-11-b.md) |
+| U-20261111-14 | 2026-11-11 | Reconcile package-loading progress with existing execution support | #snapshot #progress | [2026-11-b](2026-11-b.md) |
+| U-20261111-13 | 2026-11-11 | Validate integrated implementation and package artifacts | #snapshot #verification | [2026-11-b](2026-11-b.md) |
+| U-20261111-12 | 2026-11-11 | Remove remaining WebRTC Qt typing exemptions | #done #typing | [2026-11-b](2026-11-b.md) |
+| U-20261111-11 | 2026-11-11 | Enroll EI helpers in the strict typing gate | #done #typing | [2026-11](2026-11.md) |
+| U-20261111-10 | 2026-11-11 | Isolate default EI input in an owned helper | #done #wayland | [2026-11](2026-11.md) |
+| U-20261111-09 | 2026-11-11 | Split MCP executor adapters along strict domain boundaries | #done #mcp | [2026-11](2026-11.md) |
+| U-20261111-08 | 2026-11-11 | Reconcile conditional MCP path checks with current evidence | #snapshot #mcp | [2026-11](2026-11.md) |
+| U-20261111-07 | 2026-11-11 | Release core panels while retaining shared recorder ownership | #done #gui | [2026-11](2026-11.md) |
+| U-20261111-06 | 2026-11-11 | Check navigation and editor widgets against real Qt types | #done #typing | [2026-11](2026-11.md) |
+| U-20261111-05 | 2026-11-11 | Reconcile mobile and modernization progress with current evidence | #snapshot #progress | [2026-11](2026-11.md) |
+| U-20261111-04 | 2026-11-11 | Validate media types and restore package complexity checks | #done #typing | [2026-11](2026-11.md) |
+| U-20261111-03 | 2026-11-11 | Release Image Detection and cancel pending click work | #done #gui | [2026-11](2026-11.md) |
+| U-20261111-02 | 2026-11-11 | Bound Windows memory reads behind reviewed attestation | #snapshot #agent | [2026-11](2026-11.md) |
+| U-20261111-01 | 2026-11-11 | Prepare owned memory fixture buffers and bounded control | #snapshot #agent | [2026-11](2026-11.md) |
+| U-20261110-11 | 2026-11-10 | Own Screenshot lifecycle and run reads asynchronously | #done #agent | [2026-11](2026-11.md) |
+| U-20261110-10 | 2026-11-10 | Forward nested owner grants to presence sources | #done #agent | [2026-11](2026-11.md) |
+| U-20261110-09 | 2026-11-10 | Bound internal semantic process-memory observations | #snapshot #agent | [2026-11](2026-11.md) |
+| U-20261110-08 | 2026-11-10 | Generate reports without blocking the GUI | #done #gui | [2026-11](2026-11.md) |
+| U-20261110-07 | 2026-11-10 | Carry owned Linux presence endpoints into helpers | #done #agent | [2026-11](2026-11.md) |
+| U-20261110-06 | 2026-11-10 | Give the Report page independent ownership | #done #gui | [2026-11](2026-11.md) |
+| U-20261110-05 | 2026-11-10 | Verify existing RBAC administration delivery | #done #rbac | [2026-11](2026-11.md) |
+| U-20261110-04 | 2026-11-10 | Reconcile USB wait and channel-error progress | #done #usb | [2026-11](2026-11.md) |
+| U-20261110-03 | 2026-11-10 | GUI task cancellation reaches headless waits | #done #gui | [2026-11](2026-11.md) |
+| U-20261110-02 | 2026-11-10 | Executor stop reaches focus-event waits | #done #accessibility | [2026-11](2026-11.md) |
+| U-20261110-01 | 2026-11-10 | Cooperative cancellation for Windows focus waits | #done #accessibility | [2026-11](2026-11.md) |
 | U-20261103-01 | 2026-11-03 | Hold the collector off around the presence reader's timed windows | #incident #agent #ci #test | [2026-11](2026-11.md) |
 | U-20261102-03 | 2026-11-02 | Require Python 3.11; stop supporting 3.10 | #migration #deps #ci | [2026-11](2026-11.md) |
 | U-20261102-02 | 2026-11-02 | Clear the SonarCloud findings the 1.1.0 release PR reported | #ci #test #quality | [2026-11](2026-11.md) |
@@ -608,7 +713,8 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | File | Period | Entries |
 |---|---|---:|
-| [2026-11.md](2026-11.md) | 2026-11 | 21 |
+| [2026-11-b.md](2026-11-b.md) | 2026-11 | 21 |
+| [2026-11.md](2026-11.md) | 2026-11 | 43 |
 | [2026-10-f.md](2026-10-f.md) | 2026-10 | 5 |
 | [2026-10-e.md](2026-10-e.md) | 2026-10 | 91 |
 | [2026-10-d.md](2026-10-d.md) | 2026-10 | 15 |

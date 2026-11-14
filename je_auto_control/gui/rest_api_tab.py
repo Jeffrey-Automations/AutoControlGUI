@@ -14,13 +14,16 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
-    QCheckBox, QFileDialog, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QCheckBox, QFileDialog, QFormLayout, QGroupBox, QLabel, QLineEdit,
     QMessageBox, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -72,8 +75,8 @@ class RestApiTab(TranslatableMixin, QWidget):
         # Start/stop/copy/export/import commands run from the Actions
         # menu; the tab keeps only the config inputs and the status group.
         root = QVBoxLayout(self)
-        root.addWidget(self._build_config_group())
-        root.addWidget(self._build_status_group())
+        root.setSpacing(12)
+        root.addWidget(ResponsiveBox(self._build_config_group(), self._build_status_group()))
         root.addWidget(self._users_panel, stretch=1)
 
     def menu_actions(self) -> list:
@@ -103,19 +106,14 @@ class RestApiTab(TranslatableMixin, QWidget):
 
     def _build_config_group(self) -> QGroupBox:
         group = self._tr(QGroupBox(), "rest_config_group")
-        form = QVBoxLayout(group)
-        addr_row = QHBoxLayout()
-        addr_row.addWidget(self._tr(QLabel(), "rest_host"))
-        addr_row.addWidget(self._host_input, stretch=1)
-        addr_row.addWidget(self._tr(QLabel(), "rest_port"))
-        addr_row.addWidget(self._port_input)
-        form.addLayout(addr_row)
-        token_row = QHBoxLayout()
-        token_row.addWidget(self._tr(QLabel(), "rest_token"))
-        token_row.addWidget(self._token_input, stretch=1)
-        form.addLayout(token_row)
+        layout = QVBoxLayout(group)
+        layout.addLayout(flow_of(field_pair(self._tr(QLabel(), "rest_host"), self._host_input),
+                                 field_pair(self._tr(QLabel(), "rest_port"), self._port_input)))
+        form = QFormLayout()
+        form.addRow(self._tr(QLabel(), "rest_token"), self._token_input)
+        layout.addLayout(form)
         self._tr(self._audit_check, "rest_enable_audit")
-        form.addWidget(self._audit_check)
+        layout.addWidget(self._audit_check)
         return group
 
     def _on_config_export(self) -> None:
@@ -173,16 +171,14 @@ class RestApiTab(TranslatableMixin, QWidget):
 
     def _build_status_group(self) -> QGroupBox:
         group = self._tr(QGroupBox(), "rest_status_group")
-        form = QVBoxLayout(group)
-        url_row = QHBoxLayout()
-        url_row.addWidget(self._tr(QLabel(), "rest_url"))
-        url_row.addWidget(self._url_value, stretch=1)
-        form.addLayout(url_row)
-        token_row = QHBoxLayout()
-        token_row.addWidget(self._tr(QLabel(), "rest_active_token"))
-        token_row.addWidget(self._token_value, stretch=1)
-        form.addLayout(token_row)
-        form.addWidget(self._status_label)
+        layout = QVBoxLayout(group)
+        form = QFormLayout()
+        form.addRow(self._tr(QLabel(), "rest_url"), self._url_value)
+        form.addRow(self._tr(QLabel(), "rest_active_token"), self._token_value)
+        layout.addLayout(form)
+        self._status_label.setWordWrap(True)
+        set_role(self._status_label, "hint")
+        layout.addWidget(self._status_label)
         return group
 
     def _on_start(self) -> None:
@@ -211,7 +207,7 @@ class RestApiTab(TranslatableMixin, QWidget):
             return
         self._pending_key = "gui_op_stopping"
         self._server_op.run(rest_api_registry.stop, on_done=self._on_server_op_done,
-                            on_error=self._on_server_op_done)
+                            on_error=self._on_server_op_done, retain_failure=True)
         self._refresh_status()
 
     def _on_server_op_done(self, _outcome: object = None) -> None:

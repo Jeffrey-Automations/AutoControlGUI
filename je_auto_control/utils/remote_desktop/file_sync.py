@@ -157,6 +157,15 @@ class FolderSyncEngine:
         if thread is not None and thread is not threading.current_thread():
             thread.join(timeout=2.0)
 
+    def stop_confirmed(self) -> bool:
+        """Request stop and observe whether this exact worker has actually exited."""
+        with self._lifecycle_lock:
+            self.request_stop()
+            thread = self._thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=2.0)
+        return thread is None or not thread.is_alive()
+
     @property
     def stop_requested(self) -> bool:
         """Expose the current run's cancellation request to an owning synchronous sender."""

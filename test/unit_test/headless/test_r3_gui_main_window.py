@@ -49,3 +49,30 @@ def test_apply_font_pt_keeps_theme_across_size_changes(qapp):
         assert "font-size: 12pt" not in sheet  # old rule fully replaced
     finally:
         window.deleteLater()
+
+
+def test_a_theme_switch_restyles_the_window_once(qapp):
+    # Setting the theme's sheet and then the font's restyled every widget on
+    # every open page twice; with all tabs open that doubled the switch.
+    import types
+
+    class _Counting(QMainWindow):
+        def __init__(self):
+            super().__init__()
+            self.sheets = []
+
+        def setStyleSheet(self, sheet):  # noqa: N802  # reason: Qt override
+            self.sheets.append(sheet)
+            super().setStyleSheet(sheet)
+
+    window = _Counting()
+    window._user_font_pt = 14
+    window._adaptive = types.SimpleNamespace(set_glyph_colour=lambda colour: None)
+    try:
+        AutoControlGUIUI.set_theme(window, "light")
+        assert len(window.sheets) == 1
+        assert "font-size: 14pt" in window.sheets[0]          # the font rule rides along
+        assert window._theme_stylesheet in window.sheets[0]
+        assert "font-size: 14pt" not in window._theme_stylesheet   # kept without it, for size changes
+    finally:
+        window.deleteLater()

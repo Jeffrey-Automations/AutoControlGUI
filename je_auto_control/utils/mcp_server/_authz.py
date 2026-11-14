@@ -14,16 +14,17 @@ MCP peers have the operator ceiling at invocation and discovery; a shared
 token does not identify an administrator. Authenticated roles remain opt-in.
 """
 import hmac
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.mcp_server._protocol import _MCPError
 from je_auto_control.utils.mcp_server.audit import AuditLogger
 from je_auto_control.utils.mcp_server.tools import MCPTool
 from je_auto_control.utils.rbac.authorization import (
-    AuthorizationContext, current_authorization, resolve_token,
+    AuthorizationContext, AuthorizationError, current_authorization, resolve_token,
 )
-from je_auto_control.utils.rbac.policy import capability_for_tool, denied_command_in
+from je_auto_control.utils.rbac.policy import capabilities_for_tool_call, capability_for_tool, denied_command_in
 from je_auto_control.utils.rbac.users import Capability, UserStore
+from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
 #: JSON-RPC error code of a call refused for the caller's role.
 FORBIDDEN_CODE = -32003
@@ -72,6 +73,20 @@ def _tool_capability(tool: MCPTool) -> str:
     return capability_for_tool(tool.name, tool.annotations.read_only)
 
 
+def capture_error_artifact(tool: MCPTool, read_only: bool,
+                           capture: Callable[[str], Optional[str]]) -> Optional[str]:
+    """Capture only with writable tool ownership and current caller authority."""
+    if read_only or tool.enforce_readonly_arguments:
+        return None
+    try:
+        with DeferredAuthorization.capture().context_scope() as caller:
+            if caller is not None and not caller.allows(Capability.DRIVE_INPUT):
+                return None
+            return capture(tool.name)
+    except (AuthorizationError, OSError, ValueError):
+        return None
+
+
 def visible_tools(tools: List[MCPTool]) -> List[MCPTool]:
     """The tools the current caller may call; all of them outside an RBAC scope."""
     caller = current_authorization()
@@ -92,9 +107,10 @@ def authorize_tool_call(tool: MCPTool, arguments: Dict[str, Any],
     caller = current_authorization()
     if caller is None:
         return
-    needed: Optional[str] = _tool_capability(tool)
+    needed = next((capability for capability in capabilities_for_tool_call(
+        tool.name, tool.annotations.read_only, arguments) if not caller.allows(capability)), None)
     reason = f"tool {tool.name!r}"
-    if caller.allows(str(needed)):
+    if needed is None:
         denied = denied_command_in(arguments, caller)
         if denied is None:
             return

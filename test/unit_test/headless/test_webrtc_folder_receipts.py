@@ -5,6 +5,9 @@ from types import SimpleNamespace
 import pytest
 
 pytest.importorskip('PySide6.QtWidgets', exc_type=ImportError)
+from PySide6.QtWidgets import QApplication
+from headless.test_gui_panel_dispose import qapp as qapp  # noqa: F401
+from headless._remote_view_owner import RemoteViewOwner
 from headless._webrtc_doubles import Bridge, Channel, FakePeerConnection
 from headless.test_folder_sync_content import loop
 from je_auto_control.gui.remote_desktop import webrtc_panel, webrtc_viewer_connection
@@ -28,7 +31,9 @@ def native_folder(tmp_path, monkeypatch):
     notices = []
     signals = SimpleNamespace(**{name: SimpleNamespace(emit=lambda *_args: None)
                                  for name in ['state', 'auth', 'inbox_listing', 'inbox_op']})
-    owner = SimpleNamespace(_viewer_id='controlled', _on_av_frame=lambda _frame: None, _signals=signals,
+    signals.file_received = SimpleNamespace(emit=notices.append)
+    owner = RemoteViewOwner(_viewer_id='controlled', _recorder=None, _on_file_received_ui=notices.append,
+        _on_av_frame=lambda _frame: None, _signals=signals,
                             _on_received_file=notices.append, _viewer=None, _sync_engine=None,
                             watch=watch, store=store, _sync_dir_edit=SimpleNamespace(text=lambda: str(watch)),
                             _sync_btn=SimpleNamespace(setText=lambda _text: None, setChecked=lambda _value: None))
@@ -72,6 +77,7 @@ def test_native_gui_receipt_does_not_echo_and_later_local_bytes_still_send(nativ
     loop(engine, lambda: deliver(channel), lambda: target.write_bytes(b'local edit'), lambda: None)
     sent = [message for message in channel.sent if isinstance(message, bytes)]
     assert sent == [b'local edit'], 'the GUI folder mirror echoed received bytes or consumed a local edit'
+    QApplication.instance().processEvents()
     assert notices == [target]
 
 
@@ -151,6 +157,7 @@ def test_native_two_way_folder_receipts_converge_without_echo_or_lost_reply(
         assert (owner.watch / 'shared.bin').read_bytes() == (watch_b / 'shared.bin').read_bytes() == b'local B'
         assert [message for message in channel_a.sent if isinstance(message, bytes)] == [b'local A']
         assert [message for message in channel_b.sent if isinstance(message, bytes)] == [b'local B']
+        QApplication.instance().processEvents()
         assert notices == [owner.watch / 'shared.bin']
     finally:
         engine_b.stop()

@@ -132,3 +132,45 @@ def test_an_owned_worker_hands_its_endpoint_to_the_broker_and_serves_presence(tm
     finally:
         broker.close()
     assert broker.retired
+
+
+@linux
+def test_owned_endpoint_reaches_host_grant_and_actual_reader(tmp_path, monkeypatch):
+    import threading
+    from types import SimpleNamespace
+    from je_auto_control.utils.agent_runtime.native_channel import OwnedChannel
+    from je_auto_control.utils.agent_runtime.presence_pool import PresencePool
+    from je_auto_control.utils.agent_runtime.presence_host import TargetPresence
+    from je_auto_control.utils.agent_runtime.presence_reader import PresenceReader
+
+    runtime = tmp_path / 'runtime'
+    runtime.mkdir(mode=0o700)
+    os.chmod(runtime, 0o700)
+    monkeypatch.setenv('XDG_RUNTIME_DIR', str(runtime))
+    clock = tmp_path / 'clock.txt'
+    clock.write_text('0', encoding='utf-8')
+    broker = OwnedChannel([sys.executable, '-u', '-c', _broker_script(clock)])
+    owner = PresencePool(channel_factory=lambda argv: broker)
+    reference = owner.reference()
+    target = TargetPresence()
+    reader = None
+    notice = threading.Event()
+    try:
+        assert broker.request('bootstrap', {}, timeout=15)['ready'] is True
+        clock.write_text('60', encoding='utf-8')
+        operation = SimpleNamespace(presence=lambda: reference, checkpoint=lambda: None, spec=object())
+        binding = target.bind(operation, object(), 3)
+        endpoint = target.endpoint()
+        reader = PresenceReader(binding, notice.set, endpoint=endpoint)
+        reader.ready()
+        reader.check()
+        assert not notice.is_set()
+        reference.release(binding)
+        assert notice.wait(2), 'source revocation must fence the independently connected reader'
+    finally:
+        if reader is not None:
+            reader.close()
+        reference.close()
+        target.release()
+    assert reader.retired
+    assert owner.retired

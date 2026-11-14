@@ -160,6 +160,7 @@ async function refreshDiagnostics() {
 async function refreshSessions() {
   try {
     const data = await fetchJson("/sessions");
+    setPanelStatus("sessions", "Updated", "ok");
     panelEl("sessions").querySelector("[data-rows]").textContent =
       JSON.stringify(data, null, 2);
   } catch (error) {

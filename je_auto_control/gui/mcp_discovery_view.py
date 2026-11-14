@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (  # pylint: disable=no-name-in-module  # reason: 
     QCheckBox, QComboBox, QFormLayout, QLineEdit, QPlainTextEdit, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui.adaptive.flow_layout import flow_of
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.mcp_server.discovery import search_mcp_tools, get_mcp_tool_schema
@@ -17,6 +18,9 @@ from je_auto_control.utils.rbac.policy import authorize_command
 
 class MCPDiscoveryView(QWidget):
     """Inspect the local default registry without starting a server or granting access."""
+
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ("AC_mcp_tool_search",)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -29,15 +33,15 @@ class MCPDiscoveryView(QWidget):
         self.output = QPlainTextEdit()
         self.output.setReadOnly(True)
         self.output.setMaximumBlockCount(2000)
+        self.setProperty("role", "bare")
         form = QFormLayout()
         form.addRow(self.query)
         form.addRow(self.name)
-        form.addRow(self.read_only)
-        form.addRow(self.mode)
         form.addRow(self.profile)
-        form.addRow(self.page_size)
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(form)
+        layout.addLayout(flow_of(self.read_only, self.mode, self.page_size))
         layout.addWidget(self.output)
         self.retranslate()
 

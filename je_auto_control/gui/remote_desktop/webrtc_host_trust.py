@@ -5,6 +5,8 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
+
 import functools
 import os
 from typing import Any
@@ -22,14 +24,13 @@ from je_auto_control.gui.remote_desktop.webrtc_dialogs import (
 )
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
-    _PanelPart,
     _JSON_FILE_FILTER,
     start_panel_task,
 )
 from je_auto_control.gui.tab_task_controller import CancellationToken
 
 
-class _HostTrustMixin(_PanelPart):
+class _HostTrustMixin(_HostPanelPart):
     """Methods of ``_WebRTCHostPanel``; the module docstring says which group."""
 
     def _on_view_audit(self) -> None:

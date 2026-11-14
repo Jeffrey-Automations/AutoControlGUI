@@ -14,3 +14,8 @@ updates:
       - "/.github/requirements"
     schedule:
       interval: "daily"
+    ignore:
+      # 6.12.0 crashes the test process at interpreter exit on every platform
+      # (Progress.md, "PySide6 6.12"); a later 6.12 release may be proposed.
+      - dependency-name: "pyside6"
+        versions: ["6.12.0"]

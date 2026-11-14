@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -49,36 +51,30 @@ class DataSourceTab(TranslatableMixin, QWidget):
         # The load command runs from the Actions menu; the tab keeps the
         # source form (with its kind-synced browse button) and the table.
         root = QVBoxLayout(self)
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel(_t("ds_kind")))
-        row1.addWidget(self._kind)
-        row1.addStretch()
-        root.addLayout(row1)
+        root.setSpacing(12)
+        source = Card().add(flow_of(field_pair(self._tr(QLabel(), "ds_kind"), self._kind),
+                                    field_pair(self._tr(QLabel(), "ds_limit"), self._limit)))
 
+        # The rows of the other kinds hide; they go in as layouts, not
+        # containers, so a hidden row leaves no gap behind.
         self._path_row = QHBoxLayout()
-        self._path_label = QLabel(_t("ds_path"))
+        self._path_label = self._tr(QLabel(), "ds_path")
         self._path_row.addWidget(self._path_label)
         self._path_row.addWidget(self._path, stretch=1)
         self._browse_btn = self._tr(QPushButton(), "ds_browse")
         self._browse_btn.clicked.connect(self._on_browse)
         self._path_row.addWidget(self._browse_btn)
-        root.addLayout(self._path_row)
+        source.add(self._path_row)
 
-        self._query_label = QLabel(_t("ds_query"))
-        root.addWidget(self._query_label)
-        root.addWidget(self._query)
+        self._query_label = self._tr(QLabel(), "ds_query")
+        self._inline_label = self._tr(QLabel(), "ds_inline")
+        for widget in (self._query_label, self._query, self._inline_label, self._inline):
+            source.add(widget)
+        root.addWidget(source)
 
-        self._inline_label = QLabel(_t("ds_inline"))
-        root.addWidget(self._inline_label)
-        root.addWidget(self._inline)
-
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel(_t("ds_limit")))
-        row2.addWidget(self._limit)
-        row2.addStretch()
-        root.addLayout(row2)
-
-        root.addWidget(self._table, stretch=1)
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def menu_actions(self) -> list:

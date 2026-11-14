@@ -40,6 +40,15 @@ _ICONIC_STATE = 3
 #: Button names the project uses, in X11's button numbering.
 _BUTTONS = {"left": 1, "middle": 2, "right": 3}
 
+#: Keysyms above this are Unicode characters, ``0x01000000`` plus the code point (``keysymdef.h``).
+_UNICODE_KEYSYM_BASE = 0x01000000
+
+
+def _character_keysym(character: str) -> int:
+    """The keysym X names a character by: its code point in Latin-1, the Unicode range beyond."""
+    point = ord(character[0])
+    return point if 0x20 <= point <= 0x7E or 0xA0 <= point <= 0xFF else _UNICODE_KEYSYM_BASE | point
+
 
 def _is_linux() -> bool:
     return sys.platform in ("linux", "linux2")
@@ -336,11 +345,21 @@ class X11WindowBackend(WindowManageBackend):
         Win32's ``PostMessage`` — best-effort, and useful mainly for the
         older toolkits that do accept it. For input that always lands, focus
         the window and use the ordinary keyboard API.
+
+        X11 has no "type this character" event, so a ``character`` is sent as
+        the key the server's keymap binds it to, with Shift held in the
+        event's state when it sits on the key's shifted level: ``"%"`` is the
+        5 key with Shift, ``"Z"`` the z key with Shift. A character the keymap
+        does not bind falls back to ``keycode``; with no keycode either,
+        nothing is sent and the answer is ``False``.
         """
         from Xlib import X, protocol
 
-        del character  # X11 addresses keys by keycode; the character is Win32's
         try:
+            detail, state = self._key_for(int(keycode), character)
+            if not detail:
+                autocontrol_logger.info("post_key(%s): the keymap binds no key to %r", window_id, character)
+                return False
             window = self._window(window_id)
             for factory, mask in ((protocol.event.KeyPress, X.KeyPressMask),
                                   (protocol.event.KeyRelease, X.KeyReleaseMask)):
@@ -348,13 +367,28 @@ class X11WindowBackend(WindowManageBackend):
                     factory(time=X.CurrentTime, root=self._root(),
                             window=window, same_screen=1, child=X.NONE,
                             root_x=0, root_y=0, event_x=0, event_y=0,
-                            state=0, detail=int(keycode)),
+                            state=state, detail=detail),
                     propagate=True, event_mask=mask)
             self._display().flush()
             return True
         except Exception as error:  # noqa: BLE001  # reason: report, do not abort
             autocontrol_logger.info("post_key(%s) failed: %r", window_id, error)
             return False
+
+    def _key_for(self, keycode: int, character: str) -> Tuple[int, int]:
+        """``(keycode, modifier state)`` that types ``character``; ``(keycode, 0)`` when it is unbound."""
+        if not character:
+            return keycode, 0
+        from Xlib import X
+
+        display = self._display()
+        keysym = _character_keysym(character)
+        bound = int(display.keysym_to_keycode(keysym))
+        if not bound:
+            return keycode, 0
+        shifted = (display.keycode_to_keysym(bound, 0) != keysym
+                   and display.keycode_to_keysym(bound, 1) == keysym)
+        return bound, (X.ShiftMask if shifted else 0)
 
     def post_click(self, window_id: int, button: str, x: int, y: int) -> bool:
         """Send one click to the window without focusing it.

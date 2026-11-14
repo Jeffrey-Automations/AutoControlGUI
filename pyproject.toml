@@ -110,7 +110,7 @@ find = { namespaces = false }
 ]
 
 [project.optional-dependencies]
-gui = ["PySide6==6.12.0"]
+gui = ["PySide6==6.11.2"]
 webrtc = ["aiortc>=1.14.0", "av>=14.0.0"]
 signaling = ["fastapi>=0.115", "starlette>=1.0.1", "uvicorn>=0.32"]
 discovery = ["zeroconf>=0.149.16"]
@@ -354,6 +354,11 @@ ignore_missing_imports = true
 # as a whole is named with `.*` as well, so a file added to it is covered the
 # day it is written. Nothing here loosens a setting from `[tool.mypy]`.
 module = [
+    "je_auto_control.utils.remote_desktop.webrtc_retirement",
+    "je_auto_control.utils.remote_desktop.webrtc_peer_cleanup",
+    "je_auto_control.utils.remote_desktop.media_retirement",
+    "je_auto_control.utils.remote_desktop.webrtc_media_owners",
+    "je_auto_control.utils.remote_desktop.audio_retirement",
     "je_auto_control.android.apps",
     "je_auto_control.android.input",
     "je_auto_control.android.screen",
@@ -362,6 +367,17 @@ module = [
     "je_auto_control.gui.config_sync_tab",
     "je_auto_control.gui.mobile_tab",
     "je_auto_control.gui.navigation",
+    "je_auto_control.gui.workspace_details",
+    "je_auto_control.gui._task_details",
+    "je_auto_control.gui._stop_custody",
+    "je_auto_control.gui.failed_stops_view",
+    "je_auto_control.gui.remote_desktop.webrtc_panel_state",
+    "je_auto_control.gui.remote_desktop.view_lifetime",
+    "je_auto_control.gui.remote_desktop.view_approvals",
+    "je_auto_control.gui.remote_desktop.view_frames",
+    "je_auto_control.gui.remote_desktop.view_upload",
+    "je_auto_control.gui.remote_desktop._host_ops",
+
     "je_auto_control.gui.rbac_users_panel",
     "je_auto_control.gui.remote_desktop._connect_task",
     "je_auto_control.gui.remote_desktop._webrtc_types",
@@ -382,6 +398,10 @@ module = [
     "je_auto_control.gui.theme",
     "je_auto_control.ios.apps",
     "je_auto_control.ios.session",
+    "je_auto_control.linux_wayland.ei_default",
+    "je_auto_control.linux_wayland.ei_protocol",
+    "je_auto_control.linux_wayland.ei_transport",
+    "je_auto_control.linux_wayland.ei_worker",
     "je_auto_control.linux_wayland.global_shortcuts",
     "je_auto_control.linux_wayland.input_events",
     "je_auto_control.utils.action_journal",
@@ -404,13 +424,25 @@ module = [
     "je_auto_control.utils.config_sync.store",
     "je_auto_control.utils.config_sync.versions",
     "je_auto_control.utils.generate_report.report_path",
+    "je_auto_control.utils.rbac.tool_classification",
+    "je_auto_control.utils.mcp_server.tools._readonly",
+    "je_auto_control.utils.mcp_server.tools._handlers_accessibility_executor",
+    "je_auto_control.utils.mcp_server.tools._handlers_automation_executor",
+    "je_auto_control.utils.mcp_server.tools._handlers_data_executor",
+    "je_auto_control.utils.mcp_server.tools._handlers_desktop_executor",
+    "je_auto_control.utils.mcp_server.tools._handlers_mobile_executor",
+    "je_auto_control.utils.mcp_server.tools._handlers_vision_executor",
     "je_auto_control.utils.mcp_server._argument_policy",
     "je_auto_control.utils.mcp_server._authz",
+    "je_auto_control.utils.mcp_server._call_run",
+    "je_auto_control.utils.mcp_server._tool_calls",
     "je_auto_control.utils.mcp_server._http_origin",
     "je_auto_control.utils.mcp_server._http_responses",
     "je_auto_control.utils.mcp_server.disclosure",
     "je_auto_control.utils.mcp_server.discovery",
     "je_auto_control.utils.monitor_layout.macos_frame",
+    "je_auto_control.utils.process_memory",
+    "je_auto_control.utils.process_memory.*",
     "je_auto_control.utils.ocr.tesseract_setup",
     "je_auto_control.utils.path_guard.policy",
     "je_auto_control.utils.rbac.__main__",
@@ -441,7 +473,12 @@ module = [
     "je_auto_control.gui._weak_call",
     "je_auto_control.gui._qt_typed",
     "je_auto_control.utils.accessibility.backends.windows_automation",
+    "je_auto_control.utils.accessibility.backends.windows_events",
     "je_auto_control.utils.remote_desktop.input_send_queue",
+    "je_auto_control.gui.adaptive",
+    "je_auto_control.gui.adaptive.*",
+    "je_auto_control.gui.adaptive_window",
+    "je_auto_control.gui._arrow_icons",
     "je_auto_control_pytest",
 ]
 disallow_untyped_defs = true

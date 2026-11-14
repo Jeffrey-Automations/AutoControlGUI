@@ -87,10 +87,10 @@ def test_admin_console_refresh_actually_polls(qapp, tmp_path, monkeypatch):
     tab._thumb_timer.stop()  # noqa: SLF001
     tab._on_refresh()  # noqa: SLF001
     tab._refresh_thumbnails()  # noqa: SLF001
-    assert _pump(qapp, lambda: tab._poll_thread is None and tab._thumb_thread is None)  # noqa: SLF001
+    assert _pump(qapp, lambda: not tab._polls.running and not tab._thumbs.running)  # noqa: SLF001
     assert sorted(polled) == [1, 2], "the workers were collected before run()"
     tab._on_refresh()  # noqa: SLF001  # and the guard lets a second refresh run
-    assert _pump(qapp, lambda: tab._poll_thread is None)  # noqa: SLF001
+    assert _pump(qapp, lambda: not tab._polls.running)  # noqa: SLF001
     assert polled.count(1) == 2
     tab.deleteLater()
 

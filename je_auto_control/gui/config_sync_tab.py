@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox, fit_columns
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.config_sync_worker import ConfigSyncWorker, SyncUIOutcome, SyncUIRequest
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.config_sync.adapter_schema import AdapterKind, KINDS
@@ -37,13 +39,20 @@ def _t(key: str) -> str:
 class ConfigSyncTab(TranslatableMixin, QWidget):
     """No connection, source capture, activation or credential lookup occurs when the tab is constructed."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ('AC_sync_workspace',)
+
     def __init__(self, parent: Optional[QWidget] = None, *, path_policy: Optional[PathPolicy] = None) -> None:
         super().__init__(parent)
         self._tr_init()
         self._policy = path_policy
         self._generation = 0
         self._worker: Optional[ConfigSyncWorker] = None
-        self._handle: Optional[WorkerHandle] = None
+        # Cancel and the tab's destruction stop the request at its next checkpoint; it stays busy until then.
+        self._task = TabTask(self)
+        self._task.result.connect(self._received)
+        self._task.error.connect(self._task_failed)
+        self._task.finished.connect(self._thread_done)
         self._reviewed: Optional[dict[str, dict[str, object]]] = None
         self._row_ids: list[str] = []
         self._last_sync: object = None
@@ -70,11 +79,15 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
 
     def _build_form(self) -> QVBoxLayout:
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
         note = self._label('notice')
         note.setWordWrap(True)
+        set_role(note, 'hint')
         layout.addWidget(note)
         self._form = QWidget(self)
+        self._form.setProperty('role', 'bare')
         form = QFormLayout(self._form)
+        form.setContentsMargins(0, 0, 0, 0)
         self._configuration = QPlainTextEdit(self)
         self._configuration.setMaximumHeight(160)
         self._tr(self._configuration, 'config_sync_configuration_hint', 'setPlaceholderText')
@@ -95,12 +108,13 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
         self._kind = QComboBox(self)
         self._kind.addItems(sorted(KINDS))
         form.addRow(self._label('kind'), self._kind)
-        layout.addWidget(self._form)
         return layout
 
     def _build_profile_inputs(self, layout: QVBoxLayout) -> None:
         self._load_form = QWidget(self)
+        self._load_form.setProperty('role', 'bare')
         form = QFormLayout(self._load_form)
+        form.setContentsMargins(0, 0, 0, 0)
         self._generation_directory = QLineEdit(self)
         form.addRow(self._label('generation_directory'), self._generation_directory)
         self._manifest_digest = QLineEdit(self)
@@ -109,37 +123,40 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
         form.addRow(self._label('working_root'), self._working_root)
         self._loaded_scripts = QComboBox(self)
         form.addRow(self._label('loaded_script'), self._loaded_scripts)
-        layout.addWidget(self._load_form)
         notice = self._label('profile_notice')
         notice.setWordWrap(True)
-        layout.addWidget(notice)
+        set_role(notice, 'hint')
+        profile = Card().add(self._load_form).add(notice)
+        profile.body.addStretch(1)
+        layout.addWidget(ResponsiveBox(Card().add(self._form), profile))
 
     def _build_review(self, layout: QVBoxLayout) -> None:
         self._summary = QLabel(self)
         self._summary.setTextFormat(Qt.TextFormat.PlainText)
         self._summary.setWordWrap(True)
-        layout.addWidget(self._summary)
+        set_role(self._summary, 'hint')
+        review = Card().add(self._summary)
         self._heads = QTableWidget(0, 6, self)
         self._heads.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._heads.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._heads.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._heads.setMinimumHeight(140)
-        layout.addWidget(self._heads)
+        review.add(self._heads, stretch=1)
         self._value = QPlainTextEdit(self)
         self._value.setMaximumHeight(130)
-        layout.addWidget(self._label('resolution_value'))
-        layout.addWidget(self._value)
+        review.add(self._label('resolution_value')).add(self._value)
         self._deleted = QCheckBox(self)
         self._tr(self._deleted, 'config_sync_deleted')
-        layout.addWidget(self._deleted)
+        review.add(self._deleted)
+        layout.addWidget(review, stretch=1)
         self._status = QLabel(self)
         self._status.setTextFormat(Qt.TextFormat.PlainText)
         self._status.setWordWrap(True)
-        layout.addWidget(self._status)
+        set_role(self._status, 'hint')
         self._details = QPlainTextEdit(self)
         self._details.setReadOnly(True)
         self._details.setMaximumHeight(150)
-        layout.addWidget(self._details)
+        layout.addWidget(Card().add(self._status).add(self._details))
 
     def menu_actions(self) -> tuple[tuple[str, Callable[[], None]], ...]:
         """Expose explicit operations through the window's Actions menu."""
@@ -220,7 +237,7 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
 
     def begin(self, operation: str) -> None:
         """Snapshot one explicit menu operation and run it outside the GUI thread."""
-        if self._handle is not None:
+        if self._task.running:
             self._set_status('busy')
             return
         try:
@@ -235,15 +252,14 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
             self._value.setEnabled(False)
             self._deleted.setEnabled(False)
             self._set_status('running')
-            self._handle = start_worker(self, self._worker, on_done=self._received,
-                                        on_thread_done=self._thread_done, on_fail=self._failed)
+            self._task.start_until_stopped(self._worker)
         except (AutoControlException, ValueError, TypeError, RuntimeError) as error:
             self._failed(scrub_secret_text(str(error)))
 
     def cancel(self) -> None:
         """Request cooperative stop; durable completed operations keep their result."""
-        if self._worker is not None:
-            self._worker.request_stop()
+        if self._task.running:
+            self._task.stop()
             self._set_status('cancelling')
 
     def _received(self, outcome: SyncUIOutcome) -> None:
@@ -314,7 +330,7 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
         self._set_status('done')
 
     def _use_loaded_profile(self, operation: Callable[[LoadedSyncProfile], None]) -> None:
-        if self._handle is not None:
+        if self._task.running:
             self._set_status('busy')
             return
         try:
@@ -368,7 +384,7 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
                       entry['is_deleted'], json.dumps(entry['value'], ensure_ascii=False))
             for column, value in enumerate(values):
                 self._heads.setItem(row, column, QTableWidgetItem(str(value)[:1000]))
-        self._heads.resizeColumnsToContents()
+        fit_columns(self._heads)
         if heads:
             self._heads.selectRow(0)
 
@@ -395,8 +411,11 @@ class ConfigSyncTab(TranslatableMixin, QWidget):
         self._details.clear()
         self._set_status('error', scrub_secret_text(error))
 
+    def _task_failed(self, error: object) -> None:
+        self._failed(str(error))
+
     def _thread_done(self) -> None:
-        self._handle = self._worker = None
+        self._worker = None
         for control in (self._form, self._load_form, self._heads, self._value, self._deleted):
             control.setEnabled(True)
         if self._status_key in {'running', 'cancelling'}:

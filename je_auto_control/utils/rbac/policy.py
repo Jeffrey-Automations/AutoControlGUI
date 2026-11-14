@@ -5,17 +5,19 @@ Three surfaces, one rule each:
 * **REST routes** are listed one by one. A route missing from the list needs
   ``manage_hosts``, so a route added without a decision is admin-only rather
   than open. A ``GET`` route that returns records or configuration the host
-  keeps needs ``read_data`` like the MCP tool reading the same thing; one
-  that observes live state needs ``read_screen``.
-* **MCP tools** default to ``read_screen`` for a read-only annotation and
-  ``drive_input`` otherwise. Named overrides separate non-mutating sensitive
+  keeps needs ``read_data`` like the MCP tool reading the same thing. Reviewed
+  desktop observations may use ``read_screen``. Live host records and
+  device status still need data authority.
+* **MCP tools** default to ``read_data`` for a read-only annotation and
+  ``drive_input`` otherwise. Only reviewed screen/caller-data tools grant
+  ``read_screen``. Named overrides separate non-mutating sensitive
   reads (clipboard, local data, credentials, network and audio) from screen
   observation, hand the host's records to ``read_data``, manage users, and
   protect administration of the host itself.
 * **``AC_*`` commands** reach the executor through anything that runs an
   action list (``POST /execute``, ``ac_execute_actions``, an action file).
-  Being allowed to run actions is ``drive_input``; the commands named here
-  need more, and are checked both where the list is submitted and again by
+  Running submitted actions requires ``drive_input``; the commands named here
+  have explicit requirements, checked where the list is submitted and again by
   the executor, which is what covers a list read from a file.
 
 The roles are not a sandbox. An operator drives the real keyboard and can
@@ -26,7 +28,8 @@ and egress policy, its secrets vault and its audit log.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Iterator, Optional, Tuple
+from collections.abc import Mapping
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
 from je_auto_control.utils.rbac.authorization import (
     AuthorizationContext, AuthorizationError, current_authorization,
@@ -47,24 +50,24 @@ REST_ROUTE_CAPABILITIES: Dict[Tuple[str, str], str] = {
     ("GET", "/agent/task"): _DRIVE,
     ("POST", "/agent/shutdown"): _HOSTS,
     ("POST", "/agent/recover_target"): _HOSTS,
-    ("GET", "/metrics"): _READ,
-    ("GET", "/jobs"): _READ,
+    ("GET", "/metrics"): _DATA,
+    ("GET", "/jobs"): _DATA,
     ("GET", "/history"): _DATA,  # run history, as ac_list_run_history
     ("GET", "/screenshot"): _READ,
     ("GET", "/mouse_position"): _READ,
     ("GET", "/screen_size"): _READ,
     ("GET", "/windows"): _READ,
-    ("GET", "/sessions"): _READ,
+    ("GET", "/sessions"): _DATA,
     ("GET", "/commands"): _READ,
-    ("GET", "/inspector/recent"): _READ,
-    ("GET", "/inspector/summary"): _READ,
-    ("GET", "/usb/devices"): _READ,
-    ("GET", "/usb/events"): _READ,
-    ("GET", "/usb/passthrough/status"): _READ,
+    ("GET", "/inspector/recent"): _DATA,
+    ("GET", "/inspector/summary"): _DATA,
+    ("GET", "/usb/devices"): _DATA,
+    ("GET", "/usb/events"): _DATA,
+    ("GET", "/usb/passthrough/status"): _DATA,
     ("GET", "/usb/acl"): _DATA,  # the stored ACL, as ac_usb_acl_list
-    ("GET", "/usb/loopback/devices"): _READ,
-    ("GET", "/usb/remote/devices"): _READ,
-    ("GET", "/diagnose"): _READ,
+    ("GET", "/usb/loopback/devices"): _DATA,
+    ("GET", "/usb/remote/devices"): _DATA,
+    ("GET", "/diagnose"): _DATA,
     ("GET", "/openapi.json"): _READ,
     ("GET", "/audit/list"): _AUDIT,
     ("GET", "/audit/verify"): _AUDIT,
@@ -86,20 +89,29 @@ REST_ROUTE_CAPABILITIES.update({("POST", f"/agent/{operation}"): _DRIVE
                                                   "transfer", "transfer/peer")})
 
 #: The routes that need ``read_data``: the ones returning records or
-#: configuration the host keeps, by the rule :data:`DATA_TOOLS` states. Each
-#: has an MCP tool reading the same thing, and the two must agree.
+#: configuration the host keeps, by the rule :data:`DATA_TOOLS` states. Where
+#: an MCP tool reads the same source, the requirements must agree.
 DATA_ROUTES = frozenset(
     route for route, needed in REST_ROUTE_CAPABILITIES.items() if needed == _DATA)
 
-#: Commands that need more than ``drive_input``. Every other command is
-#: covered by the capability of the surface that submitted the action list.
+#: Explicit command requirements, including audited host-data reads. Unlisted
+#: commands still rely on the capability of the surface submitting the action list.
 COMMAND_CAPABILITIES: Dict[str, str] = {
     "AC_agent_target": _HOSTS,
     "AC_agent_target_recover": _HOSTS,
     "AC_agent_runtime_stop": _HOSTS,
     "AC_agent_runtime_start": _HOSTS,
-    "AC_probe_capabilities": _READ,
-    "AC_diagnose": _READ,
+    "AC_probe_capabilities": _DATA,
+    "AC_diagnose": _DATA,
+    "AC_remote_host_status": _DATA,
+    "AC_remote_viewer_status": _DATA,
+    "AC_usb_passthrough_status": _DATA,
+    "AC_usb_loopback_list": _DATA,
+    "AC_usb_remote_list": _DATA,
+    "AC_list_usb_devices": _DATA,
+    "AC_usb_recent_events": _DATA,
+    "AC_inspector_recent": _DATA,
+    "AC_inspector_summary": _DATA,
     "AC_mcp_tool_search": _READ,
     "AC_mcp_tool_schema": _READ,
     "AC_history_capture": _DRIVE,
@@ -185,13 +197,9 @@ COMMAND_CAPABILITIES: Dict[str, str] = {
 #: says a tool changes nothing; it does not say that what it returns is
 #: something a viewer of the desktop was meant to see.
 #:
-#: The rule: a tool that returns records or configuration the host keeps --
-#: history, traces, cost ledgers, healing logs, journals, saved libraries, ACL
-#: contents -- is listed here; a tool that only observes the live screen (or
-#: computes on what the caller sent) is not. What a tool costs to run is a
-#: separate question this table does not answer: ``ac_vlm_locate`` and
-#: ``ac_self_heal_locate`` read the screen and stay ``read_screen`` although a
-#: call may be billed by a model provider.
+#: These explicit data classifications remain stable when annotations change.
+#: Other read-only tools also default to READ_DATA unless their canonical name
+#: has a reviewed screen classification. Effectful overrides take precedence.
 DATA_TOOLS = frozenset({
     # the clipboard and its history, a connected device's included
     "ac_get_clipboard", "ac_get_clipboard_csv", "ac_get_clipboard_files",
@@ -365,10 +373,24 @@ def capability_for_route(method: str, path: str) -> str:
 
 def capability_for_tool(name: str, read_only: bool) -> str:
     """The capability the MCP tool ``name`` needs, given its read-only hint."""
+    from je_auto_control.utils.rbac.tool_classification import (
+        MIXED_ARGUMENT_TOOLS, SCREEN_SOURCE_TOOLS, SCREEN_TOOLS, canonical_tool_name,
+    )
+    name = canonical_tool_name(name)
     listed = TOOL_CAPABILITIES.get(name)
     if listed is not None:
         return listed
-    return _READ if read_only else _DRIVE
+    if not read_only:
+        return _DRIVE
+    return _READ if name in SCREEN_TOOLS or name in SCREEN_SOURCE_TOOLS or name in MIXED_ARGUMENT_TOOLS else _DATA
+
+
+def capabilities_for_tool_call(name: str, read_only: bool, arguments: Mapping[str, object]) -> tuple[str, ...]:
+    """Use one base and argument policy at admission and refreshed invocation."""
+    from je_auto_control.utils.rbac.tool_classification import argument_capability
+    base = capability_for_tool(name, read_only)
+    extra = argument_capability(name, arguments)
+    return (base,) if extra is None or extra == base else (base, extra)
 
 
 def capability_for_command(name: str) -> str:
@@ -392,6 +414,21 @@ def authorize_command(name: Any) -> None:
         raise AuthorizationError(
             f"{name} needs the {needed!r} capability; user {context.user_id!r} "
             f"has role {context.role!r}", capability=needed)
+
+
+def refused_commands(names: Iterable[str],
+                     context: Optional[AuthorizationContext] = None) -> List[str]:
+    """The ``names`` that :func:`authorize_command` would refuse for ``context``, in order.
+
+    ``context`` defaults to the current caller; outside any RBAC scope nothing
+    is refused, and a command not listed in :data:`COMMAND_CAPABILITIES` never
+    is -- the same rule ``authorize_command`` applies, without raising.
+    """
+    caller = context if context is not None else current_authorization()
+    if caller is None:
+        return []
+    return [name for name in names
+            if name in COMMAND_CAPABILITIES and not caller.allows(COMMAND_CAPABILITIES[name])]
 
 
 def denied_command_in(payload: Any,
@@ -434,5 +471,5 @@ __all__ = [
     "COMMAND_CAPABILITIES", "DATA_ROUTES", "DATA_TOOLS", "REST_ROUTE_CAPABILITIES",
     "TOOL_CAPABILITIES",
     "authorize_command", "capability_for_command", "capability_for_route",
-    "capability_for_tool", "denied_command_in",
+    "capability_for_tool", "denied_command_in", "refused_commands",
 ]

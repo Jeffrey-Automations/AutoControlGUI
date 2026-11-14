@@ -1,5 +1,9 @@
 """ctypes binding for libei — Wayland's input-emulation protocol.
 
+``LibeiBackend`` is the explicitly in-process low-level API, including injected
+symbols. NORMAL's default selector uses an owned helper through ``ei_default``;
+only that default path isolates native EI and portal faults from the caller.
+
 libei is not a "call a function and a key is pressed" library. A sender has
 to complete a handshake before it may emit anything:
 
@@ -652,75 +656,11 @@ def _quietly(action: Callable[[], object]) -> None:
         pass
 
 
-_DEFAULT_BACKEND: Optional[LibeiBackend] = None
-_PROBE_FAILED = False
-_BLOCKED_PROBE: Optional[InputFailure] = None
-_DEFAULT_LOCK = threading.Lock()
-
-
-def connected_backend() -> Optional[LibeiBackend]:
-    """Return a connected backend, or None — probing at most once.
-
-    The probe involves a portal round trip and a consent dialog, so a host
-    where libei cannot be used must pay for that discovery once rather than
-    on every keystroke. Only optional absence returns None. Authority/protocol
-    refusals retain inert metadata and raise until an explicit reset/retry.
-    """
-    global _DEFAULT_BACKEND, _PROBE_FAILED, _BLOCKED_PROBE
-    with _DEFAULT_LOCK:
-        if _BLOCKED_PROBE is not None:
-            raise LibeiUnavailable(_BLOCKED_PROBE.message, state=_BLOCKED_PROBE.state,
-                                   fallback_allowed=_BLOCKED_PROBE.fallback_allowed)
-        if _DEFAULT_BACKEND is not None:
-            return _DEFAULT_BACKEND
-        if _PROBE_FAILED:
-            return None
-        backend = LibeiBackend()
-        if not backend.is_available:
-            _PROBE_FAILED = True
-            return None
-        try:
-            backend.connect()
-        except (LibeiUnavailable, OSError, ValueError, AttributeError) as error:
-            blocked = blocked_input(error)
-            _PROBE_FAILED = True
-            if blocked is not None:
-                _BLOCKED_PROBE = blocked[1]
-                raise blocked[0]
-            return None
-        _DEFAULT_BACKEND = backend
-        return _DEFAULT_BACKEND
-
-
-def _observed_input_state() -> tuple[Optional[str], bool]:
-    """Inert snapshot for passive diagnostics; never construct a backend or wait on the portal-probe lock."""
-    failure = _BLOCKED_PROBE
-    if failure is not None:
-        return failure.state, failure.fallback_allowed
-    backend = _DEFAULT_BACKEND
-    if backend is None:
-        return ('unavailable', True) if _PROBE_FAILED else (None, False)
-    return backend.observed_state(), False
-
-
-def get_default_backend() -> Optional[LibeiBackend]:
-    """Return the cached backend if libei resolved, without connecting."""
-    with _DEFAULT_LOCK:
-        if _DEFAULT_BACKEND is not None:
-            return _DEFAULT_BACKEND
-    backend = LibeiBackend()
-    return backend if backend.is_available else None
-
-
-def reset_default_backend() -> None:
-    """Explicitly retire the cached sender/refusal so a later request may seek a fresh grant."""
-    global _DEFAULT_BACKEND, _PROBE_FAILED, _BLOCKED_PROBE
-    with _DEFAULT_LOCK:
-        if _DEFAULT_BACKEND is not None:
-            _quietly(_DEFAULT_BACKEND.disconnect)
-        _DEFAULT_BACKEND = None
-        _PROBE_FAILED = False
-        _BLOCKED_PROBE = None
+# Compatibility imports preserve the public low-level module entry points.
+from je_auto_control.linux_wayland.ei_default import (  # noqa: E402  # reason: compatibility cache imports follow native definitions to avoid a cycle
+    connected_backend, get_default_backend, reset_default_backend,
+    _observed_input_state as _observed_input_state,
+)
 
 
 __all__ = [

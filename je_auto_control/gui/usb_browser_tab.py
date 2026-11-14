@@ -13,6 +13,10 @@ host's ``usb`` DataChannel is a separate piece of the WebRTC viewer
 integration. The browse + enumerate path works against any reachable
 REST server today; for the simple share/use flow see the *USB Sharing*
 panel.
+
+Both requests run as a :class:`~je_auto_control.gui._tab_task.TabTask`: one
+at a time, a Stop in the Actions menu and a deadline. A request stopped, timed
+out or left by a closed tab has its answer dropped.
 """
 from __future__ import annotations
 
@@ -22,15 +26,16 @@ import urllib.parse
 from email.message import Message
 from typing import Any, Dict, List, Optional
 
-from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox,
+    QFormLayout, QGroupBox, QHeaderView, QLabel, QLineEdit, QMessageBox,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import CallWorker as _CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
+from je_auto_control.gui.tab_task_controller import TaskTimeout
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -47,6 +52,8 @@ _DESC_REQUEST_TYPE = 0x80
 _DESC_REQUEST = 0x06
 _DESC_VALUE = 0x0100
 _DESC_LENGTH = 18
+#: How long a fetch or a local open may take before the tab gives up on it.
+REQUEST_DEADLINE_S = 30.0
 
 
 def _is_loopback_target(base_url: str) -> bool:
@@ -111,28 +118,10 @@ def fetch_remote_devices(*, base_url: str,
     return devices
 
 
-class _FetchWorker(QObject):
-    """Background fetch — keeps the Qt thread responsive."""
-
-    finished = Signal(list)
-    failed = Signal(str)
-
-    def __init__(self, *, base_url: str, token: str) -> None:
-        super().__init__()
-        self._base_url = base_url
-        self._token = token
-
-    def run(self) -> None:
-        try:
-            devices = fetch_remote_devices(
-                base_url=self._base_url, token=self._token,
-            )
-        # Not redundant: TimeoutError is not an OSError on Python 3.10.
-        # URLError already is one, so it was dropped.
-        except (ValueError, OSError, TimeoutError) as error:  # NOSONAR
-            self.failed.emit(str(error))
-            return
-        self.finished.emit(devices)
+def _open_local(vendor_id: str, product_id: str, serial: Optional[str]) -> tuple:
+    """Open the device locally; return ``(vendor_id, product_id, descriptor)`` for the status line."""
+    return vendor_id, product_id, open_local_descriptor(
+        vendor_id=vendor_id, product_id=product_id, serial=serial)
 
 
 class UsbBrowserTab(TranslatableMixin, QWidget):
@@ -150,23 +139,27 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents,
         )
-        self._fetch_thread: Optional[WorkerHandle] = None
-        self._open_thread: Optional[WorkerHandle] = None
+        self._requests = TabTask(self)
+        self._requests.result.connect(self._show_outcome)
+        self._requests.error.connect(self._apply_failure)
         self._build_layout()
         self._apply_table_headers()
 
     def _build_layout(self) -> None:
         # Fetch/open commands run from the Actions menu; the tab keeps
-        # only the target inputs, the status line, and the device table.
+        # only the target inputs, the device table, and the status line.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         root.addWidget(self._build_target_group())
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._status_label.setWordWrap(True)
+        set_role(self._status_label, "hint")
         root.addWidget(self._status_label)
-        root.addWidget(self._table, stretch=1)
 
     def dispose(self) -> None:
-        """Release what the tab holds beyond its widgets: the device listing or open still out, whose answer is dropped.
+        """Release what the tab holds beyond its widgets: cancel the listing or open still out.
 
-        The request itself cannot be interrupted and runs to its end. Called by
+        The request itself cannot be interrupted and runs to its end; its answer is dropped. Called by
         ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
         """
         release_resources(self)
@@ -176,19 +169,14 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
         return [
             ("usb_browser_fetch", self._on_fetch),
             ("usb_browser_open", self._on_open_selected),
+            ("task_stop", self._on_stop),
         ]
 
     def _build_target_group(self) -> QGroupBox:
         group = self._tr(QGroupBox(), "usb_browser_target_group")
-        form = QVBoxLayout(group)
-        url_row = QHBoxLayout()
-        url_row.addWidget(self._tr(QLabel(), "usb_browser_url"))
-        url_row.addWidget(self._url_input, stretch=1)
-        form.addLayout(url_row)
-        token_row = QHBoxLayout()
-        token_row.addWidget(self._tr(QLabel(), "usb_browser_token"))
-        token_row.addWidget(self._token_input, stretch=1)
-        form.addLayout(token_row)
+        form = QFormLayout(group)
+        form.addRow(self._tr(QLabel(), "usb_browser_url"), self._url_input)
+        form.addRow(self._tr(QLabel(), "usb_browser_token"), self._token_input)
         return group
 
     def _apply_table_headers(self) -> None:
@@ -201,19 +189,26 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
         ])
 
     def _on_fetch(self) -> None:
-        if self._fetch_thread is not None:
-            return
-        self._status_label.setText(_t("usb_browser_fetching"))
-        self._fetch_thread = start_worker(
-            self, _FetchWorker(
-                base_url=self._url_input.text().strip(),
-                token=self._token_input.text().strip(),
-            ),
-            on_done=self._apply_devices, on_fail=self._apply_failure,
-            on_thread_done=self._on_fetch_done)
+        work = functools.partial(fetch_remote_devices, base_url=self._url_input.text().strip(),
+                                 token=self._token_input.text().strip())
+        if self._start(work, "fetch"):
+            self._status_label.setText(_t("usb_browser_fetching"))
 
-    def _on_fetch_done(self) -> None:
-        self._fetch_thread = None
+    def _start(self, work, tag: str) -> bool:
+        if self._requests.start(work, tag=tag, timeout_s=REQUEST_DEADLINE_S):
+            return True
+        self._status_label.setText(_t("task_busy"))
+        return False
+
+    def _on_stop(self) -> None:
+        if self._requests.stop():
+            self._status_label.setText(_t("task_stopped"))
+
+    def _show_outcome(self, value: Any) -> None:
+        if self._requests.tag == "open":
+            self._on_local_opened(*value)
+        else:
+            self._apply_devices(value)
 
     def _apply_devices(self, devices: list) -> None:
         self._status_label.setText(
@@ -231,9 +226,12 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
             for col_index, text in enumerate(cells):
                 self._table.setItem(row_index, col_index, QTableWidgetItem(text))
 
-    def _apply_failure(self, message: str) -> None:
+    def _apply_failure(self, error: object) -> None:
+        if isinstance(error, TaskTimeout):
+            self._status_label.setText(_t("task_timed_out"))
+            return
         self._status_label.setText(
-            _t("usb_browser_fetch_failed").format(error=message),
+            _t("usb_browser_fetch_failed").format(error=error),
         )
 
     def _on_open_selected(self) -> None:
@@ -252,8 +250,6 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
                 _t("usb_browser_open_unwired"),
             )
             return
-        if self._open_thread is not None:
-            return
         row = rows[0]
         vid = self._row_text(row, 0)
         pid = self._row_text(row, 1)
@@ -262,16 +258,7 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
 
     def _start_local_open(self, vid: str, pid: str,
                           serial: Optional[str]) -> None:
-        # on_done runs on the GUI thread (start_worker relays it) and is held weakly.
-        self._open_thread = start_worker(
-            self, _CallWorker(lambda: open_local_descriptor(
-                vendor_id=vid, product_id=pid, serial=serial,
-            )),
-            on_done=functools.partial(self._on_local_opened, vid, pid),
-            on_fail=self._apply_failure, on_thread_done=self._on_open_done)
-
-    def _on_open_done(self) -> None:
-        self._open_thread = None
+        self._start(functools.partial(_open_local, vid, pid, serial), "open")
 
     def _on_local_opened(self, vid: str, pid: str, descriptor: bytes) -> None:
         from je_auto_control.utils.usb.passthrough import describe_descriptor

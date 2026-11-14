@@ -12,8 +12,13 @@ without noticeably starving the video pipe.
 """
 import threading
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, cast
 
+from je_auto_control.utils.remote_desktop.audio_retirement import AudioLease, AudioOutputStream, AudioStream
+from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
+from je_auto_control.utils.remote_desktop.media_retirement import (
+    Completion, MediaRetirementError, RetirementStatus, require_retired, preserve_interrupted_owner,
+)
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -51,44 +56,6 @@ def _device_errors(sd: Any) -> tuple:
     return (OSError, RuntimeError, sd.PortAudioError)
 
 
-def _open_started(sd: Any, factory: Callable[[], Any]) -> Any:
-    """Create a stream and start it; a stream that fails to start is closed.
-
-    Raises :class:`AudioBackendError`: a raw ``PortAudioError`` escaped the
-    ``RuntimeError`` / ``OSError`` guards around every caller, and a stream
-    kept after a failed ``start()`` made every later ``start()`` a no-op.
-    """
-    errors = _device_errors(sd)
-    try:
-        stream = factory()
-    except errors as error:
-        raise AudioBackendError(f"audio device unavailable: {error}") from error
-    try:
-        stream.start()
-    except errors as error:
-        _close_quietly(stream, errors)
-        raise AudioBackendError(f"audio device failed to start: {error}") from error
-    return stream
-
-
-def _close_quietly(stream: Any, errors: tuple) -> None:
-    try:
-        stream.close()
-    except errors as error:
-        autocontrol_logger.debug("audio stream close: %r", error)
-
-
-def _stop_and_close(stream: Any) -> None:
-    """Stop and close ``stream``; device errors on the way out are logged, never raised."""
-    errors = _device_errors(_load_sounddevice())
-    try:
-        stream.stop()
-    except errors as error:
-        autocontrol_logger.debug("audio stream stop: %r", error)
-    finally:
-        _close_quietly(stream, errors)
-
-
 def is_audio_backend_available() -> bool:
     """Return True if ``sounddevice`` can be imported."""
     try:
@@ -109,7 +76,51 @@ class AudioCaptureConfig:
     block_frames: int = DEFAULT_BLOCK_FRAMES
 
 
-class AudioCapture:
+class _AudioOwner:
+    """Serialize start/retire on one retained stream generation."""
+
+    _lease: Optional[AudioLease]
+    _lock: threading.Lock
+
+    @property
+    def retirement_status(self) -> RetirementStatus:
+        if self._lease is None:
+            return RetirementStatus(True, Completion.CONFIRMED, Completion.CONFIRMED)
+        return self._lease.status
+
+    def _start_stream(self, lease: AudioLease, factory: Callable[[], AudioStream]) -> None:
+        try:
+            lease.stream = factory()
+            lease.stream.start()
+            lease.activate()
+        except BaseException as error:
+            try:
+                lease.retire(started=False)
+            except BaseException as cleanup_error:
+                preserve_interrupted_owner(self, error, cleanup_error)
+                raise
+            if not lease.status.complete:
+                preserve_interrupted_owner(self, error)
+                raise MediaRetirementError(self) from error
+            raise_caused_run_interruption(error)
+            raise AudioBackendError("audio device failed to start") from error
+
+    def close_admission(self) -> None:
+        """Stop admitting audio at once, without the owner's lock or a native call; :meth:`stop` still retires."""
+        lease = self._lease
+        if lease is not None:
+            lease.close_admission()
+
+    def stop(self) -> None:
+        """Close admission and report any unconfirmed retirement."""
+        with self._lock:
+            lease = self._lease
+            if lease is not None:
+                lease.retire()
+            require_retired(self)
+
+
+class AudioCapture(_AudioOwner):
     """Capture mono int16 PCM blocks and hand them to ``on_block`` as bytes.
 
     ``on_block`` is invoked from the audio library's internal thread, so
@@ -133,7 +144,7 @@ class AudioCapture:
         self._sample_rate = int(sample_rate)
         self._channels = int(channels)
         self._block_frames = int(block_frames)
-        self._stream: Optional[Any] = None
+        self._lease: Optional[AudioLease] = None
         self._lock = threading.Lock()
 
     @property
@@ -146,31 +157,34 @@ class AudioCapture:
 
     @property
     def is_running(self) -> bool:
-        return self._stream is not None
+        return self._lease is not None and self._lease.running
 
     def start(self) -> None:
         """Open the input stream; subsequent blocks fire ``on_block`` callbacks."""
         with self._lock:
-            if self._stream is not None:
+            if self.is_running:
                 return
+            if self._lease is not None:
+                require_retired(self)
             sd = _load_sounddevice()
-            self._stream = _open_started(sd, lambda: sd.RawInputStream(
+            lease = AudioLease()
+            self._lease = lease
+            self._start_stream(lease, lambda: sd.RawInputStream(
                 samplerate=self._sample_rate,
                 channels=self._channels,
                 dtype=SAMPLE_DTYPE,
                 blocksize=self._block_frames,
                 device=self._device,
-                callback=self._raw_callback,
+                callback=lambda *args: self._raw_callback_for(lease, *args),
             ))
 
-    def stop(self) -> None:
-        """Stop and release the input stream."""
-        with self._lock:
-            stream = self._stream
-            self._stream = None
-        if stream is None:
+    def _raw_callback_for(self, lease, *args) -> None:
+        if not lease.enter():
             return
-        _stop_and_close(stream)
+        try:
+            self._raw_callback(*args)
+        finally:
+            lease.leave()
 
     def _raw_callback(self, indata, frames, time_info, status) -> None:
         del frames, time_info  # unused — block size is fixed
@@ -185,7 +199,7 @@ class AudioCapture:
             return
 
 
-class AudioPlayer:
+class AudioPlayer(_AudioOwner):
     """Play int16 PCM bytes through the default (or chosen) output device."""
 
     def __init__(self, device: Optional[int] = None,
@@ -196,22 +210,26 @@ class AudioPlayer:
         self._device = device
         self._sample_rate = int(sample_rate)
         self._channels = int(channels)
-        self._stream: Optional[Any] = None
+        self._lease: Optional[AudioLease] = None
         self._write_errors: tuple = (OSError, RuntimeError)
         self._lock = threading.Lock()
 
     @property
     def is_running(self) -> bool:
-        return self._stream is not None
+        return self._lease is not None and self._lease.running
 
     def start(self) -> None:
         """Open the output stream so :meth:`play` becomes valid."""
         with self._lock:
-            if self._stream is not None:
+            if self.is_running:
                 return
+            if self._lease is not None:
+                require_retired(self)
             sd = _load_sounddevice()
             self._write_errors = _device_errors(sd)
-            self._stream = _open_started(sd, lambda: sd.RawOutputStream(
+            lease = AudioLease()
+            self._lease = lease
+            self._start_stream(lease, lambda: sd.RawOutputStream(
                 samplerate=self._sample_rate,
                 channels=self._channels,
                 dtype=SAMPLE_DTYPE,
@@ -224,20 +242,15 @@ class AudioPlayer:
             raise TypeError("chunk must be bytes-like")
         if not chunk:
             return
-        stream = self._stream
-        if stream is None:
+        lease = self._lease
+        if lease is None or not lease.enter():
             raise RuntimeError("AudioPlayer is not running; call start() first")
         try:
-            stream.write(bytes(chunk))
+            cast(AudioOutputStream, lease.stream).write(bytes(chunk))
         except self._write_errors as error:
+            raise_caused_run_interruption(error)
             # Late writes after stop / device removal — ignored so the
             # network thread keeps flowing; PortAudioError included.
             autocontrol_logger.debug("audio write dropped: %r", error)
-
-    def stop(self) -> None:
-        with self._lock:
-            stream = self._stream
-            self._stream = None
-        if stream is None:
-            return
-        _stop_and_close(stream)
+        finally:
+            lease.leave()

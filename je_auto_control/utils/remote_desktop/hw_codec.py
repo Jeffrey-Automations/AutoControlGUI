@@ -1,14 +1,12 @@
 """Detect and (opt-in) enable hardware H.264 encoding for the WebRTC host.
 
-aiortc 1.14 hard-codes ``libx264`` as the encoder in ``H264Encoder``. To
-use NVENC / QuickSync / VAAPI we monkey-patch ``av.CodecContext.create``
-so any "libx264" write request gets swapped to the chosen hardware codec.
-The original is kept as a fallback if the hardware open fails.
+aiortc hard-codes ``libx264`` as the encoder in ``H264Encoder``. To use
+hardware encoding we replace ``H264Encoder._encode_frame`` with an encoder
+that opens the selected codec and falls back to libx264 if opening fails.
 
-Risk: the swap is process-wide, so every libx264 encode in the process
-becomes hardware-backed. For AutoControl that's the WebRTC host only —
-no other component encodes H.264 — so it's safe in practice. Still,
-``install_hardware_codec`` is opt-in via the GUI and logs a warning.
+The replacement affects all aiortc H264Encoder instances in the process.
+Other PyAV users, including session recording, keep their own codecs.
+``install_hardware_codec`` is opt-in via the GUI.
 
 Diagnostic-only path: ``available_hardware_codecs()`` lists which encoders
 PyAV can actually open without changing global state.
@@ -16,10 +14,13 @@ PyAV can actually open without changing global state.
 from __future__ import annotations
 
 import threading
-from typing import List, Optional
+from typing import TYPE_CHECKING, Callable, Iterator, List, Optional
+
+if TYPE_CHECKING:
+    from aiortc.codecs.h264 import H264Encoder
 
 try:
-    import av  # type: ignore
+    import av
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "Hardware codec detection requires the 'webrtc' extra (PyAV).",
@@ -37,7 +38,7 @@ _CANDIDATE_CODECS = [
 ]
 
 _install_lock = threading.Lock()
-_original_encode_frame = None
+_original_encode_frame: Callable[[H264Encoder, av.VideoFrame, bool], Iterator[bytes]] | None = None
 _active_codec: Optional[str] = None
 
 
@@ -70,10 +71,12 @@ def _can_open(codec_name: str) -> bool:
 
 
 def _open_configured(codec_name: str, width: int, height: int,
-                     bitrate: int, fps: int):
+                     bitrate: int, fps: int) -> av.VideoCodecContext:
     """Create, configure and open an encoder context (raises when it cannot open)."""
     from fractions import Fraction
     ctx = av.CodecContext.create(codec_name, "w")
+    if not isinstance(ctx, av.VideoCodecContext):
+        raise ValueError("hardware encoding requires a video codec")
     ctx.width = width
     ctx.height = height
     ctx.bit_rate = bitrate
@@ -139,7 +142,7 @@ def install_hardware_codec(codec_name: str) -> bool:
         )
         return False
     try:
-        from aiortc.codecs import h264 as aiortc_h264  # type: ignore
+        from aiortc.codecs import h264 as aiortc_h264
     except ImportError as error:
         autocontrol_logger.warning("aiortc h264 module unavailable: %r", error)
         return False
@@ -149,7 +152,7 @@ def install_hardware_codec(codec_name: str) -> bool:
 
         target = codec_name
 
-        def patched(self, frame, force_keyframe):
+        def patched(self: H264Encoder, frame: av.VideoFrame, force_keyframe: bool) -> Iterator[bytes]:
             # Replicate aiortc's reset-on-shape-change but with hw codec.
             if _shape_changed(self.codec, frame, self.target_bitrate):
                 self.buffer_data = b""
@@ -170,7 +173,7 @@ def install_hardware_codec(codec_name: str) -> bool:
             if data_to_send:
                 yield from self._split_bitstream(data_to_send)
 
-        aiortc_h264.H264Encoder._encode_frame = patched
+        setattr(aiortc_h264.H264Encoder, "_encode_frame", patched)
         _active_codec = codec_name
     autocontrol_logger.info(
         "install_hardware_codec: aiortc libx264 -> %s", codec_name,
@@ -185,10 +188,10 @@ def uninstall_hardware_codec() -> None:
         if _original_encode_frame is None:
             return
         try:
-            from aiortc.codecs import h264 as aiortc_h264  # type: ignore
+            from aiortc.codecs import h264 as aiortc_h264
         except ImportError:
             return
-        aiortc_h264.H264Encoder._encode_frame = _original_encode_frame
+        setattr(aiortc_h264.H264Encoder, "_encode_frame", _original_encode_frame)
         _active_codec = None
     autocontrol_logger.info("uninstall_hardware_codec: restored libx264 path")
 

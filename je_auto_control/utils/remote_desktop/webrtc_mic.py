@@ -17,6 +17,7 @@ from __future__ import annotations
 import threading
 from typing import Optional
 
+from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop.audio import (
     AudioBackendError, AudioCapture, AudioPlayer, is_audio_backend_available,
@@ -46,6 +47,8 @@ class MicUplinkSender:
         self._device = device
         self._capture: Optional[AudioCapture] = None
         self._lock = threading.Lock()
+        self._stopped = False
+        self._generation = 0
 
     def start(self) -> None:
         if not is_audio_backend_available():
@@ -54,9 +57,15 @@ class MicUplinkSender:
             )
         with self._lock:
             if self._capture is not None:
-                return
+                if not self._stopped:
+                    return
+                self._capture.stop()
+                self._capture = None
+            self._stopped = True
+            self._generation += 1
+            generation = self._generation
             capture = AudioCapture(
-                on_block=self._on_block,
+                on_block=lambda data: self._on_generation(data, generation),
                 device=self._device,
                 sample_rate=self._sample_rate,
                 channels=self._channels,
@@ -64,34 +73,50 @@ class MicUplinkSender:
             )
             # Kept only once started: a device that failed to start left it
             # set, and every later start() returned early.
-            capture.start()
             self._capture = capture
+            try:
+                capture.start()
+            except BaseException as error:
+                try:
+                    capture.stop()
+                except BaseException:
+                    raise_caused_run_interruption(error)
+                    raise
+                self._capture = None
+                raise
+            self._stopped = False
         autocontrol_logger.info("mic uplink: capture started (%d Hz)",
                                 self._sample_rate)
 
     def stop(self) -> None:
+        self._stopped = True
         with self._lock:
+            self._stopped = True
             if self._capture is None:
                 return
-            try:
-                self._capture.stop()
-            except (RuntimeError, OSError) as error:
-                autocontrol_logger.debug("mic uplink stop: %r", error)
+            self._capture.stop()
             self._capture = None
 
     def is_running(self) -> bool:
         return self._capture is not None and bool(self._capture.is_running)
 
     def _on_block(self, pcm_bytes: bytes) -> None:
-        if self._channel is None:
-            return
-        get_bridge().call_soon(self._safe_send, pcm_bytes)
+        self._on_generation(pcm_bytes, self._generation)
 
-    def _safe_send(self, data: bytes) -> None:
-        try:
-            self._channel.send(data)
-        except (RuntimeError, OSError) as error:
-            autocontrol_logger.debug("mic chunk send: %r", error)
+    def _on_generation(self, pcm_bytes: bytes, generation: int) -> None:
+        if self._stopped or generation != self._generation or self._channel is None:
+            return
+        get_bridge().call_soon(self._safe_send, pcm_bytes, generation)
+
+    def _safe_send(self, data: bytes, generation: int) -> None:
+        with self._lock:
+            if self._stopped or generation != self._generation:
+                return
+            try:
+                self._channel.send(data)
+            except (RuntimeError, OSError) as error:
+                raise_caused_run_interruption(error)
+                autocontrol_logger.debug("mic chunk send: %r", error)
 
 
 class MicUplinkReceiver:
@@ -106,6 +131,7 @@ class MicUplinkReceiver:
         self._device = device
         self._player: Optional[AudioPlayer] = None
         self._lock = threading.Lock()
+        self._stopped = False
 
     def start(self) -> None:
         if not is_audio_backend_available():
@@ -114,25 +140,38 @@ class MicUplinkReceiver:
             )
         with self._lock:
             if self._player is not None:
-                return
+                if not self._stopped:
+                    return
+                self._player.stop()
+                self._player = None
+            self._stopped = True
             player = AudioPlayer(
                 device=self._device,
                 sample_rate=self._sample_rate,
                 channels=self._channels,
             )
-            player.start()   # kept only once started, as for the capture
             self._player = player
+            try:
+                player.start()
+            except BaseException as error:
+                try:
+                    player.stop()
+                except BaseException:
+                    raise_caused_run_interruption(error)
+                    raise
+                self._player = None
+                raise
+            self._stopped = False
         autocontrol_logger.info("mic uplink: playback started (%d Hz)",
                                 self._sample_rate)
 
     def stop(self) -> None:
+        self._stopped = True
         with self._lock:
+            self._stopped = True
             if self._player is None:
                 return
-            try:
-                self._player.stop()
-            except (RuntimeError, OSError) as error:
-                autocontrol_logger.debug("mic uplink stop: %r", error)
+            self._player.stop()
             self._player = None
 
     def is_running(self) -> bool:
@@ -144,12 +183,13 @@ class MicUplinkReceiver:
             return
         with self._lock:
             player = self._player
-        if player is None or not bool(player.is_running):
-            return
-        try:
-            player.play(bytes(chunk))
-        except (RuntimeError, OSError) as error:
-            autocontrol_logger.debug("mic playback: %r", error)
+            if self._stopped or player is None or not bool(player.is_running):
+                return
+            try:
+                player.play(bytes(chunk))
+            except (RuntimeError, OSError) as error:
+                raise_caused_run_interruption(error)
+                autocontrol_logger.debug("mic playback: %r", error)
 
 
 __all__ = ["MicUplinkSender", "MicUplinkReceiver"]

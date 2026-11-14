@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import queue
+import sys
 import threading
 import time
 from typing import Any, Callable
@@ -12,8 +13,8 @@ from je_auto_control.utils.agent_runtime.presence_frames import (
     decode_frame, encode_frame, presence_body, validate_response,
 )
 from je_auto_control.utils.agent_runtime.presence_handshake import client_handshake
-from je_auto_control.utils.agent_runtime.presence_pipe_windows import WindowsPresencePipe
-from je_auto_control.utils.agent_runtime.presence_security_windows import WindowsPresenceSecurity
+from je_auto_control.utils.agent_runtime.presence_platform import default_presence_pipe, default_presence_security
+from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
 
 
 @dataclass
@@ -48,11 +49,20 @@ class PresenceReader:
     """One permanent lease binding; only its private I/O owner touches blocking native resources."""
 
     def __init__(self, binding: dict, takeover: Callable[[], None], *, pipe: Any = None,
-                 security: Any = None) -> None:
+                 security: Any = None, endpoint: dict | None = None) -> None:
         self._binding = presence_body('check', binding)
         self._takeover = takeover
-        security = security if security is not None else WindowsPresenceSecurity()
-        self._wire = _Transport(pipe if pipe is not None else WindowsPresencePipe(security), security)
+        if pipe is None:
+            if sys.platform.startswith('linux'):
+                if endpoint is None:
+                    raise AgentTaskError('Linux presence reader requires an owned launch endpoint')
+            elif sys.platform != 'win32' or endpoint is not None:
+                raise AgentTaskError('presence reader transport is unsupported on this platform')
+            pipe = default_presence_pipe()
+        if endpoint is not None:
+            pipe.use(endpoint_to_wire(endpoint_from_wire(endpoint)))
+        security = security if security is not None else default_presence_security()
+        self._wire = _Transport(pipe, security)
         self._state = _Lifetime()
         self._state.retired.set()
         self._mutex = threading.RLock()

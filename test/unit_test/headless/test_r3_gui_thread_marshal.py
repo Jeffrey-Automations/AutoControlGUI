@@ -178,19 +178,16 @@ def check_thumbnail_reaped():
     tab._thumb_timer.stop()
     tab._refresh_thumbnails()
 
-    handle = tab._thumb_thread
-    assert handle is not None, "no thumbnail worker was started"
-    # The registry holds the worker until the GUI thread has seen it end, so
-    # closing the tab mid-poll cannot collect it.
-    assert handle in worker_mod._RUNNING, "the worker is not held by the registry"
+    # The round runs as a tab task, whose worker the registry holds until the
+    # GUI thread has seen it end, so closing the tab mid-poll cannot collect it.
+    assert tab._thumbs.running, "no thumbnail round was started"
 
     # With no hosts the poll returns at once; the end is queued to the GUI thread.
-    assert pump_until(lambda: tab._thumb_thread is None), "_on_thumb_thread_done did not run"
+    assert pump_until(lambda: not tab._thumbs.running), "the thumbnail round never finished"
     app.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
     # Without the release the registry would grow by one worker per poll tick.
     released = pump_until(lambda: worker_mod.running_threads() == before)
     assert released, "a worker lingers in the registry"
-    assert not handle.isRunning()
 
 
 for name, check in [
@@ -213,6 +210,14 @@ sys.stdout.write(json.dumps(report))
 sys.stdout.flush()
 # Skip Qt/native-thread teardown entirely -- that teardown is the whole
 # reason this runs out of process. The report is already on stdout.
+if sys.platform == "win32":
+    # os._exit still runs every DLL's detach on Windows, where Qt's teardown
+    # races the helper threads tabs start and can fault (0xC0000005) after the
+    # report is written. TerminateProcess ends the process without it.
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+    kernel32.TerminateProcess(ctypes.c_void_p(kernel32.GetCurrentProcess()), 0)
 os._exit(0)
 """
 

@@ -70,7 +70,10 @@ for entry in widget._tab_entries:
 record_entry = next(e for e in widget._tab_entries if e.key == "record")
 widget.tabs.setCurrentWidget(record_entry.widget)
 report["record_menu_matches"] = (
-    widget.current_tab_menu_actions() == list(record_entry.actions)
+    widget.current_tab_menu_actions() == entry_actions(record_entry)
+    and [key for key, _ in widget.current_tab_menu_actions()] == [
+        "start_record", "stop_record", "playback", "stop_playback", "save_record", "load_record",
+    ]
 )
 
 widget.show_tab("variables")
@@ -92,6 +95,14 @@ sys.stdout.flush()
 # Skip Qt/native-thread teardown entirely: some tabs start helper threads
 # at construction and interpreter shutdown can abort. The report is
 # already on stdout, so a hard exit is the safe end for this probe.
+if sys.platform == "win32":
+    # os._exit still runs every DLL's detach on Windows, where Qt's teardown
+    # races the helper threads tabs start and can fault (0xC0000005) after the
+    # report is written. TerminateProcess ends the process without it.
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+    kernel32.TerminateProcess(ctypes.c_void_p(kernel32.GetCurrentProcess()), 0)
 os._exit(0)
 """
 
@@ -135,6 +146,7 @@ def test_hook_tab_actions_reach_the_menu(report):
 
 def test_diagnostic_run_stop_and_passive_inspection_reach_the_window_actions_menu(report):
     assert report['diagnostic_menu_keys'] == ['diag_probe', 'diag_run', 'diag_stop',
+                                              'failed_stops_retry', 'failed_stops_forget',
                                               'mcp_discovery_search', 'mcp_discovery_schema', 'mcp_disclosure_plan']
 
 

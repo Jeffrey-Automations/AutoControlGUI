@@ -1,5 +1,6 @@
 """Offscreen live locator inputs and evidence browsing without native capture/input."""
 import json
+import time
 
 import pytest
 
@@ -24,8 +25,10 @@ def widget(monkeypatch, tmp_path):
     view = SelfHealingTab()
     yield view, log
     view._source.cancel()
-    if view._source._handle is not None:
-        view._source._handle.wait(5)
+    deadline = time.monotonic() + 5
+    while view._source._task.running and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(.005)
     view.deleteLater()
     app.processEvents()
 
@@ -172,10 +175,10 @@ def test_source_action_reads_only_selected_original_step_off_thread(widget, monk
     view._on_source()
     app = QApplication.instance()
     deadline = time.monotonic() + 5
-    while view._source._handle is not None and time.monotonic() < deadline:
+    while view._source._task.running and time.monotonic() < deadline:
         app.processEvents()
         time.sleep(0.005)
-    assert view._source._handle is None
+    assert not view._source._task.running
     assert view._views.currentWidget() is view._source
     assert view._source._step_source
     view._source.retranslate()
@@ -219,9 +222,9 @@ def test_source_action_switching_during_read_loads_new_target(widget, monkeypatc
         release.set()
     app = QApplication.instance()
     deadline = time.monotonic() + 5
-    while view._source._handle is not None and time.monotonic() < deadline:
+    while view._source._task.running and time.monotonic() < deadline:
         app.processEvents()
         time.sleep(0.005)
-    assert view._source._handle is None
+    assert not view._source._task.running
     assert calls == ["first", "second"]
     assert [row["step_id"] for row in view._source._events] == ["second"]

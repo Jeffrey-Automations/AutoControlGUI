@@ -520,6 +520,15 @@ Override::
 Wayland libei native backend
 ----------------------------
 
+NORMAL's default EI sender now owns a fixed helper process for libei and portal
+calls. The direct ``LibeiBackend`` API remains in-process. Batches are bounded to
+128 events and 16 KiB; deadlines include client queue time. Uncertain replies
+and cancellation retire the helper without replay or provider fallback. Failed
+close retains ownership for explicit retry. Emission acknowledgements and process
+retirement do not prove application delivery or compositor input release; native
+acceptance remains pending.
+
+
 ctypes binding to ``libei.so.*`` that bypasses the CLI shims for
 microsecond-latency input. Opt-in via
 ``JE_AUTOCONTROL_WAYLAND_INPUT_BACKEND=libei|cli|auto``; the
@@ -647,7 +656,9 @@ returns. Native compositor/dialog, restore and restart acceptance remain open.
 
 The repository's dev/main headless jobs retain merged test output and runtime
 versions even after a native failure. Linux runs under GDB for all-thread
-native backtraces; other platforms retain Python faulthandler output. The
+native backtraces; Windows has Windows Error Reporting write a minidump of a
+crashed ``python.exe`` (every thread's native stack) into the same artifact;
+macOS retains Python faulthandler output. The
 ``native-<os>-<python>`` artifacts expire after seven days. Failed child exits
 still fail CI. Linux first checks the runner outside the suite's debugger;
 literal argv and handled SIGINT are preserved. See

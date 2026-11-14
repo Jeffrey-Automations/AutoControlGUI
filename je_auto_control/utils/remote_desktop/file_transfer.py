@@ -35,10 +35,12 @@ import re
 import threading
 from collections import OrderedDict
 import uuid
+from concurrent.futures import CancelledError
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from je_auto_control.utils.exception.cancellation import current_cancellation_token
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop.protocol import MessageType
@@ -408,20 +410,47 @@ class FileSendResult:
     bytes_sent: int = 0
 
 
+def _stop_check(cancelled: Optional[Callable[[], bool]]) -> Callable[[], bool]:
+    """``cancelled``, or the calling thread's cancellation scope when none is given."""
+    if cancelled is not None:
+        return cancelled
+    token = current_cancellation_token()
+    return (lambda: token.is_cancelled) if token is not None else (lambda: False)
+
+
+def _end_cancelled(channel: Any, transfer_id: str) -> None:
+    """Tell the receiver to discard its part file; a channel already closed has nobody to tell."""
+    try:
+        channel.send_typed(MessageType.FILE_END,
+                           encode_end(transfer_id, status="cancelled", error="cancelled by the sender"))
+    except (OSError, ConnectionError, RuntimeError) as error:
+        autocontrol_logger.debug("file transfer %s: cancel notice not sent: %r", transfer_id, error)
+
+
 def send_file(channel, source_path: str, dest_path: str,
               on_progress: Optional[ProgressCallback] = None,
               chunk_size: int = DEFAULT_CHUNK_SIZE,
-              transfer_id: Optional[str] = None) -> FileSendResult:
+              transfer_id: Optional[str] = None, *,
+              cancelled: Optional[Callable[[], bool]] = None) -> FileSendResult:
     """Stream ``source_path`` to ``dest_path`` over ``channel``.
 
     Synchronous: the caller's thread does the I/O. Wrap in a thread for
     background uploads. ``on_progress(transfer_id, bytes_done, total)``
     fires after every chunk (and once at the start with ``bytes_done=0``).
+
+    The transfer stops at the next chunk once ``cancelled()`` is true --
+    by default, once the calling thread's cancellation scope is cancelled:
+    the receiver is sent a ``cancelled`` end, so it discards the part file,
+    and :class:`concurrent.futures.CancelledError` is raised. Nothing is sent
+    when it is cancelled before the first byte.
     """
+    stopped = _stop_check(cancelled)
     transfer_id = transfer_id or new_transfer_id()
     source = Path(os.path.expanduser(source_path))
     if not source.is_file():
         raise FileTransferError(f"source not found: {source}")
+    if stopped():
+        raise CancelledError()
     total_size = source.stat().st_size
     channel.send_typed(MessageType.FILE_BEGIN,
                        encode_begin(transfer_id, dest_path, total_size))
@@ -431,6 +460,9 @@ def send_file(channel, source_path: str, dest_path: str,
     try:
         with open(source, "rb") as handle:
             while True:
+                if stopped():
+                    _end_cancelled(channel, transfer_id)
+                    raise CancelledError()
                 chunk = handle.read(int(chunk_size))
                 if not chunk:
                     break

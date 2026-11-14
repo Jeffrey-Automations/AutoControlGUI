@@ -101,6 +101,11 @@ class Win32InputHook:
         # still calls that address and the process dies.
         self._procs: List[Any] = []
 
+    @property
+    def is_recording(self) -> bool:
+        """Report retained capture state without probing native hook health."""
+        return bool(self._hooks) and bool(self._thread_id) and self.error is None
+
     # -- public ------------------------------------------------------------
     def start(self) -> None:
         """Install the hooks and begin recording. Raises if they cannot be set."""

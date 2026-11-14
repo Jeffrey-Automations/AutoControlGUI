@@ -54,9 +54,11 @@ def _start(owner: Any, factory: Callable[..., FolderSyncEngine]) -> None:
     try:
         viewer = owner._require_viewer()
         checkpoint = history.checkpoint(viewer, path)
-        engine = factory(viewer, path, lambda: owner._viewer, lambda: owner._sync_engine, checkpoint)
+        current_viewer = owner._view.getter(lambda page: page._viewer, None)
+        current_engine = owner._view.getter(lambda page: page._sync_engine, None)
+        engine = factory(viewer, path, current_viewer, current_engine, checkpoint)
         owner._sync_engine = engine
-        bind_folder_receipts(viewer, lambda: owner._viewer, lambda: owner._sync_engine)
+        bind_folder_receipts(viewer, current_viewer, current_engine)
         engine.start()
         history.remember(viewer, path, engine)
     except (RuntimeError, OSError) as error:

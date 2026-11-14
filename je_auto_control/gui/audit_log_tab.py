@@ -3,12 +3,14 @@ from datetime import datetime
 from typing import List, Optional, Sequence
 
 from PySide6.QtWidgets import (
-    QComboBox, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
+    QComboBox, QGroupBox, QHeaderView, QLabel, QLineEdit,
     QMessageBox, QSpinBox, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -75,8 +77,11 @@ class AuditLogTab(TranslatableMixin, QWidget):
         # Refresh/verify/clear commands run from the Actions menu; the
         # tab keeps only the filter inputs, the table, and the status.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         root.addWidget(self._build_filter_group())
-        root.addWidget(self._table, stretch=1)
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._verify_status.setWordWrap(True)
+        set_role(self._verify_status, "hint")
         root.addWidget(self._verify_status)
 
     def menu_actions(self) -> list:
@@ -89,13 +94,10 @@ class AuditLogTab(TranslatableMixin, QWidget):
 
     def _build_filter_group(self) -> QGroupBox:
         group = self._tr(QGroupBox(), "audit_filter_group")
-        row = QHBoxLayout(group)
-        row.addWidget(self._tr(QLabel(), "audit_filter_type"))
-        row.addWidget(self._type_filter)
-        row.addWidget(self._tr(QLabel(), "audit_filter_host"))
-        row.addWidget(self._host_filter)
-        row.addWidget(self._tr(QLabel(), "audit_filter_limit"))
-        row.addWidget(self._limit_input)
+        layout = QVBoxLayout(group)
+        layout.addLayout(flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
+            ("audit_filter_type", self._type_filter), ("audit_filter_host", self._host_filter),
+            ("audit_filter_limit", self._limit_input)))))
         return group
 
     def _refresh(self) -> None:

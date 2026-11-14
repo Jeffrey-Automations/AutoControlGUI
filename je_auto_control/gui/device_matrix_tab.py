@@ -10,12 +10,15 @@ from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QHBoxLayout, QLabel, QPlainTextEdit,
+    QAbstractItemView, QLabel, QPlainTextEdit,
     QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.tab_task_controller import TaskHandle, task_controller
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -68,17 +71,14 @@ class DeviceMatrixTab(TranslatableMixin, QWidget):
         # The run command runs from the Actions menu; the tab keeps only
         # the device/action editors, the result table, and the summary.
         root = QVBoxLayout(self)
-        root.addWidget(QLabel(_t("dm_devices")))
-        root.addWidget(self._devices)
-        root.addWidget(QLabel(_t("dm_actions")))
-        root.addWidget(self._actions)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(_t("dm_parallel")))
-        row.addWidget(self._parallel)
-        row.addStretch()
-        root.addLayout(row)
-        root.addWidget(self._table, stretch=1)
-        root.addWidget(self._summary)
+        root.setSpacing(12)
+        devices = Card("dm_devices").add(self._devices, stretch=1)
+        actions = Card("dm_actions").add(self._actions, stretch=1)
+        root.addWidget(ResponsiveBox(devices, actions, stretches=(1, 1)))
+        self._summary.setWordWrap(True)
+        set_role(self._summary, "hint")
+        results = Card().add(flow_of(field_pair(self._tr(QLabel(), "dm_parallel"), self._parallel)))
+        root.addWidget(results.add(self._table, stretch=1).add(self._summary), stretch=1)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: the command still running in the background.

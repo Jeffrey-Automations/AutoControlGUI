@@ -13,7 +13,9 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.responsive import fit_columns
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.healing_evaluation_worker import HealingEvaluationOutcome, HealingEvaluationWorker
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -43,7 +45,7 @@ def _populate(table: QTableWidget, rows: list[list[str]]) -> None:
     for index, row in enumerate(rows):
         for column, value in enumerate(row):
             table.setItem(index, column, QTableWidgetItem(value))
-    table.resizeColumnsToContents()
+    fit_columns(table)
 
 
 def _ratio(ratio: EvaluationRatio) -> str:
@@ -71,12 +73,17 @@ def _case_row(row: HealingAttempt) -> list[str]:
 class HealingEvaluationPanel(TranslatableMixin, QWidget):
     """Run comparisons through Actions; show explicit populations and selected case details."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ("AC_self_heal_evaluate",)
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
         self._generation = 0
-        self._handle: Optional[WorkerHandle] = None
-        self._worker: Optional[HealingEvaluationWorker] = None
+        # Cancel stops the comparison at its next checkpoint; closing the panel does too.
+        self._task = TabTask(self)
+        self._task.result.connect(self._completed)
+        self._task.error.connect(self._failed)
         self._report: Optional[HealingComparison] = None
         self._path = QLineEdit()
         self._summary, self._cases = _table(_SUMMARY), _table(_CASES)
@@ -86,18 +93,25 @@ class HealingEvaluationPanel(TranslatableMixin, QWidget):
         self._status.setTextFormat(Qt.TextFormat.PlainText)
         self._status.setWordWrap(True)
         self._state, self._error = "idle", ""
+        self.setProperty("role", "bare")
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         form = QFormLayout()
         form.addRow(self._tr(QLabel(), "healing_eval_path"), self._path)
-        root.addLayout(form)
-        root.addWidget(self._tr(QLabel(), "healing_eval_explanation"))
+        explanation = self._tr(QLabel(), "healing_eval_explanation")
+        explanation.setWordWrap(True)
+        set_role(explanation, "hint")
+        root.addWidget(Card().add(form).add(explanation))
         views = QSplitter(Qt.Orientation.Vertical)
         views.addWidget(self._summary)
         cases = QSplitter(Qt.Orientation.Horizontal)
-        cases.addWidget(self._cases)
-        cases.addWidget(self._details)
+        # A user-resizable split: each side may shrink well below its content.
+        for pane in (self._cases, self._details):
+            pane.setMinimumWidth(120)
+            cases.addWidget(pane)
         views.addWidget(cases)
-        root.addWidget(views, stretch=1)
+        root.addWidget(Card().add(views, stretch=1), stretch=1)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
         # pylint: disable-next=no-member  # reason: PySide binds the Qt signal at runtime
         self._path.textChanged.connect(self._path_changed)
@@ -143,7 +157,7 @@ class HealingEvaluationPanel(TranslatableMixin, QWidget):
 
     def evaluate(self) -> None:
         """Start one background comparison after authorizing the owning caller."""
-        if self._handle is not None:
+        if self._task.running:
             self._set_status("busy")
             return
         try:
@@ -153,26 +167,16 @@ class HealingEvaluationPanel(TranslatableMixin, QWidget):
             return
         self._generation += 1
         self._clear()
-        worker = HealingEvaluationWorker(self._generation, self._path.text().strip())
-        self._worker = worker
-        # pylint: disable-next=no-member  # reason: PySide binds the Qt signal at runtime
-        self.destroyed.connect(worker.request_stop)
         self._set_status("running")
-        self._handle = start_worker(self, worker, on_done=self._completed,
-                                     on_thread_done=self._thread_done, on_fail=self._failed)
+        self._task.start_until_stopped(HealingEvaluationWorker(self._generation, self._path.text().strip()))
 
     @Slot()
     def cancel(self) -> None:
         """Request stop without blocking the GUI or publishing partial results."""
-        if self._worker is not None:
-            self._worker.request_stop()
+        self._task.stop()
 
-    def _thread_done(self) -> None:
-        self._handle = None
-        self._worker = None
-
-    def _failed(self, error: str) -> None:
-        self._set_status("error", error)
+    def _failed(self, error: object) -> None:
+        self._set_status("error", str(error))
 
     @Slot(object)
     def _completed(self, outcome: HealingEvaluationOutcome) -> None:

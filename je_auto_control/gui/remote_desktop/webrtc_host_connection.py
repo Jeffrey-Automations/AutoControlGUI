@@ -5,11 +5,13 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
+
 import functools
 import threading
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QCoreApplication, QThread, QTimer
 from PySide6.QtWidgets import (
     QMessageBox,
 )
@@ -21,7 +23,7 @@ from je_auto_control.gui.remote_desktop._helpers import (
 from je_auto_control.gui.remote_desktop.webrtc_workers import (
     HostPublishLoopWorker, generate_host_id, retire_worker,
 )
-from je_auto_control.gui._slow_op import stop_each
+from je_auto_control.gui._slow_op import app_stop_queue, hold_failed_stop, stop_each
 from je_auto_control.gui._weak_call import weak_slot
 from je_auto_control.gui.tab_task_controller import CancellationToken, task_controller
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -30,7 +32,6 @@ if TYPE_CHECKING:  # the facade types optional members as possibly None
 else:
     from je_auto_control.utils.remote_desktop import MultiViewerHost
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
-    _PanelPart,
     _read_webrtc_config,
     start_panel_task,
 )
@@ -39,17 +40,41 @@ if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
     from je_auto_control.utils.remote_desktop.lan_discovery import HostAdvertiser
 
 
-def _create_offer(host: MultiViewerHostT, _token: CancellationToken) -> Tuple[str, str]:
-    """Worker thread: mint a session and its offer (ICE gathering, up to 12 s)."""
-    return host.create_session_offer()
+def _create_offer(host: MultiViewerHostT, _token: CancellationToken) -> Any:
+    """Worker thread: mint a session and its offer (ICE gathering, up to 12 s).
+
+    The offer carries its session's ``retirement``, captured as it was made, so
+    dropping the offer later stops exactly that session.
+    """
+    return host.create_owned_session_offer()
 
 
-def _drop_offer(host: MultiViewerHostT, outcome: Tuple[str, str]) -> None:
-    """End the session of an offer nobody will show."""
+def _retire_quietly(retirement: Any, *_token: object) -> None:
+    """Worker thread: stop a session nobody will use; one already gone is not an error.
+
+    A stop that fails is kept by the stop custody for a retry from Diagnostics:
+    the session's peer may still be open.
+    """
     try:
-        host.stop_session(outcome[0])
-    except (KeyError, RuntimeError, OSError) as error:
+        retirement.stop()
+    except KeyError as error:
         autocontrol_logger.debug("dropping an unused offer: %r", error)
+    except (RuntimeError, OSError) as error:
+        hold_failed_stop(retirement.stop, error)
+
+
+def _drop_offer(offer: Any) -> None:
+    """End the session of an offer nobody will show, without holding the GUI thread.
+
+    The task's ``discard``: on the GUI thread when the panel goes away with the
+    offer undelivered -- the stop, which waits for the peer to close, then goes
+    to a worker -- or on the worker that made the offer, which simply runs it.
+    """
+    app = QCoreApplication.instance()
+    if app is not None and QThread.currentThread() is app.thread():
+        app_stop_queue().retire(functools.partial(_retire_quietly, offer.retirement))
+    else:
+        _retire_quietly(offer.retirement)
 
 
 #: One zeroconf registration change at a time: Publish stops the old advertiser and starts the
@@ -70,7 +95,9 @@ def _stop_advertiser(advertiser: HostAdvertiser) -> None:
         try:
             advertiser.stop()
         except (RuntimeError, OSError) as error:
-            autocontrol_logger.debug("lan advertise stop: %r", error)
+            # Includes MediaRetirementError: zeroconf may still hold the name or its
+            # socket. Kept, with the advertiser that owns them, for a retry from Diagnostics.
+            hold_failed_stop(functools.partial(_stop_advertiser, advertiser), error)
 
 
 def _advertise_failed(error: object) -> None:
@@ -78,7 +105,7 @@ def _advertise_failed(error: object) -> None:
     autocontrol_logger.debug("lan advertise: %r", error)
 
 
-class _HostConnectionMixin(_PanelPart):
+class _HostConnectionMixin(_HostPanelPart):
     """Methods of ``_WebRTCHostPanel``; the module docstring says which group."""
 
     # State this group owns; the panel's __init__ sets the starting values.
@@ -192,7 +219,7 @@ class _HostConnectionMixin(_PanelPart):
         # create_session_offer waits for ICE gathering (up to 12 s), which
         # used to freeze the window; the backend takes no timeout or cancel.
         task = task_controller().submit(functools.partial(_create_offer, host), owner=self,
-                                        discard=functools.partial(_drop_offer, host))
+                                        discard=_drop_offer)
         # Weak: the task is this panel's child and must not be what keeps it alive.
         task.result.connect(weak_slot(self._show_offer, host))
         task.error.connect(weak_slot(self._show_offer_error, host))
@@ -201,12 +228,13 @@ class _HostConnectionMixin(_PanelPart):
         if self._multi_host is host:        # a host stopped meanwhile fails by design
             self._show_error(error)
 
-    def _show_offer(self, host: MultiViewerHostT, outcome: Tuple[str, str]) -> None:
+    def _show_offer(self, host: MultiViewerHostT, owned: Any) -> None:
         """GUI thread: the offer is ready -- unless the host was stopped or replaced meanwhile."""
         if self._multi_host is not host:
-            _drop_offer(host, outcome)
+            # Its own session, captured with the offer; stopping waits for the peer to close.
+            self._stops.retire(functools.partial(_retire_quietly, owned.retirement))
             return
-        session_id, offer = outcome
+        session_id, offer = owned.session_id, owned.sdp
         self._manual_session_id = session_id
         self._offer_view.setPlainText(offer)
         self._status_label.setText(_t("rd_webrtc_offer_ready"))
@@ -263,16 +291,17 @@ class _HostConnectionMixin(_PanelPart):
         whitelist_text = self._ip_whitelist_edit.toPlainText().strip()
         whitelist = [line.strip() for line in whitelist_text.splitlines()
                      if line.strip() and not line.strip().startswith("#")]
+        state_changed = self._view.callback("_on_state")
         host = MultiViewerHost(
             token=token,
             config=_read_webrtc_config(self),
             trust_list=self._trust_list,
             read_only=self._readonly_check.isChecked(),
             ip_whitelist=whitelist,
-            on_annotation=self._signals.annotation.emit,
-            on_session_state=lambda _sid, state: self._signals.state.emit(state),
-            on_session_authenticated=self._on_session_authed,
-            on_pending_viewer=self._signals.pending_viewer.emit,
+            on_annotation=self._view.callback("_on_annotation_event"),
+            on_session_state=lambda _sid, state: state_changed(state),
+            on_session_authenticated=self._view.callback("_on_session_authed"),
+            on_pending_viewer=self._view.callback("_on_pending_viewer"),
         )
         return host
 
