@@ -34,7 +34,7 @@ the leading arguments given in ``args`` (:mod:`je_auto_control.gui._weak_call`);
 pass a method and ``args``, never a lambda that closes over the tab.
 """
 import functools
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 from PySide6.QtCore import QObject, Signal
 
@@ -42,7 +42,10 @@ from je_auto_control.gui._weak_call import Callback, WeakCall as _WeakCall, weak
 from je_auto_control.gui.tab_task_controller import (
     CancellationToken, TaskController, TaskUsageError, _widgets_reachable_from, task_controller,
 )
+from je_auto_control.gui._stop_custody import stop_custody
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
 
 def _call(work: Callable[[], Any], _token: CancellationToken) -> Any:
@@ -53,6 +56,24 @@ def _call(work: Callable[[], Any], _token: CancellationToken) -> Any:
 def _log_failure(error: object) -> None:
     """A failed stop with nobody to tell is still recorded."""
     autocontrol_logger.warning(f"GUI background operation failed: {error!r}")
+
+
+class StopsFailed(AutoControlException, RuntimeError):
+    """Some of :func:`stop_each`'s stops raised; ``failures`` pairs each with its error."""
+
+    def __init__(self, failures: List[Tuple[Callable[[], Any], BaseException]]) -> None:
+        super().__init__("; ".join(f"{type(error).__name__}: {error}" for _stop, error in failures))
+        self.failures = failures
+
+
+def hold_failed_stop(stop: Callable[[], Any], error: object,
+                     authority: Optional[DeferredAuthorization] = None) -> None:
+    """Hand a failed stop to the application's custody (each one of a :class:`StopsFailed` separately)."""
+    if isinstance(error, StopsFailed):
+        for inner, inner_error in error.failures:
+            stop_custody().hold(inner, inner_error, authority=authority)
+    else:
+        stop_custody().hold(stop, error, authority=authority)
 
 
 def _refuse_widgets(work: Callable[[], Any]) -> None:
@@ -154,14 +175,16 @@ class StopQueue(QObject):
                args: Tuple[Any, ...] = ()) -> None:
         """Run ``stop()`` off the GUI thread; ``on_done(*args, result)`` follows on the GUI thread.
 
-        A shutdown that raises is logged: the object is already out of use
-        and there is nothing for the panel to undo.
+        A shutdown that raises is kept by :func:`~je_auto_control.gui._stop_custody.stop_custody`,
+        with the caller's authority captured now, so it can be retried from
+        the Diagnostics tab: the object is out of the panel's hands, but its
+        resource may still be held.
         """
         _refuse_widgets(stop)
         controller = self._controller if self._controller is not None else task_controller()
         handle = controller.submit(functools.partial(_call, stop), owner=self)
         self._pending += 1
-        handle.error.connect(_log_failure)
+        handle.error.connect(functools.partial(hold_failed_stop, stop, authority=DeferredAuthorization.capture()))
         if on_done is not None:
             handle.result.connect(weak_slot(on_done, *args))     # a weak call, never the panel
         handle.finished.connect(self._one_reported)
@@ -173,12 +196,19 @@ class StopQueue(QObject):
 
 
 def stop_each(*stops: Callable[[], Any]) -> None:
-    """Worker thread: call every ``stop`` in order; one that fails does not keep the rest from running."""
+    """Worker thread: call every ``stop`` in order; one that fails does not keep the rest from running.
+
+    Raises :class:`StopsFailed` afterwards when any did, naming each failed
+    stop, so a :class:`StopQueue` keeps every one of them for a retry.
+    """
+    failures: List[Tuple[Callable[[], Any], BaseException]] = []
     for stop in stops:
         try:
             stop()
-        except Exception as error:  # noqa: BLE001  # reason: logged; the remaining shutdowns must still run
-            autocontrol_logger.warning(f"GUI background shutdown failed: {error!r}")
+        except Exception as error:  # noqa: BLE001  # reason: collected and raised below; the remaining shutdowns must still run
+            failures.append((stop, error))
+    if failures:
+        raise StopsFailed(failures)
 
 
-__all__ = ["SlowOp", "StopQueue", "stop_each"]
+__all__ = ["SlowOp", "StopQueue", "StopsFailed", "hold_failed_stop", "stop_each"]

@@ -369,6 +369,8 @@ module = [
     "je_auto_control.gui.navigation",
     "je_auto_control.gui.workspace_details",
     "je_auto_control.gui._task_details",
+    "je_auto_control.gui._stop_custody",
+    "je_auto_control.gui.failed_stops_view",
     "je_auto_control.gui.remote_desktop.webrtc_panel_state",
     "je_auto_control.gui.remote_desktop.view_lifetime",
     "je_auto_control.gui.remote_desktop.view_approvals",

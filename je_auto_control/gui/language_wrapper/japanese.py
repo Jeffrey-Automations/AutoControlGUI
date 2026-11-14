@@ -1394,6 +1394,21 @@ japanese_word_dict = {
     "page_banner_permission": ("現在のロール（{role}）ではこのページの {commands} を実行できません。"
                                "管理者にアクセスを依頼してください。"),
     "page_banner_dismiss": "閉じる",
+    "failed_stops_title": "失敗したバックグラウンド停止",
+    "failed_stops_hint": ("パネルはこれらを手放しましたが、停止で例外が発生したため、保持していたも"
+                          "のがまだ開いている可能性があります。"
+                          "再試行は、キューに入れた時点の権限で各停止をもう一度実行します。"),
+    "failed_stops_col_what": "対象",
+    "failed_stops_col_error": "エラー",
+    "failed_stops_col_attempts": "試行回数",
+    "failed_stops_col_at": "最後の失敗",
+    "failed_stops_retry": "失敗した停止を再試行",
+    "failed_stops_forget": "選択した失敗停止を破棄",
+    "failed_stops_nothing": "保持している失敗停止はありません。",
+    "failed_stops_retrying": "失敗した停止を再試行しています…",
+    "failed_stops_result": "解放 {released} 件、失敗のまま {failing} 件。",
+    "failed_stops_forgotten": "破棄しました。",
+    "failed_stops_select_first": "先に失敗停止を選択してください。",
     "stop_playback": "再生を停止",
     "record_playing": "再生中...",
     "rd_file_sending": "{name} を送信中...",

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- GUI: a shutdown handed to `StopQueue` that raises is kept by the new
+  `gui/_stop_custody.py` (`stop_custody()`: `snapshot`, `retry`, `retry_all`, `forget`) with
+  its error and the caller's authority captured when it was queued, instead of only being
+  logged. `stop_each` now raises `StopsFailed` (with `failures`) after running every stop when
+  any failed -- a caller outside `StopQueue` sees that error. The Diagnostics tab lists held
+  stops and has **Retry failed stops** and **Forget selected failed stop** in the Actions menu
+  (new `gui/failed_stops_view.py`; new catalogue keys `failed_stops_*`).
+
 - Remote desktop: a WebRTC session whose peer fails to build (`MultiViewerHost.create_owned_session_offer`)
   no longer leaves its session token, its relay subscription, or a screen source no other session
   uses. GUI: the WebRTC host panel makes owned offers and disconnects through

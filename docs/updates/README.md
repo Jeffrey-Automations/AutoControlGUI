@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-36 | 2026-11-14 | A failed background stop is kept for a retry from Diagnostics | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
 | U-20261114-35 | 2026-11-14 | The WebRTC host panel stops the session it captured; a failed peer build leaves nothing | #done #gui #webrtc | [2026-11-b](2026-11-b.md) |
 | U-20261114-34 | 2026-11-14 | A replaced viewer session's late events no longer reach the next one | #done #gui #remote-desktop | [2026-11-b](2026-11-b.md) |
 | U-20261114-33 | 2026-11-14 | A file transfer already sending stops at the next chunk when cancelled | #done #remote-desktop #files | [2026-11-b](2026-11-b.md) |

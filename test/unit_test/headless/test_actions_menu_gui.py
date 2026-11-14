@@ -146,6 +146,7 @@ def test_hook_tab_actions_reach_the_menu(report):
 
 def test_diagnostic_run_stop_and_passive_inspection_reach_the_window_actions_menu(report):
     assert report['diagnostic_menu_keys'] == ['diag_probe', 'diag_run', 'diag_stop',
+                                              'failed_stops_retry', 'failed_stops_forget',
                                               'mcp_discovery_search', 'mcp_discovery_schema', 'mcp_disclosure_plan']
 
 

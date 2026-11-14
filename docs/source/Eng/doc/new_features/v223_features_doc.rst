@@ -177,6 +177,17 @@ on its own worker before connecting. Callbacks are held
 weakly: pass a method and ``args=``, not a ``functools.partial`` or a lambda
 that closes over the tab.
 
+A shutdown handed to a ``StopQueue`` that raises is not only logged:
+``je_auto_control.gui._stop_custody.stop_custody()`` keeps it, with its error
+and the authority captured when it was queued, for the life of the
+application -- the object is out of the panel's hands, but what it held may
+still be open. ``stop_each`` still runs every stop and then raises
+``StopsFailed`` naming each failed one, so each is kept on its own. The
+Diagnostics tab lists them from the custody's snapshot (which runs nothing and
+waits on no native lock); **Retry failed stops** runs each again on a worker
+under its original authority and releases the ones that succeed, and **Forget
+selected failed stop** lets one go.
+
 This is a GUI-internal API (it imports ``PySide6``) and is not re-exported by
 the package facade; the headless functions a tab calls stay usable without it.
 

@@ -12,9 +12,11 @@ from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QObject
 
+from je_auto_control.gui._slow_op import hold_failed_stop
 from je_auto_control.gui._weak_call import weak_slot
 from je_auto_control.gui.tab_task_controller import CancellationToken, TaskHandle, task_controller
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
 #: Seconds the backend gets for each step of the connect.
 CONNECT_TIMEOUT_S = 5.0
@@ -29,7 +31,7 @@ def _disconnect_quietly(viewer: Any) -> None:
 
 
 def _connect(viewer: Any, timeout_s: float, before: Optional[Callable[[], Any]],
-             token: CancellationToken) -> Any:
+             authority: DeferredAuthorization, token: CancellationToken) -> Any:
     """Worker thread: run ``before`` (always), then connect ``viewer`` and return it."""
     if before is not None:
         # The previous session's shutdown: it lets go of its seat before this
@@ -37,7 +39,8 @@ def _connect(viewer: Any, timeout_s: float, before: Optional[Callable[[], Any]],
         try:
             before()
         except (OSError, RuntimeError) as error:
-            autocontrol_logger.warning("closing the previous remote-desktop session failed: %r", error)
+            # Kept for a retry from Diagnostics: the old session may still hold its socket.
+            hold_failed_stop(before, error, authority)
     # connect() takes a timeout but no cancel signal: a cancelled attempt
     # runs out its timeout, and the viewer it produced is disconnected by
     # the task's ``discard``.
@@ -61,7 +64,8 @@ def connect_viewer(owner: QObject, viewer: Any, *,
     one replaces, from ``registry.detach``
     -- runs on the same worker first, so it does not hold the GUI thread.
     """
-    handle = task_controller().submit(functools.partial(_connect, viewer, timeout_s, before),
+    handle = task_controller().submit(functools.partial(_connect, viewer, timeout_s, before,
+                                                        DeferredAuthorization.capture()),
                                       owner=owner, discard=_disconnect_quietly)
     handle.result.connect(weak_slot(on_connected))
     handle.error.connect(weak_slot(on_failed))

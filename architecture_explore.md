@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,541 |
-| 程式碼總行數 | 236,648 |
+| Python 模組總數（含周邊子專案） | 1,543 |
+| 程式碼總行數 | 237,046 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1315,6 +1315,8 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `workspace.py` | 582 | Registry-owned tab workspace with scrollable pages and passive execution details. `WorkspaceShell(registry, parent)` 保留分頁身分、弱關閉觀測、show/hide/close API 與右側詳情；每頁放入時加頁首並跑 `fit_to_width`；`set_details_overlay` 讓詳情在窄視窗改為右側抽屜。 |
 | `workspace_details.py` | 116 | Immutable execution snapshots and a passive, scrollable workspace detail view. Diagnostics 與每個 `TabTask` 都是 publisher；僅訂閱目前頁面，`details_sources()` 通知綁定後才建立的來源。 |
 | `_task_details.py` | 116 | Execution details a TabTask publishes for the page it runs on. 由子面板往上找出工作區的分頁、第一次執行時建立來源，發布執行中／停止中／完成／已取消／錯誤與回報的進度。 |
+| `_stop_custody.py` | 187 | Stops that failed in the background, kept so they can be retried instead of only logged. StopQueue／stop_each 失敗時保留停止、錯誤與排入時的權限；`snapshot` 不執行任何東西，`retry` 以原權限重試。 |
+| `failed_stops_view.py` | 116 | Diagnostics' view of background stops that failed: what is held, and a retry from the Actions menu. |
 | `workspace_settings.py` | 36 | 驗證與載入主題、字級、導覽面板顯示與寬度；QSettings 使用當次帳號家目錄的 `gui.ini`，測試可注入獨立檔案。 |
 | `agent_transfer_view.py` | 171 | Explicit transfer requests and consent preparation with revision-bound background observations. |
 | `config_sync_worker.py` | 130 | Run explicit workspace requests with immutable inputs, live authority and cooperative cancellation. |
@@ -1339,7 +1341,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `journal_browser.py` | 260 | Run History 與 Self-Healing 共用的唯讀日誌檢視：來源連結／路徑／run／step 篩選、有界快照表與明細，舊結果以 request ID 隔離。 |
 | `journal_browser_worker.py` | 88 | 背景查閱與逐筆取消；帶入 context 並在開檔前重查 deferred 擁有者，以 queued counts 回報進度。 |
 | `manual_run_controls.py` | 72 | 手動執行的 history 勾選與獨立 journal 路徑；以共用無頭 scope 包住既有 GUI 執行，不改結果與變數。 |
-| `language_wrapper/` | 8,544 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
+| `language_wrapper/` | 8,601 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
 | `selector/` | 216 | 拖曳選取螢幕區域的半透明全螢幕覆蓋層與樣板裁切工具（互動式，但都有對應的程式化 API）。 |
 
 > **分頁指令一律走 Actions 選單**：分頁本身只放輸入、表格與結果檢視，指令由視窗層選單暴露。
@@ -1389,7 +1391,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | dag_runner | `dag_tab.py` | 366 | 編輯、驗證、執行跨主機 DAG。 |
 | chatops | `chatops_tab.py` | 140 | 在接上 Slack 前先本機測試 slash 指令。 |
 | trace_replay | `trace_replay_tab.py` | 194 | 拖曳捲動時光回溯錄製內容。 |
-| remote_desktop | `remote_desktop/`（40 檔） | 8,521 | 見下。 |
+| remote_desktop | `remote_desktop/`（40 檔） | 8,525 | 見下。 |
 | presence | `presence_tab.py` | 168 | 多檢視者在場名單。 |
 | rest_api | `rest_api_tab.py` | 256 | 啟停 HTTP 前端並顯示 URL、實際驗證模式與可用 token。 |
 | admin_console | `admin_console_tab.py` | 330 | 管理多個遠端 AutoControl REST 端點。 |
@@ -1398,7 +1400,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | usb_devices | `usb_devices_tab.py` | 175 | 唯讀列舉 + 熱插拔監看控制。 |
 | usb_browser | `usb_browser_tab.py` | 277 | 檢視端 USB 裝置瀏覽器。 |
 | usb_share | `usb_passthrough_panel.py` + `usb_passthrough_prompt.py` | 778 | AnyDesk 風格 USB 直通面板與主機端 ACL 授權對話框。 |
-| diagnostics | `diagnostics_tab.py` | 238 | Actions 提供被動快照、背景主動診斷與停止；四語進度／重試、關閉後結果隔離；不自動取得授權。 |
+| diagnostics | `diagnostics_tab.py` | 242 | Actions 提供被動快照、背景主動診斷與停止；四語進度／重試、關閉後結果隔離；不自動取得授權。 |
 | report | `_report_tab.py` | 106 | 產生 HTML／JSON／XML 報表。 |
 
 #### 診斷顯示輔助
@@ -1407,7 +1409,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `gui/diagnostics_capabilities.py` | 60 | 只呈現既有不可變能力快照與四語狀態；不探測、不連線，不持有原生物件。 |
 
-#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／8,521 行）
+#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／8,525 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1547,7 +1549,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 164 | 43,280 |
+| `gui/` | 166 | 43,678 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,822 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1568,7 +1570,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,222 |
-| **總計** | **1,529** | **235,903** |
+| **總計** | **1,531** | **236,301** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

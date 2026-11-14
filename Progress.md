@@ -538,9 +538,9 @@ F 還缺：
 - **F3** 還缺 backend timeout／cancel 傳遞與關閉生命週期遷移（Quick Connect 與 Viewer 分頁的啟停／中斷連線已移出 GUI 執行緒，
   U-20261114-32；傳送中的檔案傳輸會在下一個區塊停止，U-20261114-33；同頁 session generation 已隔離，U-20261114-34）。分頁的背景工作已全部改走共用 `TaskController`
   （`TabTask`，U-20261114-13～26），GUI 內除兩個 controller 本身外已無 `start_worker` 呼叫。
-- **F3 關閉失敗恢復**：`gui/_slow_op.py` 的 StopQueue／stop_each 目前只記錄停止失敗，
-  尚未保留失敗資源的明確重試所有權。須接上應用程式生命週期的資源保管、原授權下的 Diagnostics 查詢／重試，
-  並遷移一般停止及頁面銷毀後的 discard 路徑，包含 `_drop_offer` 與廣播清理；不能把背景排程等同原生資源已釋放。
+- **F3 關閉失敗恢復**：StopQueue／stop_each 的失敗停止已交給應用程式層的保管者，Diagnostics 可在原授權下查詢／重試
+  （U-20261114-36）；仍須遷移 SlowOp 的一般停止、頁面銷毀後的 discard 路徑（含 `_drop_offer` 背景停止）與廣播清理，
+  讓它們失敗時也交給保管者；不能把背景排程等同原生資源已釋放。
   GUI 廣播／錄影呼叫端仍須保留 `MediaRetirementError.owner` 和取消訊號附帶的清理擁有者；
   不可吞掉未確認結果、清掉失敗子物件或只因 `has_output` 就顯示已儲存。`HostBrowser` 對話框的持續所有權與背景清理仍缺整合。
   仍缺授權撤銷後可安全執行、只封閉本機准入且不等待原生鎖的獨立操作；不能用完整 stop 代替。
