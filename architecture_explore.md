@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,537 |
-| 程式碼總行數 | 235,756 |
+| 程式碼總行數 | 235,783 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -516,7 +516,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 52,945 行。
+> 14 個套件、約 52,951 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -533,7 +533,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/mcp_server/` | 22,228 | **無頭 MCP 伺服器**（預設註冊 820 個工具＝801 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
 | `utils/tool_use_schema/` | 191 | 把 `AC_*` 指令匯出成 Claude／OpenAI 的 tool-use schema |
 | `utils/trajectory_eval/` | 132 | agent 軌跡評估：依評分規準為一次執行打分 |
-| `utils/vision/` | 660 | VLM 元素定位器（依描述找元素）+ Anthropic／OpenAI／null 後端 |
+| `utils/vision/` | 666 | VLM 元素定位器（依描述找元素）+ Anthropic／OpenAI／null 後端 |
 
 ### 5.4.10 遠端桌面與 USB
 
@@ -1336,7 +1336,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `journal_browser.py` | 250 | Run History 與 Self-Healing 共用的唯讀日誌檢視：來源連結／路徑／run／step 篩選、有界快照表與明細，舊結果以 request ID 隔離。 |
 | `journal_browser_worker.py` | 85 | 背景查閱與逐筆取消；帶入 context 並在開檔前重查 deferred 擁有者，以 queued counts 回報進度。 |
 | `manual_run_controls.py` | 72 | 手動執行的 history 勾選與獨立 journal 路徑；以共用無頭 scope 包住既有 GUI 執行，不改結果與變數。 |
-| `language_wrapper/` | 8,495 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
+| `language_wrapper/` | 8,499 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
 | `selector/` | 216 | 拖曳選取螢幕區域的半透明全螢幕覆蓋層與樣板裁切工具（互動式，但都有對應的程式化 API）。 |
 
 > **分頁指令一律走 Actions 選單**：分頁本身只放輸入、表格與結果檢視，指令由視窗層選單暴露。
@@ -1357,12 +1357,12 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | recording_editor | `recording_editor_tab.py` | 255 | 裁切、過濾、重新縮放錄製內容；Actions 提供背景日誌候選審閱。 |
 | variables | `variables_tab.py` | 170 | 檢視、灌入、清除 executor 執行期作用域。 |
 | secrets | `secrets_tab.py` | 190 | 解鎖保險庫並管理 `${secrets.NAME}`。 |
-| vlm | `vlm_tab.py` | 126 | 用文字描述 UI 元素，交由模型定位。 |
+| vlm | `vlm_tab.py` | 150 | 用文字描述 UI 元素，交由模型定位。 |
 | self_healing | `self_healing_tab.py`、`healing_evaluation_panel.py`、`healing_evaluation_worker.py`、`template_candidate_panel.py`、`template_candidate_worker.py` | 954 | 執行時定位／記錄、固定影像版本比較、原始步驟與候選樣板生命週期；背景工作可取消並丟棄過期結果。 |
 | ocr_reader | `ocr_tab.py` | 192 | 傾印區域文字或以 regex 搜尋。 |
 | accessibility | `accessibility_tab.py` | 193 | 瀏覽 OS UI 樹並依 role/name 點擊。 |
 | live_hud | `live_hud_tab.py` | 140 | 即時 HUD：滑鼠位置、游標下像素色、log tail。 |
-| llm_planner | `llm_planner_tab.py` | 203 | 自然語言描述 → 預覽 → 執行。 |
+| llm_planner | `llm_planner_tab.py` | 196 | 自然語言描述 → 預覽 → 執行。 |
 | computer_use | `computer_use_tab.py` | 185 | 從 GUI 啟動 Anthropic 閉環 agent。 |
 | agent_tasks | `agent_tasks_tab.py` | 618 | 受管任務輸入、狀態與 Actions menu；服務獨立於視圖生命週期。 |
 | scheduler | `scheduler_tab.py` | 174 | 註冊間隔式 action JSON 執行。 |
@@ -1543,7 +1543,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 160 | 42,559 |
+| `gui/` | 160 | 42,580 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1563,8 +1563,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,153 |
-| **總計** | **1,525** | **235,011** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,159 |
+| **總計** | **1,525** | **235,038** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

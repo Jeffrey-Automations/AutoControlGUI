@@ -119,8 +119,9 @@ def test_the_tabs_run_their_job_and_clear_the_guard(monkeypatch, which):
         tab = mod.LLMPlannerTab()
         tab._description.setPlainText("do it")  # noqa: SLF001
         tab._on_plan()  # noqa: SLF001
-        guard = "_plan_thread"
-    assert getattr(tab, guard) is not None
-    assert _pump_until(app, lambda: getattr(tab, guard) is None), "the guard never cleared"
+        guard = "task"
+    holder = tab._plans if which == "llm_planner" else tab  # noqa: SLF001
+    assert getattr(holder, guard) is not None
+    assert _pump_until(app, lambda: getattr(holder, guard) is None), "the guard never cleared"
     assert seen
     tab.deleteLater()

@@ -1353,6 +1353,7 @@ traditional_chinese_word_dict = {
     "task_stopping": "正在停止...",
     "task_stopped": "已停止。",
     "task_stop": "停止執行",
+    "task_timed_out": "執行逾時，已停止。",
     "stop_playback": "停止回放",
     "record_playing": "回放中...",
     "rd_file_sending": "正在傳送 {name}...",

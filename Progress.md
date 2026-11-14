@@ -538,6 +538,10 @@ F 還缺：
   - 已在本機真實桌面（Windows 11、單一螢幕 1920×1080、150% 縮放）審閱（U-20261114-05）；混合 DPI／多螢幕與 Linux／macOS 字型仍只有 offscreen 截圖。
 - **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移，
   包含 Quick Connect 的同步啟停、已進入傳輸的取消與同頁 session generation 隔離。
+  AI Locator 與 LLM Planner 的 Plan 已遷移（U-20261114-13）；仍直接使用 `start_worker`、沒有 Stop／期限的面板：
+  `admin_console_tab`、`computer_use_tab`、`config_sync_tab`、`dag_tab`、`email_triggers_tab`、
+  `healing_evaluation_panel`、`journal_browser`、`journal_candidate_panel`、`template_candidate_panel`、
+  `usb_browser_tab`、`usb_devices_tab`、`usb_passthrough_panel`。
 - **F3 關閉失敗恢復**：`gui/_slow_op.py` 的 StopQueue／stop_each 目前只記錄停止失敗，
   尚未保留失敗資源的明確重試所有權。須接上應用程式生命週期的資源保管、原授權下的 Diagnostics 查詢／重試，
   並遷移一般停止及頁面銷毀後的 discard 路徑，包含 `_drop_offer` 與廣播清理；不能把背景排程等同原生資源已釋放。

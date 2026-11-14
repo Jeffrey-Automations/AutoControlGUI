@@ -327,8 +327,14 @@ Environment variables (keys are never logged or persisted):
 - ``AUTOCONTROL_VLM_BACKEND=anthropic|openai``
 - ``AUTOCONTROL_VLM_MODEL=<model-id>``
 
+Inside a cancellation scope (a GUI task, or any caller that binds one) both
+calls check for cancellation before the model request and ``click_by_description``
+checks again before it moves the mouse, so an answer that arrives after a
+stop or a deadline raises ``CancelledError`` instead of clicking.
+
 Action-JSON commands: ``AC_vlm_locate``, ``AC_vlm_click``. GUI:
-**AI Locator** tab.
+**AI Locator** tab: one request at a time, off the GUI thread, with a **Stop
+run** action and a two-minute deadline (*Took too long and was stopped.*).
 
 
 Run history + error-snapshot artifacts
@@ -682,9 +688,10 @@ Backend selection mirrors ``vision.backends``:
 
 Action-JSON commands: ``AC_llm_plan``, ``AC_llm_run``.
 
-GUI: **LLM Planner** tab. Description box, ``QThread``-backed *Plan*
-button, action-list preview, and a *Run plan* button — long calls run
-off the GUI thread so the UI stays responsive.
+GUI: **LLM Planner** tab. Description box, *Plan* button, action-list
+preview, and a *Run plan* button. Planning and running happen off the GUI
+thread; a plan has a deadline of 200 seconds, and **Stop run** ends the run
+or, when none is going, drops the plan still being asked for.
 
 
 Remote desktop (host + viewer)

@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-13 | 2026-11-14 | AI Locator and LLM Planner requests get Stop, a deadline and no late click | #done #gui #vision | [2026-11-b](2026-11-b.md) |
 | U-20261114-12 | 2026-11-14 | Whole-window probes end without Windows DLL teardown | #done #gui #test | [2026-11-b](2026-11-b.md) |
 | U-20261114-11 | 2026-11-14 | Trace Replay and Run History get their draggable divider back | #done #gui | [2026-11-b](2026-11-b.md) |
 | U-20261114-10 | 2026-11-14 | Remote Desktop's collapsed sections shrink to their title; wrapped groups show one title | #done #gui #remote-desktop | [2026-11-b](2026-11-b.md) |

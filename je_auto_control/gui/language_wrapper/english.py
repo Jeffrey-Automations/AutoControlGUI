@@ -1485,6 +1485,7 @@ english_word_dict = {
     "task_stopping": "Stopping...",
     "task_stopped": "Stopped.",
     "task_stop": "Stop run",
+    "task_timed_out": "Took too long and was stopped.",
     "stop_playback": "Stop playback",
     "record_playing": "Playing back...",
     "rd_file_sending": "Sending {name}...",

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- `locate_by_description` and `click_by_description` observe a bound cancellation scope:
+  cancelled before the model request, they raise `concurrent.futures.CancelledError` without
+  sending it, and `click_by_description` checks again before it moves the mouse, so an answer
+  that arrives after a stop or a deadline no longer clicks. Calls outside a scope are unchanged.
+  GUI: the AI Locator tab and the LLM Planner's Plan step run as cancellable tasks with a
+  **Stop run** action and a deadline (120 s and 200 s); `LLMPlannerTab._plan_thread` and
+  `VLMTab._vlm_thread` are gone (`_plans` and `_task` are their `TabTask`s).
+
 - GUI: drop-down lists and spin boxes draw theme-coloured chevrons, inset from the rounded
   border, and spin boxes inset their digits like every other field. The chevrons are drawn
   once per theme colour into `~/.je_auto_control/gui_cache/`, next to the tab close cross;

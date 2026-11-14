@@ -302,8 +302,13 @@ VLM（AI）元件定位
 - ``AUTOCONTROL_VLM_BACKEND=anthropic|openai``
 - ``AUTOCONTROL_VLM_MODEL=<model-id>``
 
+在取消範圍內（GUI 背景工作，或任何綁定範圍的呼叫端）兩者都會在送出模型請求前檢查取消，
+``click_by_description`` 在移動滑鼠前會再檢查一次：停止或逾時之後才回來的答案會拋出
+``CancelledError``，不會點擊。
+
 Action-JSON 指令：``AC_vlm_locate``、``AC_vlm_click``。GUI：
-**AI Locator** 分頁。
+**AI Locator** 分頁：一次一個請求、在 GUI 執行緒之外執行，有 **停止執行** 動作與兩分鐘期限
+（「執行逾時，已停止。」）。
 
 
 執行歷史 + 錯誤截圖附件
@@ -622,8 +627,9 @@ LLM 動作規劃器
 
 Action-JSON 指令：``AC_llm_plan``、``AC_llm_run``。
 
-GUI：**LLM Planner** 分頁。描述輸入框、``QThread`` 背景執行的 *Plan*
-按鈕、預覽指令清單、以及 *Run plan* 按鈕 — 長時間呼叫不會卡 UI。
+GUI：**LLM Planner** 分頁。描述輸入框、*Plan* 按鈕、預覽指令清單、以及 *Run plan* 按鈕。
+規劃與執行都在 GUI 執行緒之外；規劃有 200 秒期限，**停止執行** 會停止執行中的腳本，
+沒有腳本在跑時則丟棄仍在等待的規劃。
 
 
 遠端桌面（Host + Viewer）

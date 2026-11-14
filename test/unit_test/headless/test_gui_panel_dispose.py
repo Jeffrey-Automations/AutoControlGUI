@@ -310,12 +310,13 @@ def test_a_released_vlm_tab_drops_the_answer_of_the_request_still_out(monkeypatc
     tab = vlm_tab.VLMTab()
     tab._description.setText("the button")
     tab._on_locate()
-    assert tab._vlm_thread is not None
+    assert tab._task.running
+    status = tab._status.text()
     tab.dispose()
     release.set()
-    assert pump_until(lambda: tab._vlm_thread is None)
+    assert pump_until(lambda: not tab._task.running)
     assert tab._last_result.text() == ""
-    assert tab._status.text() == ""
+    assert tab._status.text() == status
 
 
 def test_a_released_usb_browser_tab_drops_the_open_still_out(monkeypatch):
