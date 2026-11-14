@@ -28,8 +28,7 @@ def panel(app):
     widget = HealingEvaluationPanel()
     yield widget
     widget.cancel()
-    if widget._handle is not None:
-        assert widget._handle.wait(5)
+    until(app, lambda: not widget._task.running)
     widget.deleteLater()
     app.processEvents()
 
@@ -45,14 +44,14 @@ def until(app, predicate):
 def test_panel_starts_empty_and_exposes_only_actions(panel):
     assert panel.findChildren(QPushButton) == []
     assert panel._summary.rowCount() == panel._cases.rowCount() == 0
-    assert panel._handle is None
+    assert not panel._task.running
     assert len(panel.menu_actions()) == 5
 
 
 def test_background_comparison_details_and_shared_exports(panel, app, tmp_path, monkeypatch):
     panel._path.setText(str(DATASET))
     panel.evaluate()
-    until(app, lambda: panel._report is not None and panel._handle is None)
+    until(app, lambda: panel._report is not None and not panel._task.running)
     assert panel._summary.rowCount() == 2
     assert panel._cases.rowCount() == 10
     panel._cases.setCurrentCell(0, 0)
@@ -82,7 +81,7 @@ def test_changed_selection_cancels_and_discards_late_result(panel, app, monkeypa
     assert started.wait(5)
     panel._path.setText("different.json")
     release.set()
-    until(app, lambda: panel._handle is None)
+    until(app, lambda: not panel._task.running)
     assert panel._report is None
     assert panel._cases.rowCount() == 0
     assert thread_ids[0] != get_ident()
@@ -98,7 +97,6 @@ def test_worker_revalidates_authority_and_pre_cancel_before_io(monkeypatch):
     assert worker._evaluate().status == "error"
     worker.request_stop()
     assert worker._evaluate().status == "cancelled"
-    worker.deleteLater()
 
 
 def test_panel_destruction_requests_stop_without_touching_dead_widgets(app, monkeypatch):
@@ -111,14 +109,47 @@ def test_panel_destruction_requests_stop_without_touching_dead_widgets(app, monk
         return report
 
     monkeypatch.setattr("je_auto_control.gui.healing_evaluation_worker.evaluate_healing_manifest", slow)
+    stops, done = [], Event()
+    real_call = HealingEvaluationWorker.__call__
+
+    def call(self, stop_event):
+        stops.append(stop_event)
+        try:
+            return real_call(self, stop_event)
+        finally:
+            done.set()
+
+    monkeypatch.setattr(HealingEvaluationWorker, "__call__", call)
     widget = HealingEvaluationPanel()
     widget._path.setText(str(DATASET))
     widget.evaluate()
     assert started.wait(5)
-    handle, worker = widget._handle, widget._worker
     widget.deleteLater()
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    assert worker._stop.is_set()
+    assert stops[0].is_set()
     release.set()
-    assert handle.wait(5)
+    assert done.wait(5)
     app.processEvents()
+
+
+def test_cancel_keeps_the_panel_busy_until_the_comparison_unwinds(panel, app, monkeypatch):
+    started, release = Event(), Event()
+    report = evaluate_healing_manifest(DATASET)
+
+    def slow(*_args, **_kwargs):
+        started.set()
+        assert release.wait(5)
+        return report
+
+    monkeypatch.setattr("je_auto_control.gui.healing_evaluation_worker.evaluate_healing_manifest", slow)
+    panel._path.setText(str(DATASET))
+    panel.evaluate()
+    assert started.wait(5)
+    dict(panel.menu_actions())["healing_eval_cancel"]()
+    assert panel._task.running and panel._task.stopping
+    panel.evaluate()                                    # still unwinding: no second comparison
+    assert panel._state == "busy"
+    release.set()
+    until(app, lambda: not panel._task.running)
+    assert panel._state == "cancelled"                  # the checkpoint after the read saw the stop
+    assert panel._report is None

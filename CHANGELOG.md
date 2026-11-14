@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- GUI internals: the self-healing comparison panel runs on `TabTask.start_until_stopped`.
+  `HealingEvaluationWorker` is no longer a `QObject`: it is called with the stop event and
+  returns its `HealingEvaluationOutcome` (`run`, `finished` and the `_handle` / `_worker`
+  attributes are gone; `_task` is the task). Cancel still publishes no partial comparison.
+
 - `AdminConsoleClient.poll_all` and `fetch_thumbnails` observe a bound cancellation scope: once
   cancelled, hosts not reached yet are skipped and `CancelledError` is raised after the requests
   already out return. Unscoped calls (`AC_admin_poll`, scripts) are unchanged. GUI: the Admin

@@ -543,9 +543,9 @@ F 還缺：
   停止時逐台回報已執行或未送出）、USB Browser 的 Fetch／Open（U-20261114-17）、
   USB passthrough 面板的 List／Open／遠端抓取（U-20261114-18）、Computer Use 的執行（U-20261114-19，
   `TabTask.start_until_stopped`：Stop 後等工作真的結束才空出分頁）、DAG Runner（U-20261114-20）、
-  Admin Console 的健康輪詢與縮圖（U-20261114-21）已遷移。仍直接使用 `start_worker` 的面板都已有自己的取消
+  Admin Console 的健康輪詢與縮圖（U-20261114-21）、自我修復比對面板（U-20261114-22）已遷移。仍直接使用 `start_worker` 的面板都已有自己的取消
   （Cancel 動作、關閉時 `request_stop`、generation 擋掉舊結果），只差改用共用 controller：`config_sync_tab`、
-  `healing_evaluation_panel`、`journal_browser`、`journal_candidate_panel`、`template_candidate_panel`。
+  `journal_browser`、`journal_candidate_panel`、`template_candidate_panel`。
   它們的 worker 以 Qt signal 回報進度，`TabTask` 尚無進度通道，遷移前須先補上。
 - **F3 關閉失敗恢復**：`gui/_slow_op.py` 的 StopQueue／stop_each 目前只記錄停止失敗，
   尚未保留失敗資源的明確重試所有權。須接上應用程式生命週期的資源保管、原授權下的 Diagnostics 查詢／重試，

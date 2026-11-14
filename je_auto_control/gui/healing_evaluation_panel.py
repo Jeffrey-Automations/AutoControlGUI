@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.responsive import fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.healing_evaluation_worker import HealingEvaluationOutcome, HealingEvaluationWorker
@@ -77,8 +77,10 @@ class HealingEvaluationPanel(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         self._generation = 0
-        self._handle: Optional[WorkerHandle] = None
-        self._worker: Optional[HealingEvaluationWorker] = None
+        # Cancel stops the comparison at its next checkpoint; closing the panel does too.
+        self._task = TabTask(self)
+        self._task.result.connect(self._completed)
+        self._task.error.connect(self._failed)
         self._report: Optional[HealingComparison] = None
         self._path = QLineEdit()
         self._summary, self._cases = _table(_SUMMARY), _table(_CASES)
@@ -152,7 +154,7 @@ class HealingEvaluationPanel(TranslatableMixin, QWidget):
 
     def evaluate(self) -> None:
         """Start one background comparison after authorizing the owning caller."""
-        if self._handle is not None:
+        if self._task.running:
             self._set_status("busy")
             return
         try:
@@ -162,26 +164,16 @@ class HealingEvaluationPanel(TranslatableMixin, QWidget):
             return
         self._generation += 1
         self._clear()
-        worker = HealingEvaluationWorker(self._generation, self._path.text().strip())
-        self._worker = worker
-        # pylint: disable-next=no-member  # reason: PySide binds the Qt signal at runtime
-        self.destroyed.connect(worker.request_stop)
         self._set_status("running")
-        self._handle = start_worker(self, worker, on_done=self._completed,
-                                     on_thread_done=self._thread_done, on_fail=self._failed)
+        self._task.start_until_stopped(HealingEvaluationWorker(self._generation, self._path.text().strip()))
 
     @Slot()
     def cancel(self) -> None:
         """Request stop without blocking the GUI or publishing partial results."""
-        if self._worker is not None:
-            self._worker.request_stop()
+        self._task.stop()
 
-    def _thread_done(self) -> None:
-        self._handle = None
-        self._worker = None
-
-    def _failed(self, error: str) -> None:
-        self._set_status("error", error)
+    def _failed(self, error: object) -> None:
+        self._set_status("error", str(error))
 
     @Slot(object)
     def _completed(self, outcome: HealingEvaluationOutcome) -> None:
