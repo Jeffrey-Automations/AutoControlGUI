@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,537 |
-| 程式碼總行數 | 235,900 |
+| 程式碼總行數 | 235,895 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1383,7 +1383,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | window_manager | `window_tab.py` | 139 | 列出、聚焦、關閉視窗。 |
 | plugins | `plugins_tab.py` | 85 | 從使用者目錄載入額外 `AC_` 指令。 |
 | webrunner | `webrunner_tab.py` | 203 | 從 GUI 驅動 `je_web_runner`。 |
-| dag_runner | `dag_tab.py` | 371 | 編輯、驗證、執行跨主機 DAG。 |
+| dag_runner | `dag_tab.py` | 366 | 編輯、驗證、執行跨主機 DAG。 |
 | chatops | `chatops_tab.py` | 140 | 在接上 Slack 前先本機測試 slash 指令。 |
 | trace_replay | `trace_replay_tab.py` | 194 | 拖曳捲動時光回溯錄製內容。 |
 | remote_desktop | `remote_desktop/`（40 檔） | 8,368 | 見下。 |
@@ -1543,7 +1543,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 160 | 42,652 |
+| `gui/` | 160 | 42,647 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1564,7 +1564,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,188 |
-| **總計** | **1,525** | **235,155** |
+| **總計** | **1,525** | **235,150** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

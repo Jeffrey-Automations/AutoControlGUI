@@ -295,7 +295,7 @@ def test_a_released_dag_tab_stops_its_run_and_drops_the_outcome(monkeypatch):
     assert pump_until(lambda: bool(seen))
     tab.dispose()
     assert seen[0].is_set()
-    assert pump_until(lambda: tab._thread is None)
+    assert pump_until(lambda: not tab._run.running)
     assert tab._table.rowCount() == 0
 
 

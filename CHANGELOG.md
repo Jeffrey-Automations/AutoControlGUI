@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- GUI internals: the DAG Runner tab runs on `TabTask.start_until_stopped`. `_DagWorker` is no
+  longer a `QObject`: it is built on the GUI thread (keeping that context) and called with the
+  stop event, returning the result instead of emitting `finished` / `failed`. `_thread` and
+  `_stop_event` are gone; `_run` is the task. A failure of any type reaches the status line.
+
 - GUI internals: `TabTask.start_until_stopped(work)` runs `work(stop_event)`; Stop sets the
   event and the task stays running until the work returns, with its outcome. The Computer Use
   tab runs on it (`_thread`, `_stop_event` and `_ComputerUseWorker` are gone; `_run` is the

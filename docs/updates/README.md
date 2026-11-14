@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-20 | 2026-11-14 | The DAG Runner runs on the shared task and stays busy until a stopped run ends | #done #gui #dag | [2026-11-b](2026-11-b.md) |
 | U-20261114-19 | 2026-11-14 | Computer Use runs on the shared task and stays busy until a stopped run ends | #done #gui #agent | [2026-11-b](2026-11-b.md) |
 | U-20261114-18 | 2026-11-14 | The USB passthrough panel's use requests get a Stop and a deadline | #done #gui #usb | [2026-11-b](2026-11-b.md) |
 | U-20261114-17 | 2026-11-14 | The USB Browser's Fetch and Open get a Stop and a deadline | #done #gui #usb | [2026-11-b](2026-11-b.md) |
