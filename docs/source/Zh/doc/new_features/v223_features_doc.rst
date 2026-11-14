@@ -141,7 +141,10 @@ GUI 設定檔):
 * **取消會傳到後端。** 工作會收到 ``CancellationToken``:以
   ``raise_if_cancelled()`` / ``wait()`` 輪詢、把 ``remaining()`` 交給接受逾時的
   後端,並用 ``on_cancel()`` 登記如何釋放手上的資源。``handle.cancel()`` 會在
-  呼叫取消的執行緒上立刻執行那些釋放動作。
+  呼叫取消的執行緒上立刻執行那些釋放動作。經 ``TabTask`` 啟動的工作在取消範圍內執行,
+  按下停止或超過期限都會取消它,網路輔助函式也會遵守:``http_client.perform_call`` 取消後不會送出,
+  取消後才到的回應也不會交出去;信令等待(``wait_for_answer``／``wait_for_offer``,也接受 ``cancelled=``\ )
+  會在約 0.1 秒內結束。
 * **有型別的結果。** ``result`` 帶回傳值、``error`` 帶例外、``progress`` 帶
   ``token.report_progress()`` 傳入的內容。逾時回報為 ``TaskTimeout``,取消回報為
   ``TaskCancelled``。

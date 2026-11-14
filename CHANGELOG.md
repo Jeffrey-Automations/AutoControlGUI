@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- `http_client.perform_call` observes a bound cancellation scope: once it is cancelled the request
+  is not sent, and a reply that arrives after the cancellation raises `CancelledError` instead of
+  being returned; unscoped calls are unchanged. `signaling_client.wait_for_answer` /
+  `wait_for_offer` take `cancelled=` (default: the caller's scope) and raise `CancelledError`
+  within about 0.1 s. GUI: the WebRTC signaling workers and the host's publish loop pass their
+  interruption, so stopping the host ends a wait of up to ten minutes and drops the session it
+  had published.
+
 - Remote desktop: `close_admission()` on `AudioCapture` / `AudioPlayer` (and `AudioLease`),
   `HostBrowser` and `MultiViewerHost` stops taking anything new at once -- audio blocks and
   writes, discovery reports, new sessions, answers and viewer input -- without the owner's

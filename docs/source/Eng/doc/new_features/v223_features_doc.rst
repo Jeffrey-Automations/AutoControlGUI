@@ -149,7 +149,12 @@ What it adds to a plain worker:
   ``CancellationToken``: it polls ``raise_if_cancelled()`` / ``wait()``, hands
   ``remaining()`` to a backend that takes a timeout, and registers how to let
   go of what it holds with ``on_cancel()``. ``handle.cancel()`` runs those at
-  once, on the cancelling thread.
+  once, on the cancelling thread. Work started through ``TabTask`` runs in a
+  cancellation scope that a Stop or a deadline cancels, and the network
+  helpers follow it: ``http_client.perform_call`` sends nothing once it is
+  cancelled and does not hand on a reply that arrived afterwards, and the
+  signaling waits (``wait_for_answer`` / ``wait_for_offer``, which also take
+  ``cancelled=``) end within about 0.1 s.
 * **Typed outcomes.** ``result`` carries the return value, ``error`` the
   exception, ``progress`` whatever ``token.report_progress()`` was given. A
   timeout is reported as ``TaskTimeout``, a cancellation as ``TaskCancelled``.

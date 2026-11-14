@@ -14,6 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.http_headers import CREDENTIAL_HEADERS
 from typing import Any, Dict, Mapping, Optional
 
@@ -256,4 +257,10 @@ def perform_call(call: Mapping[str, Any]) -> Dict[str, Any]:
     """
     from je_auto_control.utils.egress.egress_policy import get_egress_policy
     get_egress_policy().check(call["url"])  # allow-all unless an operator locked it down
-    return urllib_transport(call)
+    # Inside a cancelled scope (a GUI task stopped or past its deadline) the
+    # request is not sent, and a reply that arrives after the cancellation is
+    # not handed on; the request itself cannot be interrupted once it is out.
+    cancellation_checkpoint()
+    response = urllib_transport(call)
+    cancellation_checkpoint()
+    return response
