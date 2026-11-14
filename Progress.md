@@ -548,8 +548,6 @@ F 還缺：
   傳送器已進入無法中斷的後端呼叫時仍可能持續待停止；
   強制中斷、行程結束及原生資源回收尚未驗收。媒體清理缺口已用假資源重現，未執行原生／裝置／網路驗收。
 - **F4** 啟動／記憶體基準對照與功能對等測試已交付（U-20261114-30）；仍缺 mixed-DPI 驗收（需要第二台不同縮放的螢幕）。
-- **F3 session 所有權**：GUI 斷線及丟棄 offer 路徑仍須在背景排程前取得原始 session 清理物件；
-  peer 建構及畫面來源訂閱的部分失敗所有權仍須補齊。
 - **F3 Windows 原生釋放驗收**（`BLOCKED`：等 CI 再次發生）：`test/unit_test/headless/test_remote_desktop_host_id.py` 的 freed-thread-state abort
   尚缺 Windows 原生堆疊與獨立根因確認。CI 的 Windows 工作現在會把 `python.exe` 當掉時的 minidump 存進
   `native-<os>-<python>` artifact 的 `dumps/`（U-20261114-31）；本機 Python 3.14.7 連跑二十次未重現，

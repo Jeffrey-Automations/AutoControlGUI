@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Remote desktop: a WebRTC session whose peer fails to build (`MultiViewerHost.create_owned_session_offer`)
+  no longer leaves its session token, its relay subscription, or a screen source no other session
+  uses. GUI: the WebRTC host panel makes owned offers and disconnects through
+  `session_retirement`, so a dropped offer or a disconnect stops the session it captured -- never
+  one that reused the id -- and a dropped offer no longer stops its session on the GUI thread.
+
 - GUI: Quick Connect and the Viewer tab tag each viewer session's callbacks with a session
   number; frames, cursor moves, audio and errors from a session already replaced or closed are
   dropped instead of reaching the next session (a late error used to disconnect it).

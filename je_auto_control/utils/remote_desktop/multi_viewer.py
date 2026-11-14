@@ -156,32 +156,7 @@ class MultiViewerHost:
 
     def create_owned_session_offer(self) -> OwnedSessionOffer:
         """Mint an offer with original-resource ownership for delayed delivery."""
-        with self._lock:
-            if self._retiring or self._source_stopping or self._source_failed:
-                raise PeerStopPending("finish retiring previous sessions before creating another")
-            if self._source is None:
-                self._source = _ScreenSource(self._config)
-            session_id = secrets.token_hex(8)
-            if session_id in self._sessions:
-                raise PeerLifecycleError("session identity collision")
-            token = object()
-            self._session_tokens[session_id] = token
-            host = WebRTCDesktopHost(
-                token=self._token,
-                config=self._config,
-                trust_list=self._trust_list,
-                permissions=self._permissions,
-                input_dispatcher=self._dispatch,
-                ip_whitelist=self._ip_whitelist,
-                on_annotation=self._annotate if self._on_annotation is not None else None,
-                external_video_track=self._source.subscribe(),
-                on_state_change=self._wrap_state_callback(session_id, token),
-                on_authenticated=self._wrap_auth_callback(session_id, token),
-                on_pending_viewer=self._wrap_pending_callback(session_id, token),
-            )
-            self._sessions[session_id] = host
-            self._creating.add(host)
-            retirement = SessionRetirement(session_id, self, host, self._source)
+        session_id, host, retirement = self._register_session()
         try:
             offer = host.create_offer(peer_label=f"viewer-{session_id[:6]}")
         except BaseException:
@@ -196,6 +171,66 @@ class MultiViewerHost:
             retirement.stop()
             raise PeerLifecycleError("session stopped during offer creation")
         return OwnedSessionOffer(retirement, offer)
+
+    def _register_session(self) -> Tuple[str, WebRTCDesktopHost, SessionRetirement]:
+        """Build and register one session's peer, or leave nothing behind and raise.
+
+        A peer that fails to build -- the screen subscription or the peer
+        itself -- leaves no session token, no relay subscription and, when no
+        other session uses it, no running screen source.
+        """
+        with self._lock:
+            if self._retiring or self._source_stopping or self._source_failed:
+                raise PeerStopPending("finish retiring previous sessions before creating another")
+            if self._source is None:
+                self._source = _ScreenSource(self._config)
+            source = self._source
+            session_id = secrets.token_hex(8)
+            if session_id in self._sessions:
+                raise PeerLifecycleError("session identity collision")
+            token = object()
+            self._session_tokens[session_id] = token
+            try:
+                host = self._new_session_peer(session_id, token, source)
+            except BaseException as error:  # noqa: BLE001  # reason: re-raised below, after the source is released
+                self._session_tokens.pop(session_id, None)
+                failure = error
+            else:
+                self._sessions[session_id] = host
+                self._creating.add(host)
+                return session_id, host, SessionRetirement(session_id, self, host, source)
+        self._release_unused_source(source)
+        raise failure
+
+    def _new_session_peer(self, session_id: str, token: object, source: _ScreenSource) -> WebRTCDesktopHost:
+        """Subscribe to the shared screen and build one session's peer; a failed build drops its subscription."""
+        track = source.subscribe()
+        try:
+            return WebRTCDesktopHost(
+                token=self._token,
+                config=self._config,
+                trust_list=self._trust_list,
+                permissions=self._permissions,
+                input_dispatcher=self._dispatch,
+                ip_whitelist=self._ip_whitelist,
+                on_annotation=self._annotate if self._on_annotation is not None else None,
+                external_video_track=track,
+                on_state_change=self._wrap_state_callback(session_id, token),
+                on_authenticated=self._wrap_auth_callback(session_id, token),
+                on_pending_viewer=self._wrap_pending_callback(session_id, token),
+            )
+        except BaseException:
+            stop = getattr(track, "stop", None)
+            if callable(stop):
+                stop()
+            raise
+
+    def _release_unused_source(self, source: _ScreenSource) -> None:
+        """After a session failed to build: stop the screen source if no session uses it (it may be new)."""
+        try:
+            self._maybe_release_source(source)
+        except (RuntimeError, OSError) as error:   # the build's own error is the one to raise
+            autocontrol_logger.warning("releasing the screen source after a failed session: %r", error)
 
     def session_retirement(self, session_id: str) -> SessionRetirement:
         """Capture the currently registered generation before queuing cleanup."""

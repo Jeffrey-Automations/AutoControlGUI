@@ -3,6 +3,7 @@
 Offscreen Qt with fake hosts, viewers, recorders and sync engines whose
 ``stop`` waits until the test lets it go. Nothing here opens a peer connection.
 """
+import functools
 import os
 import threading
 import time
@@ -101,7 +102,10 @@ def test_a_host_started_while_the_old_one_closes_keeps_its_own_status():
 def test_disconnecting_one_session_is_off_the_gui_thread_and_not_repeated():
     panel = webrtc_panel._WebRTCHostPanel()
     gate, counts = _Gate(), []
-    panel._multi_host = types.SimpleNamespace(stop_session=gate, session_count=lambda: 0)
+    # The session is captured on the GUI thread (its retirement); stopping it (the gate) runs on a worker.
+    panel._multi_host = types.SimpleNamespace(
+        session_retirement=lambda sid: types.SimpleNamespace(stop=functools.partial(gate, sid)),
+        session_count=lambda: 0)
     panel._signals.session_count.disconnect()
     panel._signals.session_count.connect(counts.append)
     panel._sessions_table.setRowCount(1)

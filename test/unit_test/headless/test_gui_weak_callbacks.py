@@ -187,16 +187,19 @@ def test_a_pending_connect_does_not_keep_its_panel_alive(qapp):
     assert _freed_while_out(start)
 
 
+def _owned_offer():
+    """An offer as ``create_owned_session_offer`` returns it, whose retirement stops nothing."""
+    import types
+    return types.SimpleNamespace(session_id="session", sdp="offer", retirement=types.SimpleNamespace(stop=lambda: None))
+
+
 def _host_panel_part(gate):
     pytest.importorskip("aiortc", exc_type=ImportError)
     from je_auto_control.gui.remote_desktop.webrtc_host_connection import _HostConnectionMixin
 
     class _FakeHost:
-        def create_session_offer(self):
+        def create_owned_session_offer(self):
             return gate()
-
-        def stop_session(self, _session_id):
-            """Nothing to stop."""
 
     class _Part(_HostConnectionMixin):
         def __init__(self):
@@ -212,7 +215,7 @@ def _host_panel_part(gate):
 
 def test_an_offer_being_made_does_not_keep_the_host_panel_alive(qapp):
     def start():
-        gate = _Gate(("session", "offer"))
+        gate = _Gate(_owned_offer())
         part = _host_panel_part(gate)
         part._produce_offer()
         return part, gate
@@ -221,12 +224,13 @@ def test_an_offer_being_made_does_not_keep_the_host_panel_alive(qapp):
 
 
 def test_an_offer_still_reaches_a_host_panel_that_is_there(qapp):
-    gate = _Gate(("session", "offer"))
+    offer = _owned_offer()
+    gate = _Gate(offer)
     part = _host_panel_part(gate)
     part._produce_offer()
     gate.release.set()
     assert pump_until(lambda: bool(part.shown))
-    assert part.shown == [(part._multi_host, ("session", "offer"))]
+    assert part.shown == [(part._multi_host, offer)]
     part.deleteLater()
 
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
 
 import functools
-from typing import Callable, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import (
@@ -28,10 +28,10 @@ from je_auto_control.utils.remote_desktop.webrtc_stats import (
 )
 
 
-def _stop_session(host: MultiViewerHostT, sid: str) -> None:
-    """Worker thread: close one session; one that is already gone is not an error."""
+def _stop_session(retirement: Any) -> None:
+    """Worker thread: close the session ``retirement`` captured; one that is already gone is not an error."""
     try:
-        host.stop_session(sid)
+        retirement.stop()
     except (KeyError, RuntimeError, OSError) as error:
         autocontrol_logger.warning("disconnect session: %r", error)
 
@@ -229,9 +229,18 @@ class _HostSessionsMixin(_HostPanelPart):
         if sid in self._stopping_sessions:     # a second click on a session already closing
             return
         host = self._multi_host
+        # Captured now, so the stop closes this session even if another takes its id meanwhile.
+        try:
+            retirement = host.session_retirement(sid) if host is not None else None
+        except (KeyError, RuntimeError) as error:   # already gone, or the host is shutting down
+            autocontrol_logger.debug("disconnect session %s: %r", sid, error)
+            retirement = None
+        if retirement is None:
+            self._on_session_stopped(host, sid)
+            return
         self._stopping_sessions.add(sid)
-        # stop_session waits for the peer connection to close (seconds).
-        self._stops.retire(functools.partial(_stop_session, host, sid),
+        # Closing waits for the peer connection to close (seconds).
+        self._stops.retire(functools.partial(_stop_session, retirement),
                            on_done=self._on_session_stopped, args=(host, sid))
 
     def _on_session_stopped(self, host: MultiViewerHostT, sid: str, _outcome: object = None) -> None:

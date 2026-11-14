@@ -9,9 +9,9 @@ from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
 
 import functools
 import threading
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QCoreApplication, QThread, QTimer
 from PySide6.QtWidgets import (
     QMessageBox,
 )
@@ -40,17 +40,35 @@ if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
     from je_auto_control.utils.remote_desktop.lan_discovery import HostAdvertiser
 
 
-def _create_offer(host: MultiViewerHostT, _token: CancellationToken) -> Tuple[str, str]:
-    """Worker thread: mint a session and its offer (ICE gathering, up to 12 s)."""
-    return host.create_session_offer()
+def _create_offer(host: MultiViewerHostT, _token: CancellationToken) -> Any:
+    """Worker thread: mint a session and its offer (ICE gathering, up to 12 s).
+
+    The offer carries its session's ``retirement``, captured as it was made, so
+    dropping the offer later stops exactly that session.
+    """
+    return host.create_owned_session_offer()
 
 
-def _drop_offer(host: MultiViewerHostT, outcome: Tuple[str, str]) -> None:
-    """End the session of an offer nobody will show."""
+def _retire_quietly(retirement: Any, *_token: object) -> None:
+    """Worker thread: stop a session nobody will use; one already gone is not an error."""
     try:
-        host.stop_session(outcome[0])
+        retirement.stop()
     except (KeyError, RuntimeError, OSError) as error:
         autocontrol_logger.debug("dropping an unused offer: %r", error)
+
+
+def _drop_offer(offer: Any) -> None:
+    """End the session of an offer nobody will show, without holding the GUI thread.
+
+    The task's ``discard``: on the GUI thread when the panel goes away with the
+    offer undelivered -- the stop, which waits for the peer to close, then goes
+    to a worker -- or on the worker that made the offer, which simply runs it.
+    """
+    app = QCoreApplication.instance()
+    if app is not None and QThread.currentThread() is app.thread():
+        task_controller().submit(functools.partial(_retire_quietly, offer.retirement), owner=app)
+    else:
+        _retire_quietly(offer.retirement)
 
 
 #: One zeroconf registration change at a time: Publish stops the old advertiser and starts the
@@ -193,7 +211,7 @@ class _HostConnectionMixin(_HostPanelPart):
         # create_session_offer waits for ICE gathering (up to 12 s), which
         # used to freeze the window; the backend takes no timeout or cancel.
         task = task_controller().submit(functools.partial(_create_offer, host), owner=self,
-                                        discard=functools.partial(_drop_offer, host))
+                                        discard=_drop_offer)
         # Weak: the task is this panel's child and must not be what keeps it alive.
         task.result.connect(weak_slot(self._show_offer, host))
         task.error.connect(weak_slot(self._show_offer_error, host))
@@ -202,12 +220,13 @@ class _HostConnectionMixin(_HostPanelPart):
         if self._multi_host is host:        # a host stopped meanwhile fails by design
             self._show_error(error)
 
-    def _show_offer(self, host: MultiViewerHostT, outcome: Tuple[str, str]) -> None:
+    def _show_offer(self, host: MultiViewerHostT, owned: Any) -> None:
         """GUI thread: the offer is ready -- unless the host was stopped or replaced meanwhile."""
         if self._multi_host is not host:
-            _drop_offer(host, outcome)
+            # Its own session, captured with the offer; stopping waits for the peer to close.
+            self._stops.retire(functools.partial(_retire_quietly, owned.retirement))
             return
-        session_id, offer = outcome
+        session_id, offer = owned.session_id, owned.sdp
         self._manual_session_id = session_id
         self._offer_view.setPlainText(offer)
         self._status_label.setText(_t("rd_webrtc_offer_ready"))

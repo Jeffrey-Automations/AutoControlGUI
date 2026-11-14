@@ -680,3 +680,50 @@ def test_stop_during_offer_creation_retains_source_until_original_child_finishes
     assert observed[0].stopped
     assert host.session_count() == 0
     assert host._source is None
+
+
+class _BrokenHost(_FakeHost):
+    """A peer that cannot be built (an aiortc / codec error at construction)."""
+
+    def __init__(self, **kwargs) -> None:
+        raise RuntimeError("peer construction failed")
+
+
+class _TrackRelay(_FakeRelay):
+    """A relay whose subscriptions are real track stand-ins, so a stop can be seen."""
+
+    def subscribe(self, track):
+        proxy = Track()
+        self.subscribed.append(proxy)
+        return proxy
+
+
+def test_a_peer_that_fails_to_build_leaves_no_token_subscription_or_screen_source(monkeypatch):
+    monkeypatch.setattr(mv, "MediaRelay", _TrackRelay)
+    coordinator = _host()
+    monkeypatch.setattr(mv, "WebRTCDesktopHost", _BrokenHost)
+    with pytest.raises(RuntimeError, match="peer construction failed"):
+        coordinator.create_owned_session_offer()
+    assert coordinator._session_tokens == {}
+    assert coordinator._source is None                     # the source made for it is stopped again
+    assert coordinator.session_count() == 0
+    monkeypatch.setattr(mv, "WebRTCDesktopHost", _FakeHost)
+    offer = coordinator.create_owned_session_offer()        # nothing stuck: the next session builds
+    assert coordinator.session_count() == 1
+    offer.retirement.stop()
+
+
+def test_a_failed_build_drops_its_subscription_and_spares_a_source_others_use(monkeypatch):
+    monkeypatch.setattr(mv, "MediaRelay", _TrackRelay)
+    coordinator = _host()
+    first = coordinator.create_owned_session_offer()
+    source = coordinator._source
+    monkeypatch.setattr(mv, "WebRTCDesktopHost", _BrokenHost)
+    with pytest.raises(RuntimeError):
+        coordinator.create_owned_session_offer()
+    failed_subscription = source._relay.subscribed[-1]
+    assert failed_subscription.stopped                      # its own subscription is dropped
+    assert coordinator._source is source                    # the first session still shows the screen
+    assert not source._track.stopped
+    assert coordinator.session_count() == 1
+    first.retirement.stop()
