@@ -1,5 +1,13 @@
-"""Admin console tab: manage many remote AutoControl REST endpoints."""
+"""Admin console tab: manage many remote AutoControl REST endpoints.
+
+A broadcast runs as a :class:`~je_auto_control.gui._tab_task.TabTask`. Its
+Stop skips the hosts not sent to yet and still shows every host's row, with
+``sent`` saying whether the actions went there; closing the tab does the same
+skipping and drops the rows.
+"""
+import functools
 import json
+import threading
 from typing import Dict, List, Optional
 
 from PySide6.QtCore import QObject, QSize, QTimer, Qt, Signal
@@ -12,10 +20,11 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
-from je_auto_control.gui.adaptive.surfaces import Card
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -91,7 +100,13 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._broadcast_output = QTextEdit()
         self._broadcast_output.setReadOnly(True)
         self._poll_thread: Optional[WorkerHandle] = None
-        self._broadcast_thread: Optional[WorkerHandle] = None
+        self._broadcast_status = QLabel()
+        self._broadcast_status.setWordWrap(True)
+        set_role(self._broadcast_status, "hint")
+        self._broadcasts = TabTask(self)       # one broadcast at a time
+        self._broadcasts.result.connect(self._show_broadcast)
+        self._broadcasts.error.connect(self._show_broadcast_error)
+        self._broadcast_stop: Optional[threading.Event] = None
         # Phase 6.5: live-thumbnail grid + auto-poll timer.
         self._thumbnails = QListWidget()
         self._thumbnails.setViewMode(QListWidget.ViewMode.IconMode)
@@ -129,7 +144,9 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         root.addWidget(ResponsiveBox(hosts, self._build_broadcast_group(), stretches=(3, 2)), stretch=1)
 
     def dispose(self) -> None:
-        """Release what the tab holds beyond its widgets: its thumbnail timer and the polls still out.
+        """Release what the tab holds beyond its widgets: its thumbnail timer, the polls still out and a broadcast.
+
+        A broadcast skips the hosts it has not sent to yet; one already being sent to finishes.
 
         Called by ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
         """
@@ -143,6 +160,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
             ("admin_refresh", self._on_refresh),
             ("admin_thumb_refresh_now", self._refresh_thumbnails),
             ("admin_broadcast_run", self._on_broadcast),
+            ("admin_broadcast_stop", self._on_broadcast_stop),
         ]
 
     def _build_thumbnails_group(self) -> QGroupBox:
@@ -171,6 +189,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         form.addWidget(self._actions_input)
         form.addWidget(self._tr(QLabel(), "admin_results_label"))
         form.addWidget(self._broadcast_output, stretch=1)
+        form.addWidget(self._broadcast_status)
         return group
 
     def _on_add(self) -> None:
@@ -214,20 +233,35 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
             return
         # Each host stops at its first failing action and its row says so.
         # Off the GUI thread: every host is an HTTP round trip.
-        if self._broadcast_thread is not None:
+        stop = threading.Event()
+        work = functools.partial(self._client.broadcast_execute, actions=actions,
+                                 raise_on_error=True, stop_event=stop)
+        if not self._broadcasts.start(work):
+            self._broadcast_status.setText(_t("task_busy"))
             return
-        self._broadcast_thread = start_worker(
-            self, CallWorker(lambda: self._client.broadcast_execute(actions=actions, raise_on_error=True)),
-            on_done=self._show_broadcast, on_fail=self._broadcast_output.setPlainText,
-            on_thread_done=self._on_broadcast_thread_done)
+        self._broadcast_stop = stop
+        self._broadcast_status.setText(_t("admin_broadcast_running"))
+
+    def _on_broadcast_stop(self) -> None:
+        """Skip the hosts not sent to yet; the rows of every host still arrive."""
+        if self._broadcast_stop is None or not self._broadcasts.running:
+            return
+        self._broadcast_stop.set()
+        self._broadcast_status.setText(_t("admin_broadcast_stopping"))
 
     def _show_broadcast(self, results) -> None:
+        self._broadcast_stop = None
         self._broadcast_output.setPlainText(
             json.dumps(results, indent=2, ensure_ascii=False, default=str),
         )
+        sent = sum(1 for row in results if row.get("sent"))
+        self._broadcast_status.setText(_t("admin_broadcast_summary").format(
+            sent=sent, total=len(results), skipped=len(results) - sent))
 
-    def _on_broadcast_thread_done(self) -> None:
-        self._broadcast_thread = None
+    def _show_broadcast_error(self, error: object) -> None:
+        self._broadcast_stop = None
+        self._broadcast_output.setPlainText(str(error))
+        self._broadcast_status.setText("")
 
     def _apply_poll_result(self, statuses: list) -> None:
         self._refresh_table(statuses=statuses)

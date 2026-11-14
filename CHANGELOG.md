@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- `AdminConsoleClient.broadcast_execute` rows carry `sent`: whether the actions went to that
+  host. It takes `stop_event` and observes the caller's cancellation scope: once stopped, hosts
+  not sent to yet are skipped with `sent: false` and `error` `NOT_SENT_STOPPED` (exported from
+  `utils.admin.admin_client`), and a host already being sent to finishes. Unknown labels are
+  `sent: false`; code that compared whole rows sees the new key. GUI: the Admin Console tab has
+  **Stop broadcast** and a line summarising how many hosts were sent to.
+
 - `EmailTriggerWatcher.poll_once` observes a bound cancellation scope between triggers: cancelled,
   it raises `CancelledError` before the next trigger's server; a trigger already being read
   finishes. Unscoped calls (`AC_email_trigger_poll_once`, the watcher's own loop) are unchanged.

@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-16 | 2026-11-14 | A stopped admin broadcast reports per host whether it was sent | #done #gui #admin | [2026-11-b](2026-11-b.md) |
 | U-20261114-15 | 2026-11-14 | Stop and closing the tab cancel an email Poll Now between mailboxes | #done #gui #triggers | [2026-11-b](2026-11-b.md) |
 | U-20261114-14 | 2026-11-14 | Closing a USB tab ends the enumeration tool it started | #done #gui #usb | [2026-11-b](2026-11-b.md) |
 | U-20261114-13 | 2026-11-14 | AI Locator and LLM Planner requests get Stop, a deadline and no late click | #done #gui #vision | [2026-11-b](2026-11-b.md) |

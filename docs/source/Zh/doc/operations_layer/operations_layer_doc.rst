@@ -382,6 +382,11 @@ Headless::
 ``ok: false`` 附上錯誤回報；否則 ``ok`` 只代表主機有回應，動作失敗記在
 ``result`` 裡。DAG runner 的遠端節點與 Admin Console 分頁都會傳這個參數。
 
+每一列也以 ``sent`` 標明動作是否送到該主機。主機一次送 ``max_parallel`` 台；傳入
+``stop_event``\ （``threading.Event``）或在取消範圍內呼叫即可停止廣播：設定後尚未送出的主機
+會略過，該列為 ``sent: false``、``error`` 為 ``NOT_SENT_STOPPED``；已在傳送中的主機會執行完並回報結果。
+未知的標籤同樣是 ``sent: false``。
+
 持久化：主機儲存在 ``~/.je_auto_control/admin_hosts.json``\ （POSIX 上
 模式 0600）。建構時自動 reload。
 
@@ -394,7 +399,8 @@ Executor 指令::
    AC_admin_poll, AC_admin_broadcast_execute
 
 GUI：*Admin Console* 分頁 — 註冊主機表單、含健康/延遲/任務數欄位的
-主機表、廣播文字框。
+主機表、廣播文字框。\ **停止廣播**\ 會略過尚未送出的主機；結果仍列出每台主機，
+下方一行顯示「已送往 n／m 台主機；k 台未送出。」
 
 
 稽核紀錄雜湊鏈

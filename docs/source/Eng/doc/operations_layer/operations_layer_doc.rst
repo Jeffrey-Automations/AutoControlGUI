@@ -433,6 +433,14 @@ action and report ``ok: false`` with the error; otherwise ``ok`` only means
 the host answered, and action failures are recorded inside ``result``. The
 DAG runner's remote nodes and the Admin Console tab both pass it.
 
+Every row also says in ``sent`` whether the actions went to that host. Hosts
+are sent to ``max_parallel`` at a time; pass ``stop_event`` (a
+``threading.Event``), or call inside a cancellation scope, to stop a
+broadcast: once it is set, a host not sent to yet is skipped with
+``sent: false`` and ``error`` ``NOT_SENT_STOPPED``, and a host already being
+sent to finishes and reports its result. An unknown label is ``sent: false`` as
+well.
+
 Persistence: hosts are saved to ``~/.je_auto_control/admin_hosts.json``
 (mode 0600 on POSIX). Reload happens automatically on construction.
 
@@ -446,7 +454,9 @@ Executor commands::
    AC_admin_poll, AC_admin_broadcast_execute
 
 GUI: *Admin Console* tab — register host form, hosts table with
-health/latency/jobs columns, broadcast textarea.
+health/latency/jobs columns, broadcast textarea. **Stop broadcast** skips the
+hosts not sent to yet; the results still list every host, and the line under
+them reads *Sent to n of m hosts; k not sent.*
 
 
 Audit log hash chain
