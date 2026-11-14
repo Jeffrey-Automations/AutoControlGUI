@@ -1,4 +1,10 @@
-"""Email Triggers tab: bind IMAP mailboxes to action scripts."""
+"""Email Triggers tab: bind IMAP mailboxes to action scripts.
+
+Poll Now runs as a :class:`~je_auto_control.gui._tab_task.TabTask`. Stop (or
+closing the tab) cancels it: the pass ends before the next trigger's server,
+and a trigger already being polled finishes, so no message is marked seen
+without its script having fired.
+"""
 from typing import Optional
 
 from PySide6.QtCore import QTimer, Qt
@@ -13,7 +19,7 @@ from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
-from je_auto_control.gui._worker_thread import CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -35,7 +41,9 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
-        self._poll_thread: Optional[WorkerHandle] = None
+        self._polls = TabTask(self)       # Poll Now, off the GUI thread; one at a time
+        self._polls.result.connect(self._on_polled)
+        self._polls.error.connect(self._on_poll_failed)
         self._host_input = QLineEdit()
         self._host_input.setPlaceholderText("imap.example.com")
         self._port_input = QSpinBox()
@@ -75,7 +83,9 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         self._refresh()
 
     def dispose(self) -> None:
-        """Release what the tab holds beyond its widgets: its refresh timer (the watcher itself keeps running).
+        """Release what the tab holds beyond its widgets: its refresh timer and a Poll Now still running.
+
+        The poll stops before the next trigger; the watcher itself keeps running.
 
         Called by ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
         """
@@ -151,6 +161,8 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
     def _on_stop(self) -> None:
         # stop() joins the poll thread for up to 5 s (an IMAP round in
         # flight), which used to hold the GUI thread; a second Stop is ignored.
+        # A Poll Now in flight stops before its next trigger.
+        self._polls.stop()
         if self._watcher_op.run(default_email_trigger_watcher.stop, on_done=self._on_watcher_stopped,
                                 on_error=self._on_watcher_stopped):
             self._refresh()
@@ -161,12 +173,7 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
     def _on_poll_now(self) -> None:
         # Off the GUI thread: an IMAP server that never greets froze the
         # window for the full 30 s socket timeout.
-        if self._poll_thread is not None:
-            return
-        self._poll_thread = start_worker(
-            self, CallWorker(default_email_trigger_watcher.poll_once),
-            on_done=self._on_polled, on_fail=self._on_poll_failed,
-            on_thread_done=self._on_poll_thread_done)
+        self._polls.start(default_email_trigger_watcher.poll_once)   # False while one runs
 
     def _on_polled(self, fired: int) -> None:
         # Per-trigger errors too: a timeout was reported as "Fired 0".
@@ -177,11 +184,8 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         QMessageBox.information(self, _t("eml_poll_now"), "\n".join([text, *errors]))
         self._refresh()
 
-    def _on_poll_failed(self, message: str) -> None:
-        QMessageBox.warning(self, _t("eml_poll_now"), message)
-
-    def _on_poll_thread_done(self) -> None:
-        self._poll_thread = None
+    def _on_poll_failed(self, error: object) -> None:
+        QMessageBox.warning(self, _t("eml_poll_now"), str(error))
 
     def _on_browse(self) -> None:
         path, _ = QFileDialog.getOpenFileName(

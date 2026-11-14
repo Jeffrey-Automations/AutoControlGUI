@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- `EmailTriggerWatcher.poll_once` observes a bound cancellation scope between triggers: cancelled,
+  it raises `CancelledError` before the next trigger's server; a trigger already being read
+  finishes. Unscoped calls (`AC_email_trigger_poll_once`, the watcher's own loop) are unchanged.
+  GUI: the Email Triggers tab's Poll Now runs as a cancellable task, which Stop and closing the
+  tab cancel (`_poll_thread` is gone; `_polls` is the task).
+
 - `list_usb_devices` starts its command-line tool (PowerShell `Get-PnpDevice`, `lsusb`,
   `system_profiler`) through `run_capture_helper`: inside a cancellation scope, cancelling ends
   the tool's process and raises `CancelledError` instead of waiting out the 10 s timeout. Its

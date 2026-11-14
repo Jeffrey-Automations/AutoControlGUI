@@ -1659,8 +1659,13 @@ flags messages ``\\Seen`` so the same mail isn't replayed across
 restarts. TLS is pinned at 1.2 minimum. Combine ``AC_email_trigger_add``
 with ``${secrets.NAME}`` so passwords never appear in the JSON.
 
+``poll_once`` called inside a cancellation scope stops before the next
+trigger's server when cancelled (``CancelledError``); a trigger already being
+read finishes, so no message is marked seen without its script firing.
+
 GUI: **Email Triggers** tab — register IMAP triggers, start/stop the
-watcher, run a manual poll, inspect last error and fire counter.
+watcher, run a manual poll, inspect last error and fire counter. **Stop**
+(or closing the tab) also cancels a manual poll still running.
 
 Structured action journals (experimental)
 ================================================

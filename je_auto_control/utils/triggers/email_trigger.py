@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from email.header import decode_header, make_header
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.json.json_file import read_executable_action_json
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.run_history.context import HistoryBinding, bound_history
@@ -334,7 +335,12 @@ class EmailTriggerWatcher:
             self._thread = None
 
     def poll_once(self) -> int:
-        """Run exactly one polling pass; return total messages fired."""
+        """Run exactly one polling pass; return total messages fired.
+
+        Inside a cancellation scope a cancelled pass stops before the next
+        trigger's server, raising ``CancelledError``; a trigger already being
+        polled finishes, so no message is marked seen without being fired.
+        """
         return self._poll_pass()
 
     def _run(self, stop: threading.Event) -> None:
@@ -366,6 +372,7 @@ class EmailTriggerWatcher:
         fired = 0
         for trigger in self.list_triggers():
             if trigger.enabled:
+                cancellation_checkpoint()
                 fired += self._poll_one(trigger)
         return fired
 
