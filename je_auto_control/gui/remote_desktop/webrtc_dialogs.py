@@ -17,6 +17,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from je_auto_control.gui._slow_op import app_stop_queue
+from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
+
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.remote_desktop._helpers import (
@@ -397,13 +400,13 @@ class LanBrowseDialog(QDialog):
     """
 
     chosen = Signal(dict)
-    # Emitted from the zeroconf thread; a queued connection marshals the
-    # payload back onto the GUI thread (see _update_services).
-    _services_changed = Signal(dict)
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self._services_changed.connect(self._on_services_changed)
+        # The zeroconf thread reports through this lease: it holds the dialog
+        # weakly, reaches the GUI thread queued, and drops reports once the
+        # dialog has ended -- the browser must not be what keeps it alive.
+        self._view = ViewLifetime(self)
         self.setWindowTitle(_t("rd_webrtc_lan_title"))
         self.setMinimumSize(620, 260)
         self._services: dict = {}
@@ -456,18 +459,16 @@ class LanBrowseDialog(QDialog):
         if not is_discovery_available():
             return
         try:
-            self._browser = HostBrowser(on_change=self._update_services)
+            self._browser = HostBrowser(on_change=self._view.callback("_on_services_changed"))
         except (RuntimeError, OSError):
             self._browser = None
 
     def _update_services(self, services: dict) -> None:
-        # Called from the zeroconf browser thread, which has no Qt event loop:
-        # QTimer.singleShot would create a timer with that thread's affinity and
-        # never fire. Emit a signal instead — Qt queues it onto the GUI thread.
-        self._services_changed.emit(dict(services))
+        """Any thread: report the hosts seen; the table is redrawn on the GUI thread."""
+        self._view.post("_on_services_changed", dict(services))
 
     def _on_services_changed(self, services: dict) -> None:
-        self._services = services
+        self._services = dict(services)
         self._refresh()
 
     def _refresh(self) -> None:
@@ -495,12 +496,16 @@ class LanBrowseDialog(QDialog):
                     return
 
     def _stop_browser(self) -> None:
-        if self._browser is not None:
-            try:
-                self._browser.stop()
-            except (RuntimeError, OSError):
-                pass    # reason: the browser is being discarded either way
-            self._browser = None
+        """Let go of the browser now; closing it (which joins zeroconf's thread) runs on a worker.
+
+        It goes to the application's stop queue, not one of the dialog's: the
+        dialog is normally destroyed right after, and a stop that fails is kept
+        by the stop custody with the browser that still owns its socket.
+        """
+        browser, self._browser = self._browser, None
+        self._view.retire()
+        if browser is not None:
+            app_stop_queue().retire(browser.stop)
 
     def done(self, result: int) -> None:  # noqa: D401  # Qt override
         """Stop browsing however the dialog ends.

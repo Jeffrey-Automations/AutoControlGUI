@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-39 | 2026-11-14 | The LAN browse dialog closes its browser off the GUI thread and is not kept alive by it | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
 | U-20261114-38 | 2026-11-14 | A failed LAN broadcast stop keeps its advertiser; a failed recording is never reported saved | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
 | U-20261114-37 | 2026-11-14 | SlowOp stops and the WebRTC host's session stops join the stop custody | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
 | U-20261114-36 | 2026-11-14 | A failed background stop is kept for a retry from Diagnostics | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |

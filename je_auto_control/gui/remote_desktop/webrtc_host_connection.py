@@ -23,7 +23,7 @@ from je_auto_control.gui.remote_desktop._helpers import (
 from je_auto_control.gui.remote_desktop.webrtc_workers import (
     HostPublishLoopWorker, generate_host_id, retire_worker,
 )
-from je_auto_control.gui._slow_op import hold_failed_stop, stop_each
+from je_auto_control.gui._slow_op import app_stop_queue, hold_failed_stop, stop_each
 from je_auto_control.gui._weak_call import weak_slot
 from je_auto_control.gui.tab_task_controller import CancellationToken, task_controller
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -72,7 +72,7 @@ def _drop_offer(offer: Any) -> None:
     """
     app = QCoreApplication.instance()
     if app is not None and QThread.currentThread() is app.thread():
-        task_controller().submit(functools.partial(_retire_quietly, offer.retirement), owner=app)
+        app_stop_queue().retire(functools.partial(_retire_quietly, offer.retirement))
     else:
         _retire_quietly(offer.retirement)
 

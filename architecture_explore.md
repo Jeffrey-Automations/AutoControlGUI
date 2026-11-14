@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,543 |
-| 程式碼總行數 | 237,082 |
+| 程式碼總行數 | 237,112 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1391,7 +1391,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | dag_runner | `dag_tab.py` | 366 | 編輯、驗證、執行跨主機 DAG。 |
 | chatops | `chatops_tab.py` | 140 | 在接上 Slack 前先本機測試 slash 指令。 |
 | trace_replay | `trace_replay_tab.py` | 194 | 拖曳捲動時光回溯錄製內容。 |
-| remote_desktop | `remote_desktop/`（40 檔） | 8,545 | 見下。 |
+| remote_desktop | `remote_desktop/`（40 檔） | 8,550 | 見下。 |
 | presence | `presence_tab.py` | 168 | 多檢視者在場名單。 |
 | rest_api | `rest_api_tab.py` | 256 | 啟停 HTTP 前端並顯示 URL、實際驗證模式與可用 token。 |
 | admin_console | `admin_console_tab.py` | 330 | 管理多個遠端 AutoControl REST 端點。 |
@@ -1409,7 +1409,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `gui/diagnostics_capabilities.py` | 60 | 只呈現既有不可變能力快照與四語狀態；不探測、不連線，不持有原生物件。 |
 
-#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／8,545 行）
+#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／8,550 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1421,7 +1421,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `folder_sync_io.py` | 130 | Bind confirmed folder sends, cancellation and frozen receipts to one captured GUI owner. |
 | `webrtc_panel_state.py` | 165 | 主機／檢視端 mixin 的具體 Qt 狀態與 slot 型別契約；不新增執行時預設值。 |
 | `webrtc_panel.py` | 422 | WebRTC 子分頁主體。 |
-| `webrtc_dialogs.py` | 524 | WebRTC GUI 用的自訂對話框與清單元件（待審檢視者、信任清單、通訊錄、遠端檔案表、稽核記錄、LAN 瀏覽）。 |
+| `webrtc_dialogs.py` | 529 | WebRTC GUI 用的自訂對話框與清單元件（待審檢視者、信任清單、通訊錄、遠端檔案表、稽核記錄、LAN 瀏覽）。 |
 | `advanced_group.py` | 99 | 兩個 WebRTC 面板共用的 Advanced STUN／TURN（含選用硬體編碼器）群組，含分離的 STUN／TURN 與選用主機硬體編碼器 Protocol。 |
 | `trusted_group.py` | 75 | WebRTC host 面板的信任 viewer 清單群組（移除／清空／匯入／匯出），含它寫回面板的 Protocol。 |
 | `connection_screen.py` | 723 | Quick Connect —— AnyDesk 風格單畫面入口。 |
@@ -1549,7 +1549,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 166 | 43,714 |
+| `gui/` | 166 | 43,744 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,822 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1570,7 +1570,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,222 |
-| **總計** | **1,531** | **236,337** |
+| **總計** | **1,531** | **236,367** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

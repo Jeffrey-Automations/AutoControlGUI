@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- GUI: the WebRTC *Browse LAN* dialog closes its zeroconf browser on a worker instead of the GUI
+  thread, through the new application-owned `app_stop_queue()` (in `gui/_slow_op.py`), so a stop
+  that fails after the dialog closed still reaches the stop custody; the browser reports through
+  a `ViewLifetime` lease and no longer keeps the dialog alive (`_services_changed` is gone). A
+  WebRTC offer dropped on the GUI thread is retired through the same queue.
+
 - GUI: `StopQueue.retire` takes `on_error=`. A WebRTC recording whose finalising fails re-enables
   Record and says it may be incomplete instead of leaving the button disabled on *Stopping…*;
   it is never reported saved. A LAN broadcast (zeroconf advertiser) whose stop fails -- a

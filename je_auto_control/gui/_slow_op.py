@@ -36,7 +36,7 @@ pass a method and ``args``, never a lambda that closes over the tab.
 import functools
 from typing import Any, Callable, List, Optional, Tuple
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QCoreApplication, QObject, Signal
 
 from je_auto_control.gui._weak_call import Callback, WeakCall as _WeakCall, weak_slot
 from je_auto_control.gui.tab_task_controller import (
@@ -205,6 +205,31 @@ class StopQueue(QObject):
             self.drained.emit()
 
 
+_APP_STOPS: Optional["StopQueue"] = None
+
+
+def app_stop_queue() -> "StopQueue":
+    """A :class:`StopQueue` owned by the application, for a window or dialog that is gone before its stop reports.
+
+    A queue owned by a dialog dies with it, and so does the delivery of a
+    stop that failed after the dialog closed; this one lives as long as the
+    application, so the failure still reaches the stop custody. GUI thread.
+    """
+    global _APP_STOPS  # pylint: disable=global-statement  # reason: one queue per application, made on first use
+    app = QCoreApplication.instance()
+    queue = _APP_STOPS
+    try:
+        alive = queue is not None and queue.parent() is app
+    except RuntimeError:                    # its application was destroyed (a test made a new one)
+        alive = False
+    if alive and queue is not None:
+        return queue
+    if app is None:
+        raise RuntimeError("app_stop_queue() needs a running QApplication")
+    _APP_STOPS = StopQueue(app)
+    return _APP_STOPS
+
+
 def stop_each(*stops: Callable[[], Any]) -> None:
     """Worker thread: call every ``stop`` in order; one that fails does not keep the rest from running.
 
@@ -221,4 +246,4 @@ def stop_each(*stops: Callable[[], Any]) -> None:
         raise StopsFailed(failures)
 
 
-__all__ = ["SlowOp", "StopQueue", "StopsFailed", "hold_failed_stop", "stop_each"]
+__all__ = ["SlowOp", "StopQueue", "StopsFailed", "app_stop_queue", "hold_failed_stop", "stop_each"]
