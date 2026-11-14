@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-28 | 2026-11-14 | Empty tables, lists and trees say so | #done #gui #adaptive | [2026-11-b](2026-11-b.md) |
 | U-20261114-27 | 2026-11-14 | Every page that runs background work reports it in Execution details | #done #gui #workspace | [2026-11-b](2026-11-b.md) |
 | U-20261114-26 | 2026-11-14 | Config Sync runs on the shared task; no panel uses a bare worker | #done #gui #sync | [2026-11-b](2026-11-b.md) |
 | U-20261114-25 | 2026-11-14 | The template candidate panel runs on the shared task | #done #gui #healing | [2026-11-b](2026-11-b.md) |

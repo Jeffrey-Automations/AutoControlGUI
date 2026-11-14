@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- GUI: every table, list and tree on a workspace page shows an empty state (*Nothing to show
+  yet.*) while it has no rows. New `gui/adaptive/empty_views.py` (`show_empty_states`,
+  `NO_EMPTY_STATE` to opt a view out); two new catalogue keys, `empty_view` and
+  `empty_view_hint`. Each such view gains an `EmptyState` child named `EmptyViewState` on its
+  viewport.
+
 - GUI: every page that runs background work through `TabTask` publishes it to **View →
   Execution details**: running, stopping, then succeeded, cancelled or error (with the error
   text, or the timeout message), with reported progress. `TabTask(owner, details=False)` opts

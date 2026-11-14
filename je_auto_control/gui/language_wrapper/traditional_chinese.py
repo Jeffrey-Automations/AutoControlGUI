@@ -1359,6 +1359,8 @@ traditional_chinese_word_dict = {
     "task_stopped": "已停止。",
     "task_stop": "停止執行",
     "task_timed_out": "執行逾時，已停止。",
+    "empty_view": "目前沒有內容。",
+    "empty_view_hint": "從 Actions 選單執行指令後，結果會顯示在這裡。",
     "stop_playback": "停止回放",
     "record_playing": "回放中...",
     "rd_file_sending": "正在傳送 {name}...",

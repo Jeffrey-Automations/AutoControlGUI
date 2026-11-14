@@ -1491,6 +1491,8 @@ english_word_dict = {
     "task_stopped": "Stopped.",
     "task_stop": "Stop run",
     "task_timed_out": "Took too long and was stopped.",
+    "empty_view": "Nothing to show yet.",
+    "empty_view_hint": "Results appear here once you run a command from the Actions menu.",
     "stop_playback": "Stop playback",
     "record_playing": "Playing back...",
     "rd_file_sending": "Sending {name}...",

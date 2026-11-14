@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,538 |
-| 程式碼總行數 | 236,080 |
+| Python 模組總數（含周邊子專案） | 1,539 |
+| 程式碼總行數 | 236,189 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1305,12 +1305,13 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `adaptive/flow_layout.py` | 166 | A layout that places items left to right and wraps them onto the next line when the row is full. 最小寬度只等於最寬的一項。 |
 | `adaptive/responsive.py` | 189 | Containers that rearrange by width, and the pass that stops a page's controls from forcing it wide. `ResponsiveBox`（窄時上下堆疊）、`ResponsiveSplitter`（同上但分隔線可拖曳）、`fit_to_width`（下拉選單不再以最長項目定寬、表單窄時標籤移到欄位上方、長標籤換行、表格最後一欄延展填滿），工作區放入每頁時跑一次；`fit_columns` 依內容定欄寬後重新延展最後一欄。 |
 | `adaptive/surfaces.py` | 160 | Cards, page headers and empty states: the shared surfaces every page is built from. `Card`、`PageHeader`（標題＋`<title_key>_subtitle` 說明，缺字串時隱藏）、`EmptyState`、`add_page_header`、`retranslate_surfaces`。 |
+| `adaptive/empty_views.py` | 99 | Empty tables, lists and trees say so instead of showing a blank grid. 工作區替每頁的表格／清單／樹狀清單加上 `EmptyState` 覆蓋層，沒有任何列時顯示、第一列出現即隱藏；略過表頭與下拉選單內的清單。 |
 | `adaptive/style.py` | 117 | Fusion with check boxes and radio buttons drawn from the palette's accent. `AdaptiveStyle`：Fusion 的指示器外框在深色主題下幾乎看不見，改以向量繪製。 |
 | `adaptive/glyphs.py` | 66 | Small line icons drawn in code, so the navigation rail ships no image files and follows the theme. 選單、搜尋、詳情三個圖示，1x／2x／3x。 |
 | `adaptive/overlay.py` | 102 | A drawer that slides a panel over part of a host widget, dimming the rest until it is dismissed. `OverlayDrawer`：Escape 或點擊遮罩關閉。 |
 | `_arrow_icons.py` | 76 | Chevrons for drop-down lists and spin boxes, drawn in code and handed to the style sheet. 以導覽列的線條圖示畫出、依主題色快取成檔案；寫不進快取時不放置子控制項，保留樣式原生箭頭。 |
 | `adaptive_window.py` | 179 | Rearrange the main window's navigation and details panes as the window's width class changes. `AdaptiveWindowLayout`：expanded 兩側停靠；medium 詳情改抽屜；compact 導覽改圖示欄＋抽屜。「想要停靠導覽」與寬度是否允許分開記錄，窄視窗不會改寫使用者偏好。 |
-| `workspace.py` | 576 | Registry-owned tab workspace with scrollable pages and passive execution details. `WorkspaceShell(registry, parent)` 保留分頁身分、弱關閉觀測、show/hide/close API 與右側詳情；每頁放入時加頁首並跑 `fit_to_width`；`set_details_overlay` 讓詳情在窄視窗改為右側抽屜。 |
+| `workspace.py` | 578 | Registry-owned tab workspace with scrollable pages and passive execution details. `WorkspaceShell(registry, parent)` 保留分頁身分、弱關閉觀測、show/hide/close API 與右側詳情；每頁放入時加頁首並跑 `fit_to_width`；`set_details_overlay` 讓詳情在窄視窗改為右側抽屜。 |
 | `workspace_details.py` | 116 | Immutable execution snapshots and a passive, scrollable workspace detail view. Diagnostics 與每個 `TabTask` 都是 publisher；僅訂閱目前頁面，`details_sources()` 通知綁定後才建立的來源。 |
 | `_task_details.py` | 111 | Execution details a TabTask publishes for the page it runs on. 由子面板往上找出工作區的分頁、第一次執行時建立來源，發布執行中／停止中／完成／已取消／錯誤與回報的進度。 |
 | `workspace_settings.py` | 36 | 驗證與載入主題、字級、導覽面板顯示與寬度；QSettings 使用當次帳號家目錄的 `gui.ini`，測試可注入獨立檔案。 |
@@ -1337,7 +1338,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `journal_browser.py` | 257 | Run History 與 Self-Healing 共用的唯讀日誌檢視：來源連結／路徑／run／step 篩選、有界快照表與明細，舊結果以 request ID 隔離。 |
 | `journal_browser_worker.py` | 88 | 背景查閱與逐筆取消；帶入 context 並在開檔前重查 deferred 擁有者，以 queued counts 回報進度。 |
 | `manual_run_controls.py` | 72 | 手動執行的 history 勾選與獨立 journal 路徑；以共用無頭 scope 包住既有 GUI 執行，不改結果與變數。 |
-| `language_wrapper/` | 8,519 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
+| `language_wrapper/` | 8,527 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
 | `selector/` | 216 | 拖曳選取螢幕區域的半透明全螢幕覆蓋層與樣板裁切工具（互動式，但都有對應的程式化 API）。 |
 
 > **分頁指令一律走 Actions 選單**：分頁本身只放輸入、表格與結果檢視，指令由視窗層選單暴露。
@@ -1544,7 +1545,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 161 | 42,813 |
+| `gui/` | 162 | 42,922 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1565,7 +1566,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,207 |
-| **總計** | **1,526** | **235,335** |
+| **總計** | **1,527** | **235,444** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

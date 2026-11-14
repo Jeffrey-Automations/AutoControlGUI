@@ -1387,6 +1387,8 @@ japanese_word_dict = {
     "task_stopped": "停止しました。",
     "task_stop": "実行を停止",
     "task_timed_out": "時間がかかりすぎたため停止しました。",
+    "empty_view": "まだ表示する内容はありません。",
+    "empty_view_hint": "Actions メニューからコマンドを実行すると、結果がここに表示されます。",
     "stop_playback": "再生を停止",
     "record_playing": "再生中...",
     "rd_file_sending": "{name} を送信中...",

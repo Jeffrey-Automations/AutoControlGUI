@@ -1351,6 +1351,8 @@ simplified_chinese_word_dict = {
     "task_stopped": "已停止。",
     "task_stop": "停止执行",
     "task_timed_out": "执行超时，已停止。",
+    "empty_view": "暂无内容。",
+    "empty_view_hint": "从 Actions 菜单执行命令后，结果会显示在这里。",
     "stop_playback": "停止回放",
     "record_playing": "回放中...",
     "rd_file_sending": "正在发送 {name}...",

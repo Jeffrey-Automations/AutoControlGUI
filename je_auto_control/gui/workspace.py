@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QAbstractButton, QScrollArea, QTabBar, QTabWidget,
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.adaptive.overlay import OverlayDrawer
+from je_auto_control.gui.adaptive.empty_views import show_empty_states
 from je_auto_control.gui.adaptive.responsive import fit_to_width
 from je_auto_control.gui.adaptive.surfaces import add_page_header, retranslate_surfaces
 from je_auto_control.gui.tab_registry import MenuActions, TabEntry, TabRegistry, WidgetFactory
@@ -372,6 +373,7 @@ class WorkspaceShell(TranslatableMixin, QWidget):
         if entry is not None:
             add_page_header(page, entry.title_key, f"{entry.title_key}_subtitle")
         fit_to_width(page)
+        show_empty_states(page)
 
     def _drop_unbuilt(self, key: str) -> bool:
         """Close a start-up tab that was never built; ``False`` when ``key`` has none."""

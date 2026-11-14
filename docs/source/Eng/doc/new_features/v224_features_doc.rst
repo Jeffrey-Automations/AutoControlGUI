@@ -61,6 +61,13 @@ What every page gets
   needed 1,464 px for one command label), form labels move above their field
   when both do not fit, long notes wrap, and a table's last column takes the
   width its other columns leave.
+* **Empty views say so.** The same pass gives every table, list and tree on
+  the page an empty state (``gui.adaptive.empty_views.show_empty_states``):
+  *Nothing to show yet.* with a hint to run a command from the Actions menu,
+  shown while the view has no rows and hidden as soon as one arrives. It lets
+  clicks through, follows a replaced model, and skips header views and the
+  lists inside drop-downs; a view with the ``_jeNoEmptyState`` property set is
+  left alone.
 
 Building blocks
 ---------------
