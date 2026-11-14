@@ -217,6 +217,8 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 `test_gui_tab_not_kept_alive.py` 守住每個分頁都能被回收且直譯器正常結束。
 維護者 2026-11-14 固定在 PySide6 6.11.2（U-20261114-03；dependabot 忽略 6.12.0）。是否升級回 6.12：
 須在 PR 上以 6.12 跑完整矩陣（含 `docker.yml`）確認每一格結束時都不再崩潰；其他平台與完整套件尚未以 6.12 重驗。
+  試驗分支 `trial/pyside6-6.12`（2026-11-15，維護者決定）：草稿 PR #554 進 dev（`dev.yml`，並手動觸發 `quality.yml`）、
+  只跑 CI 的草稿 PR #555 進 main（`docker.yml`、`stable.yml`，看完結果即關閉）。全部格子都正常結束才合併 #554。
 
 ---
 
