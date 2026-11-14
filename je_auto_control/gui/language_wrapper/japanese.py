@@ -489,6 +489,8 @@ japanese_word_dict = {
     "rd_webrtc_recording_save_as": "録画ファイル保存先",
     "rd_webrtc_recording_saved": "録画を保存しました: {path}",
     "rd_webrtc_recording_empty": "録画されたフレームがありません: {path} は作成されませんでした",
+    "rd_webrtc_recording_unconfirmed": ("録画 {path} は不完全な可能性があります：{error}。"
+                                        "停止は診断タブに保持され、再試行できます。"),
     "rd_webrtc_stats_idle": "（統計データなし）",
     # (B) batch
     "rd_webrtc_hw_codec_label": "ハードウェアコーデック:",

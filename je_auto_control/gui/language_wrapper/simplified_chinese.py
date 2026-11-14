@@ -456,6 +456,7 @@ simplified_chinese_word_dict = {
     "rd_webrtc_recording_save_as": "录制保存为",
     "rd_webrtc_recording_saved": "录制已保存: {path}",
     "rd_webrtc_recording_empty": "没有录到任何画面（未收到帧）：未创建 {path}",
+    "rd_webrtc_recording_unconfirmed": "录像 {path} 可能不完整：{error}。它的停止保留在诊断分页中，可以重试。",
     "rd_webrtc_stats_idle": "(暂无统计数据)",
     # (B) batch
     "rd_webrtc_hw_codec_label": "硬件编码器:",

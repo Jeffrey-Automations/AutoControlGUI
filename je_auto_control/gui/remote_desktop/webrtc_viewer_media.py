@@ -106,7 +106,8 @@ class _ViewerMediaMixin(_ViewerPanelPart):
             # reports the button says so and takes no click.
             self._record_btn.setText(_t("gui_op_stopping"))
             self._record_btn.setEnabled(False)
-            self._stops.retire(recorder.stop, on_done=self._on_recording_stopped, args=(recorder,))
+            self._stops.retire(recorder.stop, on_done=self._on_recording_stopped,
+                               on_error=self._on_recording_stop_failed, args=(recorder,))
 
     def _on_recording_stopped(self, recorder: SessionRecorderT, _outcome: object = None) -> None:
         """GUI thread: the recording is on disk (or no frame ever arrived)."""
@@ -116,6 +117,14 @@ class _ViewerMediaMixin(_ViewerPanelPart):
         # "Saved" was reported for a file that no frame ever created.
         key = "rd_webrtc_recording_saved" if recorder.has_output else "rd_webrtc_recording_empty"
         QMessageBox.information(self, "WebRTC", _t(key).format(path=str(recorder.output_path)))
+
+    def _on_recording_stop_failed(self, recorder: SessionRecorderT, error: object) -> None:
+        """GUI thread: finalising failed -- never "saved"; the stop is kept in Diagnostics for a retry."""
+        self._record_btn.setEnabled(True)
+        if self._recorder is None:
+            self._record_btn.setText(_t("rd_webrtc_start_recording"))
+        QMessageBox.warning(self, "WebRTC", _t("rd_webrtc_recording_unconfirmed").format(
+            path=str(recorder.output_path), error=error))
 
     def _on_stats(self, snapshot: StatsSnapshot) -> None:
         parts = []

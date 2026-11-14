@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- GUI: `StopQueue.retire` takes `on_error=`. A WebRTC recording whose finalising fails re-enables
+  Record and says it may be incomplete instead of leaving the button disabled on *Stopping…*;
+  it is never reported saved. A LAN broadcast (zeroconf advertiser) whose stop fails -- a
+  `MediaRetirementError` included -- is kept, with that advertiser, by the stop custody instead
+  of being logged at debug level. New catalogue key `rd_webrtc_recording_unconfirmed`.
+
 - GUI: `SlowOp.run(..., retain_failure=True)` also hands a failed stop to the stop custody; the
   Scheduler, Triggers, Hotkeys, E-mail Triggers, Webhooks, REST API and USB Sharing stops and
   both Remote Desktop host stops pass it. The WebRTC host's dropped offers and disconnected

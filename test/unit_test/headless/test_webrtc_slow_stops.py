@@ -191,3 +191,54 @@ def test_stopping_folder_sync_joins_the_watcher_off_the_gui_thread():
     assert not _off(panel._sync_btn)
     assert panel._sync_btn.text() == _t("rd_webrtc_sync_start")
     assert pump_until(lambda: panel._stops.pending == 0)
+
+
+def _empty_custody():
+    from je_auto_control.gui._stop_custody import stop_custody
+    custody = stop_custody()
+    for record in custody.snapshot():
+        custody.forget(record.stop_id)
+    return custody
+
+
+def test_a_recording_whose_finalising_fails_is_never_reported_saved(qapp):
+    # A raising stop skipped the done slot: the button stayed on "Stopping…",
+    # disabled, and the recording was never reported at all.
+    custody = _empty_custody()
+
+    def fail():
+        raise RuntimeError("muxer did not finish")
+
+    panel = webrtc_panel._WebRTCViewerPanel()
+    panel._recorder = types.SimpleNamespace(stop=fail, has_output=True, output_path="out.mp4")
+    try:
+        panel._on_toggle_recording(False)
+        assert settle_op(panel._stops)
+        assert panel._record_btn.isEnabled()
+        assert panel._record_btn.text() == _t("rd_webrtc_start_recording")
+        assert qapp.messages == [_t("rd_webrtc_recording_unconfirmed").format(
+            path="out.mp4", error="muxer did not finish")]
+        assert [held.error for held in custody.snapshot()] == ["RuntimeError: muxer did not finish"]
+    finally:
+        _empty_custody()
+
+
+def test_a_lan_broadcast_whose_retirement_fails_keeps_its_advertiser():
+    from je_auto_control.gui.remote_desktop import webrtc_host_connection
+    custody = _empty_custody()
+    calls = []
+
+    class _Advertiser:
+        def stop(self):
+            calls.append("stop")
+            if len(calls) == 1:
+                raise RuntimeError("media retirement incomplete: unregister")
+
+    try:
+        webrtc_host_connection._stop_advertiser(_Advertiser())
+        [held] = custody.snapshot()
+        assert "unregister" in held.error
+        assert custody.retry(held.stop_id)                    # the same advertiser, stopped again
+        assert calls == ["stop", "stop"]
+    finally:
+        _empty_custody()

@@ -95,7 +95,9 @@ def _stop_advertiser(advertiser: HostAdvertiser) -> None:
         try:
             advertiser.stop()
         except (RuntimeError, OSError) as error:
-            autocontrol_logger.debug("lan advertise stop: %r", error)
+            # Includes MediaRetirementError: zeroconf may still hold the name or its
+            # socket. Kept, with the advertiser that owns them, for a retry from Diagnostics.
+            hold_failed_stop(functools.partial(_stop_advertiser, advertiser), error)
 
 
 def _advertise_failed(error: object) -> None:

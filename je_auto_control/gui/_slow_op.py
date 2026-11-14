@@ -177,8 +177,11 @@ class StopQueue(QObject):
         return self._pending
 
     def retire(self, stop: Callable[[], Any], *, on_done: Callback = None,
-               args: Tuple[Any, ...] = ()) -> None:
+               on_error: Callback = None, args: Tuple[Any, ...] = ()) -> None:
         """Run ``stop()`` off the GUI thread; ``on_done(*args, result)`` follows on the GUI thread.
+
+        ``on_error(*args, exception)`` follows instead when it raised, for a
+        panel that shows a state until its stop reports (both are held weakly).
 
         A shutdown that raises is kept by :func:`~je_auto_control.gui._stop_custody.stop_custody`,
         with the caller's authority captured now, so it can be retried from
@@ -192,6 +195,8 @@ class StopQueue(QObject):
         handle.error.connect(functools.partial(hold_failed_stop, stop, authority=DeferredAuthorization.capture()))
         if on_done is not None:
             handle.result.connect(weak_slot(on_done, *args))     # a weak call, never the panel
+        if on_error is not None:
+            handle.error.connect(weak_slot(on_error, *args))
         handle.finished.connect(self._one_reported)
 
     def _one_reported(self) -> None:
