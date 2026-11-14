@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- GUI: `hold_failed_stop` also keeps each original owner an interruption signal carries
+  (`interrupted_retirement_owners`) -- a cancellation that cut a media cleanup short -- with its
+  own `stop`, so its resources have a keeper; one that is the stop already kept is not doubled.
+
 - GUI: the WebRTC *Browse LAN* dialog closes its zeroconf browser on a worker instead of the GUI
   thread, through the new application-owned `app_stop_queue()` (in `gui/_slow_op.py`), so a stop
   that fails after the dialog closed still reaches the stop custody; the browser reports through

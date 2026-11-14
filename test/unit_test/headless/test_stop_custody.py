@@ -190,3 +190,34 @@ def test_the_webrtc_host_keeps_a_session_whose_stop_failed_but_not_one_already_g
     assert custody.snapshot() == []
     webrtc_host_sessions._stop_session(types.SimpleNamespace(stop=failing.stop))
     assert [held.error for held in custody.snapshot()] == ["OSError: peer close timed out"]
+
+
+def test_an_interruption_keeps_the_owners_it_left_holding_resources(custody):
+    # A cancellation that cut a media cleanup short carries the original owner;
+    # only the outer stop used to be seen, and the owner's resources had no keeper.
+    from je_auto_control.utils.exception.control_signals import OperationCancelledError
+    from je_auto_control.utils.remote_desktop.media_retirement import preserve_interrupted_owner
+
+    class _Owner:
+        stopped = 0
+
+        @property
+        def retirement_status(self):
+            return None
+
+        def stop(self):
+            _Owner.stopped += 1
+
+    owner = _Owner()
+    try:
+        preserve_interrupted_owner(owner, OperationCancelledError("cancelled during unregister"))
+    except OperationCancelledError as signal:
+        interrupted = signal
+    outer = _Flaky(failures=0)
+    _slow_op.hold_failed_stop(outer.stop, interrupted)
+    labels = sorted(held.label for held in custody.snapshot())
+    assert labels == ["_Flaky.stop", "_Owner.stop"]
+    assert custody.retry_all() == (2, 0)
+    assert _Owner.stopped == 1
+    _slow_op.hold_failed_stop(owner.stop, interrupted)       # the owner's own stop is not kept twice
+    assert [held.label for held in custody.snapshot()] == ["_Owner.stop"]

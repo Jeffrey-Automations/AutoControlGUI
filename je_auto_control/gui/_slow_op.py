@@ -46,6 +46,7 @@ from je_auto_control.gui._stop_custody import stop_custody
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
+from je_auto_control.utils.remote_desktop.media_retirement import interrupted_retirement_owners
 
 
 def _call(work: Callable[[], Any], _token: CancellationToken) -> Any:
@@ -68,12 +69,21 @@ class StopsFailed(AutoControlException, RuntimeError):
 
 def hold_failed_stop(stop: Callable[[], Any], error: object,
                      authority: Optional[DeferredAuthorization] = None) -> None:
-    """Hand a failed stop to the application's custody (each one of a :class:`StopsFailed` separately)."""
+    """Hand a failed stop to the application's custody (each one of a :class:`StopsFailed` separately).
+
+    An interruption that cut a media cleanup short carries the original owners
+    it left holding resources (``interrupted_retirement_owners``); each is kept
+    as well, with its own ``stop``, unless it is the stop already being kept.
+    """
     if isinstance(error, StopsFailed):
         for inner, inner_error in error.failures:
-            stop_custody().hold(inner, inner_error, authority=authority)
-    else:
-        stop_custody().hold(stop, error, authority=authority)
+            hold_failed_stop(inner, inner_error, authority)
+        return
+    stop_custody().hold(stop, error, authority=authority)
+    if isinstance(error, BaseException):
+        for owner in interrupted_retirement_owners(error):
+            if getattr(stop, "__self__", None) is not owner:
+                stop_custody().hold(owner.stop, error, authority=authority)
 
 
 def _refuse_widgets(work: Callable[[], Any]) -> None:
