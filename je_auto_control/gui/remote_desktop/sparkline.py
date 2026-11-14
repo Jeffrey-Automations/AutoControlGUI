@@ -19,12 +19,13 @@ class Sparkline(QWidget):
 
     def __init__(self, *, capacity: int = 60,
                  line_color: str = "#3a9c3a",
-                 background: str = "#161616",
+                 background: Optional[str] = None,
                  parent: Optional[QWidget] = None) -> None:
+        """``background`` defaults to the palette's base colour, so the chart follows the theme."""
         super().__init__(parent)
         self._values: "deque[float]" = deque(maxlen=capacity)
         self._line_color = QColor(line_color)
-        self._bg_color = QColor(background)
+        self._bg_color: Optional[QColor] = QColor(background) if background else None
         self.setMinimumHeight(28)
         self.setMinimumWidth(120)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
@@ -42,7 +43,7 @@ class Sparkline(QWidget):
     def paintEvent(self, _event) -> None:  # noqa: N802 Qt override
         painter = QPainter(self)
         try:
-            painter.fillRect(self.rect(), self._bg_color)
+            painter.fillRect(self.rect(), self._bg_color or self.palette().base().color())
             if len(self._values) < 2:
                 return
             w = self.width()
@@ -64,7 +65,7 @@ class Sparkline(QWidget):
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             painter.drawPolyline(poly)
             # Latest value text in the corner
-            painter.setPen(QColor("#888"))
+            painter.setPen(self.palette().placeholderText().color())
             painter.drawText(
                 self.rect().adjusted(2, 2, -2, -2),
                 Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight,

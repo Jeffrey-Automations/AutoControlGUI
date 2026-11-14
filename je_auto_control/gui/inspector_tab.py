@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -50,11 +51,14 @@ class InspectorTab(TranslatableMixin, QWidget):
 
     def _build_layout(self) -> None:
         # Refresh/reset commands run from the Actions menu; the tab keeps
-        # only the summary, the metrics group, and the samples table.
+        # only the metrics group, the samples table, and the summary line.
         root = QVBoxLayout(self)
-        root.addWidget(self._summary_label)
+        root.setSpacing(12)
         root.addWidget(self._build_metrics_group())
-        root.addWidget(self._table, stretch=1)
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._summary_label.setWordWrap(True)
+        set_role(self._summary_label, "hint")
+        root.addWidget(self._summary_label)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: its sampling timer.
@@ -76,6 +80,7 @@ class InspectorTab(TranslatableMixin, QWidget):
         for key in _METRIC_KEYS:
             label_widget = self._tr(QLabel(), f"inspector_metric_{key}")
             value_widget = QLabel("-")
+            value_widget.setWordWrap(True)
             self._metric_labels[key] = value_widget
             form.addRow(label_widget, value_widget)
         return group

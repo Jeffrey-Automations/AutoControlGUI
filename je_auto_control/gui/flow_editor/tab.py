@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.flow_editor.scene import FlowGraphScene
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -56,12 +57,17 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         # Open/save/zoom/fit commands run from the Actions menu; the tab
         # keeps only the graph view, the inspector, and the status line.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self._view)
         splitter.addWidget(self._inspector)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 1)
-        root.addWidget(splitter, stretch=1)
+        # Start at the same 3:1 split; from the size hints the empty graph got a sliver.
+        splitter.setSizes([600, 200])
+        root.addWidget(Card().add(splitter, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
         self._apply_translations()
 

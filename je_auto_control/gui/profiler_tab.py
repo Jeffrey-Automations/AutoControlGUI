@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -80,8 +81,10 @@ class ProfilerTab(TranslatableMixin, QWidget):
         # Enable/reset/refresh commands run from the Actions menu; the tab
         # keeps only the table, the total bar, and the status line.
         root = QVBoxLayout(self)
-        root.addWidget(self._table, stretch=1)
-        root.addWidget(self._totalbar)
+        root.setSpacing(12)
+        root.addWidget(Card().add(self._table, stretch=1).add(self._totalbar), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def menu_actions(self) -> list:

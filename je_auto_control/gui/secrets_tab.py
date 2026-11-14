@@ -2,12 +2,13 @@
 from typing import Optional
 
 from PySide6.QtWidgets import (
-    QAbstractItemView, QGroupBox, QHBoxLayout, QInputDialog, QLabel,
+    QAbstractItemView, QFormLayout, QGroupBox, QInputDialog, QLabel,
     QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
     QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -43,11 +44,11 @@ class SecretsTab(TranslatableMixin, QWidget):
         # run from the Actions menu; the tab keeps only passphrase input,
         # the entry list, and the status line.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         unlock_box = self._tr(QGroupBox(), "secret_unlock_group")
-        unlock_layout = QHBoxLayout(unlock_box)
-        unlock_layout.addWidget(self._tr(QLabel(), "secret_passphrase_label"))
+        unlock_layout = QFormLayout(unlock_box)
         self._passphrase.setPlaceholderText(_t("secret_passphrase_placeholder"))
-        unlock_layout.addWidget(self._passphrase)
+        unlock_layout.addRow(self._tr(QLabel(), "secret_passphrase_label"), self._passphrase)
         root.addWidget(unlock_box)
 
         manage_box = self._tr(QGroupBox(), "secret_manage_group")
@@ -55,6 +56,8 @@ class SecretsTab(TranslatableMixin, QWidget):
         manage_layout.addWidget(self._list)
         root.addWidget(manage_box, stretch=1)
 
+        self._status_label.setWordWrap(True)
+        set_role(self._status_label, "hint")
         root.addWidget(self._status_label)
 
     def menu_actions(self) -> list:

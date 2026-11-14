@@ -36,9 +36,12 @@
 - **混合 DPI 座標與樣板**：需實測各螢幕上的舊版座標、`screen_region`、視窗版面與樣板，
   包含縮放不同的副螢幕、負原點與多螢幕排列；必要時重新錄製，不能以推導代替驗收。
 - **舊版存的視窗版面檔要重存**：`save_window_layout` 改存 `GetWindowRect`，舊檔還原會偏右 7 px、縮小 14×7 px。
-- **真的 Win32 行為沒有實測**：`post_key` 在真的編輯框是否只出現一個字、DWM cloak 過濾掉的是哪些視窗、
-  `MoveWindow` 對最大化視窗與另一個 DPI 的螢幕是否能原樣還原，都只用假的 `user32` 驗過。
-- **X11／Wayland**：大寫與 Shift 標點的判斷假設 `keysym_to_keycode` 把大寫字母對到小寫的 keycode，沒有對著 X server 跑過。
+- **Win32 行為的實測（U-20261113-01，Windows 11、單一 1920×1080 螢幕）只涵蓋自有的原生 `EDIT` 視窗**：
+  `post_key` 每個字只到一次、DWM cloak 過濾與最大化視窗的還原都已驗；還沒驗的：另一個 DPI 的螢幕上的還原（只有一個螢幕）、
+  工作列在左或上時最大化視窗存下的還原矩形（工作區座標換算只有單元測試，U-20261113-05）、
+  WinUI（新版記事本）／Chromium 等非原生編輯控制項、零面積過濾（有標題列的視窗被系統夾到 202×56，到不了零）。
+- **X11／Wayland**：大寫與 Shift 標點的判斷假設 `keysym_to_keycode` 把大寫字母對到小寫的 keycode，沒有對著 X server 跑過；
+  `post_key_to_window` 依 keymap 的 Shift 層加 `ShiftMask`（U-20261113-04）也只對 stub keymap 測過。
 
 ---
 
@@ -79,27 +82,18 @@
 
 `BLOCKED` — 需要 Android 模擬器或實機、iPhone 與 WebDriverAgent；這台機器連 `adb` 都沒有
 
-U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WDA 測過。`uiautomator2` 與 `facebook-wda` 沒有安裝在開發環境裡，
-方法名稱與參數是憑記憶寫的，第一次接上真的 SDK 很可能要修：
+U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WDA 測過。方法名稱與簽章已對 SDK 原始碼核過
+（uiautomator2 3.7.1、facebook-wda 1.5.4，U-20261112-04）：全部存在、參數相符；沒有一個在裝置上執行過。還沒驗的：
 
-- uiautomator2：`send_keys`、`drag`、空 selector 的 `gesture(...)`（捏合）、`clipboard`／`set_clipboard`、對話框按鈕的 resource id。
-- facebook-wda：`app_launch`／`app_terminate`／`app_state`、`alert.*`、`set_clipboard`、`status()`、`orientation` 的值、元素的 `pinch`、`screenshot()` 回傳 PIL 影像。
+- uiautomator2：對話框按鈕的 resource id（`ACCEPT_BUTTONS`／`DISMISS_BUTTONS`）是裝置與 OEM 的資料，原始碼驗不到。
+- facebook-wda：`orientation` 只回 `PORTRAIT`／`LANDSCAPE`（原始碼的 docstring），`UIA_DEVICE_ORIENTATION_*` 兩個值是否真的會回來未知；
+  `app_state` 的 `value` 依 `XCUIApplicationState`（4 是前景），SDK 的 docstring 寫成 1–3，以 Apple 的列舉為準，沒在裝置上看過。
 - 旋轉方向：螢幕截圖以面板自然方向回來時，`landscape_left` 轉 270°、`landscape_right` 轉 90°，是從文件推的，沒看過。
 - Android：`input draganddrop` 是否存在、`monkey` 啟動輸出、`pidof`／`pm path` 的結束碼、`dumpsys activity activities` 的格式、`pkill -INT screenrecord` 能否收尾 MP4。
   ADBKeyBoard 的送達無法由裝置確認，是從 IME 被選取推定的。
-- 已知限制：iOS 捏合忽略 `x`／`y`／`span`；iOS `app_state` 不會回 `not_installed`；iOS 的安裝／檔案／錄影沒有 adapter（只有 `MobileExtension` 協定與註冊點）；
+- 已知限制：iOS 捏合忽略 `x`／`y`／`span`；iOS 滑動忽略 `duration_s`（WDA 的 drag duration 是按住時間，不能設移動時間）；iOS `app_state` 不會回 `not_installed`；iOS 的安裝／檔案／錄影沒有 adapter（只有 `MobileExtension` 協定與註冊點）；
   Mobile 分頁的 probe／run 已由 TabTask 在背景執行；真實 SDK 的逾時、取消與裝置回應仍待實機驗收。`AC_android_shell` 刻意不做成 MCP 工具，**請維護者確認**。
 - 沒有 `examples/` 的實機腳本以外的 smoke；Xcode／WDA 的建置與簽章只寫成前置條件。
-
----
-
-## macos-15 上的 TCC 權限還沒被 gate 驗過
-
-`TODO` — 2026-11-01 把所有 macOS 方格從 `macos-14` 改成 `macos-15`（U-20261101-02），
-`test/verify/macos_verify.py` 的 `EXPECTED` 沿用 2026-08-19 在 macos-14 上的實測（螢幕錄製與輔助使用兩個
-TCC 權限都給）。`platform-smoke.yml` 的 `macos-capabilities` 只在推送到 `main` 與對 `main` 的 PR 上執行，所以下一個 dev→main
-PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 重新實測後更新 `EXPECTED` 與
-`docs/CAPABILITY_MATRIX.md`，不要直接放寬 gate。
 
 ---
 
@@ -107,20 +101,18 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 
 `TODO` — U-20261009-27、-28、-34、-36、-38、-40 之後還開著的
 
-- **Windows UIA 後端的執行緒模型完全沒對真的 COM 驗過**：現在每個呼叫執行緒各有一個自動化物件（`accessibility/backends/windows_automation.py`；
-  主執行緒 STA、其他執行緒進 MTA），Accessibility 分頁與 A11y Audit 已移出 GUI 執行緒。開發環境沒裝 `comtypes`，CI 也沒有同時有 `comtypes` 與桌面的 job，
-  測試全是假 COM 物件。未驗證的假設：MTA 工作執行緒上的 UIA 呼叫可用；焦點事件 callback 不需要 message pump；
-  `import comtypes` 第一次發生在已經是 MTA 的執行緒上會丟 `OSError`（憑記憶，沒處理）。焦點等待的 cooperative cancellation 已有 headless 回歸測試；真實 COM 訂閱／解除與停止行為仍待原生驗收。
-- **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）；`AC_parallel` 分支裡產生的值不經結果掛鉤回報，
-  只能從區塊的結果裡取得（標成 `results[0].…`）。結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
+- **Windows UIA 後端的執行緒模型**已對真的 COM 驗過一次（U-20261113-01，comtypes 1.5.0 裝在暫存目錄、Windows 11）：MTA 工作執行緒上的 UIA
+  讀取可用、焦點事件不需要 message pump、第一次 `import comtypes` 現在依執行緒的 apartment 初始化。還缺的：CI 仍沒有同時有 `comtypes` 與桌面的 job，
+  `comtypes` 也不是宣告的相依；`AC_wait_for_focus_change` 被 stop 叫醒的路徑沒在真的 COM 上跑過；`utils/system_volume` 自己的 `comtypes` 匯入不經這條路。
+- **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）。
+  結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
   `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
 - **stop 還叫不醒的**：已經進到後端的單一指令（一次影像搜尋、OCR、HTTP 請求、shell 指令）、單一手勢內的節奏 sleep；
-  MCP 自己的輪詢（`ac_wait_for_image`／`ac_wait_for_pixel`）不在可停止的執行裡。非腳本分頁已傳遞協作取消；尚未檢查 token 的後端呼叫仍只能丟棄晚到結果，須逐一接合。
+  非腳本分頁已傳遞協作取消；尚未檢查 token 的後端呼叫仍只能丟棄晚到結果，須逐一接合。
   ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在輪詢執行緒上的指令 handler 裡呼叫 `stop()` 也會等到逾時。沒對真的 Slack workspace 跑過。
   新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。
-- **WebRTC**：`StatsPoller.start()` 會在 GUI 執行緒上最多等 2 秒（`future.result(timeout=2.0)`，是啟動路徑，沒動）。LAN 廣播的註冊與取消已移出 GUI 執行緒，
-  但真的 zeroconf 的時間與名稱衝突行為只對假物件測過。
+- **WebRTC**：LAN 廣播的註冊與取消已移出 GUI 執行緒，但真的 zeroconf 的時間與名稱衝突行為只對假物件測過。
 - **切換主題後那幾個事件迴圈回合內**，以被暫存的頁面為 parent 的 `QMessageBox` 會相對於隱藏的暫存 widget 定位（只影響位置）。
   系統匣路徑在 offscreen 下沒有 tray，`_on_tray_open` 是直接呼叫測的。基準（`benchmarks/gui_*.py`）CI 仍不設門檻。
 - **把 Python 建的 widget 放進分頁列在結束時崩潰**：已查明觸發條件——分頁列按鈕上接了 Python callable、又有排隊中的 `deleteLater()`、而行程經 `os._exit` 離開；
@@ -157,7 +149,6 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 - **變數範圍**：free-threaded 原生執行緒繼承與同時存取範圍的行為尚未實測。
 - **遠端桌面的擁有者模型**：Quick Connect 沒有狀態列，它的連線被取代時視窗只是關掉；主機的 Stop 會停任何擁有者開的 host（刻意的）；
   只用假的 viewer／host 測過，真的 viewer 被擠掉時會不會觸發 `on_error` 而多跳一個警告框，沒看過。
-- **快到 750 行上限的檔案**：`utils/mcp_server/server.py`（744）——下一次要加東西就得先檢查預算，超標前拆分。
 
 ---
 
@@ -165,13 +156,9 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 
 `TODO` — 小項目，各自獨立
 
-- **本機的共用 `.venv` 裝著 `je_auto_control_dev 0.0.136`**，它的 `pytest11` 進入點還是舊的重量級路徑；重裝即可，不影響 CI。
 - **free-threaded**：呼叫者身分、綁定的裝置、自愈的執行標記與 stop token 都改成只在設定它的執行緒上有效（`utils/thread_bound.py`）。
   這台機器沒有 free-threaded 直譯器：驗證用的是模擬繼承與真的 `-X thread_inherit_context=1`（3.14.7，GIL 開著）；`free-threaded-scope` job（3.14t）是第一次真的跑。
-- **能力探測**：Windows 的鎖定工作站、session 0、低完整性與擷取失敗分支只用假資料判斷；macOS 的三個 preflight 呼叫只對假物件跑過，
-  pyobjc 的 `Quartz` 有沒有 `CGPreflightListenEventAccess` 未知（沒有的話 `recording`／`stop_shortcut` 回 `unknown`）。
 - **Windows 的版面鍵名**（`slash` 等 8 個）只在美式配置上實際呼叫過。
-- **狀態機 `on_enter` 的單一動作寫法**以前一直被拒絕、從沒執行過（已修，U-20261009-24）：依賴「它不會跑」的既有狀態機現在會跑它。
 
 ---
 
@@ -218,6 +205,20 @@ PR 才會確認 macos-15 是否給一樣的權限；若不同，依 `--measure` 
 在 Python 3.10 的 Linux／macOS `coverage run -m pytest` 中仍有間歇 SIGSEGV（exit 139）紀錄。
 需在對應環境開啟 `faulthandler` 重跑並定位原生呼叫；單次重跑通過不足以證明已修復。
 2026-11-02 起不再支援 Python 3.10，CI 不再跑 3.10；同一機制（分配時觸發循環回收）在 3.11 也存在，改看 3.11 的方格。
+
+---
+
+## PySide6 6.12：headless 測試跑完後直譯器結束時崩潰（全平台）
+
+`TODO` — 維護者 2026-11-14 決定全面固定回 PySide6 6.11.2（U-20261114-03；dependabot 忽略 6.12.0），待之後的 6.12.x 或找出 closure 後再升級並重驗。先在容器看到（U-20261114-01：`docker.yml` 4 次 3 次 SIGSEGV）；到 `1d372dba`（PR #552，2026-11-14）已是**每一格**：全部測試通過後，Ubuntu 3.14 exit 255（glibc `malloc_consolidate` abort）、macOS 3.11 `Fatal Python error: Aborted`、Windows 3.11／3.14 access violation、3.13 `Aborted`，Windows 3.12 在 `test_gui_offthread_sites.py` 中段 abort。本機 Windows 3.14 的完整套件沒有重現。
+- Ubuntu 的 gdb 堆疊（dev run 43484575781）：`destroyQCoreApplication` → `visitAllPyObjects` → 某個 QObject 的 `~QObject` 釋放接在它訊號上的 Python 函式 → `func_dealloc` → closure cell → 一個 widget 的 wrapper 歸零 → `~QWidget` → `~QScrollBar` → `free()` 重複釋放；前一行是 `shared QObject was deleted directly`。即 closure 握有最後一個參考的 widget，在結束時被 shiboken 與 Qt 各刪一次。是哪個 closure 還不知道。
+- 試過把分頁關閉鈕的 lambda（握住頁面）換成 bound method，或改用 Qt 內建關閉鈕：`test_gui_lazy_registry.py` 的探針在 `os._exit` 10／10 崩潰（HEAD 13／13 正常），已還原；這條路徑本身就是「把 Python 建的 widget 放進分頁列在結束時崩潰」那一項。
+- 兩次在測試全部跑完後的直譯器結束：`Py_FinalizeEx` → `PySide::runCleanupFunctions` → `destroyQCoreApplication`
+  → `BindingManager::visitAllPyObjects` → `QObject::~QObject`，前一行是 Qt 的 `shared QObject was deleted directly`。
+- 一次在測試中段（約 46%）主執行緒的 `Shiboken::BindingManager::runDeletionInMainThread()` → QtWidgets。
+- 不是 Python 3.12 或容器映像特有（每個平台與版本都有）；還不知道是哪個測試留下了被兩邊刪除的物件。
+  上游查無相同回報。`docker.yml` 現在以 gdb 跑、`-X faulthandler`、`-v`，下次中段崩潰會有測試名稱。
+- 升級回 6.12 前要做的：在 PR 上跑完整矩陣（含 `docker.yml`）確認結束時不再崩潰；或先找出握住 widget 的 closure（上面的分頁關閉鈕實驗顯示改動它會改變崩潰點，不是單純移除）。
 
 ---
 
@@ -531,10 +532,13 @@ D2 仍缺原生半開交握資源回收與合成器釋放證據；D3 的錄製�
 H 已有三平台型別 gate 與真實相依型別檢查；仍缺嚴格型別深化、完整範例／文件及最終固定來源總驗收。
 F 還缺：
 
-- **Remote Desktop 與 Script Builder 仍在啟動時建立**（預設開啟），啟動時間 2.6–2.7 秒裡大半是它們與門面匯入。
-- **F2 其餘**：Diagnostics 以外面板的執行詳情，以及各面板的空白／錯誤／permission states 尚未全面交付。
-- **F3** 還缺共用 `TaskController` 接入其餘面板、backend timeout／cancel 傳遞與關閉生命週期遷移，
-  包含 Quick Connect 的同步啟停、已進入傳輸的取消與同頁 session generation 隔離。
+- **F2 其餘**：各面板的空白／錯誤／permission states 尚未全面交付（執行詳情已由 `TabTask` 為所有背景工作的頁面發布，U-20261114-27）。
+- **F2 GUI 重製（`WIP`，維護者 2026-11-14 決定：全面視覺改版；窄視窗時導覽與詳情改為浮層）**：
+  設計系統、視窗斷點（U-20261114-02）與 51 個分頁的版面重排（U-20261114-04）已交付，`WIDE_PAGES` 已清空。仍缺：
+  - 已在本機真實桌面（Windows 11、單一螢幕 1920×1080、150% 縮放）審閱（U-20261114-05）；混合 DPI／多螢幕與 Linux／macOS 字型仍只有 offscreen 截圖。
+- **F3** 還缺 backend timeout／cancel 傳遞與關閉生命週期遷移，包含 Quick Connect 的同步啟停、
+  已進入傳輸的取消與同頁 session generation 隔離。分頁的背景工作已全部改走共用 `TaskController`
+  （`TabTask`，U-20261114-13～26），GUI 內除兩個 controller 本身外已無 `start_worker` 呼叫。
 - **F3 關閉失敗恢復**：`gui/_slow_op.py` 的 StopQueue／stop_each 目前只記錄停止失敗，
   尚未保留失敗資源的明確重試所有權。須接上應用程式生命週期的資源保管、原授權下的 Diagnostics 查詢／重試，
   並遷移一般停止及頁面銷毀後的 discard 路徑，包含 `_drop_offer` 與廣播清理；不能把背景排程等同原生資源已釋放。
@@ -753,7 +757,7 @@ ASLR resolver、fixture 的原生身分核對與頁面故障注入、runtime gra
 | 秘密金庫（`${secrets.NAME}`） | `cryptography` | 同上 |
 | ACME／TLS 發證、加密錄影 | `cryptography` | 模組層 `ImportError` 轉述（照 `webrtc_transport` 慣例） |
 
-`BLOCKED` — 仍需相容的上游 wheel：`opencv-python>=4.8,<6`、
+`BLOCKED`（2026-11-12 以下方指令重驗，三者仍無 win_arm64 wheel；cryptography 仍只到 46.0.3）— 仍需相容的上游 wheel：`opencv-python>=4.8,<6`、
 `cryptography>=50.0.0` 與 `aiortc` 的傳遞相依 `google-crc32c`。
 不能為相容性降低 cryptography 安全下限。上游提供相容版本後，需重驗安裝與功能，
 再移除 `pyproject.toml` 中相應平台標記並同步更新
@@ -771,11 +775,3 @@ pip install --dry-run --only-binary=:all: --platform win_arm64 --python-version 
 它只影響 wheel 相容性標籤，所以拿本機做 `--dry-run` **驗不到標記的效果**（兩個
 套件依舊會被要求）。能驗的是兩件事：直接評估 marker（上面那支測試在做的），
 以及 `windows-11-arm` 那一格自己綠。
-
-## minimatch 11 在 VS Code 擴充套件
-
-`BLOCKED` — `autocontrol-lsp/vscode/package-lock.json` 的 `minimatch` 5.1.9 有 Dependabot 警示
-GHSA-g3hv-75wg-m249（moderate），只有 11.0.1 起修好（U-20261101-17）。它來自 `vscode-languageclient` 9.0.1，
-會被 esbuild 打包進擴充套件；到 11.0.0 為止的每一版都要求 `minimatch` ^5 或 ^10，並呼叫 minimatch 11 已移除的
-`Minimatch#makeRe()`，所以用 `overrides` 強制 11 會讓文件篩選在執行時壞掉。等 `vscode-languageclient`
-出支援 minimatch 11 的版本，再升級並重新產生 lock。

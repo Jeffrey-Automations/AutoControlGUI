@@ -12,12 +12,14 @@ from contextlib import nullcontext
 from typing import Any, Callable, ContextManager
 
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLabel, QLineEdit, QTextEdit, QVBoxLayout,
+    QFileDialog, QFormLayout, QLabel, QLineEdit, QTextEdit, QVBoxLayout,
     QWidget,
 )
 
 from je_auto_control.gui._tab_task import TabTask, was_stopped
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.manual_run_controls import ManualRunControls, _requested_manual_run
 from je_auto_control.utils.executor.action_executor import execute_action, execute_files
@@ -60,29 +62,23 @@ class ScriptTab(TranslatableMixin, QWidget):
         self._tr_init()
         self._status_key = ""
         layout = QVBoxLayout(self)
-        file_h = QHBoxLayout()
-        file_h.addWidget(self._tr(QLabel(), "file_path_label"))
+        layout.setSpacing(12)
+        sources = QFormLayout()
         self.script_path_input = QLineEdit()
-        file_h.addWidget(self.script_path_input)
-        layout.addLayout(file_h)
-
-        dir_h = QHBoxLayout()
-        dir_h.addWidget(self._tr(QLabel(), "execute_dir_label"))
+        sources.addRow(self._tr(QLabel(), "file_path_label"), self.script_path_input)
         self.script_dir_input = QLineEdit()
-        dir_h.addWidget(self.script_dir_input)
-        layout.addLayout(dir_h)
+        sources.addRow(self._tr(QLabel(), "execute_dir_label"), self.script_dir_input)
+        self.script_history_controls = ManualRunControls()
+        self.script_history_controls.setProperty("role", "bare")
+        layout.addWidget(Card().add(sources).add(self.script_history_controls))
 
-        layout.addWidget(self._tr(QLabel(), "script_content"))
         self.script_editor = QTextEdit()
         self.script_editor.setPlaceholderText('[["AC_type_keyboard", {"keycode": "a"}]]')
-        layout.addWidget(self.script_editor)
-
-        self.script_history_controls = ManualRunControls()
-        layout.addWidget(self.script_history_controls)
-        layout.addWidget(self._tr(QLabel(), "execution_result"))
         self.script_result_text = QTextEdit()
         self.script_result_text.setReadOnly(True)
-        layout.addWidget(self.script_result_text)
+        layout.addWidget(ResponsiveBox(self._titled_card("script_content", self.script_editor),
+                                       self._titled_card("execution_result", self.script_result_text)),
+                         stretch=1)
         self._loads = TabTask(self)
         self._loads.result.connect(self._loaded_script)
         self._loads.error.connect(self._load_error)
@@ -90,6 +86,10 @@ class ScriptTab(TranslatableMixin, QWidget):
         self._script_runs.result.connect(self._show_script_result)
         self._script_runs.error.connect(self._show_script_error)
         self._script_runs.finished.connect(self._on_finished)
+
+    def _titled_card(self, title_key: str, view: QWidget) -> Card:
+        """A card with a translated section title over ``view``, which takes the remaining height."""
+        return Card().add(set_role(self._tr(QLabel(), title_key), "sectionTitle")).add(view, stretch=1)
 
     def _start_script_run(self, work: Callable[[], Any]) -> None:
         """Run ``work`` as this tab's one stoppable script run."""

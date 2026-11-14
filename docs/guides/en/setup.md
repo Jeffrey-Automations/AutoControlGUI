@@ -13,7 +13,7 @@ Optional extras, installed only when you need them:
 
 | Extra | Enables |
 |---|---|
-| `gui` | PySide6 desktop application (51 tabs): a searchable navigation panel (`Ctrl+K`) lists every feature by category, tabs are built the first time they are opened, and **View → Theme** switches dark / light. Pages scroll in narrow windows; theme, text size, navigation visibility (`Ctrl+B`) and width are saved in `~/.je_auto_control/gui.ini` on close. Themes use Qt directly; `qt-material` is not required. |
+| `gui` | PySide6 desktop application (51 tabs): a searchable navigation panel (`Ctrl+K`) lists every feature by category, tabs are built the first time they are opened (of the three open at start, only Record is built then; Script Builder and Remote Desktop are built when first selected), and **View → Theme** switches dark / light. Pages scroll in narrow windows; theme, text size, navigation visibility (`Ctrl+B`) and width are saved in `~/.je_auto_control/gui.ini` on close. Themes use Qt directly; `qt-material` is not required. |
 | `webrtc` | WebRTC remote desktop, USB passthrough (`aiortc`, `av`) |
 | `signaling` | Standalone signaling / rendezvous server (`fastapi`, `uvicorn`) |
 | `discovery` | mDNS / Zeroconf LAN host discovery |

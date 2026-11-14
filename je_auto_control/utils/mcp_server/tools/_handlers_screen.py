@@ -107,12 +107,17 @@ def _matching_channels(raw: Any, target: List[int], tol: int) -> Optional[List[i
 
 
 def _sleep_before(deadline: float, poll_seconds: float) -> bool:
-    """Sleep one poll, never past ``deadline``; ``False`` once the deadline has passed."""
+    """Sleep one poll, never past ``deadline``; ``False`` once the deadline has passed.
+
+    The sleep is :func:`run_control.pause`: a call from the server runs as a
+    stoppable run, so a cancel or ``ac_stop_execution`` wakes it mid-poll.
+    """
     import time as _time
+    from je_auto_control.utils.executor.run_control import pause
     remaining = deadline - _time.monotonic()
     if remaining <= 0:
         return False
-    _time.sleep(min(poll_seconds, remaining))
+    pause(min(poll_seconds, remaining), sleep=_time.sleep)
     return True
 
 

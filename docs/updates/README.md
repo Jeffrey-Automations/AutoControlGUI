@@ -58,6 +58,52 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-27 | 2026-11-14 | Every page that runs background work reports it in Execution details | #done #gui #workspace | [2026-11-b](2026-11-b.md) |
+| U-20261114-26 | 2026-11-14 | Config Sync runs on the shared task; no panel uses a bare worker | #done #gui #sync | [2026-11-b](2026-11-b.md) |
+| U-20261114-25 | 2026-11-14 | The template candidate panel runs on the shared task | #done #gui #healing | [2026-11-b](2026-11-b.md) |
+| U-20261114-24 | 2026-11-14 | The journal candidate panel runs on the shared task | #done #gui #codegen | [2026-11-b](2026-11-b.md) |
+| U-20261114-23 | 2026-11-14 | The journal browser runs on the shared task, which now relays progress | #done #gui #journal | [2026-11-b](2026-11-b.md) |
+| U-20261114-22 | 2026-11-14 | The self-healing comparison panel runs on the shared task | #done #gui #healing | [2026-11-b](2026-11-b.md) |
+| U-20261114-21 | 2026-11-14 | The admin console's poll and thumbnails stop at the hosts not reached yet | #done #gui #admin | [2026-11-b](2026-11-b.md) |
+| U-20261114-20 | 2026-11-14 | The DAG Runner runs on the shared task and stays busy until a stopped run ends | #done #gui #dag | [2026-11-b](2026-11-b.md) |
+| U-20261114-19 | 2026-11-14 | Computer Use runs on the shared task and stays busy until a stopped run ends | #done #gui #agent | [2026-11-b](2026-11-b.md) |
+| U-20261114-18 | 2026-11-14 | The USB passthrough panel's use requests get a Stop and a deadline | #done #gui #usb | [2026-11-b](2026-11-b.md) |
+| U-20261114-17 | 2026-11-14 | The USB Browser's Fetch and Open get a Stop and a deadline | #done #gui #usb | [2026-11-b](2026-11-b.md) |
+| U-20261114-16 | 2026-11-14 | A stopped admin broadcast reports per host whether it was sent | #done #gui #admin | [2026-11-b](2026-11-b.md) |
+| U-20261114-15 | 2026-11-14 | Stop and closing the tab cancel an email Poll Now between mailboxes | #done #gui #triggers | [2026-11-b](2026-11-b.md) |
+| U-20261114-14 | 2026-11-14 | Closing a USB tab ends the enumeration tool it started | #done #gui #usb | [2026-11-b](2026-11-b.md) |
+| U-20261114-13 | 2026-11-14 | AI Locator and LLM Planner requests get Stop, a deadline and no late click | #done #gui #vision | [2026-11-b](2026-11-b.md) |
+| U-20261114-12 | 2026-11-14 | Whole-window probes end without Windows DLL teardown | #done #gui #test | [2026-11-b](2026-11-b.md) |
+| U-20261114-11 | 2026-11-14 | Trace Replay and Run History get their draggable divider back | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-10 | 2026-11-14 | Remote Desktop's collapsed sections shrink to their title; wrapped groups show one title | #done #gui #remote-desktop | [2026-11-b](2026-11-b.md) |
+| U-20261114-09 | 2026-11-14 | Tables fill their width: a stretched last column, re-applied after a refresh | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-08 | 2026-11-14 | Drop-down and spin box arrows drawn in theme colours, inset from the border | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-07 | 2026-11-14 | Translate the 95 strings seven testing tabs shipped in English only | #done #gui #i18n | [2026-11-b](2026-11-b.md) |
+| U-20261114-06 | 2026-11-14 | GUI polish: theme colours in Remote Desktop, idle progress line, two strings that ignored a language switch | #done #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-05 | 2026-11-14 | GUI reviewed on the real Windows desktop at 150 %; check boxes took the system accent | #done #gui #windows | [2026-11-b](2026-11-b.md) |
+| U-20261114-04 | 2026-11-14 | GUI redesign, stage 2: every tab rebuilt on the adaptive layout | #migration #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-03 | 2026-11-14 | PySide6 back to 6.11.2: 6.12.0 crashes every CI platform at exit | #decision #ci #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-02 | 2026-11-14 | GUI redesign, stage 1: adaptive building blocks, page headers, cards, window breakpoints and the width gate | #migration #gui | [2026-11-b](2026-11-b.md) |
+| U-20261114-01 | 2026-11-14 | PR #552: CI tested PySide6 6.11.2, the container crashes on 6.12.0, two test regressions | #incident #ci #gui | [2026-11-b](2026-11-b.md) |
+| U-20261113-05 | 2026-11-13 | Saved layouts keep the maximized state; restoring it is opt-in | #done #windows | [2026-11-b](2026-11-b.md) |
+| U-20261113-04 | 2026-11-13 | `post_key_to_window` takes any printable character | #done #windows #x11 | [2026-11-b](2026-11-b.md) |
+| U-20261113-03 | 2026-11-13 | PR #552: container libEGL and three asyncio cancellation findings | #incident #ci #remote | [2026-11-b](2026-11-b.md) |
+| U-20261113-02 | 2026-11-13 | macos-15 grants what the capability gate expects | #done #macos #ci | [2026-11-b](2026-11-b.md) |
+| U-20261113-01 | 2026-11-13 | Windows desktop acceptance on a self-owned window; two fixes | #done #windows #accessibility | [2026-11-b](2026-11-b.md) |
+| U-20261112-14 | 2026-11-12 | Reading the iOS pasteboard needs an explicit allowance | #done #mobile #ios | [2026-11-b](2026-11-b.md) |
+| U-20261112-13 | 2026-11-12 | Bring the shared .venv to the pinned pillow and PySide6 | #done #tooling | [2026-11-b](2026-11-b.md) |
+| U-20261112-12 | 2026-11-12 | Move the finished on_enter note out of Progress | #docs #executor | [2026-11-b](2026-11-b.md) |
+| U-20261112-11 | 2026-11-12 | Refuse asset paths Windows cannot create before staging | #done #config-sync #windows | [2026-11-b](2026-11-b.md) |
+| U-20261112-10 | 2026-11-12 | The capability-probe Progress item described deleted code | #snapshot #capabilities #macos | [2026-11-b](2026-11-b.md) |
+| U-20261112-09 | 2026-11-12 | The result hook follows AC_parallel branches | #done #executor #gui | [2026-11-b](2026-11-b.md) |
+| U-20261112-08 | 2026-11-12 | Strict tier for the two new MCP modules; Windows Qt stub nulls | #incident #typing #ci | [2026-11-b](2026-11-b.md) |
+| U-20261112-07 | 2026-11-12 | Build only the first start-up tab; the others when first selected | #done #gui #performance | [2026-11-b](2026-11-b.md) |
+| U-20261112-06 | 2026-11-12 | Split the tools/call path out of the MCP server module | #done #mcp #quality | [2026-11-b](2026-11-b.md) |
+| U-20261112-05 | 2026-11-12 | Four WebRTC tests still asserted the pre-retention contract | #incident #remote #ci | [2026-11-b](2026-11-b.md) |
+| U-20261112-04 | 2026-11-12 | Mobile SDK calls checked against uiautomator2 and facebook-wda source | #done #mobile | [2026-11-b](2026-11-b.md) |
+| U-20261112-03 | 2026-11-12 | MCP tool calls are stoppable runs; a cancel stops them | #done #mcp #executor | [2026-11-b](2026-11-b.md) |
+| U-20261112-02 | 2026-11-12 | minimatch 5.1.9 is outside the revised advisory range | #done #deps #security | [2026-11-b](2026-11-b.md) |
+| U-20261112-01 | 2026-11-12 | Remove the stale dev package from the shared .venv | #done #tooling | [2026-11-b](2026-11-b.md) |
 | U-20261111-32 | 2026-11-11 | Retain peer media failures and observe live cleanup | #done #remote | [2026-11-b](2026-11-b.md) |
 | U-20261111-31 | 2026-11-11 | Bind delayed session retirement to original resources | #done #remote | [2026-11-b](2026-11-b.md) |
 | U-20261111-30 | 2026-11-11 | Retain LAN browser cleanup and interruption ownership | #done #remote | [2026-11-b](2026-11-b.md) |

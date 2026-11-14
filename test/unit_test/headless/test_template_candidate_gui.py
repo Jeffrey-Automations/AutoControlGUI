@@ -27,18 +27,17 @@ def panel(app):
     view = TemplateCandidatePanel()
     yield view
     view.cancel()
-    if view._handle is not None:
-        view._handle.wait(5)
+    until_idle(app, view)
     view.deleteLater()
     app.processEvents()
 
 
 def until_idle(app, panel):
     deadline = time.monotonic() + 5
-    while panel._handle is not None and time.monotonic() < deadline:
+    while panel._task.running and time.monotonic() < deadline:
         app.processEvents()
         time.sleep(0.005)
-    assert panel._handle is None
+    assert not panel._task.running
 
 
 def test_actions_complete_preview_verify_accept_and_revert(panel, app, revision_files):
@@ -75,7 +74,7 @@ def test_actions_complete_preview_verify_accept_and_revert(panel, app, revision_
 
 def test_preview_is_required_before_gui_acceptance(panel):
     panel._start("accept")
-    assert panel._handle is None
+    assert not panel._task.running
     assert panel._status_key == "review_required"
 
 
@@ -101,12 +100,10 @@ def test_deferred_worker_retains_viewer_authority(app, monkeypatch):
     request = TemplateCandidateRequest(1, "preview", "", "", "private.json", "", "", 0.9)
     with authorization_scope(AuthorizationContext("viewer", Role.VIEWER)):
         worker = TemplateCandidateWorker(request)
-    outcomes = []
-    worker.finished.connect(outcomes.append)
-    worker.run()
-    assert outcomes[0].status == "error"
-    assert outcomes[0].data is None
-    worker.deleteLater()
+    import threading
+    outcome = worker(threading.Event())
+    assert outcome.status == "error"
+    assert outcome.data is None
 
 
 def test_committed_acceptance_is_not_relabelled_cancelled(app, monkeypatch, revision_files):
@@ -122,13 +119,11 @@ def test_committed_acceptance_is_not_relabelled_cancelled(app, monkeypatch, revi
         return result
 
     monkeypatch.setattr("je_auto_control.gui.template_candidate_worker.accept_template_candidate", committed)
-    outcomes = []
-    worker.finished.connect(outcomes.append)
-    worker.run()
-    assert outcomes[0].status == "ok"
-    assert outcomes[0].data["changed"] is True
+    import threading
+    outcome = worker(threading.Event())         # stopped after the acceptance was committed
+    assert outcome.status == "ok"
+    assert outcome.data["changed"] is True
     assert target.read_bytes() == (FIXTURES / "new.png").read_bytes()
-    worker.deleteLater()
 
 
 def test_close_cancels_active_read_and_discards_late_result(panel, app, monkeypatch, revision_files):
@@ -156,3 +151,34 @@ def test_close_cancels_active_read_and_discards_late_result(panel, app, monkeypa
     until_idle(app, panel)
     assert panel._details.toPlainText() == ""
     assert panel._status_key != "eligible"
+
+
+def test_progress_shows_and_cancel_keeps_the_panel_busy_until_it_unwinds(panel, app, monkeypatch, revision_files):
+    import threading
+    from je_auto_control.gui import template_candidate_worker as module
+    _, bundle, dataset = revision_files
+    create(revision_files)
+    reported, release = threading.Event(), threading.Event()
+
+    def slow(*_args, observer=None, **_kwargs):
+        observer(3)
+        reported.set()
+        assert release.wait(5)
+        observer(4)                       # the next checkpoint sees the stop
+        pytest.fail("verification went past a stopped checkpoint")
+
+    monkeypatch.setattr(module, "verify_template_candidate", slow)
+    panel._bundle.setText(str(bundle))
+    panel._dataset.setText(str(dataset))
+    panel._start("verify")
+    assert reported.wait(5)
+    deadline = time.monotonic() + 5
+    while panel._status_key != "progress" and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(0.005)
+    assert (panel._status_key, panel._status_value) == ("progress", "3")
+    panel.cancel()
+    assert panel._task.running and panel._status_key == "cancelling"
+    release.set()
+    until_idle(app, panel)
+    assert panel._status_key == "cancelled"

@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask, was_stopped
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -73,12 +75,13 @@ class TestSuiteTab(TranslatableMixin, QWidget):
         # Load/run/export and quarantine commands run from the Actions
         # menu; the tab keeps only the spec editor, tables, and summary.
         root = QVBoxLayout(self)
-        root.addWidget(QLabel(_t("suite_spec_label")))
-        root.addWidget(self._spec, stretch=1)
-        root.addWidget(self._table, stretch=2)
-        root.addWidget(self._summary)
-        root.addWidget(QLabel(_t("suite_q_label")))
-        root.addWidget(self._quarantine)
+        root.setSpacing(12)
+        root.addWidget(Card("suite_spec_label").add(self._spec, stretch=1), stretch=1)
+        self._summary.setWordWrap(True)
+        set_role(self._summary, "hint")
+        results = Card().add(self._table, stretch=1).add(self._summary)
+        quarantine = Card("suite_q_label").add(self._quarantine, stretch=1)
+        root.addWidget(ResponsiveBox(results, quarantine, stretches=(2, 1)), stretch=2)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: the command still running in the background.

@@ -275,7 +275,7 @@ def test_a_released_computer_use_tab_stops_its_run_and_drops_the_outcome(monkeyp
     before = tab._status.text()
     tab.dispose()
     assert seen[0].is_set()
-    assert pump_until(lambda: tab._thread is None)      # the thread's end is still booked
+    assert pump_until(lambda: not tab._run.running)      # the run's end is still booked
     assert tab._status.text() == before
     assert tab._output.toPlainText() == ""
     tab.dispose()
@@ -295,7 +295,7 @@ def test_a_released_dag_tab_stops_its_run_and_drops_the_outcome(monkeypatch):
     assert pump_until(lambda: bool(seen))
     tab.dispose()
     assert seen[0].is_set()
-    assert pump_until(lambda: tab._thread is None)
+    assert pump_until(lambda: not tab._run.running)
     assert tab._table.rowCount() == 0
 
 
@@ -310,12 +310,13 @@ def test_a_released_vlm_tab_drops_the_answer_of_the_request_still_out(monkeypatc
     tab = vlm_tab.VLMTab()
     tab._description.setText("the button")
     tab._on_locate()
-    assert tab._vlm_thread is not None
+    assert tab._task.running
+    status = tab._status.text()
     tab.dispose()
     release.set()
-    assert pump_until(lambda: tab._vlm_thread is None)
+    assert pump_until(lambda: not tab._task.running)
     assert tab._last_result.text() == ""
-    assert tab._status.text() == ""
+    assert tab._status.text() == status
 
 
 def test_a_released_usb_browser_tab_drops_the_open_still_out(monkeypatch):
@@ -330,9 +331,9 @@ def test_a_released_usb_browser_tab_drops_the_open_still_out(monkeypatch):
     tab._start_local_open("1234", "5678", None)
     before = tab._status_label.text()
     tab.dispose()
+    assert not tab._requests.running
     release.set()
-    assert pump_until(lambda: tab._open_thread is None)
-    assert tab._status_label.text() == before
+    assert pump_until(lambda: tab._status_label.text() != before, timeout=0.5) is False
 
 
 # --- the helper --------------------------------------------------------------------------------------------------

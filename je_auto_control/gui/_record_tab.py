@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._tab_task import TabTask, was_stopped
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.wrapper import auto_control_record
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -47,17 +48,20 @@ class RecordTab(TranslatableMixin, QWidget):
         self._tr_init()
         self._record_data: list = []
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
 
         # Record/playback/save/load all run from the Actions menu.
         self._record_status_key = "record_idle"
         self.record_status_label = QLabel()
+        self.record_status_label.setWordWrap(True)
+        set_role(self.record_status_label, "hint")
         self._apply_record_status_label()
-        layout.addWidget(self.record_status_label)
 
-        layout.addWidget(self._tr(QLabel(), "record_list_label"))
+        list_card = Card().add(set_role(self._tr(QLabel(), "record_list_label"), "sectionTitle"))
         self.record_list_text = QTextEdit()
         self.record_list_text.setReadOnly(True)
-        layout.addWidget(self.record_list_text)
+        layout.addWidget(list_card.add(self.record_list_text, stretch=1), stretch=1)
+        layout.addWidget(self.record_status_label)
         self._playback_runs = TabTask(self)
         self._playback_runs.error.connect(self._on_playback_error)
         self._playback_runs.finished.connect(self._on_playback_finished)

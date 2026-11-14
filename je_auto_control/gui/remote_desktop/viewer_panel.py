@@ -6,12 +6,14 @@ from typing import Optional
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QGuiApplication, QImage
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QGroupBox, QHBoxLayout, QInputDialog,
+    QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QInputDialog,
     QLabel, QLineEdit, QMessageBox, QProgressBar, QPushButton, QSpinBox,
     QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._slow_op import StopQueue
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._dispose import release_resources
@@ -91,7 +93,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             self._enable_audio.setEnabled(False)
         self._badge = _StatusBadge()
         self._status = QLabel()
-        self._status.setStyleSheet("color: #555; font-size: 9pt;")
+        set_role(self._status, "hint")
         # _screen_window is created lazily on connect — the AnyDesk-style
         # popout. While disconnected we hold ``None`` and the panel
         # itself stays compact instead of devoting half its height to a
@@ -132,8 +134,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
 
     def _build_layout(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(8)
+        root.setSpacing(12)
 
         root.addWidget(self._build_card())
         root.addWidget(self._build_advanced())
@@ -145,6 +146,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         # surface, status, and transfer progress.
         root.addWidget(self._progress_label)
         root.addWidget(self._progress_bar)
+        self._status.setWordWrap(True)
         root.addWidget(self._status)
         root.addStretch(1)
 
@@ -152,27 +154,23 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         card = self._tr(QGroupBox(), "rd_viewer_card_group")
         card.setStyleSheet("QGroupBox { font-weight: bold; }")
         card_layout = QVBoxLayout()
-        card_layout.setSpacing(6)
+        card_layout.setSpacing(8)
 
+        id_form = QFormLayout()
         id_row = QHBoxLayout()
-        id_row.addWidget(self._tr(QLabel(), "rd_host_id_label"))
         id_row.addWidget(self._host_id, stretch=1)
         id_row.addWidget(self._badge)
-        card_layout.addLayout(id_row)
+        id_form.addRow(self._tr(QLabel(), "rd_host_id_label"), id_row)
+        card_layout.addLayout(id_form)
 
-        addr_row = QHBoxLayout()
-        addr_row.addWidget(self._tr(QLabel(), "rd_bind_label"))
-        addr_row.addWidget(self._host_field, stretch=1)
-        addr_row.addWidget(self._tr(QLabel(), "rd_port_label"))
-        addr_row.addWidget(self._port)
-        addr_row.addWidget(self._tr(QLabel(), "rd_transport_label"))
-        addr_row.addWidget(self._transport)
-        card_layout.addLayout(addr_row)
+        # Address, port and transport wrap onto a second line when narrow.
+        card_layout.addLayout(flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
+            ("rd_bind_label", self._host_field), ("rd_port_label", self._port),
+            ("rd_transport_label", self._transport)))))
 
-        token_row = QHBoxLayout()
-        token_row.addWidget(self._tr(QLabel(), "rd_token_label"))
-        token_row.addWidget(self._token, stretch=1)
-        card_layout.addLayout(token_row)
+        token_form = QFormLayout()
+        token_form.addRow(self._tr(QLabel(), "rd_token_label"), self._token)
+        card_layout.addLayout(token_form)
 
         card.setLayout(card_layout)
         return card
@@ -202,15 +200,12 @@ class _ViewerPanel(TranslatableMixin, QWidget):
 
     def _build_action_row(self) -> QWidget:
         action_row_widget = QWidget()
-        action_row = QHBoxLayout(action_row_widget)
-        action_row.setContentsMargins(0, 0, 0, 0)
+        action_row_widget.setProperty("role", "bare")
         push_clip_btn = self._tr(QPushButton(), "rd_viewer_push_clipboard")
         push_clip_btn.clicked.connect(self._push_clipboard_to_host)
         send_file_btn = self._tr(QPushButton(), "rd_viewer_send_file")
         send_file_btn.clicked.connect(self._on_send_file_clicked)
-        action_row.addWidget(push_clip_btn)
-        action_row.addWidget(send_file_btn)
-        action_row.addStretch()
+        action_row_widget.setLayout(flow_of(push_clip_btn, send_file_btn))
         action_row_widget.setVisible(False)
         self._action_row = action_row_widget
         return action_row_widget

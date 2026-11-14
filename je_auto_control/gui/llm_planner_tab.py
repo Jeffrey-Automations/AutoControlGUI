@@ -2,30 +2,33 @@
 
 The tab calls the headless ``plan_actions`` helper, shows the resulting
 JSON action list for review, and lets the user execute it through the
-shared global executor. Planning and running both happen off the GUI thread;
-a run is a stoppable executor run, one at a time.
+shared global executor. Planning and running both happen off the GUI thread
+as :class:`~je_auto_control.gui._tab_task.TabTask` work, one of each at a time:
+a run is a stoppable executor run, and a plan has a deadline and is dropped
+when stopped. The Actions menu's Stop ends whichever is going.
 """
 import copy
 import functools
 import json
 from typing import List, Optional
 
-from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QFormLayout, QGroupBox, QLabel, QLineEdit, QMessageBox,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask, was_stopped
-from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
+from je_auto_control.gui.tab_task_controller import TaskTimeout
 from je_auto_control.utils.executor.action_executor import execute_action, executor
 from je_auto_control.utils.llm.backends.base import LLMNotAvailableError
-from je_auto_control.utils.llm.planner import LLMPlanError, plan_actions
+from je_auto_control.utils.llm.planner import plan_actions
 
 
 def _t(key: str) -> str:
@@ -37,32 +40,23 @@ def _run_plan(actions: list) -> object:
     return execute_action(actions)
 
 
-class _PlanWorker(QObject):
-    """Runs ``plan_actions`` off the GUI thread and emits the result."""
+#: How long one plan may take. The backend gives a request 60 s and its SDK
+#: retries a failed one twice, so this leaves room for all three tries.
+PLAN_DEADLINE_S = 200.0
 
-    finished = Signal(list)
-    failed = Signal(str)
 
-    def __init__(self, description: str, model: Optional[str],
-                 known_commands: List[str]) -> None:
-        super().__init__()
-        self._description = description
-        self._model = model
-        self._known = list(known_commands)
+def _plan(description: str, model: Optional[str], known_commands: List[str]) -> list:
+    """Worker thread: ask the model for a plan."""
+    return plan_actions(description, known_commands=known_commands, model=model)
 
-    def run(self) -> None:
-        try:
-            actions = plan_actions(
-                self._description,
-                known_commands=self._known,
-                model=self._model,
-            )
-        except LLMNotAvailableError as error:
-            self.failed.emit(str(error))
-        except (LLMPlanError, ValueError, OSError, RuntimeError) as error:
-            self.failed.emit(f"{type(error).__name__}: {error}")
-        else:
-            self.finished.emit(actions)
+
+def _plan_error_text(error: object) -> str:
+    """What the status line says about a plan that failed."""
+    if isinstance(error, TaskTimeout):
+        return _t("task_timed_out")
+    if isinstance(error, LLMNotAvailableError):
+        return str(error)
+    return f"{type(error).__name__}: {error}"
 
 
 class LLMPlannerTab(TranslatableMixin, QWidget):
@@ -79,7 +73,9 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         self._result_view.setReadOnly(True)
         self._status = QLabel()
         self._planned_actions: Optional[list] = None
-        self._plan_thread: Optional[WorkerHandle] = None
+        self._plans = TabTask(self)
+        self._plans.result.connect(self._on_plan_finished)
+        self._plans.error.connect(self._on_plan_failed)
         self._runs = TabTask(self)
         self._runs.result.connect(self._show_run_result)
         self._runs.error.connect(self._show_run_error)
@@ -98,13 +94,13 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         # Plan/run commands run from the Actions menu; the tab keeps only
         # the description/model inputs, the plan/result views, and status.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
 
         desc_group = self._tr(QGroupBox(), "llm_desc_group")
         desc_layout = QVBoxLayout()
         desc_layout.addWidget(self._description)
-        model_row = QHBoxLayout()
-        model_row.addWidget(self._tr(QLabel(), "llm_model_label"))
-        model_row.addWidget(self._model, stretch=1)
+        model_row = QFormLayout()
+        model_row.addRow(self._tr(QLabel(), "llm_model_label"), self._model)
         desc_layout.addLayout(model_row)
         desc_group.setLayout(desc_layout)
         root.addWidget(desc_group)
@@ -113,21 +109,22 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         actions_layout = QVBoxLayout()
         actions_layout.addWidget(self._actions_view)
         actions_group.setLayout(actions_layout)
-        root.addWidget(actions_group, stretch=1)
 
         result_group = self._tr(QGroupBox(), "llm_result_group")
         result_layout = QVBoxLayout()
         result_layout.addWidget(self._result_view)
         result_group.setLayout(result_layout)
-        root.addWidget(result_group, stretch=1)
+        root.addWidget(ResponsiveBox(actions_group, result_group), stretch=1)
 
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: the command still running in the background.
 
-        A script run is stopped; other work cannot be interrupted, so it runs to its end and its
-        result is dropped. Called by ``close_tab(key, release=True)``; safe to call twice.
+        A script run is stopped; a plan still out is cancelled: the request runs to its end and
+        its answer is dropped. Called by ``close_tab(key, release=True)``; safe to call twice.
         """
         release_resources(self)
 
@@ -144,16 +141,14 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         if not description:
             self._status.setText(_t("llm_desc_required"))
             return
-        if self._plan_thread is not None and self._plan_thread.isRunning():
-            return
         model = self._model.text().strip() or None
+        work = functools.partial(_plan, description, model, sorted(executor.known_commands()))
+        if not self._plans.start(work, timeout_s=PLAN_DEADLINE_S):
+            self._status.setText(_t("task_busy"))
+            return
         self._status.setText(_t("llm_planning"))
         self._actions_view.clear()
         self._planned_actions = None
-        worker = _PlanWorker(description, model, sorted(executor.known_commands()))
-        self._plan_thread = start_worker(
-            self, worker, on_done=self._on_plan_finished,
-            on_fail=self._on_plan_failed, on_thread_done=self._on_thread_done)
 
     def _on_plan_finished(self, actions: list) -> None:
         self._planned_actions = actions
@@ -164,13 +159,12 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
             _t("llm_plan_count").replace("{n}", str(len(actions)))
         )
 
-    def _on_plan_failed(self, message: str) -> None:
+    def _on_plan_failed(self, error: object) -> None:
         self._planned_actions = None
-        QMessageBox.warning(self, _t("llm_plan_btn"), message)
+        message = _plan_error_text(error)
+        if not isinstance(error, TaskTimeout):
+            QMessageBox.warning(self, _t("llm_plan_btn"), message)
         self._status.setText(message)
-
-    def _on_thread_done(self) -> None:
-        self._plan_thread = None
 
     def _on_run(self) -> None:
         if not self._planned_actions:
@@ -185,6 +179,8 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
     def _on_stop(self) -> None:
         if self._runs.stop():
             self._status.setText(_t("task_stopping"))
+        elif self._plans.stop():
+            self._status.setText(_t("task_stopped"))
 
     def _show_run_result(self, record: object) -> None:
         self._result_view.setText(

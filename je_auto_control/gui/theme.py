@@ -31,7 +31,10 @@ class ThemeTokens:
     selection: str
     hover: str
     danger: str
+    success: str = "#3fb950"
+    warning: str = "#d29922"
     radius: int = 6
+    radius_large: int = 10
     spacing: int = 8
     font_family: str = FONT_FAMILY
 
@@ -39,12 +42,12 @@ class ThemeTokens:
 DARK = ThemeTokens(
     name="dark", window="#16181d", surface="#1d2026", surface_raised="#262a32", border="#343944",
     text="#e7e9ee", text_muted="#9aa1ae", accent="#5b9dff", accent_hover="#7ab0ff", accent_text="#0c1220",
-    selection="#2c4470", hover="#2b303a", danger="#ff6b6b",
+    selection="#2c4470", hover="#2b303a", danger="#ff6b6b", success="#3fb950", warning="#e3b341",
 )
 LIGHT = ThemeTokens(
     name="light", window="#f4f5f8", surface="#ffffff", surface_raised="#eceef3", border="#d3d7df",
     text="#1c2029", text_muted="#5f6775", accent="#2563eb", accent_hover="#1d4fd0", accent_text="#ffffff",
-    selection="#d4e2ff", hover="#e6e9f0", danger="#c62828",
+    selection="#d4e2ff", hover="#e6e9f0", danger="#c62828", success="#1a7f37", warning="#9a6700",
 )
 THEMES: Dict[str, ThemeTokens] = {DARK.name: DARK, LIGHT.name: LIGHT}
 DEFAULT_THEME = DARK.name
@@ -58,6 +61,22 @@ def theme_named(name: str) -> ThemeTokens:
 def font_rule(point_size: int) -> str:
     """Style sheet rule setting the text size everywhere."""
     return f"* {{ font-size: {int(point_size)}pt; }}"
+
+
+def type_scale_rules(point_size: int) -> str:
+    """Rules sizing page titles, section titles and hints relative to the body text size.
+
+    A ``QLabel[role=...]`` selector outranks the ``*`` of :func:`font_rule`, so
+    these win whatever order the two are in.
+    """
+    size = int(point_size)
+    return "\n".join((
+        f'QLabel[role="pageTitle"] {{ font-size: {size + 6}pt; }}',
+        f'QLabel[role="sectionTitle"], QGroupBox {{ font-size: {size + 1}pt; }}',
+        f'QLabel[role="emptyMessage"] {{ font-size: {size + 2}pt; }}',
+        f'QLabel[role="hint"], QLabel[role="pageSubtitle"] {{ font-size: {max(size - 1, 8)}pt; }}',
+        f'#NavigationBrand {{ font-size: {size + 3}pt; }}',
+    ))
 
 
 _TEMPLATE = """
@@ -77,6 +96,8 @@ QMenu::item:disabled {{ color: {text_muted}; }}
 QMenu::separator {{ height: 1px; background: {border}; margin: {half}px {spacing}px; }}
 
 QTabWidget::pane {{ border: 1px solid {border}; border-radius: {radius}px; background-color: {surface}; top: -1px; }}
+QTabWidget#WorkspaceTabs::pane {{ border: 0; border-top: 1px solid {border}; border-radius: 0;
+    background-color: {window}; }}
 QTabBar {{ background: transparent; qproperty-drawBase: 0; }}
 QTabBar::tab {{ background: transparent; color: {text_muted}; padding: {spacing}px {wide}px;
     border: 1px solid transparent; border-top-left-radius: {radius}px; border-top-right-radius: {radius}px;
@@ -113,9 +134,25 @@ QHeaderView::section {{ background-color: {surface_raised}; color: {text_muted};
     border-bottom: 1px solid {border}; padding: {half}px {spacing}px; }}
 QTableCornerButton::section {{ background-color: {surface_raised}; border: 0; }}
 
-QGroupBox {{ border: 1px solid {border}; border-radius: {radius}px; margin-top: {wide}px;
-    padding: {spacing}px; background-color: transparent; }}
-QGroupBox::title {{ subcontrol-origin: margin; left: {spacing}px; padding: 0 {half}px; color: {text_muted}; }}
+QGroupBox {{ border: 1px solid {border}; border-radius: {radius_large}px; margin-top: 0;
+    padding: 2.3em {spacing}px {spacing}px {spacing}px; background-color: {surface}; font-weight: 600; }}
+QGroupBox[collapsed="true"] {{ padding-bottom: 0; }}
+QGroupBox::title {{ subcontrol-origin: padding; subcontrol-position: top left; left: {wide}px; top: {spacing}px;
+    padding: 0; color: {text}; background: transparent; }}
+QGroupBox QLabel, QGroupBox QCheckBox, QGroupBox QRadioButton, QGroupBox QPushButton,
+QGroupBox QLineEdit, QGroupBox QComboBox, QGroupBox QAbstractItemView {{ font-weight: normal; }}
+QFrame[role="card"] {{ background-color: {surface}; border: 1px solid {border}; border-radius: {radius_large}px; }}
+QWidget[role="bare"] {{ background: transparent; }}
+QLabel[role="pageTitle"] {{ font-weight: 600; color: {text}; }}
+QLabel[role="pageSubtitle"], QLabel[role="hint"] {{ color: {text_muted}; }}
+QLabel[role="sectionTitle"] {{ font-weight: 600; color: {text}; }}
+QLabel[role="emptyMessage"] {{ color: {text_muted}; }}
+QLabel[role="danger"] {{ color: {danger}; }}
+QLabel[role="success"] {{ color: {success}; }}
+QLabel[role="warning"] {{ color: {warning}; }}
+QLabel[role="accent"] {{ color: {accent}; }}
+QPushButton[role="primary"] {{ background-color: {accent}; color: {accent_text}; border-color: {accent}; }}
+QPushButton[role="primary"]:hover {{ background-color: {accent_hover}; }}
 
 QScrollBar:vertical {{ background: transparent; width: 10px; margin: 0; }}
 QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 0; }}
@@ -127,14 +164,27 @@ QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
 QSplitter::handle {{ background-color: {border}; }}
 QSplitter::handle:horizontal {{ width: 1px; }}
 QSplitter::handle:vertical {{ height: 1px; }}
+QSplitter[role="cards"]::handle {{ background-color: transparent; border-radius: {small}px; }}
+QSplitter[role="cards"]::handle:horizontal {{ width: 12px; }}
+QSplitter[role="cards"]::handle:vertical {{ height: 12px; }}
+QSplitter[role="cards"]::handle:hover {{ background-color: {hover}; }}
 QProgressBar {{ background-color: {surface_raised}; border: 0; border-radius: {small}px; text-align: center; }}
 QProgressBar::chunk {{ background-color: {accent}; border-radius: {small}px; }}
 QStatusBar {{ background-color: {window}; border-top: 1px solid {border}; color: {text_muted}; }}
 
 #NavigationPanel {{ background-color: {surface}; border-right: 1px solid {border}; }}
 #NavigationPanel QTreeWidget {{ background-color: {surface}; border: 0; border-radius: 0; }}
+#NavigationPanel QTreeWidget::item {{ padding: {half}px {spacing}px; margin: 1px 0; }}
+#NavigationPanel QTreeWidget::item:selected {{ background-color: {selection}; color: {text}; }}
 #NavigationPanel QLineEdit {{ background-color: {window}; }}
+#NavigationBrand {{ font-weight: 600; color: {text}; padding: {half}px {small}px {spacing}px {small}px; }}
 #NavigationEmpty {{ color: {text_muted}; padding: {wide}px; }}
+#NavigationRail {{ background-color: {surface}; border-right: 1px solid {border}; }}
+#NavigationRail QToolButton {{ background: transparent; border: 0; border-radius: {radius}px; padding: {half}px; }}
+#NavigationRail QToolButton:hover {{ background-color: {hover}; }}
+#NavigationRail QToolButton:checked {{ background-color: {selection}; }}
+#NavigationOverlay, #DetailsOverlay {{ background-color: {surface}; border: 1px solid {border}; }}
+#ExecutionDetails {{ background-color: {surface}; border: 0; border-left: 1px solid {border}; }}
 """
 
 
@@ -168,16 +218,30 @@ def apply_theme(window: Any, tokens: ThemeTokens, point_size: Optional[int] = No
     ``point_size`` appends :func:`font_rule`, so the size is set on top of the
     theme instead of replacing it.
     """
+    from je_auto_control.gui._arrow_icons import arrow_rules
     from je_auto_control.gui._tab_close_icon import close_button_rules
-    sheet = build_stylesheet(tokens)
-    close_rules = close_button_rules(tokens)
-    if close_rules:
-        sheet = f"{sheet}\n{close_rules}"
-    window.setPalette(_palette(tokens))
-    window.setStyleSheet(sheet if point_size is None else f"{sheet}\n{font_rule(point_size)}")
+    sheet = "\n".join(part for part in (build_stylesheet(tokens), close_button_rules(tokens), arrow_rules(tokens))
+                      if part)
+    palette = _palette(tokens)
+    window.setPalette(palette)
+    # A widget a style sheet styles starts from the *application* palette, not
+    # its window's: on Windows that palette carries the system accent colour,
+    # so check boxes were drawn in the user's accent instead of the theme's.
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    if isinstance(app, QApplication) and window.isWindow():
+        app.setPalette(palette)
+    window.setStyleSheet(sheet if point_size is None
+                         else f"{sheet}\n{font_rule(point_size)}\n{type_scale_rules(point_size)}")
     return sheet
 
 
 def prepare_application(app: Any) -> None:
-    """Give ``app`` the Fusion style, which follows the palette on every platform."""
-    app.setStyle("Fusion")
+    """Give ``app`` the Fusion style, which follows the palette on every platform.
+
+    Fusion's own check box and radio button outlines all but vanish on the dark
+    theme, so those two are drawn by
+    :class:`~je_auto_control.gui.adaptive.style.AdaptiveStyle` instead.
+    """
+    from je_auto_control.gui.adaptive.style import AdaptiveStyle
+    app.setStyle(AdaptiveStyle("Fusion"))

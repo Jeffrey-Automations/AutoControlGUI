@@ -11,10 +11,11 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
+from je_auto_control.gui.adaptive_window import AdaptiveWindowLayout
 from je_auto_control.gui.main_widget import AutoControlGUIWidget
 from je_auto_control.gui.navigation import NavigationPanel
 from je_auto_control.gui.theme import (
-    THEMES, apply_theme, font_rule, prepare_application, theme_named,
+    THEMES, apply_theme, font_rule, prepare_application, theme_named, type_scale_rules,
 )
 from je_auto_control.gui.workspace_settings import WorkspacePreferences, default_settings
 from je_auto_control.utils.config_sync.contract import ConfigSyncError
@@ -75,9 +76,8 @@ class AutoControlGUIUI(QMainWindow):
 
         self.auto_control_gui_widget = AutoControlGUIWidget(parent=self)
         self.setCentralWidget(self.auto_control_gui_widget)
-        self._build_navigation()
+        self._build_navigation(preferences.navigation_visible)
         self.resizeDocks([self._navigation_dock], [preferences.navigation_width], Qt.Orientation.Horizontal)
-        self._navigation_dock.setVisible(preferences.navigation_visible)
         self._navigation_dock.installEventFilter(self)
 
         self._view_menu: QMenu | None = None
@@ -102,7 +102,8 @@ class AutoControlGUIUI(QMainWindow):
         if event.isAccepted():
             for key, value in (
                 ("theme", self._theme_name), ("font_pt", self._user_font_pt),
-                ("navigation_visible", not self._navigation_dock.isHidden()),
+                # The preference, not the dock: a narrow window hides the dock without the user asking.
+                ("navigation_visible", self._adaptive.navigation_preferred),
                 ("navigation_width", self._navigation_width),
             ):
                 self._settings.setValue(f"workspace/{key}", value)
@@ -117,19 +118,26 @@ class AutoControlGUIUI(QMainWindow):
 
     # --- navigation ----------------------------------------------------------
 
-    def _build_navigation(self) -> None:
-        """Dock the searchable feature list on the left of the workspace."""
+    def _build_navigation(self, navigation_preferred: bool) -> None:
+        """Dock the searchable feature list on the left; narrow windows get a rail and a drawer instead."""
         self.navigation = NavigationPanel(self)
         self.navigation.feature_activated.connect(self.auto_control_gui_widget.activate_tab)
         self._navigation_dock = QDockWidget(self)
         self._navigation_dock.setObjectName("NavigationDock")
-        # Closable enables Qt's toggleViewAction (including Ctrl+B). The empty
-        # title bar still keeps the navigation panel fixed and button-free.
+        # The empty title bar keeps the navigation panel fixed and button-free;
+        # showing and hiding it belongs to the adaptive layout, so Qt's own
+        # toggle (offered in the dock area's context menu) is hidden.
         self._navigation_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
         self._navigation_dock.setTitleBarWidget(QWidget(self._navigation_dock))
         self._navigation_dock.setWidget(self.navigation)
+        self._navigation_dock.toggleViewAction().setVisible(False)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self._navigation_dock)
         self.resizeDocks([self._navigation_dock], [260], Qt.Orientation.Horizontal)
+        self._navigation_dock.setVisible(navigation_preferred)
+        self._adaptive = AdaptiveWindowLayout(self, self._navigation_dock, self.auto_control_gui_widget,
+                                              lambda: NavigationPanel(), navigation_preferred=navigation_preferred)
+        self._adaptive.panel.feature_activated.connect(self.auto_control_gui_widget.activate_tab)
+        self._adaptive.set_glyph_colour(theme_named(self._theme_name).text)
         # Owned by the window, not by a menu: the menu bar is rebuilt on every
         # language switch, and a shortcut on a per-menu action would be
         # registered once more each time.
@@ -137,8 +145,12 @@ class AutoControlGUIUI(QMainWindow):
         self._search_action.setShortcut(QKeySequence("Ctrl+K"))
         self._search_action.triggered.connect(self._focus_feature_search)
         self.addAction(self._search_action)
-        self._sidebar_action = self._navigation_dock.toggleViewAction()
+        self._sidebar_action = QAction(self)
+        self._sidebar_action.setCheckable(True)
+        self._sidebar_action.setChecked(self._adaptive.navigation_shown())
         self._sidebar_action.setShortcut(QKeySequence("Ctrl+B"))
+        self._sidebar_action.triggered.connect(self._adaptive.toggle_navigation)
+        self._adaptive.navigation_shown_changed.connect(self._sidebar_action.setChecked)
         self.addAction(self._sidebar_action)
         self._details_action = QAction(self)
         self._details_action.setCheckable(True)
@@ -149,14 +161,13 @@ class AutoControlGUIUI(QMainWindow):
         self._refresh_navigation()
 
     def _refresh_navigation(self) -> None:
-        self.navigation.set_entries(
-            self.auto_control_gui_widget.list_registered_tabs(), _TAB_CATEGORIES,
-        )
+        entries = self.auto_control_gui_widget.list_registered_tabs()
+        for panel in (self.navigation, self._adaptive.panel):
+            panel.set_entries(entries, _TAB_CATEGORIES)
 
     def _focus_feature_search(self) -> None:
-        """Show the navigation panel and put the cursor in its search box (Ctrl+K)."""
-        self._navigation_dock.setVisible(True)
-        self.navigation.focus_search()
+        """Show the feature list (docked, or as a drawer when narrow) and focus its search box (Ctrl+K)."""
+        self._adaptive.reveal_search()
 
     # --- menu construction ---------------------------------------------------
 
@@ -244,6 +255,7 @@ class AutoControlGUIUI(QMainWindow):
         self._theme_name = tokens.name
         self._theme_stylesheet = apply_theme(self, tokens)
         self._apply_font_pt(self._user_font_pt)
+        self._adaptive.set_glyph_colour(tokens.text)
 
     def apply_workspace_preferences(self, values: dict[str, object]) -> None:
         """Explicitly apply all four canonical preferences on the GUI thread; persist through normal window close."""
@@ -255,7 +267,7 @@ class AutoControlGUIUI(QMainWindow):
         self.set_theme(cast(str, values['theme']))
         self.resizeDocks([self._navigation_dock], [cast(int, values['navigation_width'])], Qt.Orientation.Horizontal)
         self._navigation_width = cast(int, values['navigation_width'])
-        self._navigation_dock.setVisible(cast(bool, values['navigation_visible']))
+        self._adaptive.set_navigation_preferred(cast(bool, values['navigation_visible']))
         for action in self.findChildren(QAction):
             data = action.data()
             if not action.isCheckable():
@@ -337,7 +349,7 @@ class AutoControlGUIUI(QMainWindow):
         the theme's; only the size is set here.
         """
         effective = pt if pt > 0 else self._detect_auto_font_pt()
-        self.setStyleSheet(f"{self._theme_stylesheet}\n{font_rule(effective)}")
+        self.setStyleSheet(f"{self._theme_stylesheet}\n{font_rule(effective)}\n{type_scale_rules(effective)}")
 
     def _on_text_size_selected(self) -> None:
         action = self.sender()
@@ -412,6 +424,7 @@ class AutoControlGUIUI(QMainWindow):
         self.setWindowTitle(_t("application_name", "AutoControlGUI"))
         self.auto_control_gui_widget.retranslate()
         self.navigation.retranslate()
+        self._adaptive.retranslate()
         self._refresh_navigation()
         self._build_menu_bar()
 

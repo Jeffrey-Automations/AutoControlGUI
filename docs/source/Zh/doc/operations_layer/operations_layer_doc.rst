@@ -179,7 +179,7 @@ token 控制項。Python 伺服器的 ``token`` 屬性仍保留設定的共用 t
   結果掛鉤回報給 Script Builder，值則以路徑標示（``步驟 2 › Loop 第 3 次，步驟 1 ·
   User: Rotate Token · alice · token``）。一次執行最多保留 200 個值——保留最先
   產生的；超過時結果面板會註明。被停止或失敗的執行，仍可看到在那之前已經產生的值。
-  掛鉤只跟著執行本身的執行緒，所以 ``AC_parallel`` 分支裡的指令改由區塊的結果取得。
+  掛鉤也會跟到 ``AC_parallel`` 的分支，所以分支產生的 token 只會出現一次，並以分支標示。
   結果面板會遮蔽每個指令結果中、任何深度、名稱屬於機密的欄位（``token``、
   ``password``、``api_key``…）——``AC_lease_secret``／``AC_lease_active`` 的租約
   token、``AC_rest_api_start``／``AC_rest_api_status`` 回傳的共用 bearer token——
@@ -382,11 +382,18 @@ Headless::
 ``ok: false`` 附上錯誤回報；否則 ``ok`` 只代表主機有回應，動作失敗記在
 ``result`` 裡。DAG runner 的遠端節點與 Admin Console 分頁都會傳這個參數。
 
+每一列也以 ``sent`` 標明動作是否送到該主機。主機一次送 ``max_parallel`` 台；傳入
+``stop_event``\ （``threading.Event``）或在取消範圍內呼叫即可停止廣播：設定後尚未送出的主機
+會略過，該列為 ``sent: false``、``error`` 為 ``NOT_SENT_STOPPED``；已在傳送中的主機會執行完並回報結果。
+未知的標籤同樣是 ``sent: false``。
+
 持久化：主機儲存在 ``~/.je_auto_control/admin_hosts.json``\ （POSIX 上
 模式 0600）。建構時自動 reload。
 
 健康探測使用 ``/sessions``（已認證的端點），所以 token 錯誤的主機會
-顯示為 ``HTTP 401`` 不健康狀態，而非誤導性的「可達但無用」。
+顯示為 ``HTTP 401`` 不健康狀態，而非誤導性的「可達但無用」。``poll_all`` 與
+``fetch_thumbnails`` 也會遵守呼叫端的取消範圍：取消後尚未探測的主機會略過，
+已送出的請求回來後丟出 ``CancelledError``。
 
 Executor 指令::
 
@@ -394,7 +401,9 @@ Executor 指令::
    AC_admin_poll, AC_admin_broadcast_execute
 
 GUI：*Admin Console* 分頁 — 註冊主機表單、含健康/延遲/任務數欄位的
-主機表、廣播文字框。
+主機表、廣播文字框。\ **停止廣播**\ 會略過尚未送出的主機；結果仍列出每台主機，
+下方一行顯示「已送往 n／m 台主機；k 台未送出。」\ **停止輪詢**\ 會讓進行中的健康輪詢或縮圖更新
+停在正在處理的主機；兩者各有 60 秒期限，關閉分頁也會同樣結束它們。
 
 
 稽核紀錄雜湊鏈
@@ -485,6 +494,9 @@ pyusb 不存在則退回平台特定指令。
 - macOS：``system_profiler -json SPUSBDataType``\ （遞迴走訪）
 - Linux：``/sys/bus/usb/devices``\ （讀取 sysfs）
 
+命令列工具有 10 秒期限（``SUBPROCESS_TIMEOUT_S``），失敗或逾時會放在 ``result.error``。
+在取消範圍內呼叫時，取消會結束該工具的行程並拋出 ``CancelledError``。
+
 Headless::
 
    from je_auto_control.utils.usb import list_usb_devices
@@ -503,7 +515,7 @@ Executor 指令::
    AC_list_usb_devices
 
 GUI：*USB Devices* 分頁 — 後端標籤、裝置表格（VID/PID/廠商/產品/
-序號/位置）、重新整理按鈕。
+序號/位置）、重新整理按鈕。列舉在 GUI 執行緒之外執行；關閉分頁會結束仍在執行的列舉。
 
 Phase 2（真正的 USB passthrough）分階段發布 — 協定與 backend ABC 見
 :doc:`usb_passthrough_design`\ ，端到端使用方式見

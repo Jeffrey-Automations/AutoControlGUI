@@ -376,7 +376,10 @@ What is *not* shipped yet
   right, list the shared devices over the in-process channel and *Open*
   one (a descriptor read proves the full stack). The *USB Browser* tab's
   *Open* button now also works against a **localhost** target via the
-  same loopback path. Sharing lasts as long as the panel: when the window
+  same loopback path. Its *Fetch* and *Open* run one at a time, with
+  **Stop run** in the Actions menu and a 30 s deadline; the answer to a
+  stopped or timed-out request, or one left by a closed tab, is dropped.
+  Sharing lasts as long as the panel: when the window
   holding it is destroyed, its loopback and hotplug watcher close and the
   feature flag it turned on goes back off.
 - Cross-machine is fully wired: the WebRTC host creates a ``usb``
@@ -386,6 +389,9 @@ What is *not* shipped yet
   (WebRTC)* and the List / Open buttons run against the live WebRTC
   viewer's host (via ``registry.webrtc_usb_client()``); pick *Local
   (loopback)* for same-machine use. You can also drive it from Python.
+  The panel's List, Open and remote REST fetch run one at a time, with
+  **Stop run** in the Actions menu and a 30 s deadline, so a peer that
+  stops answering no longer holds the panel; a late answer is dropped.
 - Windows WinUSB and macOS IOKit transfer paths are written but not yet
   validated against real hardware. Do not use in production until the
   Phase 2e hardware test matrix passes.

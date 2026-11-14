@@ -1126,8 +1126,9 @@ def ios_tools() -> List[MCPTool]:
         ),
         MCPTool(
             name="ac_ios_swipe",
-            description=("Swipe from (x1, y1) to (x2, y2) over "
-                         "duration_s seconds."),
+            description=("Swipe from (x1, y1) to (x2, y2). WebDriverAgent "
+                         "sets the travel speed; duration_s is accepted "
+                         "and has no effect."),
             input_schema=schema({
                 "x1": {"type": "integer"},
                 "y1": {"type": "integer"},

@@ -7,13 +7,15 @@ from typing import Any, Callable, Optional
 from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QImage
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QGroupBox, QHBoxLayout, QLabel,
+    QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
     QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui.remote_desktop._helpers import (
     _CollapsibleSection, _StatusBadge, _t,
@@ -79,9 +81,10 @@ class _HostPanel(TranslatableMixin, QWidget):
         self._host_id_label = QLabel("---")
         self._host_id_label.setStyleSheet(
             "font-family: 'Consolas', 'Menlo', 'Courier New', monospace; "
-            "font-size: 26pt; font-weight: bold; color: #2070d0; "
+            "font-size: 26pt; font-weight: bold; "
             "letter-spacing: 2px;"
         )
+        set_role(self._host_id_label, "accent")
         self._badge = _StatusBadge()
         self._token = QLineEdit()
         self._bind = QLineEdit("127.0.0.1")
@@ -147,95 +150,17 @@ class _HostPanel(TranslatableMixin, QWidget):
 
     def _build_layout(self) -> None:
         root = QVBoxLayout(self)
+        root.setSpacing(12)
 
         warning = QLabel()
         warning.setWordWrap(True)
-        warning.setStyleSheet(
-            "color: #cc7000; padding: 6px; border: 1px solid #cc7000; "
-            "border-radius: 4px;"
-        )
+        set_role(warning, "warning")
         self._tr(warning, "rd_host_security_warning")
         root.addWidget(warning)
 
-        # === Connection card — the focal point ===
-        card = self._tr(QGroupBox(), "rd_host_card_group")
-        card.setStyleSheet("QGroupBox { font-weight: bold; }")
-        card_layout = QVBoxLayout()
-
-        id_row = QHBoxLayout()
-        id_row.addWidget(self._tr(QLabel(), "rd_host_id_label"))
-        id_row.addWidget(self._host_id_label, stretch=1)
-        id_row.addWidget(self._badge)
-        card_layout.addLayout(id_row)
-
-        token_row = QHBoxLayout()
-        token_row.addWidget(self._tr(QLabel(), "rd_token_label"))
-        token_row.addWidget(self._token, stretch=1)
-        gen_btn = self._tr(QPushButton(), "rd_token_generate")
-        gen_btn.clicked.connect(self._generate_token)
-        token_row.addWidget(gen_btn)
-        card_layout.addLayout(token_row)
-
-        copy_row = QHBoxLayout()
-        self._copy_id_btn = self._tr(QPushButton(), "rd_host_id_copy")
-        self._copy_id_btn.clicked.connect(self._copy_host_id)
-        self._copy_share_btn = self._tr(QPushButton(), "rd_host_copy_share")
-        self._copy_share_btn.clicked.connect(self._copy_share_text)
-        copy_row.addWidget(self._copy_id_btn)
-        copy_row.addWidget(self._copy_share_btn)
-        copy_row.addStretch()
-        card_layout.addLayout(copy_row)
-
-        card.setLayout(card_layout)
-        root.addWidget(card)
-
-        # === Basic connection settings ===
-        basics = self._tr(QGroupBox(), "rd_host_basics_group")
-        basics_layout = QVBoxLayout()
-        bind_row = QHBoxLayout()
-        bind_row.addWidget(self._tr(QLabel(), "rd_bind_label"))
-        bind_row.addWidget(self._bind, stretch=1)
-        bind_row.addWidget(self._tr(QLabel(), "rd_port_label"))
-        bind_row.addWidget(self._port)
-        bind_row.addWidget(self._tr(QLabel(), "rd_transport_label"))
-        bind_row.addWidget(self._transport)
-        basics_layout.addLayout(bind_row)
-        basics.setLayout(basics_layout)
-        root.addWidget(basics)
-
-        # === Advanced (collapsible) ===
-        advanced = _CollapsibleSection()
-        self._tr(advanced, "rd_advanced_group", setter="setTitle")
-        adv_layout = QVBoxLayout()
-
-        tls_row = QHBoxLayout()
-        tls_row.addWidget(self._tr(QLabel(), "rd_tls_cert_label"))
-        tls_row.addWidget(self._tls_cert, stretch=2)
-        cert_browse = self._tr(QPushButton(), "rd_browse")
-        cert_browse.clicked.connect(self._browse_cert)
-        tls_row.addWidget(cert_browse)
-        adv_layout.addLayout(tls_row)
-
-        key_row = QHBoxLayout()
-        key_row.addWidget(self._tr(QLabel(), "rd_tls_key_label"))
-        key_row.addWidget(self._tls_key, stretch=2)
-        key_browse = self._tr(QPushButton(), "rd_browse")
-        key_browse.clicked.connect(self._browse_key)
-        key_row.addWidget(key_browse)
-        adv_layout.addLayout(key_row)
-
-        media_row = QHBoxLayout()
-        media_row.addWidget(self._tr(QLabel(), "rd_fps_label"))
-        media_row.addWidget(self._fps)
-        media_row.addWidget(self._tr(QLabel(), "rd_quality_label"))
-        media_row.addWidget(self._quality)
-        media_row.addStretch()
-        adv_layout.addLayout(media_row)
-
-        adv_layout.addWidget(self._tr(self._enable_audio, "rd_enable_audio"))
-
-        advanced.set_body_layout(adv_layout)
-        root.addWidget(advanced)
+        root.addWidget(self._build_card())
+        root.addWidget(self._build_basics())
+        root.addWidget(self._build_advanced())
 
         # === Primary action row ===
         btn_row = QHBoxLayout()
@@ -253,8 +178,66 @@ class _HostPanel(TranslatableMixin, QWidget):
         root.addLayout(btn_row)
 
         # === Preview ===
-        root.addWidget(self._tr(QLabel(), "rd_host_preview_label"))
-        root.addWidget(self._preview, stretch=1)
+        preview = Card("rd_host_preview_label")
+        preview.add(self._preview, stretch=1)
+        root.addWidget(preview, stretch=1)
+
+    def _build_card(self) -> QGroupBox:
+        """The connection card — the focal point: Host ID, token and the copy buttons."""
+        card = self._tr(QGroupBox(), "rd_host_card_group")
+        card.setStyleSheet("QGroupBox { font-weight: bold; }")
+        card_layout = QVBoxLayout()
+        form = QFormLayout()
+        id_row = QHBoxLayout()
+        id_row.addWidget(self._host_id_label, stretch=1)
+        id_row.addWidget(self._badge)
+        form.addRow(self._tr(QLabel(), "rd_host_id_label"), id_row)
+        token_row = QHBoxLayout()
+        token_row.addWidget(self._token, stretch=1)
+        gen_btn = self._tr(QPushButton(), "rd_token_generate")
+        gen_btn.clicked.connect(self._generate_token)
+        token_row.addWidget(gen_btn)
+        form.addRow(self._tr(QLabel(), "rd_token_label"), token_row)
+        card_layout.addLayout(form)
+
+        self._copy_id_btn = self._tr(QPushButton(), "rd_host_id_copy")
+        self._copy_id_btn.clicked.connect(self._copy_host_id)
+        self._copy_share_btn = self._tr(QPushButton(), "rd_host_copy_share")
+        self._copy_share_btn.clicked.connect(self._copy_share_text)
+        card_layout.addLayout(flow_of(self._copy_id_btn, self._copy_share_btn))
+        card.setLayout(card_layout)
+        return card
+
+    def _build_basics(self) -> QGroupBox:
+        """Basic connection settings: bind address, port and transport, wrapping when narrow."""
+        basics = self._tr(QGroupBox(), "rd_host_basics_group")
+        basics_layout = QVBoxLayout()
+        basics_layout.addLayout(flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
+            ("rd_bind_label", self._bind), ("rd_port_label", self._port),
+            ("rd_transport_label", self._transport)))))
+        basics.setLayout(basics_layout)
+        return basics
+
+    def _build_advanced(self) -> _CollapsibleSection:
+        """The collapsible TLS / media / audio section."""
+        advanced = _CollapsibleSection()
+        self._tr(advanced, "rd_advanced_group", setter="setTitle")
+        adv_layout = QVBoxLayout()
+        form = QFormLayout()
+        for label_key, field, slot in (("rd_tls_cert_label", self._tls_cert, self._browse_cert),
+                                       ("rd_tls_key_label", self._tls_key, self._browse_key)):
+            row = QHBoxLayout()
+            row.addWidget(field, stretch=1)
+            browse = self._tr(QPushButton(), "rd_browse")
+            browse.clicked.connect(slot)
+            row.addWidget(browse)
+            form.addRow(self._tr(QLabel(), label_key), row)
+        adv_layout.addLayout(form)
+        adv_layout.addLayout(flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
+            ("rd_fps_label", self._fps), ("rd_quality_label", self._quality)))))
+        adv_layout.addWidget(self._tr(self._enable_audio, "rd_enable_audio"))
+        advanced.set_body_layout(adv_layout)
+        return advanced
 
     def _generate_token(self) -> None:
         self._token.setText(secrets.token_urlsafe(24))

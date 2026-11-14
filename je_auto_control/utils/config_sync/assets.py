@@ -8,6 +8,7 @@ from hashlib import sha256
 from itertools import islice
 import os
 from pathlib import Path
+import sys
 from tempfile import TemporaryDirectory
 from typing import BinaryIO, Callable, ContextManager, Iterable, Iterator, Optional, Protocol
 
@@ -20,6 +21,8 @@ from je_auto_control.utils.exception.control_signals import raise_caused_run_int
 
 _CHUNK_BYTES = 64 * 1024
 _MANIFEST = 'manifest.json'
+#: MAX_PATH (260) less the terminating NUL: what Windows creates without long-path support.
+_WINDOWS_MAX_PATH = 259
 _Cancelled = Optional[Callable[[], bool]]
 
 
@@ -103,6 +106,7 @@ def _sync_assets(manifest: AssetManifest, transport: AssetTransport, *,
         raise ConfigSyncError('asset transfer requires a validated manifest')
     root = Path(transport.target_root).resolve()
     destination = root / ('generation-' + manifest.digest)
+    _require_paths_fit(destination, manifest)
     try:
         if destination.exists() or destination.is_symlink():
             return _verified_result(destination, manifest, True, cancelled)
@@ -129,6 +133,37 @@ def _sync_assets(manifest: AssetManifest, transport: AssetTransport, *,
         if isinstance(error, ConfigSyncError):
             raise
         raise ConfigSyncError('asset transfer could not publish a complete generation') from error
+
+
+def _path_limit() -> Optional[int]:
+    """The longest path this host can create, or ``None`` when it has no such limit."""
+    if sys.platform != 'win32':
+        return None
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\FileSystem') as key:
+            enabled, _kind = winreg.QueryValueEx(key, 'LongPathsEnabled')
+    except OSError:
+        return _WINDOWS_MAX_PATH
+    return None if enabled == 1 else _WINDOWS_MAX_PATH
+
+
+def _require_paths_fit(destination: Path, manifest: AssetManifest) -> None:
+    """Refuse up front a generation whose files the host could not create.
+
+    Without this, Windows without long-path support failed the first file past
+    MAX_PATH with ``FileNotFoundError``, reported only as an incomplete generation.
+    The published paths are the longest: ``generation-<digest>`` is longer than
+    the ``.incoming-*`` staging directory.
+    """
+    limit = _path_limit()
+    if limit is None or not manifest.files:
+        return
+    longest = max(len(str(destination / 'files' / asset.path)) for asset in manifest.files)
+    if longest > limit:
+        raise ConfigSyncError(
+            f'asset cache paths would reach {longest} characters, over the {limit} this Windows host '
+            'allows; move the sync cache to a shorter directory or enable LongPathsEnabled')
 
 
 @contextmanager

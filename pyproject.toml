@@ -110,7 +110,7 @@ find = { namespaces = false }
 ]
 
 [project.optional-dependencies]
-gui = ["PySide6==6.12.0"]
+gui = ["PySide6==6.11.2"]
 webrtc = ["aiortc>=1.14.0", "av>=14.0.0"]
 signaling = ["fastapi>=0.115", "starlette>=1.0.1", "uvicorn>=0.32"]
 discovery = ["zeroconf>=0.149.16"]
@@ -368,6 +368,7 @@ module = [
     "je_auto_control.gui.mobile_tab",
     "je_auto_control.gui.navigation",
     "je_auto_control.gui.workspace_details",
+    "je_auto_control.gui._task_details",
     "je_auto_control.gui.remote_desktop.webrtc_panel_state",
     "je_auto_control.gui.remote_desktop.view_lifetime",
     "je_auto_control.gui.remote_desktop.view_approvals",
@@ -430,6 +431,8 @@ module = [
     "je_auto_control.utils.mcp_server.tools._handlers_vision_executor",
     "je_auto_control.utils.mcp_server._argument_policy",
     "je_auto_control.utils.mcp_server._authz",
+    "je_auto_control.utils.mcp_server._call_run",
+    "je_auto_control.utils.mcp_server._tool_calls",
     "je_auto_control.utils.mcp_server._http_origin",
     "je_auto_control.utils.mcp_server._http_responses",
     "je_auto_control.utils.mcp_server.disclosure",
@@ -469,6 +472,10 @@ module = [
     "je_auto_control.utils.accessibility.backends.windows_automation",
     "je_auto_control.utils.accessibility.backends.windows_events",
     "je_auto_control.utils.remote_desktop.input_send_queue",
+    "je_auto_control.gui.adaptive",
+    "je_auto_control.gui.adaptive.*",
+    "je_auto_control.gui.adaptive_window",
+    "je_auto_control.gui._arrow_icons",
     "je_auto_control_pytest",
 ]
 disallow_untyped_defs = true

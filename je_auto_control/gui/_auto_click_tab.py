@@ -6,12 +6,15 @@ from typing import Callable, Optional
 from PySide6.QtCore import QTimer
 
 from PySide6.QtWidgets import (
-    QWidget, QLineEdit, QComboBox, QVBoxLayout, QLabel,
-    QGridLayout, QHBoxLayout, QRadioButton, QButtonGroup, QMessageBox,
+    QWidget, QLineEdit, QComboBox, QVBoxLayout, QLabel, QFormLayout,
+    QHBoxLayout, QRadioButton, QButtonGroup, QMessageBox,
     QGroupBox,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui._tab_task import TabTask, stop_all_script_runs
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
@@ -33,6 +36,20 @@ class _Click:
     x: int
     y: int
     count: int
+
+
+def _form_panel(rows) -> QWidget:
+    """A frameless panel holding ``(label, field)`` form rows; a ``None`` label spans the row."""
+    panel = QWidget()
+    panel.setProperty("role", "bare")
+    form = QFormLayout(panel)
+    form.setContentsMargins(0, 0, 0, 0)
+    for label, field in rows:
+        if label is None:
+            form.addRow(field)
+        else:
+            form.addRow(label, field)
+    return panel
 
 
 def _click(request: _Click) -> None:
@@ -59,64 +76,37 @@ class AutoClickTab(TranslatableMixin, QWidget):
         self._task.error.connect(self._on_error)
         self._task.finished.connect(self._refresh_status)
         outer = QVBoxLayout(self)
-        click_group = self._tr(QGroupBox(), "tab_auto_click")
-        grid = QGridLayout()
-        row = 0
+        outer.setSpacing(12)
+        outer.addWidget(self._build_click_card())
+        # Start/stop, position probe, hotkey, write, and scroll commands all
+        # run from the Actions menu; the tab keeps only their inputs.
+        outer.addWidget(ResponsiveBox(self._build_position_group(), self._build_scroll_group()))
+        outer.addWidget(ResponsiveBox(self._build_hotkey_group(), self._build_write_group()))
+        self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
+        set_role(self.status_label, "hint")
+        outer.addWidget(self.status_label)
+        self._refresh_status()
+        outer.addStretch()
 
-        grid.addWidget(self._tr(QLabel(), "input_method"), row, 0)
+        self.mouse_radio.toggled.connect(self._update_click_mode)
+        self._update_click_mode()
+
+    def _build_click_card(self) -> Card:
+        """The click settings: how and how often on the left, what and where on the right."""
         self.mouse_radio = self._tr(QRadioButton(), "mouse_radio")
         self.keyboard_radio = self._tr(QRadioButton(), "keyboard_radio")
         self.mouse_radio.setChecked(True)
         self._input_group = QButtonGroup(self)
         self._input_group.addButton(self.mouse_radio)
         self._input_group.addButton(self.keyboard_radio)
-        h = QHBoxLayout()
-        h.addWidget(self.mouse_radio)
-        h.addWidget(self.keyboard_radio)
-        grid.addLayout(h, row, 1)
-
-        row += 1
-        grid.addWidget(self._tr(QLabel(), "interval_time"), row, 0)
         self.interval_input = QLineEdit("1000")
         self.interval_input.setValidator(int_validator(1, 999999999))
-        grid.addWidget(self.interval_input, row, 1)
-
-        row += 1
-        grid.addWidget(self._tr(QLabel(), "cursor_x"), row, 0)
-        self.cursor_x_input = QLineEdit()
-        self.cursor_x_input.setValidator(int_validator())
-        grid.addWidget(self.cursor_x_input, row, 1)
-
-        row += 1
-        grid.addWidget(self._tr(QLabel(), "cursor_y"), row, 0)
-        self.cursor_y_input = QLineEdit()
-        self.cursor_y_input.setValidator(int_validator())
-        grid.addWidget(self.cursor_y_input, row, 1)
-
-        row += 1
-        grid.addWidget(self._tr(QLabel(), "mouse_button"), row, 0)
-        self.mouse_button_combo = QComboBox()
-        self.mouse_button_combo.addItems(
-            list(mouse_keys_table.keys()) if isinstance(mouse_keys_table, dict) else list(mouse_keys_table)
-        )
-        grid.addWidget(self.mouse_button_combo, row, 1)
-
-        row += 1
-        grid.addWidget(self._tr(QLabel(), "keyboard_button"), row, 0)
-        self.keyboard_button_combo = QComboBox()
-        self.keyboard_button_combo.addItems(list(get_keyboard_keys_table().keys()))
-        grid.addWidget(self.keyboard_button_combo, row, 1)
-
-        row += 1
-        grid.addWidget(self._tr(QLabel(), "click_type"), row, 0)
         self.click_type_combo = QComboBox()
         self._click_type_keys = ["single_click", "double_click"]
         self.click_type_combo.addItems(
             [self._translate(key) for key in self._click_type_keys]
         )
-        grid.addWidget(self.click_type_combo, row, 1)
-
-        row += 1
         self.repeat_until_stopped = self._tr(
             QRadioButton(), "repeat_until_stopped_radio",
         )
@@ -127,66 +117,71 @@ class AutoClickTab(TranslatableMixin, QWidget):
         rg.addButton(self.repeat_until_stopped)
         rg.addButton(self.repeat_count_times)
         self.repeat_until_stopped.setChecked(True)
-        rh = QHBoxLayout()
-        rh.addWidget(self.repeat_until_stopped)
-        rh.addWidget(self.repeat_count_times)
-        rh.addWidget(self.repeat_count_input)
-        grid.addLayout(rh, row, 0, 1, 2)
+        how = _form_panel((
+            (self._tr(QLabel(), "input_method"), flow_of(self.mouse_radio, self.keyboard_radio)),
+            (self._tr(QLabel(), "interval_time"), self.interval_input),
+            (self._tr(QLabel(), "click_type"), self.click_type_combo),
+            (None, flow_of(self.repeat_until_stopped,
+                           field_pair(self.repeat_count_times, self.repeat_count_input))),
+        ))
+        return Card().add(ResponsiveBox(how, self._build_target_panel()))
 
-        click_group.setLayout(grid)
-        outer.addWidget(click_group)
+    def _build_target_panel(self) -> QWidget:
+        """Cursor position and the mouse or keyboard button to press."""
+        self.cursor_x_input = QLineEdit()
+        self.cursor_x_input.setValidator(int_validator())
+        self.cursor_y_input = QLineEdit()
+        self.cursor_y_input.setValidator(int_validator())
+        self.mouse_button_combo = QComboBox()
+        self.mouse_button_combo.addItems(
+            list(mouse_keys_table.keys()) if isinstance(mouse_keys_table, dict) else list(mouse_keys_table)
+        )
+        self.keyboard_button_combo = QComboBox()
+        self.keyboard_button_combo.addItems(list(get_keyboard_keys_table().keys()))
+        return _form_panel((
+            (self._tr(QLabel(), "cursor_x"), self.cursor_x_input),
+            (self._tr(QLabel(), "cursor_y"), self.cursor_y_input),
+            (self._tr(QLabel(), "mouse_button"), self.mouse_button_combo),
+            (self._tr(QLabel(), "keyboard_button"), self.keyboard_button_combo),
+        ))
 
-        # Start/stop, position probe, hotkey, write, and scroll commands all
-        # run from the Actions menu; the tab keeps only their inputs.
+    def _build_position_group(self) -> QGroupBox:
         pos_group = self._tr(QGroupBox(), "get_position")
-        pos_layout = QHBoxLayout()
+        pos_layout = QHBoxLayout(pos_group)
         self.pos_label = QLabel()
         self._pos_label_suffix = " --"
         self.pos_label.setText(
             self._translate("current_position") + self._pos_label_suffix,
         )
         pos_layout.addWidget(self.pos_label)
-        pos_group.setLayout(pos_layout)
-        outer.addWidget(pos_group)
+        return pos_group
 
+    def _build_hotkey_group(self) -> QGroupBox:
         hotkey_group = self._tr(QGroupBox(), "hotkey_label")
-        hk_layout = QHBoxLayout()
         self.hotkey_input = QLineEdit()
         self.hotkey_input.setPlaceholderText("ctrl,a")
-        hk_layout.addWidget(self.hotkey_input)
-        hotkey_group.setLayout(hk_layout)
-        outer.addWidget(hotkey_group)
+        QHBoxLayout(hotkey_group).addWidget(self.hotkey_input)
+        return hotkey_group
 
+    def _build_write_group(self) -> QGroupBox:
         write_group = self._tr(QGroupBox(), "write_label")
-        wr_layout = QHBoxLayout()
         self.write_input = QLineEdit()
-        wr_layout.addWidget(self.write_input)
-        write_group.setLayout(wr_layout)
-        outer.addWidget(write_group)
+        QHBoxLayout(write_group).addWidget(self.write_input)
+        return write_group
 
+    def _build_scroll_group(self) -> QGroupBox:
         scroll_group = self._tr(QGroupBox(), "mouse_scroll_label")
-        sc_layout = QHBoxLayout()
         self.scroll_value_input = QLineEdit("3")
         self.scroll_value_input.setValidator(int_validator())
-        sc_layout.addWidget(self._tr(QLabel(), "mouse_scroll_label"))
-        sc_layout.addWidget(self.scroll_value_input)
+        row = [field_pair(self._tr(QLabel(), "mouse_scroll_label"), self.scroll_value_input)]
         if special_mouse_keys_table:
             self.scroll_dir_combo: Optional[QComboBox] = QComboBox()
             self.scroll_dir_combo.addItems(list(special_mouse_keys_table.keys()))
-            sc_layout.addWidget(self.scroll_dir_combo)
+            row.append(self.scroll_dir_combo)
         else:
             self.scroll_dir_combo = None
-        scroll_group.setLayout(sc_layout)
-        outer.addWidget(scroll_group)
-
-        self.status_label = QLabel()
-        outer.addWidget(self.status_label)
-        self._refresh_status()
-        outer.addStretch()
-
-        self.mouse_radio.toggled.connect(self._update_click_mode)
-        self._update_click_mode()
-
+        QVBoxLayout(scroll_group).addLayout(flow_of(*row))
+        return scroll_group
 
     def retranslate(self) -> None:
         """Re-translate composite labels and combo items that ``_tr`` can't own."""

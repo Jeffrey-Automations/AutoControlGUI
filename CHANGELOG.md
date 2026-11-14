@@ -2,6 +2,201 @@
 
 ## [Unreleased]
 
+- GUI: every page that runs background work through `TabTask` publishes it to **View →
+  Execution details**: running, stopping, then succeeded, cancelled or error (with the error
+  text, or the timeout message), with reported progress. `TabTask(owner, details=False)` opts
+  out (the Admin Console's thumbnail timer does). New `gui/_task_details.py`;
+  `workspace_details.details_sources()` announces sources created after a view bound to a page,
+  and `WorkspaceShell` rebinds to them.
+
+- GUI internals: the Config Sync tab runs on `TabTask.start_until_stopped`. `ConfigSyncWorker`
+  is no longer a `QObject`: it is called with the stop event and returns its `SyncUIOutcome`;
+  the tab keeps it for `deliver` (`run`, `finished` and the tab's `_handle` are gone; `_task`
+  is the task). No GUI module outside the task controllers calls `start_worker` any more.
+
+- GUI internals: the template candidate panel (Self-Healing) runs on
+  `TabTask.start_until_stopped(..., reports=True)`. `TemplateCandidateWorker` is no longer a
+  `QObject`: it is called with the stop event and a report of `(request_id, count)` and returns
+  its `TemplateCandidateOutcome` (`run`, `finished`, `progress` and the panel's `_handle` /
+  `_worker` are gone; `_task` is the task). A committed acceptance still reports success.
+
+- GUI internals: the journal candidate panel (Script Builder › review from journal) runs on
+  `TabTask.start_until_stopped(..., reports=True)`. `JournalCandidateWorker` is no longer a
+  `QObject`: it is called with the stop event and a report of `(request_id, count)` and returns
+  its `JournalCandidateOutcome` (`run`, `finished`, `progress` and the panel's `_handle` /
+  `_worker` are gone; `_task` is the task). A committed export still reports success.
+
+- GUI internals: `TabTask` relays `progress`; `start_until_stopped(work, reports=True)` calls
+  `work(stop_event, report)`. The journal browser (Run History, Self-Healing) runs on it:
+  `JournalReadWorker` is no longer a `QObject` and is called with the stop event and a report
+  that receives `(request_id, scanned)` (`run`, `finished`, `progress` and the browser's
+  `_handle` / `_worker` are gone; `_task` is the task).
+
+- GUI internals: the self-healing comparison panel runs on `TabTask.start_until_stopped`.
+  `HealingEvaluationWorker` is no longer a `QObject`: it is called with the stop event and
+  returns its `HealingEvaluationOutcome` (`run`, `finished` and the `_handle` / `_worker`
+  attributes are gone; `_task` is the task). Cancel still publishes no partial comparison.
+
+- `AdminConsoleClient.poll_all` and `fetch_thumbnails` observe a bound cancellation scope: once
+  cancelled, hosts not reached yet are skipped and `CancelledError` is raised after the requests
+  already out return. Unscoped calls (`AC_admin_poll`, scripts) are unchanged. GUI: the Admin
+  Console tab's health poll and thumbnail round are cancellable tasks with a 60 s deadline
+  (`POLL_DEADLINE_S`) and **Stop polling** in the Actions menu; `_PollWorker`,
+  `_ThumbnailWorker`, `_poll_thread` and `_thumb_thread` are gone (`_polls`, `_thumbs`).
+
+- GUI internals: the DAG Runner tab runs on `TabTask.start_until_stopped`. `_DagWorker` is no
+  longer a `QObject`: it is built on the GUI thread (keeping that context) and called with the
+  stop event, returning the result instead of emitting `finished` / `failed`. `_thread` and
+  `_stop_event` are gone; `_run` is the task. A failure of any type reaches the status line.
+
+- GUI internals: `TabTask.start_until_stopped(work)` runs `work(stop_event)`; Stop sets the
+  event and the task stays running until the work returns, with its outcome. The Computer Use
+  tab runs on it (`_thread`, `_stop_event` and `_ComputerUseWorker` are gone; `_run` is the
+  task), and a failure of any type now reaches its status line as `Type: message`.
+
+- GUI: the USB passthrough panel's List shared, Open and remote REST fetch run as one
+  cancellable task with a 30 s deadline (`REQUEST_DEADLINE_S`) and **Stop run** in the Actions
+  menu, which also stops a local listing; a late answer is dropped and a second request says
+  *Already running*. `_thread`, `_run_async`, `_fail` and `_fail_remote` are gone; `_requests`
+  is the task.
+
+- GUI: the USB Browser tab's Fetch and Open run as one cancellable task with a 30 s deadline
+  (`REQUEST_DEADLINE_S`) and **Stop run** in the Actions menu; a stopped, timed-out or abandoned
+  request's answer is dropped, and a second request while one runs says *Already running*
+  instead of being ignored. `_fetch_thread` and `_open_thread` are gone; `_requests` is the task.
+
+- `AdminConsoleClient.broadcast_execute` rows carry `sent`: whether the actions went to that
+  host. It takes `stop_event` and observes the caller's cancellation scope: once stopped, hosts
+  not sent to yet are skipped with `sent: false` and `error` `NOT_SENT_STOPPED` (exported from
+  `utils.admin.admin_client`), and a host already being sent to finishes. Unknown labels are
+  `sent: false`; code that compared whole rows sees the new key. GUI: the Admin Console tab has
+  **Stop broadcast** and a line summarising how many hosts were sent to.
+
+- `EmailTriggerWatcher.poll_once` observes a bound cancellation scope between triggers: cancelled,
+  it raises `CancelledError` before the next trigger's server; a trigger already being read
+  finishes. Unscoped calls (`AC_email_trigger_poll_once`, the watcher's own loop) are unchanged.
+  GUI: the Email Triggers tab's Poll Now runs as a cancellable task, which Stop and closing the
+  tab cancel (`_poll_thread` is gone; `_polls` is the task).
+
+- `list_usb_devices` starts its command-line tool (PowerShell `Get-PnpDevice`, `lsusb`,
+  `system_profiler`) through `run_capture_helper`: inside a cancellation scope, cancelling ends
+  the tool's process and raises `CancelledError` instead of waiting out the 10 s timeout. Its
+  output is decoded with `errors="replace"`. Failures and timeouts are still `result.error`.
+  GUI: the USB Devices tab and the USB passthrough panel list devices as cancellable tasks,
+  so closing them ends a listing still running (`_list_thread` is gone; `_listing` is the task).
+
+- `locate_by_description` and `click_by_description` observe a bound cancellation scope:
+  cancelled before the model request, they raise `concurrent.futures.CancelledError` without
+  sending it, and `click_by_description` checks again before it moves the mouse, so an answer
+  that arrives after a stop or a deadline no longer clicks. Calls outside a scope are unchanged.
+  GUI: the AI Locator tab and the LLM Planner's Plan step run as cancellable tasks with a
+  **Stop run** action and a deadline (120 s and 200 s); `LLMPlannerTab._plan_thread` and
+  `VLMTab._vlm_thread` are gone (`_plans` and `_task` are their `TabTask`s).
+
+- GUI: drop-down lists and spin boxes draw theme-coloured chevrons, inset from the rounded
+  border, and spin boxes inset their digits like every other field. The chevrons are drawn
+  once per theme colour into `~/.je_auto_control/gui_cache/`, next to the tab close cross;
+  when that folder cannot be written the controls keep the style's own arrows.
+
+- GUI: Remote Desktop's host-ID labels, stats line, sparklines and missing-extras message take
+  their colours from the theme instead of fixed values (the sparkline's `background` now
+  defaults to the palette's base colour; pass a colour to keep a fixed one). A new `accent`
+  label role carries the theme's accent. Diagnostics hides its progress line while idle, and the
+  Assertions kind list and the Email Triggers password placeholder follow a language switch.
+
+- GUI: applying a theme to a top-level window also sets the application palette. Widgets a
+  style sheet styles start from the application palette, which on Windows carries the system
+  accent colour, so checked boxes were drawn in the user's accent instead of the theme's.
+
+- GUI: every tab's layout is rebuilt on cards, wrapping rows and side-by-side panes that stack
+  when narrow; widget objects, attributes, signals, Actions-menu entries and translation keys
+  are unchanged. Each page's scroll area no longer uses `setWidgetResizable(True)`
+  (`ScrollableTabs.scroll_area()` returns a `PageScrollArea`, which sizes the page to the
+  viewport or its minimum), `FlowLayout` no longer reports height-for-width, and group-box
+  titles are drawn inside the box. The WebRTC viewer's remote-files section showed the raw key
+  `rd_webrtc_files_group`; it uses `rd_webrtc_remote_files_group`. The English
+  "Publish & wait for viewer" button read "Publish _wait"; it is "Publish and wait for viewer".
+
+- The `gui` extra and the development and CI pins are back on `PySide6==6.11.2`. 6.12.0 crashed
+  the test process at interpreter exit on every CI platform (a double free while
+  `destroyQCoreApplication` tears down Python-held widgets); Dependabot now skips 6.12.0.
+
+- GUI: `prepare_application` installs `AdaptiveStyle` (Fusion with check boxes and radio
+  buttons drawn from the palette) instead of plain Fusion, and the workspace inserts a
+  `PageHeader` at the top of every tab laid out by a vertical box layout and runs
+  `fit_to_width` on it, which changes its combo boxes' size-adjust policy and its form
+  layouts' row-wrap policy. Code that embeds a tab and reads its layout's first item, or
+  relies on a combo box sizing to its longest entry, sees the difference.
+- GUI: below 800 px the main window hides the docked navigation and shows a rail; between
+  800 and 1,199 px the execution details open as a drawer. `AutoControlGUIUI._sidebar_action`
+  (Ctrl+B) is now the window's own checkable action rather than the dock's `toggleViewAction()`,
+  and the dock's toggle is hidden from the dock area's context menu. The saved
+  `workspace/navigation_visible` is the user's preference, not whether the dock happened to be
+  shown when the window closed.
+
+- `save_window_layout` stores a maximized window with `"maximized": true` and its restored
+  rectangle; it used to store the maximized rectangle, which restored as a screen-sized normal
+  window. `restore_window_layout(..., maximize=True)` (`AC_restore_window_layout`'s
+  `maximize`) maximizes those windows again, activating each on Windows; without it nothing is
+  activated. A custom `mover` receives `maximize=True` for those entries only when it is set.
+
+- `post_key_to_window` (`AC_post_key_to_window`, `ac_post_key_to_window`) accepts any
+  printable character, not only those in the platform's key table: on Windows `"%"` and other
+  punctuation used to raise `unknown key name`, and a character beyond the BMP is now posted
+  as its two UTF-16 units. On X11 a character is sent as the key the keymap binds it to, with
+  Shift when it is on the shifted level, so `"%"` and `"Z"` no longer arrive as `5` and `z`.
+
+- WebRTC cleanup that cancels a child task (viewer video retirement, peer teardown) no longer
+  swallows its own cancellation when it is cancelled while waiting for that child.
+- The container image installs `libegl1`: PySide6 6.12's QtGui loads `libEGL.so.1` at import.
+
+- Windows: `move_window` (used by `restore_window_layout`, `snap_window`, the grid and
+  cascade layouts, `ac_window_move` and the window backend) un-maximizes a maximized window
+  first, without activating it. `MoveWindow` alone gave it the new rectangle but left it
+  flagged maximized.
+- Windows accessibility: the first `comtypes` import initialises COM to match the importing
+  thread. Imported first on a worker it used to put that worker in an STA, and on a thread
+  already in the MTA it raised `OSError` (`RPC_E_CHANGED_MODE`).
+
+- Reading the iOS pasteboard (`WdaExtension.get_clipboard`, `AC_ios_get_clipboard`,
+  `ac_ios_get_clipboard`) now needs `allow_app_switch=True`: facebook-wda brings WebDriverAgent
+  to the front through Siri for about 3 s and relaunches the app that was in front. Without it
+  the call raises `DeviceUnsupportedError` and sends nothing. Android accepts and ignores the
+  flag; an adapter registered through `register_mobile_extension` is called without it unless
+  it is set.
+
+- `sync_assets` (and `AC_sync_assets`, `materialize` of `AC_sync_workspace`) refuses up front,
+  with a `ConfigSyncError` naming the length, a generation whose published paths would pass
+  259 characters on Windows without `LongPathsEnabled`; it used to fail on the first such file
+  with a generic "could not publish a complete generation".
+
+- The executor result hook (`result_callback`, `observe_results`) now follows `AC_parallel`
+  branches: a branch command is reported under the `AC_parallel` step with the branch's
+  1-based index as `run`, and branches never call the callback concurrently. The Script
+  Builder therefore offers a token a branch issued as that command's own value instead of
+  `AC_parallel` `results[0].…`.
+
+- Of the three GUI tabs open at start, only Record is built then: Script Builder and Remote
+  Desktop sit in the tab bar as empty stand-ins and are built in place the first time they
+  are selected or their widget is asked for (`TabEntry.widget`, `activate_tab`). Offscreen,
+  median start-up went from 3.2 s to 1.7 s and memory from 172 MB to 111 MB. Code that
+  expected those two widgets to exist right after `AutoControlGUIWidget()` now builds them
+  on first access.
+
+- iOS `swipe` (`Swipe` gestures, `AC_ios_swipe`, `ac_ios_swipe`) no longer presses for
+  `duration_s` before moving: facebook-wda's swipe duration is the start-point hold, so the
+  old mapping made swipes start as drags. WebDriverAgent sets the travel speed and
+  `duration_s` has no effect on iOS; a negative or NaN value is rejected. An Android pinch
+  whose fingers would reach past the left or top edge raises `DeviceError` instead of
+  uiautomator2's bare `AssertionError`.
+
+- Each MCP `tools/call` now runs as a stoppable executor run (`mcp-…`). `notifications/cancelled`
+  stops it: an action list from `ac_execute_actions` halts before its next action and
+  `ac_wait_for_image` / `ac_wait_for_pixel` wake mid-poll, answered `-32800` as before for a
+  cancelled call. `ac_stop_execution()` without a `run_id` (and any other `stop_execution()`
+  caller) now also stops MCP calls in progress, reported as an `ExecutionStopped` tool error,
+  and `ac_list_executions` lists them, excluding its own call.
+
 - WebRTC peers retain media constructor and disable failures, expose cached slot outcomes,
   observe actual receiver/task completion, and guard deferred media operations against
   peer replacement. GUI caretaker and Diagnostics integration remain pending.

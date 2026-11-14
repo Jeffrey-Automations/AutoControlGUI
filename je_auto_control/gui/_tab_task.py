@@ -7,8 +7,8 @@ tab shares on top of :mod:`je_auto_control.gui.tab_task_controller`:
 * **One run at a time.** :meth:`TabTask.start` refuses while a task is
   running, so a second click (or a script that clicks this window's own Run
   action) does not start a nested run.
-* **Outcomes on the GUI thread.** ``result`` / ``error`` / ``finished`` are
-  relayed from the task's handle; :attr:`TabTask.tag` says which command the
+* **Outcomes on the GUI thread.** ``result`` / ``error`` / ``finished`` (and
+  ``progress``, for work that reports it) are relayed from the task's handle; :attr:`TabTask.tag` says which command the
   outcome belongs to. :attr:`TabTask.task` is ``None`` again before
   ``finished`` is emitted.
 * **Stop.** A script run (:meth:`TabTask.start_script`) is a stoppable
@@ -16,18 +16,28 @@ tab shares on top of :mod:`je_auto_control.gui.tab_task_controller`:
   it never waits for the worker, so a script that drives this GUI cannot
   deadlock it -- and the run's end arrives as an ``ExecutionStopped`` error
   once the worker has really unwound, which is when the tab is free again.
+  Work started with :meth:`TabTask.start_until_stopped` is handed a stop
+  event instead: Stop sets it and the task stays running until the work has
+  returned, with what it did, so the tab is not free while that work still
+  drives the machine.
   Other work binds a headless cancellation scope. Cooperative backends stop
   at their next checkpoint; late results from noncooperative work are dropped.
+* **Execution details.** Each run is published to the workspace's details
+  pane for the page the task runs on (:mod:`je_auto_control.gui._task_details`):
+  running, stopping, then succeeded, cancelled or error, with reported
+  progress. Periodic background work passes ``details=False``.
 
 The object keeps no reference to its tab beyond Qt parentage, and the work it
 is given must not hold a widget (the controller refuses it): read what the
 work needs from the widgets first and pass plain values.
 """
 import functools
+import threading
 from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QObject, Signal
 
+from je_auto_control.gui._task_details import TaskDetails
 from je_auto_control.gui.tab_task_controller import CancellationToken, TaskHandle, task_controller
 from je_auto_control.utils.exception.cancellation import (
     CancellationToken as CoreCancellationToken, cancellation_scope,
@@ -43,12 +53,15 @@ class TabTask(QObject):
     result = Signal(object)
     error = Signal(object)
     finished = Signal()
+    progress = Signal(object)
 
-    def __init__(self, owner: QObject) -> None:
+    def __init__(self, owner: QObject, *, details: bool = True) -> None:
         super().__init__(owner)
         self.task: Optional[TaskHandle] = None
         self.tag = ""
         self._stop_token: Optional[StopToken] = None
+        self._stop_event: Optional[threading.Event] = None
+        self._details = TaskDetails(self) if details else None
 
     @property
     def running(self) -> bool:
@@ -58,7 +71,11 @@ class TabTask(QObject):
     @property
     def stopping(self) -> bool:
         """Whether the running script was asked to stop and is still unwinding."""
-        return self.task is not None and self._stop_token is not None and self._stop_token.stopped
+        if self.task is None:
+            return False
+        if self._stop_event is not None:
+            return self._stop_event.is_set()
+        return self._stop_token is not None and self._stop_token.stopped
 
     def start(self, work: Callable[[], Any], *, tag: str = "", timeout_s: Optional[float] = None,
               discard: Optional[Callable[[Any], object]] = None) -> bool:
@@ -76,8 +93,27 @@ class TabTask(QObject):
         self._submit(functools.partial(_call_stoppable, self._stop_token, work), tag, None, None)
         return True
 
+    def start_until_stopped(self, work: Callable[..., Any], *, tag: str = "", reports: bool = False) -> bool:
+        """Run ``work(stop_event)`` off the GUI thread; ``False`` when a task is already running.
+
+        For work that ends itself at its next step once the event is set and
+        returns what it did, such as an agent run or a DAG. :meth:`stop` sets
+        the event; the task stays running until ``work`` returns and its
+        outcome arrives as usual. The tab being destroyed, or the application
+        exiting, sets the event too. There is no deadline: the work's own
+        limits bound it. With ``reports`` the work is called
+        ``work(stop_event, report)``; each ``report(value)`` arrives as
+        :attr:`progress` on the GUI thread, while the tab lives.
+        """
+        if self.task is not None:
+            return False
+        self._stop_event = threading.Event()
+        call = _call_until_stopped_reporting if reports else _call_until_stopped
+        self._submit(functools.partial(call, self._stop_event, work), tag, None, None)
+        return True
+
     def stop(self) -> bool:
-        """Stop the running script, or cancel other work; return whether anything was running.
+        """Stop the running script, set the stop event, or cancel other work; return whether anything was running.
 
         Never blocks. A script ends at its next checkpoint and reports
         ``ExecutionStopped`` through :attr:`error`; calling this again while
@@ -87,8 +123,13 @@ class TabTask(QObject):
             return False
         if self._stop_token is not None:
             self._stop_token.stop("stopped from the GUI")
-            return True
-        return self.task.cancel()
+        elif self._stop_event is not None:
+            self._stop_event.set()
+        else:
+            return self.task.cancel()
+        if self._details is not None:
+            self._details.stopping()
+        return True
 
     def _submit(self, work: Callable[[CancellationToken], Any], tag: str,
                 timeout_s: Optional[float], discard: Optional[Callable[[Any], object]]) -> None:
@@ -99,11 +140,32 @@ class TabTask(QObject):
         self.task = handle
         handle.result.connect(self.result)
         handle.error.connect(self.error)
+        handle.progress.connect(self.progress)
+        if self._details is not None:
+            handle.result.connect(self._note_result)
+            handle.error.connect(self._note_error)
+            handle.progress.connect(self._note_progress)
+            self._details.started()
         handle.finished.connect(self._on_finished)
+
+    def _note_result(self, _value: object) -> None:
+        if self._details is not None:
+            self._details.noted("result")
+
+    def _note_error(self, error: object) -> None:
+        if self._details is not None:
+            self._details.noted("error", error)
+
+    def _note_progress(self, value: object) -> None:
+        if self._details is not None:
+            self._details.progressed(value)
 
     def _on_finished(self) -> None:
         self.task = None
         self._stop_token = None
+        self._stop_event = None
+        if self._details is not None:
+            self._details.finished()
         self.finished.emit()
 
 
@@ -114,6 +176,21 @@ def _call_plain(work: Callable[[], Any], token: CancellationToken) -> Any:
     with cancellation_scope(core_token):
         core_token.checkpoint()
         return work()
+
+
+def _call_until_stopped(stop: threading.Event, work: Callable[[threading.Event], Any],
+                        token: CancellationToken) -> Any:
+    """Worker thread: hand ``work`` the stop event, which handle cancellation also sets."""
+    token.on_cancel(stop.set)
+    return work(stop)
+
+
+def _call_until_stopped_reporting(stop: threading.Event,
+                                  work: Callable[[threading.Event, Callable[[object], None]], Any],
+                                  token: CancellationToken) -> Any:
+    """Worker thread: as :func:`_call_until_stopped`, also handing ``work`` the handle's progress report."""
+    token.on_cancel(stop.set)
+    return work(stop, token.report_progress)
 
 
 def _call_stoppable(stop: StopToken, work: Callable[[], Any], token: CancellationToken) -> Any:

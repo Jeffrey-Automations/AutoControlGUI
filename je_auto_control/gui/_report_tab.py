@@ -4,12 +4,13 @@ from typing import Callable, Optional
 
 from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.generate_report.generate_html_report import generate_html_report
 from je_auto_control.utils.generate_report.generate_json_report import generate_json_report
@@ -24,6 +25,7 @@ class ReportTab(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
 
         # Enable/disable recording and report generation run from the
         # Actions menu; the tab keeps only status, name input, and result.
@@ -34,17 +36,15 @@ class ReportTab(TranslatableMixin, QWidget):
         tr_group.setLayout(tr_h)
         layout.addWidget(tr_group)
 
-        name_h = QHBoxLayout()
-        name_h.addWidget(self._tr(QLabel(), "report_name"))
+        name_form = QFormLayout()
         self.report_name_input = QLineEdit("autocontrol_report")
-        name_h.addWidget(self.report_name_input)
-        layout.addLayout(name_h)
+        name_form.addRow(self._tr(QLabel(), "report_name"), self.report_name_input)
+        layout.addWidget(Card().add(name_form))
 
-        layout.addWidget(self._tr(QLabel(), "report_result"))
+        result_card = Card().add(set_role(self._tr(QLabel(), "report_result"), "sectionTitle"))
         self.report_result_text = QTextEdit()
         self.report_result_text.setReadOnly(True)
-        layout.addWidget(self.report_result_text)
-        layout.addStretch()
+        layout.addWidget(result_card.add(self.report_result_text, stretch=1), stretch=1)
         self._task = TabTask(self)
         self._task.result.connect(self._on_report_result)
         self._task.error.connect(self._on_report_error)

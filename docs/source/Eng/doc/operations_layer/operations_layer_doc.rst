@@ -205,8 +205,8 @@ surface, each of which needs the ``manage_users`` capability:
   Rotate Token · alice · token``). At most 200 values are kept for one run
   -- the first ones; the result pane says when a run issued more. A run
   that was stopped or failed still offers what it had issued by then. The
-  hook follows the run's own thread, so a command in an ``AC_parallel``
-  branch is offered from the block's result instead. The pane masks every
+  hook follows ``AC_parallel`` branches too, so a token a branch issued is
+  offered once, labelled by its branch. The pane masks every
   secret-named field (``token``, ``password``, ``api_key``...) of every
   command's result at any depth -- a lease token from ``AC_lease_secret`` /
   ``AC_lease_active``, the shared bearer token ``AC_rest_api_start`` /
@@ -433,12 +433,23 @@ action and report ``ok: false`` with the error; otherwise ``ok`` only means
 the host answered, and action failures are recorded inside ``result``. The
 DAG runner's remote nodes and the Admin Console tab both pass it.
 
+Every row also says in ``sent`` whether the actions went to that host. Hosts
+are sent to ``max_parallel`` at a time; pass ``stop_event`` (a
+``threading.Event``), or call inside a cancellation scope, to stop a
+broadcast: once it is set, a host not sent to yet is skipped with
+``sent: false`` and ``error`` ``NOT_SENT_STOPPED``, and a host already being
+sent to finishes and reports its result. An unknown label is ``sent: false`` as
+well.
+
 Persistence: hosts are saved to ``~/.je_auto_control/admin_hosts.json``
 (mode 0600 on POSIX). Reload happens automatically on construction.
 
 Health probe uses ``/sessions`` (an authenticated endpoint), so a host
 with the wrong token shows up as unhealthy with an ``HTTP 401`` error
-rather than a misleading "reachable but useless" status.
+rather than a misleading "reachable but useless" status. ``poll_all`` and
+``fetch_thumbnails`` observe the caller's cancellation scope too: once it is
+cancelled, the hosts not reached yet are skipped and ``CancelledError`` is
+raised when the requests already out have returned.
 
 Executor commands::
 
@@ -446,7 +457,11 @@ Executor commands::
    AC_admin_poll, AC_admin_broadcast_execute
 
 GUI: *Admin Console* tab — register host form, hosts table with
-health/latency/jobs columns, broadcast textarea.
+health/latency/jobs columns, broadcast textarea. **Stop broadcast** skips the
+hosts not sent to yet; the results still list every host, and the line under
+them reads *Sent to n of m hosts; k not sent.* **Stop polling** ends a health
+poll or a thumbnail round still out at the hosts in flight; each has a 60 s
+deadline, and closing the tab ends them the same way.
 
 
 Audit log hash chain
@@ -543,6 +558,10 @@ Backends:
 - macOS: ``system_profiler -json SPUSBDataType`` (recursive walk)
 - Linux: ``/sys/bus/usb/devices`` (sysfs read)
 
+A command-line tool gets 10 seconds (``SUBPROCESS_TIMEOUT_S``); a failure or
+timeout comes back as ``result.error``. Called inside a cancellation scope,
+cancelling ends the tool's process and raises ``CancelledError``.
+
 Headless::
 
    from je_auto_control.utils.usb import list_usb_devices
@@ -561,7 +580,8 @@ Executor command::
    AC_list_usb_devices
 
 GUI: *USB Devices* tab — backend label, devices table (VID/PID/
-manufacturer/product/serial/location), refresh button.
+manufacturer/product/serial/location), refresh button. The listing runs off
+the GUI thread; closing the tab ends a listing still running.
 
 Phase 2 (actual USB passthrough) ships in stages — see
 :doc:`usb_passthrough_design` for the protocol + backend ABCs and

@@ -29,6 +29,7 @@ from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.rbac.authorization import authorization_scope, current_authorization
 from je_auto_control.utils.action_journal.capture import bound_journal, current_journal
 from je_auto_control.utils.executor.dispatch import bound_command_guards, capture_command_guards
+from je_auto_control.utils.executor.result_hook import bound_branch_hook, capture_branch_hook
 from je_auto_control.utils.exception.cancellation import cancellation_scope, current_cancellation_token
 from je_auto_control.utils.logging.secret_scope import bound_secret_scope, current_secret_scope
 from je_auto_control.utils.run_history.context import bound_history, current_history
@@ -498,8 +499,9 @@ class _ParallelRun:
         from je_auto_control.utils.agent_runtime.origin_policy import current_origin
         self._task_operation = current_operation()
         self._origin = current_origin()
-        # Branch threads do not inherit the run's stop token either.
+        # Branch threads do not inherit the run's stop token or result hook either.
         self._stop_token = current_stop_token()
+        self._result_hook = capture_branch_hook()
         self._stopped: Optional[ExecutionStopped] = None
         self.results: list = [None] * len(branches)
         self._failures: list = [0] * len(branches)
@@ -537,7 +539,7 @@ class _ParallelRun:
                   bound_secret_scope(self._secret_scope), bound_history(self._history),
                   bound_command_guards(self._command_guards), cancellation_scope(self._cancellation),
                   operation_scope(self._task_operation), origin_scope(self._origin),
-                  bound_stop_token(self._stop_token)):
+                  bound_stop_token(self._stop_token), bound_branch_hook(self._result_hook, index)):
                 self.results[index] = self._branch_executor().execute_action(
                     branch, raise_on_error=self._strict, _validated=True)
             self._failures[index] = self._module.recorded_failures()

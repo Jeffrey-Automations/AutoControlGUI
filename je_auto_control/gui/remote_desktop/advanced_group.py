@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Protocol, TypeVar
 
 from PySide6.QtWidgets import (
-    QComboBox, QGridLayout, QGroupBox, QLabel, QLineEdit, QWidget,
+    QComboBox, QFormLayout, QGroupBox, QLabel, QLineEdit, QWidget,
 )
 
 from je_auto_control.gui.remote_desktop._helpers import _t
@@ -61,33 +61,28 @@ def build_advanced_group(panel: AdvancedGroupHost,
                          *, hardware_codec: HardwareCodecGroupHost | None = None) -> QGroupBox:
     """Shared 'Advanced' STUN/TURN (+ optional hw codec) group."""
     group = panel._tr(QGroupBox(), "rd_webrtc_advanced_group")
-    grid = QGridLayout()
-    grid.addWidget(panel._tr(QLabel(), "rd_webrtc_stun_label"), 0, 0)
+    form = QFormLayout()
     panel._stun_edit = QLineEdit(DEFAULT_STUN)
-    grid.addWidget(panel._stun_edit, 0, 1, 1, 3)
-    grid.addWidget(panel._tr(QLabel(), "rd_webrtc_turn_label"), 1, 0)
+    form.addRow(panel._tr(QLabel(), "rd_webrtc_stun_label"), panel._stun_edit)
     panel._turn_edit = panel._tr(QLineEdit(), "rd_webrtc_turn_placeholder")
-    grid.addWidget(panel._turn_edit, 1, 1, 1, 3)
-    grid.addWidget(panel._tr(QLabel(), "rd_webrtc_turn_user_label"), 2, 0)
+    form.addRow(panel._tr(QLabel(), "rd_webrtc_turn_label"), panel._turn_edit)
     panel._turn_user_edit = QLineEdit()
-    grid.addWidget(panel._turn_user_edit, 2, 1)
-    grid.addWidget(panel._tr(QLabel(), "rd_webrtc_turn_cred_label"), 2, 2)
+    form.addRow(panel._tr(QLabel(), "rd_webrtc_turn_user_label"), panel._turn_user_edit)
     panel._turn_cred_edit = QLineEdit()
     panel._turn_cred_edit.setEchoMode(QLineEdit.EchoMode.Password)
-    grid.addWidget(panel._turn_cred_edit, 2, 3)
+    form.addRow(panel._tr(QLabel(), "rd_webrtc_turn_cred_label"), panel._turn_cred_edit)
     if hardware_codec is not None:
-        _add_hw_codec_row(hardware_codec, grid)
-    group.setLayout(grid)
+        _add_hw_codec_row(hardware_codec, form)
+    group.setLayout(form)
     return group
 
 
-def _add_hw_codec_row(panel: HardwareCodecGroupHost, grid: QGridLayout) -> None:
+def _add_hw_codec_row(panel: HardwareCodecGroupHost, form: QFormLayout) -> None:
     """Add the hardware-codec picker, pre-selected to the active codec."""
-    grid.addWidget(panel._tr(QLabel(), "rd_webrtc_hw_codec_label"), 3, 0)
     combo = QComboBox()
     panel._hw_codec_combo = combo
     combo.addItem(_t("rd_webrtc_hw_codec_off"), "")
-    grid.addWidget(combo, 3, 1, 1, 3)
+    form.addRow(panel._tr(QLabel(), "rd_webrtc_hw_codec_label"), combo)
     if available_hardware_codecs is None or active_hardware_codec is None:
         combo.setEnabled(False)
         return

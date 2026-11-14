@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.journal_candidate_worker import (
     CandidateOperation, JournalCandidateOutcome, JournalCandidateTask, JournalCandidateWorker,
 )
@@ -35,8 +35,12 @@ class JournalCandidatePanel(TranslatableMixin, QWidget):
         self._candidate: Optional[CandidateScript] = None
         self._generation = 0
         self._operation: CandidateOperation = "generate"
-        self._handle: Optional[WorkerHandle] = None
-        self._worker: Optional[JournalCandidateWorker] = None
+        # Cancel and the view's destruction stop the work at its next checkpoint; it stays busy until then.
+        self._task = TabTask(self)
+        self._task.result.connect(self._received)
+        self._task.error.connect(self._task_failed)
+        self._task.progress.connect(self._progress)
+        self._task.finished.connect(self._thread_done)
         self._path, self._run_id = QLineEdit(), QLineEdit()
         self._target, self._style = QComboBox(), QComboBox()
         self._target.addItems(["pytest", "python", "robot"])
@@ -101,7 +105,7 @@ class JournalCandidatePanel(TranslatableMixin, QWidget):
         self._set_status("idle")
 
     def _browse(self) -> None:
-        if self._handle is not None:
+        if self._task.running:
             return
         try:
             authorize_command("AC_generate_candidate_from_log")
@@ -128,7 +132,7 @@ class JournalCandidatePanel(TranslatableMixin, QWidget):
         if self._candidate is None:
             self._set_status("review_required")
             return
-        if self._handle is not None:
+        if self._task.running:
             return
         try:
             authorize_command("AC_generate_candidate_from_log")
@@ -139,7 +143,7 @@ class JournalCandidatePanel(TranslatableMixin, QWidget):
             self._failed(str(error))
 
     def _start(self, operation: CandidateOperation, output: str = "") -> None:
-        if self._handle is not None:
+        if self._task.running:
             return
         self._generation += 1
         self._operation = operation
@@ -150,22 +154,19 @@ class JournalCandidatePanel(TranslatableMixin, QWidget):
         task = JournalCandidateTask(self._generation, operation, output or self._path.text().strip(),
                                       self._run_id.text(), self._target.currentText(), self._style.currentText(),
                                       self._baseline, self._candidate)
-        worker = JournalCandidateWorker(task)
-        self._worker = worker
-        worker.progress.connect(self._progress)
-        # pylint: disable-next=no-member  # reason: PySide binds this Qt signal at runtime
-        self.destroyed.connect(worker.request_stop)
         self._busy(True)
         self._set_status("running")
-        self._handle = start_worker(self, worker, on_done=self._received,
-                                     on_thread_done=self._thread_done, on_fail=self._failed)
+        self._task.start_until_stopped(JournalCandidateWorker(task), reports=True)
 
     def _busy(self, busy: bool) -> None:
         for control in (self._path, self._run_id, self._target, self._style):
             control.setEnabled(not busy)
 
-    @Slot(int, int)
-    def _progress(self, request_id: int, count: int) -> None:
+    @Slot(object)
+    def _progress(self, value: object) -> None:
+        if not isinstance(value, tuple) or len(value) != 2:   # the worker reports (request_id, count)
+            return
+        request_id, count = value
         if request_id == self._generation and self._status_key != "cancelling":
             self._set_status("progress", str(count))
 
@@ -201,12 +202,14 @@ class JournalCandidatePanel(TranslatableMixin, QWidget):
 
     def cancel(self) -> None:
         """Request stop; completed atomic exports remain committed."""
-        if self._worker is not None:
-            self._worker.request_stop()
+        if self._task.running:
+            self._task.stop()
             self._set_status("cancelling")
 
+    def _task_failed(self, error: object) -> None:
+        self._failed(str(error))
+
     def _thread_done(self) -> None:
-        self._worker = self._handle = None
         self._busy(False)
         if self._status_key in ("running", "progress", "cancelling"):
             self._set_status("interrupted")

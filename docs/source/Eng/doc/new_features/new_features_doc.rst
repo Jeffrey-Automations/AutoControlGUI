@@ -55,8 +55,10 @@ whose results are in no execution record::
 
    executor.execute_action(actions, result_callback=seen)
 
-The hook lasts for that run on the calling thread only (a thread the run
-starts, such as an ``AC_parallel`` branch, is not followed), a failed command
+The hook lasts for that run on the calling thread. ``AC_parallel`` branches
+are followed: a branch command's path is the ``AC_parallel`` step's path plus
+the branch's 1-based index as ``run``, and two branches never call the
+callback at the same time. Any other thread the run starts is not followed. A failed command
 and a ``dry_run`` report nothing, and a callback that raises is logged by its
 exception type and ignored. The run returns and logs the same with or without
 it. ``result`` is the recorded object: do not change it. To observe several
@@ -325,8 +327,14 @@ Environment variables (keys are never logged or persisted):
 - ``AUTOCONTROL_VLM_BACKEND=anthropic|openai``
 - ``AUTOCONTROL_VLM_MODEL=<model-id>``
 
+Inside a cancellation scope (a GUI task, or any caller that binds one) both
+calls check for cancellation before the model request and ``click_by_description``
+checks again before it moves the mouse, so an answer that arrives after a
+stop or a deadline raises ``CancelledError`` instead of clicking.
+
 Action-JSON commands: ``AC_vlm_locate``, ``AC_vlm_click``. GUI:
-**AI Locator** tab.
+**AI Locator** tab: one request at a time, off the GUI thread, with a **Stop
+run** action and a two-minute deadline (*Took too long and was stopped.*).
 
 
 Run history + error-snapshot artifacts
@@ -680,9 +688,10 @@ Backend selection mirrors ``vision.backends``:
 
 Action-JSON commands: ``AC_llm_plan``, ``AC_llm_run``.
 
-GUI: **LLM Planner** tab. Description box, ``QThread``-backed *Plan*
-button, action-list preview, and a *Run plan* button — long calls run
-off the GUI thread so the UI stays responsive.
+GUI: **LLM Planner** tab. Description box, *Plan* button, action-list
+preview, and a *Run plan* button. Planning and running happen off the GUI
+thread; a plan has a deadline of 200 seconds, and **Stop run** ends the run
+or, when none is going, drops the plan still being asked for.
 
 
 Remote desktop (host + viewer)
@@ -1650,8 +1659,13 @@ flags messages ``\\Seen`` so the same mail isn't replayed across
 restarts. TLS is pinned at 1.2 minimum. Combine ``AC_email_trigger_add``
 with ``${secrets.NAME}`` so passwords never appear in the JSON.
 
+``poll_once`` called inside a cancellation scope stops before the next
+trigger's server when cancelled (``CancelledError``); a trigger already being
+read finishes, so no message is marked seen without its script firing.
+
 GUI: **Email Triggers** tab — register IMAP triggers, start/stop the
-watcher, run a manual poll, inspect last error and fire counter.
+watcher, run a manual poll, inspect last error and fire counter. **Stop**
+(or closing the tab) also cancels a manual poll still running.
 
 Structured action journals (experimental)
 ================================================

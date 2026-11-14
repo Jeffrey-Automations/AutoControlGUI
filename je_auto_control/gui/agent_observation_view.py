@@ -9,6 +9,7 @@ from PySide6.QtGui import QMouseEvent, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QLabel, QScrollArea, QTableWidget,
                                QTableWidgetItem, QVBoxLayout, QWidget)
 
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.images import observation_image_bytes
@@ -45,7 +46,10 @@ class AgentObservationView(QWidget):
         self._image = _Image()
         self._image.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self._image.picked.connect(self.picked.emit)
+        self.setProperty("role", "bare")
         self._notice = QLabel()
+        self._notice.setWordWrap(True)
+        set_role(self._notice, "danger")
         scroll = QScrollArea()
         scroll.setWidgetResizable(False)
         scroll.setWidget(self._image)

@@ -4,9 +4,9 @@ import ssl
 import weakref
 from typing import Any, Callable, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QKeyEvent
-from PySide6.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -179,7 +179,11 @@ class _StatusBadge(QLabel):
 
 
 class _CollapsibleSection(QGroupBox):
-    """``QGroupBox`` with a checkable header that hides/shows its body."""
+    """``QGroupBox`` with a checkable header that hides/shows its body.
+
+    Collapsed, it shrinks to its title: the layout margins and the box's
+    bottom padding go too, or the card kept an empty strip under the title.
+    """
 
     def __init__(self, title: str = "",
                  parent: Optional[QWidget] = None) -> None:
@@ -187,11 +191,11 @@ class _CollapsibleSection(QGroupBox):
         self.setCheckable(True)
         self.setChecked(False)
         self._body = QWidget(self)
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(8, 14, 8, 8)
-        outer.addWidget(self._body)
-        self._body.setVisible(False)
-        self.toggled.connect(self._body.setVisible)
+        self._body.setProperty("role", "bare")
+        self._outer = QVBoxLayout(self)
+        self._outer.addWidget(self._body)
+        self.toggled.connect(self._show_body)
+        self._show_body(False)
 
     @property
     def body(self) -> QWidget:
@@ -199,6 +203,55 @@ class _CollapsibleSection(QGroupBox):
 
     def set_body_layout(self, layout) -> None:
         self._body.setLayout(layout)
+
+    def adopt(self, inner: QGroupBox) -> None:
+        """Make ``inner`` the body, without its own frame and title: the section already shows both."""
+        inner.setTitle("")
+        inner.setStyleSheet(
+            "QGroupBox { border: none; margin: 0px; padding: 0px; background: transparent; }")
+        body = QVBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.addWidget(inner)
+        self.set_body_layout(body)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802  # reason: Qt override
+        """Collapsed, only the padding that holds the title.
+
+        The style sheet's hint adds the title's height on top of a top padding
+        that already contains the title, which alone left a strip below it.
+        """
+        hint = super().minimumSizeHint()
+        if not self.isChecked():
+            margins = self.contentsMargins()
+            hint.setHeight(margins.top() + margins.bottom())
+        return hint
+
+    def _show_body(self, shown: bool) -> None:
+        self._body.setVisible(shown)
+        self._outer.setContentsMargins(0, 4 if shown else 0, 0, 0)
+        self.setProperty("collapsed", not shown)
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+
+def _row(field: QWidget, *extras: QWidget) -> QHBoxLayout:
+    """``field`` taking the width, followed by its buttons at their natural size (one form row)."""
+    row = QHBoxLayout()
+    row.addWidget(field, 1)
+    for extra in extras:
+        row.addWidget(extra)
+    return row
+
+
+def _pane(label: QLabel, field: QWidget) -> QWidget:
+    """A caption over its field, as one part of a side-by-side pair."""
+    pane = QWidget()
+    pane.setProperty("role", "bare")
+    layout = QVBoxLayout(pane)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.addWidget(label)
+    layout.addWidget(field, 1)
+    return pane
 
 
 def displaced_notifier(panel: Any) -> Callable[[str, str], None]:

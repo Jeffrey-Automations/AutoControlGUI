@@ -148,7 +148,7 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         """Hand-off entry point used by the Quick Connect screen.
 
         Populates the signaling-flow fields so the operator can click
-        "Publish & wait for viewer" without retyping a token they
+        "Publish and wait for viewer" without retyping a token they
         already shared on the Quick Connect tab.
         """
         if token:

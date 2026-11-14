@@ -203,7 +203,13 @@ Execution details
 
 **View → Execution details** (``Ctrl+Shift+D``) expands a scrollable right pane.
 It starts collapsed. Diagnostics publishes actual run progress, stop requests,
-results and errors; pages without a publisher show an explicit unavailable state.
+results and errors, and so does every page that runs background work through a
+``TabTask`` (``je_auto_control.gui._tab_task``) -- also when the work belongs to
+a panel inside the page: *Running*, *Stopping* while a stopped run unwinds,
+then *Completed*, *Cancelled* or *Error* with the error text (a deadline reads
+*Took too long and was stopped.*), and progress where the work reports it.
+Periodic refreshes, such as the Admin Console's thumbnails, do not publish. A
+page that has not run anything shows an explicit unavailable state.
 Switching or closing a page disconnects its updates, including queued old results.
 The pane does not start work or own cancellation. Use the page's Actions menu.
 

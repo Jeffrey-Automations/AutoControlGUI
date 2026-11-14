@@ -10,12 +10,14 @@ import re
 from typing import Any, Callable, Optional
 
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QFormLayout, QLabel, QLineEdit, QMessageBox,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -72,29 +74,24 @@ class OCRReaderTab(TranslatableMixin, QWidget):
         # Pick/dump/find commands run from the Actions menu; the tab keeps
         # only the region/params/regex inputs, the results view, and status.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
 
-        region_group = self._tr(QGroupBox(), "ocr_region_group")
-        region_layout = QHBoxLayout()
-        region_layout.addWidget(self._tr(QLabel(), "ocr_region_label"))
-        region_layout.addWidget(self._region, stretch=1)
-        region_group.setLayout(region_layout)
-        root.addWidget(region_group)
+        region_layout = QFormLayout()
+        region_layout.addRow(self._tr(QLabel(), "ocr_region_label"), self._region)
+        root.addWidget(Card("ocr_region_group").add(region_layout))
 
-        params_layout = QHBoxLayout()
-        params_layout.addWidget(self._tr(QLabel(), "ocr_lang_label"))
-        params_layout.addWidget(self._lang)
-        params_layout.addWidget(self._tr(QLabel(), "ocr_min_conf_label"))
-        params_layout.addWidget(self._min_conf)
-        params_layout.addStretch()
-        root.addLayout(params_layout)
+        params = Card()
+        params.add(flow_of(field_pair(self._tr(QLabel(), "ocr_lang_label"), self._lang),
+                           field_pair(self._tr(QLabel(), "ocr_min_conf_label"), self._min_conf)))
+        params.add(field_pair(self._tr(QLabel(), "ocr_regex_label"), self._regex))
+        root.addWidget(params)
 
-        regex_layout = QHBoxLayout()
-        regex_layout.addWidget(self._tr(QLabel(), "ocr_regex_label"))
-        regex_layout.addWidget(self._regex, stretch=1)
-        root.addLayout(regex_layout)
-
-        root.addWidget(self._tr(QLabel(), "ocr_results_label"))
-        root.addWidget(self._result, stretch=1)
+        results = Card()
+        results.add(self._tr(QLabel(), "ocr_results_label"))
+        results.add(self._result, stretch=1)
+        root.addWidget(results, stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def dispose(self) -> None:

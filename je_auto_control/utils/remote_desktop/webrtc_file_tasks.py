@@ -112,7 +112,7 @@ async def _observe_sender(worker: asyncio.Future[Optional[BaseException]], stop:
     while not worker.done():
         try:
             await asyncio.shield(worker)
-        except asyncio.CancelledError as error:
+        except asyncio.CancelledError as error:  # NOSONAR python:S7497  # reason: re-raised below once the worker exits
             if interruption is None:
                 interruption = error
             stop.set()

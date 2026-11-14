@@ -38,39 +38,27 @@ def test_dag_gui_worker_does_not_borrow_ambient_admin_authority(monkeypatch):
     from je_auto_control.gui.dag_tab import _DagWorker
     from je_auto_control.utils.admin import admin_client
 
-    app = QApplication.instance() or QApplication([])
     monkeypatch.setattr(admin_client, "default_admin_console", lambda: pytest.fail("GUI borrowed host credentials"))
     with authorization_scope(AuthorizationContext("caller", "operator")):
-        worker = _DagWorker(definition(host="remote"), 1, threading.Event())
-    outcomes = []
-    worker.finished.connect(outcomes.append)
+        worker = _DagWorker(definition(host="remote"), 1)
     admin = AuthorizationContext("ambient", "admin")
     with authorization_scope(admin):
-        worker.run()
+        outcome = worker(threading.Event())     # runs in the context captured at construction
         assert current_authorization() is admin
-    assert len(outcomes) == 1
-    assert not outcomes[0].succeeded
-    assert "manage_hosts" in outcomes[0].nodes["one"].error
-    worker.deleteLater()
-    app.processEvents()
+    assert not outcome.succeeded
+    assert "manage_hosts" in outcome.nodes["one"].error
 
 
 def test_dag_inspection_worker_calls_only_inspection(monkeypatch):
     from je_auto_control.gui import dag_tab
 
-    app = QApplication.instance() or QApplication([])
     calls = []
     monkeypatch.setattr(dag_tab, "run_dag", lambda *_args, **_kwargs: pytest.fail("inspection submitted tasks"))
     monkeypatch.setattr(dag_tab, "inspect_agent_dag", lambda graph: calls.append(graph) or {"inspection_only": True})
     graph = definition()
-    worker = dag_tab._DagWorker(graph, 1, threading.Event(), inspect_only=True)
-    results = []
-    worker.finished.connect(results.append)
-    worker.run()
+    worker = dag_tab._DagWorker(graph, 1, inspect_only=True)
+    assert worker(threading.Event()) == {"inspection_only": True}
     assert calls == [graph]
-    assert results == [{"inspection_only": True}]
-    worker.deleteLater()
-    app.processEvents()
 
 
 @pytest.mark.parametrize("changed", [False, True])

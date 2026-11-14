@@ -79,6 +79,9 @@ class NavigationPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
+        self.brand = QLabel(self)
+        self.brand.setObjectName("NavigationBrand")
+        layout.addWidget(self.brand)
         layout.addWidget(self.search)
         layout.addWidget(self.tree, 1)
         layout.addWidget(self.empty, 1)
@@ -137,13 +140,19 @@ class NavigationPanel(QWidget):
             if group is not None:
                 yield group
 
+    @staticmethod
+    def _features(group: QTreeWidgetItem) -> Iterator[QTreeWidgetItem]:
+        for row in range(group.childCount()):
+            item = group.child(row)
+            if item is not None:
+                yield item
+
     def apply_filter(self, text: str = "") -> int:
         """Hide what ``text`` does not match; return how many features remain."""
         shown = 0
         for group in self._groups():
             in_group = 0
-            for row in range(group.childCount()):
-                item = group.child(row)
+            for item in self._features(group):
                 entry = {"title": item.text(0), "key": item.data(0, _KEY_ROLE)}
                 hit = matches(text, entry, group.text(0))
                 item.setHidden(not hit)
@@ -158,17 +167,16 @@ class NavigationPanel(QWidget):
         """Keys of the features the current search leaves on screen, top to bottom."""
         keys: List[str] = []
         for group in self._groups():
-            for row in range(group.childCount()):
-                item = group.child(row)
+            for item in self._features(group):
                 if not item.isHidden():
                     keys.append(str(item.data(0, _KEY_ROLE)))
         return keys
 
     def _first_match(self) -> Optional[QTreeWidgetItem]:
         for group in self._groups():
-            for row in range(group.childCount()):
-                if not group.child(row).isHidden():
-                    return group.child(row)
+            for item in self._features(group):
+                if not item.isHidden():
+                    return item
         return None
 
     def activate_first_match(self) -> None:
@@ -197,6 +205,7 @@ class NavigationPanel(QWidget):
 
     def retranslate(self) -> None:
         """Re-read every label from the language wrapper."""
+        self.brand.setText(_t("application_name", "AutoControlGUI"))
         self.search.setPlaceholderText(_t("nav_search_placeholder", "Search features (Ctrl+K)"))
         self.empty.setText(_t("nav_no_results", "No feature matches this search."))
         if self._entries:

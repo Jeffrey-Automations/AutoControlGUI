@@ -5,7 +5,7 @@ import asyncio
 from dataclasses import dataclass
 from functools import partial
 import threading
-from typing import Callable, Coroutine, Protocol, TypeVar, runtime_checkable
+from typing import Callable, Coroutine, Literal, Protocol, TypeVar, overload, runtime_checkable
 
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -85,6 +85,12 @@ class PeerMediaOwners:
             blocked = bool(failed) if slot is None else slot in failed
             if blocked:
                 raise PeerStopFailed("original media cleanup remains unresolved")
+
+    @overload
+    def create(self, slot: str, factory: Callable[[], Media], *, optional: Literal[False]) -> Media: ...
+
+    @overload
+    def create(self, slot: str, factory: Callable[[], Media], *, optional: bool = True) -> Media | None: ...
 
     def create(self, slot: str, factory: Callable[[], Media], *, optional: bool = True) -> Media | None:
         self.require_available(slot)

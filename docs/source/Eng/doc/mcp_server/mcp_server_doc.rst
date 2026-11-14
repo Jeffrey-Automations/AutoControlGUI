@@ -88,6 +88,11 @@ Action executor / history
   ``ac_list_action_commands``, ``ac_list_run_history``,
   ``ac_stop_execution``, ``ac_list_executions`` (stop / list the stoppable
   runs; a list becomes stoppable by wrapping it in ``AC_run_stoppable``).
+  Every ``tools/call`` is itself a stoppable run, listed as ``mcp-…``
+  while it runs (``ac_list_executions`` omits its own call): a stop ends an
+  ``ac_execute_actions`` list or an ``ac_wait_for_image`` /
+  ``ac_wait_for_pixel`` poll at its next checkpoint and answers the call as
+  a tool error.
 
 Scheduler / triggers / hotkeys
   ``ac_scheduler_add_job``, ``ac_scheduler_remove_job``,
@@ -181,7 +186,10 @@ Logging notifications, progress, cancellation
   ``ctx.progress(value, total, message)`` to push
   ``notifications/progress`` (when the client supplied a
   ``progressToken``) and ``ctx.check_cancelled()`` to abort
-  cooperatively when ``notifications/cancelled`` arrives.
+  cooperatively when ``notifications/cancelled`` arrives. The cancel also
+  stops the call's stoppable run, so an action list the tool executes halts
+  at its next action and a wait on ``run_control.pause`` wakes at once; the
+  call is answered with ``-32800`` instead of a result.
 
 Starting the server (programmatic)
 ==================================

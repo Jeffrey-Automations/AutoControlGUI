@@ -80,7 +80,10 @@ list-changed 通知與 elicitation。
   ``ac_execute_actions``、``ac_execute_action_file``、
   ``ac_list_action_commands``、``ac_list_run_history``、
   ``ac_stop_execution``、``ac_list_executions``（停止／列出可停止的執行；把清單包進
-  ``AC_run_stoppable`` 就是可停止的）。
+  ``AC_run_stoppable`` 就是可停止的）。每個 ``tools/call`` 本身也是一個可停止的執行，
+  執行期間以 ``mcp-…`` 列出（``ac_list_executions`` 不列自己這次呼叫）：停止會讓
+  ``ac_execute_actions`` 的清單或 ``ac_wait_for_image``／``ac_wait_for_pixel`` 的輪詢在
+  下一個檢查點結束，該次呼叫回報為工具錯誤。
 
 排程 / 觸發 / 熱鍵
   ``ac_scheduler_add_job``、``ac_scheduler_remove_job``、
@@ -161,7 +164,8 @@ Logging 通知 / Progress / Cancellation
   ``ctx.progress(value, total, message)`` 推送
   ``notifications/progress``(client 須提供 ``progressToken``);呼
   叫 ``ctx.check_cancelled()`` 在收到 ``notifications/cancelled``
-  時合作式中止。
+  時合作式中止。取消同時會停掉該次呼叫的可停止執行：工具執行的動作清單在下一個動作前停下，
+  睡在 ``run_control.pause`` 上的等待立即醒來；該次呼叫以 ``-32800`` 回覆，而不是結果。
 
 以程式啟動伺服器
 ================

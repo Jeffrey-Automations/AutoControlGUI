@@ -207,16 +207,18 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         self._pc = RTCPeerConnection(
             configuration=self._config.to_rtc_configuration(),
         )
-        if self._external_video_track is not None:
-            self._video_track = self._external_video_track
+        external = self._external_video_track
+        if external is not None:
+            track = external
         else:
-            self._video_track = self._media_owners.create("screen track", lambda: ScreenVideoTrack(
+            track = self._media_owners.create("screen track", lambda: ScreenVideoTrack(
                 monitor_index=self._config.monitor_index,
                 fps=self._config.fps,
                 region=self._config.region,
                 show_cursor=self._config.show_cursor,
             ), optional=False)
-        self._pc.addTrack(self._video_track)
+        self._video_track = track
+        self._pc.addTrack(track)
         if self._config.accept_viewer_video:
             self._pc.addTransceiver("video", direction="recvonly")
         if self._config.accept_viewer_audio_opus:

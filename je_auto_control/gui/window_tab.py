@@ -3,11 +3,12 @@ from typing import Optional
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
-    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QTableWidget,
+    QLabel, QLineEdit, QMessageBox, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -61,10 +62,11 @@ class WindowManagerTab(TranslatableMixin, QWidget):
         # Refresh/focus/close commands run from the Actions menu; the tab
         # keeps only the filter input, the window table, and the status.
         root = QVBoxLayout(self)
-        top = QHBoxLayout()
-        top.addWidget(self._filter, stretch=1)
-        root.addLayout(top)
-        root.addWidget(self._table, stretch=1)
+        root.setSpacing(12)
+        root.addWidget(Card().add(self._filter))
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def menu_actions(self) -> list:

@@ -6,9 +6,7 @@ from concurrent.futures import CancelledError
 from contextvars import copy_context
 from dataclasses import dataclass, field
 from threading import Event
-from typing import Literal, Optional
-
-from PySide6.QtCore import QObject, Signal, Slot
+from typing import Callable, Literal, Optional
 
 from je_auto_control.utils.action_journal.inspection import inspect_journal
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -38,36 +36,41 @@ class JournalReadOutcome:
     error: str = ""
 
 
-class JournalReadWorker(QObject):
-    """Read off the GUI thread; callbacks carry only IDs, counts and sanitized data."""
+def _no_report(_value: object) -> None:
+    """Progress sink for a worker run without one."""
 
-    finished = Signal(object)
-    progress = Signal(int, int)
+
+class JournalReadWorker:
+    """Read off the GUI thread; reports carry only IDs, counts and sanitized data.
+
+    Built on the GUI thread, which captures the caller's context and authority,
+    and called on a worker thread with the stop event and a progress report;
+    each report is ``(request_id, scanned)`` every hundred records.
+    """
 
     def __init__(self, request: JournalReadRequest) -> None:
-        super().__init__()
         self._request = request
         self._stop = Event()
+        self._report: Callable[[object], None] = _no_report
         self._context = copy_context()
         self._authority = DeferredAuthorization.capture()
         self._scanned = 0
 
-    @Slot()
     def request_stop(self) -> None:
         """Request cancellation without blocking the GUI or closing another thread's handle."""
         self._stop.set()
 
-    @Slot()
-    def run(self) -> None:
-        """Emit exactly one terminal result for ordinary errors or cooperative cancellation."""
-        self.finished.emit(self._context.run(self._inspect))
+    def __call__(self, stop_event: Event, report: Callable[[object], None] = _no_report) -> JournalReadOutcome:
+        """Return exactly one terminal result for ordinary errors or cooperative cancellation."""
+        self._stop, self._report = stop_event, report
+        return self._context.run(self._inspect)
 
     def _checkpoint(self, count: int) -> None:
         if self._stop.is_set():
             raise CancelledError()
         self._scanned = count
         if count % 100 == 0:
-            self.progress.emit(self._request.request_id, count)
+            self._report((self._request.request_id, count))
 
     def _inspect(self) -> JournalReadOutcome:
         request = self._request

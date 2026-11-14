@@ -41,7 +41,11 @@ Actions 選單可停止待完成的搜尋；關閉分頁會丟棄晚到結果，
 
 自動點擊、錄製與腳本執行分頁各自持有控制項與背景工作；關閉會停止本頁工作，重開會建立新的輸入欄位。共用錄製器不隨分頁關閉，重開後會讀取後端狀態，不支援查詢時顯示未知；此狀態不代表原生掛鉤健康檢查。Ctrl+4 仍可停止腳本與自動點擊。
 
-View → 執行詳情（Ctrl+Shift+D）可展開右側詳情。診斷分頁會提供實際進度、停止、結果與錯誤狀態；其他分頁尚未提供時會明確顯示。切換或關閉分頁會斷開其更新。嵌入程式可將 TabRegistry 傳入 WorkspaceShell；AutoControlGUIWidget(parent) 仍可使用。
+啟動時開著的三個分頁只先建立 Record；Script Builder 與 Remote Desktop 在第一次被選取時才建立，啟動時間與記憶體約減半。
+
+View → 執行詳情（Ctrl+Shift+D）可展開右側詳情。診斷分頁會提供實際進度、停止、結果與錯誤狀態，其他在背景執行工作的分頁（模型請求、USB 列舉、廣播、DAG 執行、日誌讀取）也會：執行中、停止中，然後是完成、已取消或錯誤，工作有回報進度時一併顯示。尚未執行過工作的分頁會明確顯示沒有詳情。切換或關閉分頁會斷開其更新。嵌入程式可將 TabRegistry 傳入 WorkspaceShell；AutoControlGUIWidget(parent) 仍可使用。
+
+每個分頁開頭都有標題與一行用途說明，控制項依用途分組在卡片上；核取方塊與選項按鈕以主題強調色繪製，深色主題下也看得清楚。控制項會隨視窗縮小，不再撐寬頁面：下拉選單不再以最長項目決定寬度，表單欄位放不下時標籤移到欄位上方，長說明會自動換行。視窗會依寬度重新排列：1,200 px 以上，導覽與執行詳情並排在分頁兩側；較窄時詳情改為覆蓋在分頁上的抽屜；800 px 以下導覽縮成窄圖示欄，按其選單鈕或 Ctrl+K 以抽屜開啟功能清單（Escape 或點擊旁邊即關閉）。因寬度隱藏導覽不會改動已儲存的偏好。
 
 WebRTC 統計輪詢在背景啟動，停止後會捨棄晚到的樣本。
 
@@ -74,6 +78,8 @@ WebRTC host/viewer 的 `stop()` 最多等待三秒完成軟體清理。`PeerStop
 主機檔案請求會保留原傳送工作，直到工作執行緒退出，重複停止也不會提前釋放所有權。停止會通知取消並等候原工作；無法中斷的後端操作仍可能讓停止維持待完成。
 
 MCP 唯讀標記不授予 viewer 存取權。已審查的即時畫面與呼叫者資料運算使用 `read_screen`；檔案、裝置資料及未知工具需要 `read_data`。別名共用標準名稱的權限，較強的明確設定優先。提供影像來源、從環境變數讀取設定欄位或規劃開啟本機檔案時需要 `read_data`。Anchor locator 的 accessibility／OCR 允許觀測即時畫面，影像範本需要 `read_data`，VLM 請求需要 `drive_input`。唯讀呼叫拒絕擷取產物及 VLM 分支，目錄排除可自選 ADB 執行檔的工具。MCP CI annotations 只回傳格式化文字，不寫入 stdout。未審查的 plugin 與 WebRunner 初始化工具不列入唯讀目錄，等待相依版本的個別審查。
+
+MCP 的 `tools/call` 以可停止的執行進行，列為 `mcp-…`。`notifications/cancelled` 會停掉它：`ac_execute_actions` 的動作清單在下一個動作前停下，`ac_wait_for_image`／`ac_wait_for_pixel` 在輪詢中途醒來；該次呼叫以 `-32800` 回覆。`ac_stop_execution` 與其他停止請求以同樣方式結束它，回報為工具錯誤。已經進到後端的單一指令仍會先跑完。
 
 REST 主機資料讀取與對應 MCP 權限一致：排程、遠端 session、USB passthrough 狀態、loopback／remote 裝置清單及診斷需要 `read_data`。對應已註冊的狀態指令、`AC_probe_capabilities` 與 `AC_diagnose` 會在執行提供者之前檢查權限。唯讀標記不授予 viewer 存取權；operator／admin 仍可使用。USB 列舉／事件、保留的 inspector 統計與程序 metrics 也需要 `read_data`；`AC_list_usb_devices`、`AC_usb_recent_events`、`AC_inspector_recent`、`AC_inspector_summary` 同樣檢查此權限。Dashboard 各面板分別顯示缺少的權限並清除舊資料；session 重新整理成功後也會清除先前的錯誤狀態。未列入權限表格的 executor 指令仍屬另一項審查範圍。
 

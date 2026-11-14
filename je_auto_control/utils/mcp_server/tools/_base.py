@@ -183,6 +183,9 @@ class MCPTool:
 
         A source path policy follows managed submissions through legacy wrappers.
         Task-aware dispatch resolves this lazily carried policy's private metadata.
+
+        A call from the server runs as its own stoppable executor run, which
+        the client's ``notifications/cancelled`` stops (``mcp_server._call_run``).
         """
         if self.enforce_readonly_arguments:
             from je_auto_control.utils.mcp_server.tools._readonly import check_readonly_arguments
@@ -190,8 +193,10 @@ class MCPTool:
         from je_auto_control.utils.script_vars.execution import execution_scope
         from je_auto_control.utils.agent_runtime.origin_policy import source_policy_scope
         from je_auto_control.utils.mcp_server._call_authority import invocation_authority
+        from je_auto_control.utils.mcp_server._call_run import tool_call_run
         policy = getattr(ctx, "path_policy", None)
-        with execution_scope(), source_policy_scope(policy), invocation_authority(self, arguments, ctx):
+        with execution_scope(), source_policy_scope(policy), invocation_authority(self, arguments, ctx), \
+                tool_call_run(ctx):
             if ctx is not None and _handler_accepts_ctx(self.handler):
                 return self.handler(ctx=ctx, **arguments)
             return self.handler(**arguments)
