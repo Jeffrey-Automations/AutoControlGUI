@@ -20,7 +20,8 @@ def console(tmp_path):
     # One host at a time, so "not reached yet" is well defined.
     client = AdminConsoleClient(persist_path=tmp_path / "hosts.json", max_parallel=1)
     for label in _HOSTS:
-        client.add_host(label, f"http://{label}.example", "tok")  # NOSONAR python:S5332  # reason: no network, _http_post is faked
+        # No network: the HTTP call is faked.
+        client.add_host(label, f"http://{label}.example", "tok")  # NOSONAR python:S5332
     return client
 
 

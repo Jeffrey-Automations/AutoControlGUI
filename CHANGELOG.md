@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- `AdminConsoleClient.poll_all` and `fetch_thumbnails` observe a bound cancellation scope: once
+  cancelled, hosts not reached yet are skipped and `CancelledError` is raised after the requests
+  already out return. Unscoped calls (`AC_admin_poll`, scripts) are unchanged. GUI: the Admin
+  Console tab's health poll and thumbnail round are cancellable tasks with a 60 s deadline
+  (`POLL_DEADLINE_S`) and **Stop polling** in the Actions menu; `_PollWorker`,
+  `_ThumbnailWorker`, `_poll_thread` and `_thumb_thread` are gone (`_polls`, `_thumbs`).
+
 - GUI internals: the DAG Runner tab runs on `TabTask.start_until_stopped`. `_DagWorker` is no
   longer a `QObject`: it is built on the GUI thread (keeping that context) and called with the
   stop event, returning the result instead of emitting `finished` / `failed`. `_thread` and

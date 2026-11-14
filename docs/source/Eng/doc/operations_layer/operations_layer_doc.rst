@@ -446,7 +446,10 @@ Persistence: hosts are saved to ``~/.je_auto_control/admin_hosts.json``
 
 Health probe uses ``/sessions`` (an authenticated endpoint), so a host
 with the wrong token shows up as unhealthy with an ``HTTP 401`` error
-rather than a misleading "reachable but useless" status.
+rather than a misleading "reachable but useless" status. ``poll_all`` and
+``fetch_thumbnails`` observe the caller's cancellation scope too: once it is
+cancelled, the hosts not reached yet are skipped and ``CancelledError`` is
+raised when the requests already out have returned.
 
 Executor commands::
 
@@ -456,7 +459,9 @@ Executor commands::
 GUI: *Admin Console* tab — register host form, hosts table with
 health/latency/jobs columns, broadcast textarea. **Stop broadcast** skips the
 hosts not sent to yet; the results still list every host, and the line under
-them reads *Sent to n of m hosts; k not sent.*
+them reads *Sent to n of m hosts; k not sent.* **Stop polling** ends a health
+poll or a thumbnail round still out at the hosts in flight; each has a 60 s
+deadline, and closing the tab ends them the same way.
 
 
 Audit log hash chain

@@ -133,11 +133,16 @@ class AdminConsoleClient:
         return removed
 
     def poll_all(self, *, labels: Optional[List[str]] = None) -> List[HostStatus]:
+        """Probe every host (or ``labels``), ``max_parallel`` at a time; one status per host.
+
+        Inside a cancelled cancellation scope the hosts not probed yet are
+        skipped and :class:`concurrent.futures.CancelledError` is raised once
+        the probes already out have returned.
+        """
         targets = self._resolve_targets(labels)
         if not targets:
             return []
-        with ThreadPoolExecutor(max_workers=self._max_parallel) as pool:
-            return list(pool.map(self._poll_one, targets))
+        return self._map_unless_cancelled(self._poll_one, targets)
 
     def fetch_thumbnails(self, *, labels: Optional[List[str]] = None,
                          ) -> Dict[str, Optional[bytes]]:
@@ -145,7 +150,9 @@ class AdminConsoleClient:
 
         Returns ``label → png_bytes`` (or ``None`` on a host that
         errored). The Cross-host Dashboard polls this on a timer and
-        scales the resulting image down to a thumbnail tile.
+        scales the resulting image down to a thumbnail tile. A cancelled
+        cancellation scope skips the hosts not reached yet and raises
+        :class:`concurrent.futures.CancelledError`, as :meth:`poll_all` does.
         """
         import base64
         targets = self._resolve_targets(labels)
@@ -170,9 +177,21 @@ class AdminConsoleClient:
             except ValueError:  # binascii.Error is one
                 return host.label, None
 
+        return dict(self._map_unless_cancelled(grab, targets))
+
+    def _map_unless_cancelled(self, call: Callable[[AdminHost], Any], targets: List[AdminHost]) -> List[Any]:
+        """``call`` over ``targets`` in the pool; a cancelled scope skips the rest and raises ``CancelledError``."""
+        # Read in the caller's thread: the pool's threads do not see its scope.
+        token = current_cancellation_token()
+
+        def one(host: AdminHost) -> Any:
+            return None if token is not None and token.is_cancelled else call(host)
+
         with ThreadPoolExecutor(max_workers=self._max_parallel) as pool:
-            results = list(pool.map(grab, targets))
-        return dict(results)
+            results = list(pool.map(one, targets))
+        if token is not None:
+            token.checkpoint()
+        return results
 
     def broadcast_execute(self, actions: List[Any],
                           *, labels: Optional[List[str]] = None,

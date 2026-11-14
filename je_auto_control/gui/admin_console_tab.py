@@ -4,13 +4,17 @@ A broadcast runs as a :class:`~je_auto_control.gui._tab_task.TabTask`. Its
 Stop skips the hosts not sent to yet and still shows every host's row, with
 ``sent`` saying whether the actions went there; closing the tab does the same
 skipping and drops the rows.
+
+The health poll and the thumbnail fetch are tasks too, with a deadline and
+**Stop polling** in the Actions menu: stopping either, or closing the tab,
+skips the hosts not reached yet and drops the answer.
 """
 import functools
 import json
 import threading
 from typing import Dict, List, Optional
 
-from PySide6.QtCore import QObject, QSize, QTimer, Qt, Signal
+from PySide6.QtCore import QSize, QTimer, Qt
 from PySide6.QtGui import QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
@@ -21,58 +25,24 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
-from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
+from je_auto_control.gui.tab_task_controller import TaskTimeout
 from je_auto_control.utils.admin.admin_client import (
-    AdminConsoleClient, default_admin_console,
+    default_admin_console,
 )
+from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+
+#: How long one poll or thumbnail round may take before the tab gives up on it.
+POLL_DEADLINE_S = 60.0
 
 
 def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
-
-
-class _PollWorker(QObject):
-    """Background poller — runs ``client.poll_all`` off the GUI thread."""
-
-    finished = Signal(list)
-    failed = Signal(str)
-
-    def __init__(self, client: AdminConsoleClient,
-                 labels: Optional[List[str]] = None) -> None:
-        super().__init__()
-        self._client = client
-        self._labels = labels
-
-    def run(self) -> None:
-        try:
-            result = self._client.poll_all(labels=self._labels)
-        except (OSError, RuntimeError, ValueError) as error:
-            self.failed.emit(str(error))
-            return
-        self.finished.emit(result)
-
-
-class _ThumbnailWorker(QObject):
-    """Phase 6.5 GUI: poll fetch_thumbnails off the GUI thread."""
-
-    finished = Signal(dict)
-
-    def __init__(self, client: AdminConsoleClient) -> None:
-        super().__init__()
-        self._client = client
-
-    def run(self) -> None:
-        try:
-            result = self._client.fetch_thumbnails()
-        except (OSError, RuntimeError, ValueError):
-            result = {}
-        self.finished.emit(result)
 
 
 class AdminConsoleTab(TranslatableMixin, QWidget):
@@ -99,7 +69,10 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._actions_input.setPlaceholderText('[["AC_get_mouse_position"]]')
         self._broadcast_output = QTextEdit()
         self._broadcast_output.setReadOnly(True)
-        self._poll_thread: Optional[WorkerHandle] = None
+        # Closing the tab, Stop polling or the deadline skip the hosts not reached yet.
+        self._polls = TabTask(self)
+        self._polls.result.connect(self._apply_poll_result)
+        self._polls.error.connect(self._apply_poll_failure)
         self._broadcast_status = QLabel()
         self._broadcast_status.setWordWrap(True)
         set_role(self._broadcast_status, "hint")
@@ -121,7 +94,9 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._thumb_interval.valueChanged.connect(self._on_thumb_interval_changed)
         self._thumb_timer = QTimer(self)
         self._thumb_timer.timeout.connect(self._refresh_thumbnails)
-        self._thumb_thread: Optional[WorkerHandle] = None
+        self._thumbs = TabTask(self)
+        self._thumbs.result.connect(self._apply_thumbnails)
+        self._thumbs.error.connect(self._on_thumbnails_failed)
         self._build_layout()
         self._refresh_table()
         self._apply_thumb_interval()
@@ -158,6 +133,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
             ("admin_add", self._on_add),
             ("admin_remove", self._on_remove),
             ("admin_refresh", self._on_refresh),
+            ("admin_poll_stop", self._on_poll_stop),
             ("admin_thumb_refresh_now", self._refresh_thumbnails),
             ("admin_broadcast_run", self._on_broadcast),
             ("admin_broadcast_stop", self._on_broadcast_stop),
@@ -215,12 +191,12 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._refresh_table()
 
     def _on_refresh(self) -> None:
-        if self._poll_thread is not None:
-            return
-        self._poll_thread = start_worker(
-            self, _PollWorker(self._client),
-            on_done=self._apply_poll_result, on_fail=self._apply_poll_failure,
-            on_thread_done=self._on_poll_thread_done)
+        self._polls.start(self._client.poll_all, timeout_s=POLL_DEADLINE_S)
+
+    def _on_poll_stop(self) -> None:
+        """Cancel the poll and the thumbnail fetch still out; the hosts not reached yet are skipped."""
+        self._polls.stop()
+        self._thumbs.stop()
 
     def _on_broadcast(self) -> None:
         text = self._actions_input.toPlainText().strip()
@@ -266,11 +242,9 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
     def _apply_poll_result(self, statuses: list) -> None:
         self._refresh_table(statuses=statuses)
 
-    def _apply_poll_failure(self, message: str) -> None:
+    def _apply_poll_failure(self, error: object) -> None:
+        message = _t("task_timed_out") if isinstance(error, TaskTimeout) else str(error)
         QMessageBox.warning(self, _t("admin_refresh"), message)
-
-    def _on_poll_thread_done(self) -> None:
-        self._poll_thread = None
 
     # --- live thumbnails (Phase 6.5 GUI) -------------------------------
 
@@ -285,17 +259,13 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._thumb_timer.start(seconds * 1000)
 
     def _refresh_thumbnails(self) -> None:
-        if self._thumb_thread is not None:
-            return
-        # start_worker releases the worker and its relay on finish, so one
-        # poll tick no longer leaves one of each behind.
-        self._thumb_thread = start_worker(
-            self, _ThumbnailWorker(self._client),
-            on_done=self._apply_thumbnails,
-            on_thread_done=self._on_thumb_thread_done)
+        # A tick while the previous fetch is still out is skipped.
+        self._thumbs.start(self._client.fetch_thumbnails, timeout_s=POLL_DEADLINE_S)
 
-    def _on_thumb_thread_done(self) -> None:
-        self._thumb_thread = None
+    def _on_thumbnails_failed(self, error: object) -> None:
+        # A failed round shows every host as a placeholder, as an empty answer does.
+        autocontrol_logger.info("admin: thumbnail round failed: %r", error)
+        self._apply_thumbnails({})
 
     def _apply_thumbnails(self, png_by_label: Dict[str, Optional[bytes]]) -> None:
         """Paint every host as one tile; placeholder when fetch failed."""

@@ -426,6 +426,7 @@ english_word_dict = {
     "admin_add": "Add",
     "admin_remove": _REMOVE_SELECTED,
     "admin_refresh": "Poll all",
+    "admin_poll_stop": "Stop polling",
     "admin_label": "Label:",
     "admin_url": "Base URL:",
     "admin_token": _TOKEN_LABEL,

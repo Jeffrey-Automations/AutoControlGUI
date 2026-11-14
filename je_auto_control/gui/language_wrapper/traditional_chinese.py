@@ -298,6 +298,7 @@ traditional_chinese_word_dict = {
     "admin_add": "新增",
     "admin_remove": "移除所選",
     "admin_refresh": "全部輪詢",
+    "admin_poll_stop": "停止輪詢",
     "admin_label": "標籤:",
     "admin_url": "基底 URL:",
     "admin_token": "權杖:",

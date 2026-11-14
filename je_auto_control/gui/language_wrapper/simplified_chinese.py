@@ -291,6 +291,7 @@ simplified_chinese_word_dict = {
     "admin_add": "添加",
     "admin_remove": "移除所选",
     "admin_refresh": "全部轮询",
+    "admin_poll_stop": "停止轮询",
     "admin_label": "标签:",
     "admin_url": "基础 URL:",
     "admin_token": "令牌:",

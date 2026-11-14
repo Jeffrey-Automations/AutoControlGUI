@@ -320,6 +320,7 @@ japanese_word_dict = {
     "admin_add": "追加",
     "admin_remove": _REMOVE_SEL_FW,
     "admin_refresh": "全件ポーリング",
+    "admin_poll_stop": "ポーリングを停止",
     "admin_label": "ラベル:",
     "admin_url": "ベース URL:",
     "admin_token": _TOKEN_LABEL,
