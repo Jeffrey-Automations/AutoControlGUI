@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,537 |
-| 程式碼總行數 | 235,876 |
+| 程式碼總行數 | 235,884 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1394,7 +1394,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | inspector | `inspector_tab.py` | 133 | WebRTC 檢測器：即時摘要與近期統計取樣。 |
 | usb_devices | `usb_devices_tab.py` | 175 | 唯讀列舉 + 熱插拔監看控制。 |
 | usb_browser | `usb_browser_tab.py` | 277 | 檢視端 USB 裝置瀏覽器。 |
-| usb_share | `usb_passthrough_panel.py` + `usb_passthrough_prompt.py` | 770 | AnyDesk 風格 USB 直通面板與主機端 ACL 授權對話框。 |
+| usb_share | `usb_passthrough_panel.py` + `usb_passthrough_prompt.py` | 778 | AnyDesk 風格 USB 直通面板與主機端 ACL 授權對話框。 |
 | diagnostics | `diagnostics_tab.py` | 235 | Actions 提供被動快照、背景主動診斷與停止；四語進度／重試、關閉後結果隔離；不自動取得授權。 |
 | report | `_report_tab.py` | 106 | 產生 HTML／JSON／XML 報表。 |
 
@@ -1543,7 +1543,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 160 | 42,628 |
+| `gui/` | 160 | 42,636 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1564,7 +1564,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,188 |
-| **總計** | **1,525** | **235,131** |
+| **總計** | **1,525** | **235,139** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

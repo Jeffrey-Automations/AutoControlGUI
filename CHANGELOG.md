@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- GUI: the USB passthrough panel's List shared, Open and remote REST fetch run as one
+  cancellable task with a 30 s deadline (`REQUEST_DEADLINE_S`) and **Stop run** in the Actions
+  menu, which also stops a local listing; a late answer is dropped and a second request says
+  *Already running*. `_thread`, `_run_async`, `_fail` and `_fail_remote` are gone; `_requests`
+  is the task.
+
 - GUI: the USB Browser tab's Fetch and Open run as one cancellable task with a 30 s deadline
   (`REQUEST_DEADLINE_S`) and **Stop run** in the Actions menu; a stopped, timed-out or abandoned
   request's answer is dropped, and a second request while one runs says *Already running*

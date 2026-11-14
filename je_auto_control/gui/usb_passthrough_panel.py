@@ -12,8 +12,11 @@ One simple two-pane screen:
 
 The widget is a thin wrapper: every action calls the headless
 :class:`UsbLoopback`, :class:`UsbAcl`, and ``list_usb_devices`` — no USB
-business logic lives here. Blocking calls run on a worker thread so the
-GUI stays responsive.
+business logic lives here. Blocking calls run off the GUI thread as
+:class:`~je_auto_control.gui._tab_task.TabTask` work: the local listing, and
+one use request at a time (list shared, open, remote fetch) with a deadline
+and **Stop run** in the Actions menu. A stopped, timed-out or abandoned
+request's answer is dropped.
 """
 from __future__ import annotations
 
@@ -32,7 +35,7 @@ from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui._tab_task import TabTask
-from je_auto_control.gui._worker_thread import CallWorker as _CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui.tab_task_controller import TaskTimeout
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
@@ -59,6 +62,8 @@ _DESC_REQUEST_TYPE = 0x80
 _DESC_REQUEST = 0x06
 _DESC_VALUE = 0x0100
 _DESC_LENGTH = 18
+#: How long one use request (list shared, open, remote fetch) may take before the panel gives up on it.
+REQUEST_DEADLINE_S = 30.0
 
 
 
@@ -91,7 +96,10 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         )
         self._share = _ShareState()
         self.destroyed.connect(self._share.release)
-        self._thread: Optional[WorkerHandle] = None
+        # One use request at a time: list shared, open a device, fetch a remote host.
+        self._requests = TabTask(self)
+        self._requests.result.connect(self._show_outcome)
+        self._requests.error.connect(self._show_request_error)
         # Closing the loopback joins its pump thread; done off the GUI thread.
         self._share_op = SlowOp(self)
         self._host_badge = _StatusBadge()
@@ -150,6 +158,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
             ("usb_share_fetch_shared", self._list_shared),
             ("usb_share_open_selected", self._open_selected),
             ("usb_share_remote_fetch", self._fetch_remote),
+            ("task_stop", self._on_stop),
         ]
 
     def _build_host_section(self) -> QWidget:
@@ -412,8 +421,8 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         client = self._use_client_or_warn()
         if client is None:
             return
-        self._viewer_status.setText(_t("usb_share_listing"))
-        self._run_async(client.list_devices, self._apply_shared, self._fail)
+        if self._start(client.list_devices, "shared"):
+            self._viewer_status.setText(_t("usb_share_listing"))
 
     def _apply_shared(self, devices: List[dict]) -> None:
         self._viewer_status.setText(
@@ -439,14 +448,10 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         vid = self._cell(self._shared_table, row, 0)
         pid = self._cell(self._shared_table, row, 1)
         serial = self._cell(self._shared_table, row, 3) or None
-        self._viewer_status.setText(
-            _t("usb_share_opening").format(vid=vid, pid=pid),
-        )
-        self._run_async(
-            lambda: _probe_device(client, vid, pid, serial),
-            functools.partial(self._opened, vid, pid),
-            self._fail,
-        )
+        if self._start(functools.partial(_probe_labelled, client, vid, pid, serial), "open"):
+            self._viewer_status.setText(
+                _t("usb_share_opening").format(vid=vid, pid=pid),
+            )
 
     def _opened(self, vid: str, pid: str, descriptor: bytes) -> None:
         self._viewer_status.setText(
@@ -460,37 +465,35 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
     def _fetch_remote(self) -> None:
         url = self._remote_url.text().strip()
         token = self._remote_token.text().strip()
-        self._viewer_status.setText(_t("usb_browser_fetching"))
-        self._run_async(
-            lambda: fetch_remote_devices(base_url=url, token=token),
-            self._apply_shared, self._fail_remote,
-        )
+        if self._start(functools.partial(fetch_remote_devices, base_url=url, token=token), "remote"):
+            self._viewer_status.setText(_t("usb_browser_fetching"))
 
-    def _fail_remote(self, message: str) -> None:
-        self._viewer_status.setText(
-            _t("usb_browser_fetch_failed").format(error=message),
-        )
+    # --- request plumbing --------------------------------------------------
 
-    def _fail(self, message: str) -> None:
-        self._viewer_status.setText(
-            _t("usb_share_open_failed").format(error=message),
-        )
+    def _start(self, work: Callable[[], Any], tag: str) -> bool:
+        if self._requests.start(work, tag=tag, timeout_s=REQUEST_DEADLINE_S):
+            return True
+        self._viewer_status.setText(_t("task_busy"))
+        return False
 
-    # --- worker plumbing ---------------------------------------------------
+    def _on_stop(self) -> None:
+        stopped = self._requests.stop()
+        stopped = self._listing.stop() or stopped
+        if stopped:
+            self._viewer_status.setText(_t("task_stopped"))
 
-    def _run_async(self, fn: Callable[[], Any],
-                   on_done: Callable[[Any], None],
-                   on_fail: Callable[[str], None]) -> None:
-        if self._thread is not None:
+    def _show_outcome(self, value: Any) -> None:
+        if self._requests.tag == "open":
+            self._opened(*value)
+        else:
+            self._apply_shared(value)
+
+    def _show_request_error(self, error: object) -> None:
+        if isinstance(error, TaskTimeout):
+            self._viewer_status.setText(_t("task_timed_out"))
             return
-        # start_worker runs on_done / on_fail on the GUI thread, where they may
-        # touch widgets, and holds them weakly: pass methods (or partials of
-        # them), not lambdas over this panel.
-        self._thread = start_worker(self, _CallWorker(fn), on_done=on_done,
-                                    on_fail=on_fail, on_thread_done=self._on_thread_done)
-
-    def _on_thread_done(self) -> None:
-        self._thread = None
+        key = "usb_browser_fetch_failed" if self._requests.tag == "remote" else "usb_share_open_failed"
+        self._viewer_status.setText(_t(key).format(error=error))
 
     # --- helpers -----------------------------------------------------------
 
@@ -560,6 +563,11 @@ def _default_remote_client() -> Optional[Any]:
     except ImportError:
         return None
     return registry.webrtc_usb_client()
+
+
+def _probe_labelled(client: Any, vid: str, pid: str, serial: Optional[str]) -> tuple:
+    """Probe the device; return ``(vid, pid, descriptor)`` for the status line."""
+    return vid, pid, _probe_device(client, vid, pid, serial)
 
 
 def _probe_device(client: Any, vid: str, pid: str,

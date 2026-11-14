@@ -389,6 +389,9 @@ What is *not* shipped yet
   (WebRTC)* and the List / Open buttons run against the live WebRTC
   viewer's host (via ``registry.webrtc_usb_client()``); pick *Local
   (loopback)* for same-machine use. You can also drive it from Python.
+  The panel's List, Open and remote REST fetch run one at a time, with
+  **Stop run** in the Actions menu and a 30 s deadline, so a peer that
+  stops answering no longer holds the panel; a late answer is dropped.
 - Windows WinUSB and macOS IOKit transfer paths are written but not yet
   validated against real hardware. Do not use in production until the
   Phase 2e hardware test matrix passes.

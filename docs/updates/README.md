@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-18 | 2026-11-14 | The USB passthrough panel's use requests get a Stop and a deadline | #done #gui #usb | [2026-11-b](2026-11-b.md) |
 | U-20261114-17 | 2026-11-14 | The USB Browser's Fetch and Open get a Stop and a deadline | #done #gui #usb | [2026-11-b](2026-11-b.md) |
 | U-20261114-16 | 2026-11-14 | A stopped admin broadcast reports per host whether it was sent | #done #gui #admin | [2026-11-b](2026-11-b.md) |
 | U-20261114-15 | 2026-11-14 | Stop and closing the tab cancel an email Poll Now between mailboxes | #done #gui #triggers | [2026-11-b](2026-11-b.md) |

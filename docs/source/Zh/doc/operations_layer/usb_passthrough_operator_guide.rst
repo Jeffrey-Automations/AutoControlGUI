@@ -349,7 +349,8 @@ JSON action 範例::
   / ``open`` / ``resume``\ ）。*USB 分享* 面板有 **來源** 下拉：選
   *遠端(WebRTC)* 時 List / Open 會對 live WebRTC viewer 的主機操作
   （經 ``registry.webrtc_usb_client()``\ ）；選 *本機(loopback)* 則走同機。
-  亦可從 Python 驅動。
+  亦可從 Python 驅動。面板的 List、Open 與遠端 REST 抓取一次只跑一個，
+  Actions 選單有\ **停止執行**\ ，期限 30 秒，不再回應的對端不會卡住面板；遲來的回應會被丟棄。
 - Windows WinUSB 與 macOS IOKit 的 transfer 路徑已寫但尚未對實體硬體
   驗證。在 Phase 2e 硬體測試矩陣通過前請勿用於 production。
 - Phase 2e 外部安全審查尚未簽核；feature flag 必須維持顯式 opt-in。
