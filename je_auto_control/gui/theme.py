@@ -148,6 +148,10 @@ QLabel[role="pageSubtitle"], QLabel[role="hint"] {{ color: {text_muted}; }}
 QLabel[role="sectionTitle"] {{ font-weight: 600; color: {text}; }}
 QLabel[role="emptyMessage"] {{ color: {text_muted}; }}
 QLabel[role="danger"] {{ color: {danger}; }}
+QFrame[role="banner"] {{ background-color: {surface}; border: 1px solid {border}; border-left: 4px solid {border};
+    border-radius: {radius_large}px; }}
+QFrame[role="banner"][kind="error"] {{ border-color: {danger}; }}
+QFrame[role="banner"][kind="permission"] {{ border-color: {warning}; }}
 QLabel[role="success"] {{ color: {success}; }}
 QLabel[role="warning"] {{ color: {warning}; }}
 QLabel[role="accent"] {{ color: {accent}; }}

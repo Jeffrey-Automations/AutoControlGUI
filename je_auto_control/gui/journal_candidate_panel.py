@@ -27,6 +27,9 @@ def _t(key: str) -> str:
 class JournalCandidatePanel(TranslatableMixin, QWidget):
     """Review a journal candidate before choosing a separate import or archive export."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ("AC_generate_candidate_from_log",)
+
     def __init__(self, parent: Optional[QWidget] = None, *, baseline: str = "[]",
                     on_import: Optional[Callable[[CandidateScript], None]] = None) -> None:
         super().__init__(parent)

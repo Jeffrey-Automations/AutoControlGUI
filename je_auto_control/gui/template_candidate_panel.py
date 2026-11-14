@@ -30,6 +30,9 @@ def _t(key: str) -> str:
 class TemplateCandidatePanel(TranslatableMixin, QWidget):
     """Operate only through Actions, with a concrete reviewed revision before file transitions."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ("AC_template_candidate_preview",)
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()

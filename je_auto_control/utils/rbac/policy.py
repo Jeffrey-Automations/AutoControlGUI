@@ -29,7 +29,7 @@ and egress policy, its secrets vault and its audit log.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Dict, Iterator, Optional, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
 from je_auto_control.utils.rbac.authorization import (
     AuthorizationContext, AuthorizationError, current_authorization,
@@ -416,6 +416,21 @@ def authorize_command(name: Any) -> None:
             f"has role {context.role!r}", capability=needed)
 
 
+def refused_commands(names: Iterable[str],
+                     context: Optional[AuthorizationContext] = None) -> List[str]:
+    """The ``names`` that :func:`authorize_command` would refuse for ``context``, in order.
+
+    ``context`` defaults to the current caller; outside any RBAC scope nothing
+    is refused, and a command not listed in :data:`COMMAND_CAPABILITIES` never
+    is -- the same rule ``authorize_command`` applies, without raising.
+    """
+    caller = context if context is not None else current_authorization()
+    if caller is None:
+        return []
+    return [name for name in names
+            if name in COMMAND_CAPABILITIES and not caller.allows(COMMAND_CAPABILITIES[name])]
+
+
 def denied_command_in(payload: Any,
                       context: AuthorizationContext) -> Optional[Tuple[str, str]]:
     """``(command, capability)`` for the first privileged command ``context`` may not run.
@@ -456,5 +471,5 @@ __all__ = [
     "COMMAND_CAPABILITIES", "DATA_ROUTES", "DATA_TOOLS", "REST_ROUTE_CAPABILITIES",
     "TOOL_CAPABILITIES",
     "authorize_command", "capability_for_command", "capability_for_route",
-    "capability_for_tool", "denied_command_in",
+    "capability_for_tool", "denied_command_in", "refused_commands",
 ]

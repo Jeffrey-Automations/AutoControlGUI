@@ -19,6 +19,9 @@ from je_auto_control.utils.rbac.policy import authorize_command
 class MCPDiscoveryView(QWidget):
     """Inspect the local default registry without starting a server or granting access."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ("AC_mcp_tool_search",)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.query, self.name = QLineEdit(), QLineEdit()

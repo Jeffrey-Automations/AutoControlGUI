@@ -33,6 +33,9 @@ _COLUMNS = ("sequence", "status", "command", "run_id", "step_id", "parent_id")
 class JournalBrowser(TranslatableMixin, QWidget):
     """Inspect an explicit file or a selected history link without executing its contents."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ("AC_journal_read",)
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()

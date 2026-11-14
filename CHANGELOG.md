@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- GUI: every workspace page has a banner under its header (`gui/adaptive/page_banner.py`): a
+  failed background run (*The last run failed:*), a run refused by RBAC (*Not permitted:*), and,
+  inside an RBAC scope, the commands the active role cannot run. Panels declare theirs in a
+  `REQUIRED_COMMANDS` class attribute (journal browser, self-healing comparison, journal and
+  template candidates, Config Sync, Diagnostics, MCP discovery). New
+  `utils.rbac.policy.refused_commands(names, context=None)`; four new catalogue keys
+  (`page_banner_*`).
+
 - GUI: every table, list and tree on a workspace page shows an empty state (*Nothing to show
   yet.*) while it has no rows. New `gui/adaptive/empty_views.py` (`show_empty_states`,
   `NO_EMPTY_STATE` to opt a view out); two new catalogue keys, `empty_view` and

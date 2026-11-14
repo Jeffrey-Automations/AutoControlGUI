@@ -39,6 +39,9 @@ def _t(key: str) -> str:
 class ConfigSyncTab(TranslatableMixin, QWidget):
     """No connection, source capture, activation or credential lookup occurs when the tab is constructed."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ('AC_sync_workspace',)
+
     def __init__(self, parent: Optional[QWidget] = None, *, path_policy: Optional[PathPolicy] = None) -> None:
         super().__init__(parent)
         self._tr_init()

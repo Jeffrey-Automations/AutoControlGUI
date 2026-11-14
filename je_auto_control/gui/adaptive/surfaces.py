@@ -151,7 +151,10 @@ def add_page_header(page: QWidget, title_key: str, subtitle_key: str = "") -> Op
 
 
 def retranslate_surfaces(root: QWidget) -> None:
-    """Re-read every card title, page header and empty state under ``root`` in the active language."""
+    """Re-read every card title, page header, page banner and empty state under ``root`` in the active language."""
+    from je_auto_control.gui.adaptive.page_banner import PageBanner  # reason: page_banner imports this module
+    for banner in root.findChildren(PageBanner):
+        banner.retranslate()
     for header in root.findChildren(PageHeader):
         header.retranslate()
     for card in root.findChildren(Card):

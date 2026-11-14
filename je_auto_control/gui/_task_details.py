@@ -2,7 +2,8 @@
 
 The workspace's details pane shows what the current page's
 :class:`~je_auto_control.gui.workspace_details.ExecutionDetailsSource`
-publishes. A tab task finds its page -- the widget the workspace holds as a
+publishes, and the page's :class:`~je_auto_control.gui.adaptive.page_banner.PageBanner`
+reports a failed run. A tab task finds its page -- the widget the workspace holds as a
 tab, which may be an ancestor of the panel that owns the task -- and creates
 that source the first time it runs, so every page that runs background work
 reports it: running, stopping, then succeeded, cancelled or error, with the
@@ -11,31 +12,18 @@ progress the work reports.
 from typing import Optional, Tuple
 
 from PySide6.QtCore import QObject, Qt
-from PySide6.QtWidgets import QScrollArea, QStackedWidget, QTabWidget, QWidget
+from PySide6.QtWidgets import QWidget
 
+from je_auto_control.gui.adaptive.page_banner import PageBanner, page_banner, page_of
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.tab_task_controller import TaskTimeout
 from je_auto_control.gui.workspace_details import ExecutionDetails, ExecutionDetailsSource, ExecutionPhase
 from je_auto_control.utils.executor.run_control import ExecutionStopped
 from je_auto_control.utils.logging.secret_scope import scrub_secret_text
+from je_auto_control.utils.rbac.authorization import AuthorizationError
 
 #: The longest error text the details pane is given.
 SUMMARY_LIMIT = 500
-
-
-def page_of(owner: QWidget) -> QWidget:
-    """The workspace page ``owner`` sits on, or ``owner`` itself when it is on no tab page."""
-    current = owner
-    while True:
-        viewport = current.parentWidget()
-        if viewport is None:
-            return owner
-        scroll = viewport.parentWidget()
-        if isinstance(scroll, QScrollArea) and scroll.widget() is current:
-            stack = scroll.parentWidget()
-            if isinstance(stack, QStackedWidget) and isinstance(stack.parentWidget(), QTabWidget):
-                return current
-        current = viewport
 
 
 def details_source_for(owner: QWidget) -> ExecutionDetailsSource:
@@ -65,10 +53,13 @@ class TaskDetails:
         self._completed = self._total = 0
 
     def started(self) -> None:
-        """A run began."""
+        """A run began; it clears the banner's report of the last one."""
         self._outcome, self._stopped = None, False
         self._completed = self._total = 0
         self._publish("running")
+        banner = self._banner()
+        if banner is not None:
+            banner.clear("error")
 
     def stopping(self) -> None:
         """Stop was requested for a run that unwinds before it ends."""
@@ -95,10 +86,24 @@ class TaskDetails:
             else:
                 summary = scrub_secret_text(f"{type(error).__name__}: {error}")[:SUMMARY_LIMIT]
             self._publish("error", summary)
+            self._report(error, summary)
         elif kind == "result" and not self._stopped:
             self._publish("succeeded")
         else:   # cancelled, stopped, or the owner went away
             self._publish("cancelled")
+
+    def _banner(self) -> Optional[PageBanner]:
+        owner = self._task.parent()
+        return page_banner(owner) if isinstance(owner, QWidget) else None
+
+    def _report(self, error: object, summary: str) -> None:
+        banner = self._banner()
+        if banner is None:
+            return
+        if isinstance(error, AuthorizationError):
+            banner.show_refusal(summary)
+        else:
+            banner.show_error(summary)
 
     def _publish(self, phase: ExecutionPhase, summary: str = "") -> None:
         owner = self._task.parent()

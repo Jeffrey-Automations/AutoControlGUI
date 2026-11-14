@@ -73,6 +73,9 @@ def _case_row(row: HealingAttempt) -> list[str]:
 class HealingEvaluationPanel(TranslatableMixin, QWidget):
     """Run comparisons through Actions; show explicit populations and selected case details."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ("AC_self_heal_evaluate",)
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()

@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QAbstractButton, QScrollArea, QTabBar, QTabWidget,
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.adaptive.overlay import OverlayDrawer
 from je_auto_control.gui.adaptive.empty_views import show_empty_states
+from je_auto_control.gui.adaptive.page_banner import add_page_banner, refresh_permission
 from je_auto_control.gui.adaptive.responsive import fit_to_width
 from je_auto_control.gui.adaptive.surfaces import add_page_header, retranslate_surfaces
 from je_auto_control.gui.tab_registry import MenuActions, TabEntry, TabRegistry, WidgetFactory
@@ -303,6 +304,8 @@ class WorkspaceShell(TranslatableMixin, QWidget):
             self._details_connection = None
         self._details_source = None
         page = self.tabs.currentWidget()
+        if page is not None:
+            refresh_permission(page)
         source = None if page is None else page.findChild(
             ExecutionDetailsSource, options=Qt.FindChildOption.FindDirectChildrenOnly,
         )
@@ -372,6 +375,7 @@ class WorkspaceShell(TranslatableMixin, QWidget):
         entry = self._find_entry(key)
         if entry is not None:
             add_page_header(page, entry.title_key, f"{entry.title_key}_subtitle")
+        add_page_banner(page)
         fit_to_width(page)
         show_empty_states(page)
 

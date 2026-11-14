@@ -1389,6 +1389,11 @@ japanese_word_dict = {
     "task_timed_out": "時間がかかりすぎたため停止しました。",
     "empty_view": "まだ表示する内容はありません。",
     "empty_view_hint": "Actions メニューからコマンドを実行すると、結果がここに表示されます。",
+    "page_banner_error": "前回の実行は失敗しました：{detail}",
+    "page_banner_refused": "許可されていません：{detail}",
+    "page_banner_permission": ("現在のロール（{role}）ではこのページの {commands} を実行できません。"
+                               "管理者にアクセスを依頼してください。"),
+    "page_banner_dismiss": "閉じる",
     "stop_playback": "再生を停止",
     "record_playing": "再生中...",
     "rd_file_sending": "{name} を送信中...",

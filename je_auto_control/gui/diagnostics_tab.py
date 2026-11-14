@@ -59,6 +59,9 @@ def _diagnostic_work(runner: Callable[[], DiagnosticsReport], token: Cancellatio
 class DiagnosticsTab(TranslatableMixin, QWidget):
     """Run :func:`run_diagnostics` and render the results."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ("AC_diagnose",)
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()

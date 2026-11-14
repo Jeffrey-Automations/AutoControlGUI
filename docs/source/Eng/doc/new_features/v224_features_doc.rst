@@ -68,6 +68,15 @@ What every page gets
   clicks through, follows a replaced model, and skips header views and the
   lists inside drop-downs; a view with the ``_jeNoEmptyState`` property set is
   left alone.
+* **Page banner.** Every page gets a banner under its header
+  (``gui.adaptive.page_banner``), hidden until there is something to say. A
+  background run on the page that fails shows *The last run failed:* with the
+  error, and the next run clears it; a run the RBAC layer refuses shows *Not
+  permitted:* instead. When the GUI runs inside an RBAC scope, opening a page
+  checks the commands its panels declare in ``REQUIRED_COMMANDS`` against the
+  active role (``utils.rbac.policy.refused_commands``) and names the ones it
+  cannot run. The banner's *Dismiss* is a link, not a button: a page's
+  commands stay in the Actions menu.
 
 Building blocks
 ---------------

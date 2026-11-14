@@ -55,6 +55,11 @@ GUI 正以一組共用的自適應元件重新設計，讓每個分頁外觀一�
   （``gui.adaptive.empty_views.show_empty_states``\ ）：沒有任何列時顯示「目前沒有內容。」與
   「從 Actions 選單執行指令」的提示，第一列出現就隱藏。它不攔截滑鼠、會跟著替換的 model，
   略過表頭與下拉選單內的清單；設定了 ``_jeNoEmptyState`` 屬性的檢視不受影響。
+* **頁面橫幅。** 每頁標題下方都有一個橫幅（``gui.adaptive.page_banner``\ ），有事要說明時才出現。
+  頁面上的背景執行失敗時顯示「上次執行失敗：」與錯誤，下次執行時清除；被 RBAC 拒絕的執行改顯示「未獲許可：」。
+  GUI 在 RBAC 範圍內執行時，開啟頁面會以目前角色檢查子面板在 ``REQUIRED_COMMANDS`` 宣告的指令
+  （``utils.rbac.policy.refused_commands``\ ），列出無法執行的指令。橫幅的「關閉」是連結而不是按鈕：
+  頁面的指令仍在 Actions 選單。
 
 元件
 ----
