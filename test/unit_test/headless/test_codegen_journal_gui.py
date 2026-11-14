@@ -23,8 +23,7 @@ def panel(app):
     view = JournalCandidatePanel()
     yield view
     view.cancel()
-    if view._handle is not None:
-        view._handle.wait(5)
+    idle(app, view)
     view.close()
     view.deleteLater()
     app.processEvents()
@@ -32,10 +31,10 @@ def panel(app):
 
 def idle(app, panel):
     deadline = time.monotonic() + 5
-    while panel._handle is not None and time.monotonic() < deadline:
+    while panel._task.running and time.monotonic() < deadline:
         app.processEvents()
         time.sleep(.005)
-    assert panel._handle is None
+    assert not panel._task.running
 
 
 def test_review_shows_code_diff_manifest_and_warnings_offscreen(journal, panel, app):
@@ -131,13 +130,10 @@ def test_viewer_worker_cannot_open_source_after_leaving_registration_scope(app, 
     monkeypatch.setattr("je_auto_control.gui.journal_candidate_worker.generate_candidate_from_log", forbidden)
     with authorization_scope(AuthorizationContext("viewer", Role.VIEWER)):
         worker = JournalCandidateWorker(JournalCandidateTask(1, "generate", "private.jsonl", "selected"))
-    outcomes = []
-    worker.finished.connect(outcomes.append)
-    worker.run()
-    assert outcomes[0].status == "error"
-    assert outcomes[0].candidate is None
-    worker.deleteLater()
-    app.processEvents()
+    import threading
+    outcome = worker(threading.Event())
+    assert outcome.status == "error"
+    assert outcome.candidate is None
 
 
 def test_completed_export_is_not_relabelled_cancelled(journal, app, tmp_path, monkeypatch):
@@ -157,13 +153,9 @@ def test_completed_export_is_not_relabelled_cancelled(journal, app, tmp_path, mo
         return result
 
     monkeypatch.setattr(module, "write_candidate_archive", export)
-    outcomes = []
-    worker.finished.connect(outcomes.append)
-    worker.run()
-    assert outcomes[0].status == "ok"
+    import threading
+    assert worker(threading.Event()).status == "ok"     # stopped after the archive was committed
     assert output.exists()
-    worker.deleteLater()
-    app.processEvents()
 
 
 def test_close_cancels_generation_and_discards_late_result(journal, panel, app, monkeypatch):
@@ -212,3 +204,34 @@ def test_owned_dialog_retranslates_and_releases_language_listener(app):
         owner.close()
         owner.deleteLater()
         app.processEvents()
+
+
+def test_progress_shows_and_cancel_keeps_the_panel_busy_until_it_unwinds(journal, panel, app, monkeypatch):
+    import threading
+    from je_auto_control.gui import journal_candidate_worker as module
+    fixtures.append_step(journal, "kept")
+    reported, release = threading.Event(), threading.Event()
+
+    def slow(*_args, observer=None, **_kwargs):
+        observer(100)
+        reported.set()
+        assert release.wait(5)
+        observer(101)                     # the next record boundary sees the stop
+        pytest.fail("the generation went past a stopped checkpoint")
+
+    monkeypatch.setattr(module, "generate_candidate_from_log", slow)
+    panel._path.setText(str(journal.path))
+    panel._run_id.setText("selected")
+    panel._start_generate()
+    assert reported.wait(5)
+    deadline = time.monotonic() + 5
+    while panel._status_key != "progress" and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(.005)
+    assert (panel._status_key, panel._status_value) == ("progress", "100")
+    panel.cancel()
+    assert panel._task.running and panel._status_key == "cancelling"
+    release.set()
+    idle(app, panel)
+    assert panel._status_key == "cancelled"
+    assert panel._candidate is None

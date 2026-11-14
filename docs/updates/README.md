@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-24 | 2026-11-14 | The journal candidate panel runs on the shared task | #done #gui #codegen | [2026-11-b](2026-11-b.md) |
 | U-20261114-23 | 2026-11-14 | The journal browser runs on the shared task, which now relays progress | #done #gui #journal | [2026-11-b](2026-11-b.md) |
 | U-20261114-22 | 2026-11-14 | The self-healing comparison panel runs on the shared task | #done #gui #healing | [2026-11-b](2026-11-b.md) |
 | U-20261114-21 | 2026-11-14 | The admin console's poll and thumbnails stop at the hosts not reached yet | #done #gui #admin | [2026-11-b](2026-11-b.md) |
