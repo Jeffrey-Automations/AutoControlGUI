@@ -4,9 +4,7 @@ from concurrent.futures import CancelledError
 from contextvars import copy_context
 from dataclasses import dataclass
 from threading import Event
-from typing import Literal, Optional
-
-from PySide6.QtCore import QObject, Signal, Slot
+from typing import Callable, Literal, Optional
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.secret_scope import scrub_secret_text
@@ -51,21 +49,26 @@ class TemplateCandidateOutcome:
     error: str = ""
 
 
-class TemplateCandidateWorker(QObject):
-    """Run under captured authority; cancellation checkpoints stop before atomic writes."""
+def _no_report(_value: object) -> None:
+    """Progress sink for a worker run without one."""
 
-    finished = Signal(object)
-    progress = Signal(int, int)
+
+class TemplateCandidateWorker:
+    """Run under captured authority; cancellation checkpoints stop before atomic writes.
+
+    Built on the GUI thread, which captures that context and authority, and
+    called on a worker thread with the stop event and a progress report; each
+    report is ``(request_id, count)`` at every checkpoint.
+    """
 
     def __init__(self, request: TemplateCandidateRequest) -> None:
-        super().__init__()
         self._request = request
         self._stop = Event()
+        self._report: Callable[[object], None] = _no_report
         self._context = copy_context()
         self._authority = DeferredAuthorization.capture()
         self._last_count = 0
 
-    @Slot()
     def request_stop(self) -> None:
         """Request cooperative stop before the next candidate operation checkpoint."""
         self._stop.set()
@@ -74,12 +77,12 @@ class TemplateCandidateWorker(QObject):
         if self._stop.is_set():
             raise CancelledError()
         self._last_count = max(self._last_count, count)
-        self.progress.emit(self._request.request_id, self._last_count)
+        self._report((self._request.request_id, self._last_count))
 
-    @Slot()
-    def run(self) -> None:
-        """Emit one outcome; a successful committed write is never relabelled cancelled afterward."""
-        self.finished.emit(self._context.run(self._perform))
+    def __call__(self, stop_event: Event, report: Callable[[object], None] = _no_report) -> TemplateCandidateOutcome:
+        """Return one outcome; a successful committed write is never relabelled cancelled afterward."""
+        self._stop, self._report = stop_event, report
+        return self._context.run(self._perform)
 
     def _perform(self) -> TemplateCandidateOutcome:
         request = self._request

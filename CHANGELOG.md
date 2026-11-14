@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- GUI internals: the template candidate panel (Self-Healing) runs on
+  `TabTask.start_until_stopped(..., reports=True)`. `TemplateCandidateWorker` is no longer a
+  `QObject`: it is called with the stop event and a report of `(request_id, count)` and returns
+  its `TemplateCandidateOutcome` (`run`, `finished`, `progress` and the panel's `_handle` /
+  `_worker` are gone; `_task` is the task). A committed acceptance still reports success.
+
 - GUI internals: the journal candidate panel (Script Builder › review from journal) runs on
   `TabTask.start_until_stopped(..., reports=True)`. `JournalCandidateWorker` is no longer a
   `QObject`: it is called with the stop event and a report of `(request_id, count)` and returns
