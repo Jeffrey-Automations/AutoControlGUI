@@ -42,6 +42,17 @@ class AudioLease:
         with self._lock:
             self._admitting = True
 
+    def close_admission(self) -> None:
+        """Admit no further block or write, now; the stream itself is closed by :meth:`retire`.
+
+        Takes only this lease's short lock and makes no native call, so it is
+        safe from any thread -- including while a retire holds the owner's lock
+        around a native close, and for a caller whose authority was revoked.
+        """
+        with self._lock:
+            self._admitting = False
+            self._retiring = True
+
     @property
     def running(self) -> bool:
         with self._lock:

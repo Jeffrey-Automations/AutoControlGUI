@@ -283,6 +283,15 @@ class HostBrowser:
             return RetirementStatus(self._stopping, resources, finalized, retryable,
                                     tuple(sorted(self._failures)))
 
+    def close_admission(self) -> None:
+        """Report no further hosts, at once; :meth:`stop` still cancels the browser and closes zeroconf.
+
+        Takes only short state locks and makes no native call.
+        """
+        self._listener.retire()
+        with self._state_lock:
+            self._stopping = True
+
     def stop(self) -> None:
         """Close publication, attempt cancellation once and observe original resource completion."""
         self._listener.retire()

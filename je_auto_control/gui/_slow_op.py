@@ -86,6 +86,42 @@ def hold_failed_stop(stop: Callable[[], Any], error: object,
                 stop_custody().hold(owner.stop, error, authority=authority)
 
 
+def _admission_owners(stop: object, depth: int = 0) -> List[object]:
+    """The objects ``stop`` would stop that can close admission: bound methods' owners, through partials."""
+    if depth > 4:
+        return []
+    found: List[object] = []
+    owner = getattr(stop, "__self__", None)
+    if owner is not None and callable(getattr(owner, "close_admission", None)):
+        found.append(owner)
+    if isinstance(stop, functools.partial):
+        for inner in (stop.func, *stop.args, *stop.keywords.values()):
+            if callable(getattr(inner, "close_admission", None)) and not callable(inner):
+                found.append(inner)                  # an owner passed as an argument
+            elif callable(inner):
+                found.extend(_admission_owners(inner, depth + 1))
+    return found
+
+
+def close_admission_of(stop: Callable[[], Any]) -> int:
+    """Close admission, now, on every owner ``stop`` would stop; return how many were closed.
+
+    ``close_admission()`` takes only short locks and makes no native call, so
+    this runs on the GUI thread before the full stop is queued: a session,
+    stream or browser a panel let go of admits nothing more from that moment,
+    even while its full stop waits on a native lock -- or is refused because
+    the caller's authority was revoked.
+    """
+    closed = 0
+    for owner in _admission_owners(stop):
+        try:
+            owner.close_admission()  # type: ignore[attr-defined]  # reason: checked callable by _admission_owners
+            closed += 1
+        except Exception as error:  # noqa: BLE001  # reason: logged; the full stop is still queued
+            autocontrol_logger.warning(f"closing admission failed for {type(owner).__name__}: {error!r}")
+    return closed
+
+
 def _refuse_widgets(work: Callable[[], Any]) -> None:
     """Raise unless ``work`` is free of widgets (the controller only sees the wrapper around it)."""
     if _widgets_reachable_from(work):
@@ -199,6 +235,7 @@ class StopQueue(QObject):
         resource may still be held.
         """
         _refuse_widgets(stop)
+        close_admission_of(stop)            # at once: nothing new is admitted while the stop is queued
         controller = self._controller if self._controller is not None else task_controller()
         handle = controller.submit(functools.partial(_call, stop), owner=self)
         self._pending += 1
@@ -256,4 +293,6 @@ def stop_each(*stops: Callable[[], Any]) -> None:
         raise StopsFailed(failures)
 
 
-__all__ = ["SlowOp", "StopQueue", "StopsFailed", "app_stop_queue", "hold_failed_stop", "stop_each"]
+__all__ = [
+    "SlowOp", "StopQueue", "StopsFailed", "app_stop_queue", "close_admission_of", "hold_failed_stop", "stop_each",
+]

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Remote desktop: `close_admission()` on `AudioCapture` / `AudioPlayer` (and `AudioLease`),
+  `HostBrowser` and `MultiViewerHost` stops taking anything new at once -- audio blocks and
+  writes, discovery reports, new sessions, answers and viewer input -- without the owner's
+  native-cleanup lock or a native call; `stop()` still closes what was admitted. After it,
+  `MultiViewerHost.create_owned_session_offer` and `accept_session_answer` raise
+  `PeerStopPending`. GUI: `StopQueue.retire` closes admission on every owner a stop refers to
+  before queuing it (`close_admission_of` in `gui/_slow_op.py`).
+
 - GUI: a held failed stop whose error is a `MediaRetirementError` records the owner's retirement
   state from the snapshot the error carries (`FailedStop.detail`: admission, resources,
   finalization, failed steps); the custody never asks the owner, whose live status may wait on

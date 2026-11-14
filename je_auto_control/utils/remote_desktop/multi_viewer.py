@@ -119,7 +119,7 @@ class MultiViewerHost:
             else SessionPermissions.from_read_only(read_only)
         )
         # The sessions relay one shared track, so they map input by its origin.
-        self._dispatch = input_dispatcher or dispatcher_at(self._capture_origin)
+        self._deliver_input = input_dispatcher or dispatcher_at(self._capture_origin)
         self._ip_whitelist = list(ip_whitelist) if ip_whitelist else []
         self._on_annotation = on_annotation
         self._on_session_state = on_session_state
@@ -134,6 +134,7 @@ class MultiViewerHost:
         self._source_failed = False
         self._source: Optional[_ScreenSource] = None
         self._lock = threading.Lock()
+        self._admission_closed = False
 
     def _capture_origin(self) -> Tuple[int, int]:
         source = self._source
@@ -146,6 +147,21 @@ class MultiViewerHost:
         """
         if self._on_annotation is not None:
             self._on_annotation({**data, "screen_origin": self._capture_origin()})
+
+    def _dispatch(self, action: Mapping[str, Any]) -> Any:
+        """Hand a viewer's input on, unless admission was closed."""
+        if self._admission_closed:
+            return None
+        return self._deliver_input(action)
+
+    def close_admission(self) -> None:
+        """Accept no new session, answer or viewer input, at once; :meth:`stop_all` still closes the peers.
+
+        Takes only this host's short lock and makes no native call, so it is
+        safe from any thread and for a caller whose authority was revoked.
+        """
+        with self._lock:
+            self._admission_closed = True
 
     # --- session lifecycle --------------------------------------------------
 
@@ -180,6 +196,8 @@ class MultiViewerHost:
         other session uses it, no running screen source.
         """
         with self._lock:
+            if self._admission_closed:
+                raise PeerStopPending("admission is closed: the host is stopping")
             if self._retiring or self._source_stopping or self._source_failed:
                 raise PeerStopPending("finish retiring previous sessions before creating another")
             if self._source is None:
@@ -242,6 +260,8 @@ class MultiViewerHost:
             return SessionRetirement(session_id, self, host, source)
 
     def accept_session_answer(self, session_id: str, answer_sdp: str) -> None:
+        if self._admission_closed:
+            raise PeerStopPending("admission is closed: the host is stopping")
         host = self._require_session(session_id)
         host.accept_answer(answer_sdp)
 

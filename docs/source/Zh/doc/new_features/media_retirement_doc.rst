@@ -16,12 +16,19 @@ Zeroconf close 可重試；建構取得資源失敗仍維持不確定。單次�
 MultiViewerHost 的 ``create_owned_session_offer()`` 回傳 SDP 與原始 session 清理物件。
 排入背景工作前，可用 ``session_retirement(id)`` 取得既有連線的清理物件；
 即使 ID 重用，重試也不會停止新的連線或畫面來源。既有 tuple API 保持相容。
-GUI 斷線與丟棄 offer 路徑仍須接入此所有權。
+WebRTC host 面板的斷線與丟棄 offer 路徑都已使用這兩者。
+
+``close_admission()`` 與 ``stop()`` 分開：音訊擷取與播放、``HostBrowser`` 與 ``MultiViewerHost``
+會立即停止接收任何新東西（音訊區塊與寫入、探索回報、新的連線、answer 與 viewer 輸入），
+不取用原生清理所持的鎖、也不做原生呼叫，因此可從任何執行緒、在呼叫端權限已撤銷時使用；
+完整的 ``stop()`` 仍負責關閉已接收的部分。``HostAdvertiser`` 不接收任何東西，所以沒有這個操作。
+GUI 的 ``StopQueue`` 在排入停止前，會先對該停止涉及的每個 owner 關閉准入。
 
 Host／viewer peer 會接收建構失敗的清理 owner，並透過 ``media_failures`` 提供快取的
 不可變結果。失敗的子資源不能被覆寫；即時停用會觀測原 task 的實際完成，其他媒體與
 peer 關閉仍可獨立進行。麥克風啟動佔用中的 slot 會回報待完成，不會卡住 bridge loop
 等待鎖。延後執行的 detach 與重新協商均綁定原 peer。
 
-此 producer 單元尚未完成應用程式 caretaker、GUI 儲存成功提示、GUI 丟棄路徑，
-以及 HostBrowser 對話框所有權整合。原生驗收仍待完成；本單元使用注入的資源驗證。
+GUI 中停止失敗時，會由應用程式的停止保管者保留 owner 及其 ``MediaRetirementError`` 擷取的狀態，
+可從診斷分頁重試；錄影定稿失敗時不會顯示已儲存；LAN 瀏覽對話框把瀏覽器的停止交給應用程式擁有的佇列。
+原生驗收仍待完成；本單元使用注入的資源驗證。

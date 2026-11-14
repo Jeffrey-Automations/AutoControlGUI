@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261114-42 | 2026-11-14 | close_admission(): media owners stop taking anything new at once | #done #remote-desktop #lifecycle | [2026-11-b](2026-11-b.md) |
 | U-20261114-41 | 2026-11-14 | Diagnostics shows a held media stop's retirement state from its snapshot | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
 | U-20261114-40 | 2026-11-14 | An interruption's attached cleanup owners join the stop custody | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |
 | U-20261114-39 | 2026-11-14 | The LAN browse dialog closes its browser off the GUI thread and is not kept alive by it | #done #gui #lifecycle | [2026-11-b](2026-11-b.md) |

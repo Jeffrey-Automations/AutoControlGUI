@@ -105,6 +105,12 @@ class _AudioOwner:
             raise_caused_run_interruption(error)
             raise AudioBackendError("audio device failed to start") from error
 
+    def close_admission(self) -> None:
+        """Stop admitting audio at once, without the owner's lock or a native call; :meth:`stop` still retires."""
+        lease = self._lease
+        if lease is not None:
+            lease.close_admission()
+
     def stop(self) -> None:
         """Close admission and report any unconfirmed retirement."""
         with self._lock:
