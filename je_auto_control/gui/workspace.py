@@ -11,7 +11,9 @@ from je_auto_control.gui.adaptive.overlay import OverlayDrawer
 from je_auto_control.gui.adaptive.responsive import fit_to_width
 from je_auto_control.gui.adaptive.surfaces import add_page_header, retranslate_surfaces
 from je_auto_control.gui.tab_registry import MenuActions, TabEntry, TabRegistry, WidgetFactory
-from je_auto_control.gui.workspace_details import ExecutionDetails, ExecutionDetailsPane, ExecutionDetailsSource
+from je_auto_control.gui.workspace_details import (
+    ExecutionDetails, ExecutionDetailsPane, ExecutionDetailsSource, details_sources,
+)
 
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 
@@ -243,6 +245,7 @@ class WorkspaceShell(TranslatableMixin, QWidget):
                 shell._detach_closed_tab(page)
         self.destroyed.connect(registry.subscribe_close(closed))
         self.tabs.currentChanged.connect(self._on_current_tab_changed)
+        details_sources().appeared.connect(self._on_details_source_appeared)
         for entry in registry.entries:
             if entry.default_visible:
                 self.show_tab(entry.key)
@@ -308,6 +311,12 @@ class WorkspaceShell(TranslatableMixin, QWidget):
             self._details_source = weakref.ref(source)
             self._details_connection = source.changed.connect(self._on_details_changed)
             self.details.display(source.snapshot, selected=True)
+
+    @Slot(object)
+    def _on_details_source_appeared(self, source: ExecutionDetailsSource) -> None:
+        """The current page gained a source after it was bound: show what it publishes."""
+        if self._details_source is None and source.parent() is self.tabs.currentWidget():
+            self._bind_details()
 
     @Slot(object)
     def _on_details_changed(self, snapshot: ExecutionDetails) -> None:

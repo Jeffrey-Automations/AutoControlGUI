@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,537 |
-| 程式碼總行數 | 235,914 |
+| Python 模組總數（含周邊子專案） | 1,538 |
+| 程式碼總行數 | 236,080 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1310,8 +1310,9 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `adaptive/overlay.py` | 102 | A drawer that slides a panel over part of a host widget, dimming the rest until it is dismissed. `OverlayDrawer`：Escape 或點擊遮罩關閉。 |
 | `_arrow_icons.py` | 76 | Chevrons for drop-down lists and spin boxes, drawn in code and handed to the style sheet. 以導覽列的線條圖示畫出、依主題色快取成檔案；寫不進快取時不放置子控制項，保留樣式原生箭頭。 |
 | `adaptive_window.py` | 179 | Rearrange the main window's navigation and details panes as the window's width class changes. `AdaptiveWindowLayout`：expanded 兩側停靠；medium 詳情改抽屜；compact 導覽改圖示欄＋抽屜。「想要停靠導覽」與寬度是否允許分開記錄，窄視窗不會改寫使用者偏好。 |
-| `workspace.py` | 567 | Registry-owned tab workspace with scrollable pages and passive execution details. `WorkspaceShell(registry, parent)` 保留分頁身分、弱關閉觀測、show/hide/close API 與右側詳情；每頁放入時加頁首並跑 `fit_to_width`；`set_details_overlay` 讓詳情在窄視窗改為右側抽屜。 |
-| `workspace_details.py` | 97 | Immutable execution snapshots and a passive, scrollable workspace detail view. Diagnostics 提供第一個實際 publisher；僅訂閱目前頁面。 |
+| `workspace.py` | 576 | Registry-owned tab workspace with scrollable pages and passive execution details. `WorkspaceShell(registry, parent)` 保留分頁身分、弱關閉觀測、show/hide/close API 與右側詳情；每頁放入時加頁首並跑 `fit_to_width`；`set_details_overlay` 讓詳情在窄視窗改為右側抽屜。 |
+| `workspace_details.py` | 116 | Immutable execution snapshots and a passive, scrollable workspace detail view. Diagnostics 與每個 `TabTask` 都是 publisher；僅訂閱目前頁面，`details_sources()` 通知綁定後才建立的來源。 |
+| `_task_details.py` | 111 | Execution details a TabTask publishes for the page it runs on. 由子面板往上找出工作區的分頁、第一次執行時建立來源，發布執行中／停止中／完成／已取消／錯誤與回報的進度。 |
 | `workspace_settings.py` | 36 | 驗證與載入主題、字級、導覽面板顯示與寬度；QSettings 使用當次帳號家目錄的 `gui.ini`，測試可注入獨立檔案。 |
 | `agent_transfer_view.py` | 171 | Explicit transfer requests and consent preparation with revision-bound background observations. |
 | `config_sync_worker.py` | 130 | Run explicit workspace requests with immutable inputs, live authority and cooperative cancellation. |
@@ -1543,7 +1544,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 160 | 42,647 |
+| `gui/` | 161 | 42,813 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,736 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1564,7 +1565,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,207 |
-| **總計** | **1,525** | **235,169** |
+| **總計** | **1,526** | **235,335** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

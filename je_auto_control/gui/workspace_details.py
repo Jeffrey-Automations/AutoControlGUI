@@ -1,6 +1,6 @@
 """Immutable execution snapshots and a passive, scrollable workspace detail view."""
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Optional
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QLabel, QProgressBar, QScrollArea, QVBoxLayout, QWidget
@@ -21,6 +21,23 @@ class ExecutionDetails:
     total: int = 0
 
 
+class _SourceNotifier(QObject):
+    """Announces each new :class:`ExecutionDetailsSource`, so a view showing its page can bind to it."""
+
+    appeared = Signal(object)
+
+
+_NOTIFIER: Optional[_SourceNotifier] = None
+
+
+def details_sources() -> _SourceNotifier:
+    """The process-wide notifier whose ``appeared`` carries every source created after it."""
+    global _NOTIFIER  # pylint: disable=global-statement  # reason: one GUI-thread notifier, made on first use
+    if _NOTIFIER is None:
+        _NOTIFIER = _SourceNotifier()
+    return _NOTIFIER
+
+
 class ExecutionDetailsSource(QObject):
     """A page-owned snapshot publisher updated on the GUI thread."""
 
@@ -29,6 +46,8 @@ class ExecutionDetailsSource(QObject):
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self._snapshot = ExecutionDetails()
+        # A page can gain its source after the view bound to it (a tab task's first run).
+        details_sources().appeared.emit(self)
 
     @property
     def snapshot(self) -> ExecutionDetails:

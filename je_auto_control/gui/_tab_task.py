@@ -22,6 +22,10 @@ tab shares on top of :mod:`je_auto_control.gui.tab_task_controller`:
   drives the machine.
   Other work binds a headless cancellation scope. Cooperative backends stop
   at their next checkpoint; late results from noncooperative work are dropped.
+* **Execution details.** Each run is published to the workspace's details
+  pane for the page the task runs on (:mod:`je_auto_control.gui._task_details`):
+  running, stopping, then succeeded, cancelled or error, with reported
+  progress. Periodic background work passes ``details=False``.
 
 The object keeps no reference to its tab beyond Qt parentage, and the work it
 is given must not hold a widget (the controller refuses it): read what the
@@ -33,6 +37,7 @@ from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QObject, Signal
 
+from je_auto_control.gui._task_details import TaskDetails
 from je_auto_control.gui.tab_task_controller import CancellationToken, TaskHandle, task_controller
 from je_auto_control.utils.exception.cancellation import (
     CancellationToken as CoreCancellationToken, cancellation_scope,
@@ -50,12 +55,13 @@ class TabTask(QObject):
     finished = Signal()
     progress = Signal(object)
 
-    def __init__(self, owner: QObject) -> None:
+    def __init__(self, owner: QObject, *, details: bool = True) -> None:
         super().__init__(owner)
         self.task: Optional[TaskHandle] = None
         self.tag = ""
         self._stop_token: Optional[StopToken] = None
         self._stop_event: Optional[threading.Event] = None
+        self._details = TaskDetails(self) if details else None
 
     @property
     def running(self) -> bool:
@@ -117,11 +123,13 @@ class TabTask(QObject):
             return False
         if self._stop_token is not None:
             self._stop_token.stop("stopped from the GUI")
-            return True
-        if self._stop_event is not None:
+        elif self._stop_event is not None:
             self._stop_event.set()
-            return True
-        return self.task.cancel()
+        else:
+            return self.task.cancel()
+        if self._details is not None:
+            self._details.stopping()
+        return True
 
     def _submit(self, work: Callable[[CancellationToken], Any], tag: str,
                 timeout_s: Optional[float], discard: Optional[Callable[[Any], object]]) -> None:
@@ -133,12 +141,31 @@ class TabTask(QObject):
         handle.result.connect(self.result)
         handle.error.connect(self.error)
         handle.progress.connect(self.progress)
+        if self._details is not None:
+            handle.result.connect(self._note_result)
+            handle.error.connect(self._note_error)
+            handle.progress.connect(self._note_progress)
+            self._details.started()
         handle.finished.connect(self._on_finished)
+
+    def _note_result(self, _value: object) -> None:
+        if self._details is not None:
+            self._details.noted("result")
+
+    def _note_error(self, error: object) -> None:
+        if self._details is not None:
+            self._details.noted("error", error)
+
+    def _note_progress(self, value: object) -> None:
+        if self._details is not None:
+            self._details.progressed(value)
 
     def _on_finished(self) -> None:
         self.task = None
         self._stop_token = None
         self._stop_event = None
+        if self._details is not None:
+            self._details.finished()
         self.finished.emit()
 
 

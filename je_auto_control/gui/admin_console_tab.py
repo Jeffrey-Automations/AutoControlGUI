@@ -94,7 +94,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._thumb_interval.valueChanged.connect(self._on_thumb_interval_changed)
         self._thumb_timer = QTimer(self)
         self._thumb_timer.timeout.connect(self._refresh_thumbnails)
-        self._thumbs = TabTask(self)
+        self._thumbs = TabTask(self, details=False)     # a timer tick, not a run to report
         self._thumbs.result.connect(self._apply_thumbnails)
         self._thumbs.error.connect(self._on_thumbnails_failed)
         self._build_layout()

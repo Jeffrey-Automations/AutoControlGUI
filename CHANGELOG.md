@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- GUI: every page that runs background work through `TabTask` publishes it to **View →
+  Execution details**: running, stopping, then succeeded, cancelled or error (with the error
+  text, or the timeout message), with reported progress. `TabTask(owner, details=False)` opts
+  out (the Admin Console's thumbnail timer does). New `gui/_task_details.py`;
+  `workspace_details.details_sources()` announces sources created after a view bound to a page,
+  and `WorkspaceShell` rebinds to them.
+
 - GUI internals: the Config Sync tab runs on `TabTask.start_until_stopped`. `ConfigSyncWorker`
   is no longer a `QObject`: it is called with the stop event and returns its `SyncUIOutcome`;
   the tab keeps it for `deliver` (`run`, `finished` and the tab's `_handle` are gone; `_task`
