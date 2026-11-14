@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- GUI internals: `TabTask` relays `progress`; `start_until_stopped(work, reports=True)` calls
+  `work(stop_event, report)`. The journal browser (Run History, Self-Healing) runs on it:
+  `JournalReadWorker` is no longer a `QObject` and is called with the stop event and a report
+  that receives `(request_id, scanned)` (`run`, `finished`, `progress` and the browser's
+  `_handle` / `_worker` are gone; `_task` is the task).
+
 - GUI internals: the self-healing comparison panel runs on `TabTask.start_until_stopped`.
   `HealingEvaluationWorker` is no longer a `QObject`: it is called with the stop event and
   returns its `HealingEvaluationOutcome` (`run`, `finished` and the `_handle` / `_worker`

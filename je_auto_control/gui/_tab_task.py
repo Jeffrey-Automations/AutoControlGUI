@@ -7,8 +7,8 @@ tab shares on top of :mod:`je_auto_control.gui.tab_task_controller`:
 * **One run at a time.** :meth:`TabTask.start` refuses while a task is
   running, so a second click (or a script that clicks this window's own Run
   action) does not start a nested run.
-* **Outcomes on the GUI thread.** ``result`` / ``error`` / ``finished`` are
-  relayed from the task's handle; :attr:`TabTask.tag` says which command the
+* **Outcomes on the GUI thread.** ``result`` / ``error`` / ``finished`` (and
+  ``progress``, for work that reports it) are relayed from the task's handle; :attr:`TabTask.tag` says which command the
   outcome belongs to. :attr:`TabTask.task` is ``None`` again before
   ``finished`` is emitted.
 * **Stop.** A script run (:meth:`TabTask.start_script`) is a stoppable
@@ -48,6 +48,7 @@ class TabTask(QObject):
     result = Signal(object)
     error = Signal(object)
     finished = Signal()
+    progress = Signal(object)
 
     def __init__(self, owner: QObject) -> None:
         super().__init__(owner)
@@ -86,7 +87,7 @@ class TabTask(QObject):
         self._submit(functools.partial(_call_stoppable, self._stop_token, work), tag, None, None)
         return True
 
-    def start_until_stopped(self, work: Callable[[threading.Event], Any], *, tag: str = "") -> bool:
+    def start_until_stopped(self, work: Callable[..., Any], *, tag: str = "", reports: bool = False) -> bool:
         """Run ``work(stop_event)`` off the GUI thread; ``False`` when a task is already running.
 
         For work that ends itself at its next step once the event is set and
@@ -94,12 +95,15 @@ class TabTask(QObject):
         the event; the task stays running until ``work`` returns and its
         outcome arrives as usual. The tab being destroyed, or the application
         exiting, sets the event too. There is no deadline: the work's own
-        limits bound it.
+        limits bound it. With ``reports`` the work is called
+        ``work(stop_event, report)``; each ``report(value)`` arrives as
+        :attr:`progress` on the GUI thread, while the tab lives.
         """
         if self.task is not None:
             return False
         self._stop_event = threading.Event()
-        self._submit(functools.partial(_call_until_stopped, self._stop_event, work), tag, None, None)
+        call = _call_until_stopped_reporting if reports else _call_until_stopped
+        self._submit(functools.partial(call, self._stop_event, work), tag, None, None)
         return True
 
     def stop(self) -> bool:
@@ -128,6 +132,7 @@ class TabTask(QObject):
         self.task = handle
         handle.result.connect(self.result)
         handle.error.connect(self.error)
+        handle.progress.connect(self.progress)
         handle.finished.connect(self._on_finished)
 
     def _on_finished(self) -> None:
@@ -151,6 +156,14 @@ def _call_until_stopped(stop: threading.Event, work: Callable[[threading.Event],
     """Worker thread: hand ``work`` the stop event, which handle cancellation also sets."""
     token.on_cancel(stop.set)
     return work(stop)
+
+
+def _call_until_stopped_reporting(stop: threading.Event,
+                                  work: Callable[[threading.Event, Callable[[object], None]], Any],
+                                  token: CancellationToken) -> Any:
+    """Worker thread: as :func:`_call_until_stopped`, also handing ``work`` the handle's progress report."""
+    token.on_cancel(stop.set)
+    return work(stop, token.report_progress)
 
 
 def _call_stoppable(stop: StopToken, work: Callable[[], Any], token: CancellationToken) -> Any:

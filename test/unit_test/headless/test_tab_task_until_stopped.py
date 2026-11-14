@@ -133,3 +133,28 @@ def test_a_dag_stop_waits_for_the_run_and_shows_what_it_did(monkeypatch):
     finally:
         work.finish.set()
         tab.deleteLater()
+
+
+def test_reported_progress_reaches_the_gui_thread_and_stops_with_the_owner():
+    import shiboken6
+    owner = QWidget()
+    task, seen, threads = TabTask(owner), [], []
+    gui = threading.get_ident()
+    task.progress.connect(lambda value: (seen.append(value), threads.append(threading.get_ident())))
+    reported, go_on = threading.Event(), threading.Event()
+
+    def work(stop_event, report):
+        report(1)
+        report(2)
+        reported.set()
+        assert go_on.wait(30.0)
+        report(3)                       # after the owner is gone: dropped
+        return "done"
+
+    assert task.start_until_stopped(work, reports=True)
+    assert reported.wait(10.0)
+    assert pump_until(lambda: seen == [1, 2])
+    assert set(threads) == {gui}
+    shiboken6.delete(owner)
+    go_on.set()
+    assert pump_until(lambda: len(seen) > 2, timeout=0.5) is False

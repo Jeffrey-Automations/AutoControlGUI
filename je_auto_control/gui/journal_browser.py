@@ -1,4 +1,9 @@
-"""Read-only lifecycle snapshots and provenance links for journal inspection."""
+"""Read-only lifecycle snapshots and provenance links for journal inspection.
+
+A read runs as a :class:`~je_auto_control.gui._tab_task.TabTask` started with
+``start_until_stopped``: Cancel, and the view being destroyed, stop it at the
+next validated-record boundary, and the view stays busy until it has.
+"""
 from __future__ import annotations
 
 import json
@@ -13,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.journal_browser_worker import JournalReadOutcome, JournalReadRequest, JournalReadWorker
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -32,8 +37,11 @@ class JournalBrowser(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         self._generation = 0
-        self._handle: Optional[WorkerHandle] = None
-        self._worker: Optional[JournalReadWorker] = None
+        self._task = TabTask(self)
+        self._task.result.connect(self._received)
+        self._task.error.connect(self._task_failed)
+        self._task.progress.connect(self._progress)
+        self._task.finished.connect(self._thread_done)
         self._pending_source: Optional[Context] = None
         self._events: list[dict[str, object]] = []
         self._step_source = False
@@ -140,14 +148,14 @@ class JournalBrowser(TranslatableMixin, QWidget):
     def open_source(self, path: str, run_id: str, step_id: str) -> None:
         """Inspect this target after any older reader stops, retaining the caller's context."""
         self.set_source(path, run_id, step_id)
-        if self._handle is not None:
+        if self._task.running:
             self._pending_source = copy_context()
         else:
             self.read()
 
     def browse(self) -> None:
         """Choose a source file without reading or rewriting it."""
-        if self._handle is not None:
+        if self._task.running:
             return
         try:
             authorize_command("AC_journal_read")
@@ -162,7 +170,7 @@ class JournalBrowser(TranslatableMixin, QWidget):
 
     def read(self) -> None:
         """Launch bounded inspection; one active reader belongs to this widget."""
-        if self._handle is not None:
+        if self._task.running:
             return
         self._clear_events()
         try:
@@ -177,21 +185,15 @@ class JournalBrowser(TranslatableMixin, QWidget):
         self._generation += 1
         request = JournalReadRequest(self._generation, path, self._run_id.text() or None,
                                       self._limit.value(), self._step_id.text() or None)
-        worker = JournalReadWorker(request)
-        self._worker = worker
-        worker.progress.connect(self._progress)
-        # pylint: disable-next=no-member  # reason: PySide binds this Qt signal at runtime
-        self.destroyed.connect(worker.request_stop)
         self._set_busy(True)
         self._set_status("journal_reading")
-        self._handle = start_worker(self, worker, on_done=self._received,
-                                    on_thread_done=self._thread_done, on_fail=self._failed)
+        self._task.start_until_stopped(JournalReadWorker(request), reports=True)
 
     def cancel(self) -> None:
         """Ask the current reader to stop at its next validated-record boundary."""
         self._pending_source = None
-        if self._worker is not None:
-            self._worker.request_stop()
+        if self._task.running:
+            self._task.stop()
             self._set_status("journal_cancelling")
 
     # pylint: disable-next=invalid-name  # reason: Qt override
@@ -208,8 +210,11 @@ class JournalBrowser(TranslatableMixin, QWidget):
         for control in (self._path, self._run_id, self._step_id, self._limit, self._links):
             control.setEnabled(not busy)
 
-    @Slot(int, int)
-    def _progress(self, request_id: int, count: int) -> None:
+    @Slot(object)
+    def _progress(self, value: object) -> None:
+        if not isinstance(value, tuple) or len(value) != 2:   # the worker reports (request_id, scanned)
+            return
+        request_id, count = value
         if request_id == self._generation and self._status_key != "journal_cancelling":
             self._set_status("journal_progress", str(count))
 
@@ -235,9 +240,11 @@ class JournalBrowser(TranslatableMixin, QWidget):
         self._clear_events()
         self._set_status("journal_error", scrub_secret_text(message))
 
+    def _task_failed(self, error: object) -> None:
+        self._failed(str(error))
+
     def _thread_done(self) -> None:
         pending, self._pending_source = self._pending_source, None
-        self._handle = self._worker = None
         self._set_busy(False)
         if self._status_key in ("journal_reading", "journal_progress", "journal_cancelling"):
             self._set_status("journal_interrupted")
