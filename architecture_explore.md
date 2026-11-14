@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,543 |
-| 程式碼總行數 | 237,122 |
+| 程式碼總行數 | 237,145 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1315,8 +1315,8 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `workspace.py` | 582 | Registry-owned tab workspace with scrollable pages and passive execution details. `WorkspaceShell(registry, parent)` 保留分頁身分、弱關閉觀測、show/hide/close API 與右側詳情；每頁放入時加頁首並跑 `fit_to_width`；`set_details_overlay` 讓詳情在窄視窗改為右側抽屜。 |
 | `workspace_details.py` | 116 | Immutable execution snapshots and a passive, scrollable workspace detail view. Diagnostics 與每個 `TabTask` 都是 publisher；僅訂閱目前頁面，`details_sources()` 通知綁定後才建立的來源。 |
 | `_task_details.py` | 116 | Execution details a TabTask publishes for the page it runs on. 由子面板往上找出工作區的分頁、第一次執行時建立來源，發布執行中／停止中／完成／已取消／錯誤與回報的進度。 |
-| `_stop_custody.py` | 187 | Stops that failed in the background, kept so they can be retried instead of only logged. StopQueue／stop_each 失敗時保留停止、錯誤與排入時的權限；`snapshot` 不執行任何東西，`retry` 以原權限重試。 |
-| `failed_stops_view.py` | 116 | Diagnostics' view of background stops that failed: what is held, and a retry from the Actions menu. |
+| `_stop_custody.py` | 209 | Stops that failed in the background, kept so they can be retried instead of only logged. StopQueue／stop_each 失敗時保留停止、錯誤與排入時的權限；`snapshot` 不執行任何東西，`retry` 以原權限重試。 |
+| `failed_stops_view.py` | 117 | Diagnostics' view of background stops that failed: what is held, and a retry from the Actions menu. |
 | `workspace_settings.py` | 36 | 驗證與載入主題、字級、導覽面板顯示與寬度；QSettings 使用當次帳號家目錄的 `gui.ini`，測試可注入獨立檔案。 |
 | `agent_transfer_view.py` | 171 | Explicit transfer requests and consent preparation with revision-bound background observations. |
 | `config_sync_worker.py` | 130 | Run explicit workspace requests with immutable inputs, live authority and cooperative cancellation. |
@@ -1549,7 +1549,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 166 | 43,754 |
+| `gui/` | 166 | 43,777 |
 | `utils/mcp_server/` | 63 | 22,228 |
 | `utils/remote_desktop/` | 77 | 16,822 |
 | `utils/executor/` | 11 | 10,752 |
@@ -1570,7 +1570,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 866 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,006 | 103,222 |
-| **總計** | **1,531** | **236,377** |
+| **總計** | **1,531** | **236,400** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

@@ -221,3 +221,30 @@ def test_an_interruption_keeps_the_owners_it_left_holding_resources(custody):
     assert _Owner.stopped == 1
     _slow_op.hold_failed_stop(owner.stop, interrupted)       # the owner's own stop is not kept twice
     assert [held.label for held in custody.snapshot()] == ["_Owner.stop"]
+
+
+def test_a_media_owners_state_comes_from_its_errors_snapshot_never_a_live_query():
+    from je_auto_control.utils.remote_desktop.media_retirement import (
+        Completion, MediaRetirementError, RetirementStatus,
+    )
+
+    class _Advertiser:
+        live = True
+
+        @property
+        def retirement_status(self):
+            if not _Advertiser.live:           # a live read would wait on the native cleanup's lock
+                raise AssertionError("the custody queried the owner")
+            return RetirementStatus(True, Completion.UNCERTAIN, Completion.PENDING, failed_steps=("unregister",))
+
+        def stop(self):
+            pass
+
+    owner = _Advertiser()
+    error = MediaRetirementError(owner)          # the snapshot is taken here, as the owner raises it
+    _Advertiser.live = False
+    custody = StopCustody()
+    custody.hold(owner.stop, error)
+    [held] = custody.snapshot()
+    assert held.detail == "admission closed; resources uncertain; finalization pending; failed: unregister"
+    assert custody.retry(held.stop_id)

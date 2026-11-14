@@ -79,7 +79,8 @@ class FailedStopsView(QWidget):
         self._table.setRowCount(len(rows))
         for row, held in enumerate(rows):
             stamp = datetime.datetime.fromtimestamp(held.failed_at).strftime("%H:%M:%S")
-            for column, text in enumerate((held.label, held.error, str(held.attempts), stamp)):
+            error = f"{held.error} ({held.detail})" if held.detail else held.error
+            for column, text in enumerate((held.label, error, str(held.attempts), stamp)):
                 item = QTableWidgetItem(text)
                 item.setData(Qt.ItemDataRole.UserRole, held.stop_id)
                 self._table.setItem(row, column, item)

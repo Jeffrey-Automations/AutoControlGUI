@@ -31,6 +31,7 @@ from typing import Any, Callable, Dict, List, Optional
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.logging.secret_scope import scrub_secret_text
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
+from je_auto_control.utils.remote_desktop.media_retirement import RetirementStatus
 
 #: The most failed stops held at once; the oldest is let go (and logged) beyond it.
 MAX_HELD = 200
@@ -45,6 +46,8 @@ class FailedStop:
     error: str
     failed_at: float
     attempts: int
+    #: For a media owner: its retirement state as it was when the stop failed, never read live.
+    detail: str = ""
 
 
 @dataclass
@@ -55,6 +58,7 @@ class _Held:
     failed_at: float
     attempts: int
     authority: Optional[DeferredAuthorization]
+    detail: str = ""
 
 
 def describe_stop(stop: Callable[[], Any]) -> str:
@@ -80,7 +84,8 @@ class StopCustody:
     def hold(self, stop: Callable[[], Any], error: object, *, label: str = "",
              authority: Optional[DeferredAuthorization] = None) -> int:
         """Keep ``stop``, which raised ``error``; return its id. Safe from any thread."""
-        record = _Held(stop, label or describe_stop(stop), scrub_secret_text(_text(error)), time.time(), 1, authority)
+        record = _Held(stop, label or describe_stop(stop), scrub_secret_text(_text(error)), time.time(), 1, authority,
+                       _media_detail(error))
         with self._lock:
             stop_id = next(self._ids)
             self._held[stop_id] = record
@@ -94,7 +99,7 @@ class StopCustody:
     def snapshot(self) -> List[FailedStop]:
         """What is held, oldest first; runs no stop and never waits on anything but this lock."""
         with self._lock:
-            return [FailedStop(stop_id, held.label, held.error, held.failed_at, held.attempts)
+            return [FailedStop(stop_id, held.label, held.error, held.failed_at, held.attempts, held.detail)
                     for stop_id, held in self._held.items()]
 
     def retry(self, stop_id: int) -> bool:
@@ -116,6 +121,7 @@ class StopCustody:
             with self._lock:
                 if self._held.get(stop_id) is held:
                     held.error = scrub_secret_text(_text(error))
+                    held.detail = _media_detail(error)
                     held.attempts += 1
                     held.failed_at = time.time()
             self._changed()
@@ -170,6 +176,22 @@ class StopCustody:
                 listener()
             except Exception as error:  # noqa: BLE001  # reason: a listener must not undo the custody change
                 autocontrol_logger.warning(f"stop custody listener failed: {error!r}")
+
+
+def _media_detail(error: object) -> str:
+    """A media owner's retirement state from the snapshot its error carries -- never by asking the owner.
+
+    Reading ``retirement_status`` live may wait on the lock the owner's native
+    cleanup holds; ``MediaRetirementError.status`` was taken when it was raised.
+    """
+    status = getattr(error, "status", None)
+    if not isinstance(status, RetirementStatus):
+        return ""
+    parts = [f"admission {'closed' if status.admission_closed else 'open'}",
+             f"resources {status.resources.value}", f"finalization {status.finalization.value}"]
+    if status.failed_steps:
+        parts.append("failed: " + ", ".join(status.failed_steps))
+    return "; ".join(parts)
 
 
 def _text(error: object) -> str:

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- GUI: a held failed stop whose error is a `MediaRetirementError` records the owner's retirement
+  state from the snapshot the error carries (`FailedStop.detail`: admission, resources,
+  finalization, failed steps); the custody never asks the owner, whose live status may wait on
+  its native cleanup's lock. Diagnostics shows it beside the error.
+
 - GUI: `hold_failed_stop` also keeps each original owner an interruption signal carries
   (`interrupted_retirement_owners`) -- a cancellation that cut a media cleanup short -- with its
   own `stop`, so its resources have a keeper; one that is the stop already kept is not doubled.
