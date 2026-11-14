@@ -260,7 +260,8 @@ class _ViewerPanel(TranslatableMixin, QWidget):
                       if transport in ("WebSocket", "WSS")
                       else RemoteDesktopViewer)
         self._cancel_pending_connect()
-        registry.evict(SLOT_VIEWER, by=self._owner)
+        # The slot is free at once; the old session closes on the connect's worker (a join).
+        previous = registry.detach(SLOT_VIEWER, self._owner)
         authority = DeferredAuthorization.capture()
         clipboard_receiver = ClipboardReceiver(authority, self._view.callback("_on_clipboard_main"))
         viewer: RemoteDesktopViewer
@@ -283,12 +284,14 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             clipboard_receiver.bind(viewer)
             self._connect_authority = authority
         except (OSError, RuntimeError, ValueError, AutoControlException) as error:
+            if previous is not None:
+                self._stops.retire(previous)
             QMessageBox.warning(self, _t("rd_viewer_connect"), str(error))
             return
         # The connect itself (TCP, TLS / WebSocket upgrade, auth: up to five
         # seconds each) held the GUI thread for all of it.
         self._connect_task = connect_viewer(
-            self, viewer, on_connected=self._on_connected, on_failed=self._on_connect_failed)
+            self, viewer, on_connected=self._on_connected, on_failed=self._on_connect_failed, before=previous)
         self._connect_task.finished.connect(self._on_connect_finished)
         self._refresh_status()
 
@@ -381,7 +384,9 @@ class _ViewerPanel(TranslatableMixin, QWidget):
     def _disconnect(self) -> None:
         self._clipboard_authority = None
         self._cancel_pending_connect()
-        registry.release(SLOT_VIEWER, self._owner)
+        close = registry.detach(SLOT_VIEWER, self._owner, only_own=True)
+        if close is not None:
+            self._stops.retire(close)       # free at once; closing the socket joins its thread
         self._stop_audio_player()
         self._connected = False
         self._early_frame = None

@@ -804,6 +804,11 @@ from ``je_auto_control.utils.remote_desktop.registry.new_owner(label)``.
 ``stop_host`` / ``disconnect_viewer`` (and the ``ws`` pair) take an optional
 ``owner=`` that limits them to that owner's host or viewer.
 ``on_displaced(slot, by)`` runs on the thread that did the replacing.
+``detach(slot, by, only_own=False)`` is ``evict`` (or, with ``only_own``,
+``release``) split in two for a caller that must not block: the slot is free
+when it returns, and it hands back the call that stops what the slot held
+(joining its threads) -- or ``None`` -- to run on a worker; the displaced owner
+is told when that call runs.
 
 GUI: **Remote Desktop** tab opens to the **Quick Connect** screen
 (AnyDesk-style) by default — huge Host ID on one side, a single input

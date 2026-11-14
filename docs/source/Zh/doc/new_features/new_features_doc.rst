@@ -731,7 +731,9 @@ on_displaced)``、``owned(slot, owner)``、``release(slot, owner)``、
 ``je_auto_control.utils.remote_desktop.registry.new_owner(label)`` 產生。
 ``stop_host``／``disconnect_viewer``（以及 ``ws`` 那一組）多了可選的
 ``owner=``，只在該 owner 擁有時才動作。``on_displaced(slot, by)``
-在執行取代動作的那個執行緒上被呼叫。
+在執行取代動作的那個執行緒上被呼叫。``detach(slot, by, only_own=False)`` 是把 ``evict``\ （加上
+``only_own`` 時為 ``release``\ ）拆成兩半，給不能阻塞的呼叫端：回傳時 slot 已經空出，並回傳停止原佔用者
+（會 join 它的執行緒）的呼叫或 ``None``，交給 worker 執行；被取代的 owner 在那個呼叫執行時收到通知。
 
 GUI：\ **Remote Desktop**\ 分頁預設打開的是 **快速連線** （AnyDesk
 風格）— 一邊是超大本機 Host ID，另一邊一個輸入框接受

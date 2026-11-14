@@ -374,6 +374,7 @@ module = [
     "je_auto_control.gui.remote_desktop.view_approvals",
     "je_auto_control.gui.remote_desktop.view_frames",
     "je_auto_control.gui.remote_desktop.view_upload",
+    "je_auto_control.gui.remote_desktop._host_ops",
 
     "je_auto_control.gui.rbac_users_panel",
     "je_auto_control.gui.remote_desktop._connect_task",

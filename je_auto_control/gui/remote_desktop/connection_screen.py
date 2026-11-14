@@ -31,10 +31,12 @@ from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._slow_op import SlowOp, StopQueue, stop_each
 from je_auto_control.gui._weak_call import WeakCall
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui.remote_desktop.view_approvals import ApprovalRequest as _ApprovalRequest, ViewApprovals
 from je_auto_control.gui.remote_desktop._connect_task import connect_viewer
+from je_auto_control.gui.remote_desktop._host_ops import release_host, replace_host, stop_host
 from je_auto_control.gui.remote_desktop.connection_recent import _RecentConnectionsMixin
 from je_auto_control.gui.remote_desktop._helpers import (
     _StatusBadge, _build_verifying_client_context, _t,
@@ -148,6 +150,10 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         # and replay it the moment the window is created.
         self._pending_frame: Optional[bytes] = None
         self._connect_task: Optional[TaskHandle] = None    # the connect in progress, off-thread
+        # Starting and stopping the host join threads; so does closing a viewer.
+        self._host_op = SlowOp(self)
+        self._stops = StopQueue(self)
+        self._host_pending = ""
         self._uploads = TabTask(self)                      # dropped files going to the host, off-thread
         self._uploads.error.connect(self._on_upload_failed)
         self._uploads.finished.connect(self._refresh_status)
@@ -182,6 +188,9 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         """
         self._view.retire()
         self._approvals.retire()
+        # A host start still out is cancelled and the host it brings up released;
+        # sessions already let go of keep closing on the stop queue.
+        release_resources(self._host_op)
         release_resources(self, self._cancel_pending_connect, self._close_screen_window)
 
     def retranslate(self) -> None:
@@ -302,19 +311,28 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         if not token:
             self._generate_token()
             token = self._host_token.text().strip()
-        registry.evict(SLOT_HOST, by=self._owner)
-        try:
-            host = RemoteDesktopHost(
-                token=token, bind="127.0.0.1", port=0,
-                fps=10.0, quality=70,
-                on_pending_viewer=self._approvals.request,
-            )
-            host.start()
-        except (OSError, ValueError, RuntimeError) as error:
-            QMessageBox.warning(self, _t("rd_quick_start_host"), str(error))
-            return
-        registry.adopt(SLOT_HOST, host, self._owner, self._view.callback("_on_displaced"))
+        build = functools.partial(
+            RemoteDesktopHost, token=token, bind="127.0.0.1", port=0, fps=10.0, quality=70,
+            on_pending_viewer=self._approvals.request,
+        )
+        if self._host_op.run(
+                functools.partial(replace_host, self._owner, build, self._view.callback("_on_displaced")),
+                on_done=self._on_host_changed, on_error=self._on_host_start_failed,
+                discard=functools.partial(release_host, self._owner)):
+            self._host_pending = "gui_op_starting"
         self._refresh_status()
+
+    def _on_host_changed(self, _outcome: object = None) -> None:
+        """GUI thread: a start or stop finished; repaint from the registry."""
+        self._refresh_status()
+
+    def _on_host_start_failed(self, error: Exception) -> None:
+        self._refresh_status()
+        QMessageBox.warning(self, _t("rd_quick_start_host"), str(error))
+
+    def _on_host_stop_failed(self, error: Exception) -> None:
+        self._refresh_status()
+        QMessageBox.warning(self, _t("rd_quick_stop_host"), str(error))
 
     def _host_approval_callback(self, pending: PendingViewer):
         """Bridge incoming viewers to a GUI Allow/View-only/Deny dialog.
@@ -374,11 +392,9 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
 
     def _stop_hosting(self) -> None:
         # Stops the host the badge shows, whoever started it; see _HostPanel._stop.
-        try:
-            registry.evict(SLOT_HOST, by=self._owner)
-        except (OSError, RuntimeError) as error:
-            QMessageBox.warning(self, _t("rd_quick_stop_host"), str(error))
-            return
+        if self._host_op.run(functools.partial(stop_host, self._owner), on_done=self._on_host_changed,
+                             on_error=self._on_host_stop_failed):
+            self._host_pending = "gui_op_stopping"
         self._refresh_status()
 
     def _copy_host_id(self) -> None:
@@ -435,11 +451,16 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
             self, _t("rd_quick_connect_btn"), _t("rd_quick_bad_target"),
         )
 
-    def _take_slot(self, slot: str) -> None:
-        """Clear ``slot`` for a new session and end this screen's other one."""
+    def _take_slot(self, slot: str) -> Optional[functools.partial]:
+        """Clear ``slot`` for a new session and let go of this screen's other one.
+
+        Both slots are free when this returns; the shutdown of what they held
+        -- which joins threads -- is returned, to run on a worker.
+        """
         other = SLOT_WS_VIEWER if slot == SLOT_VIEWER else SLOT_VIEWER
-        registry.release(other, self._owner)
-        registry.evict(slot, by=self._owner)
+        closes = [close for close in (registry.detach(other, self._owner, only_own=True),
+                                      registry.detach(slot, self._owner)) if close is not None]
+        return functools.partial(stop_each, *closes) if closes else None
 
     def _own_viewer(self):
         """The viewer this screen opened, or None once it is gone or replaced."""
@@ -464,15 +485,18 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         ``on_live`` is a method of this screen or a partial of one; it is held weakly.
         """
         self._cancel_pending_connect()
-        self._take_slot(slot)
+        previous = self._take_slot(slot)
         try:
             viewer = build()
         except (OSError, RuntimeError, ValueError, AutoControlException) as error:
+            if previous is not None:
+                self._stops.retire(previous)
             self._on_connect_failed(error)
             return
+        # The old session is closed on the connect's worker, before the new one connects.
         self._connect_task = connect_viewer(
             self, viewer, on_connected=functools.partial(self._on_viewer_live, slot, WeakCall(on_live)),
-            on_failed=self._on_connect_failed)
+            on_failed=self._on_connect_failed, before=previous)
         self._connect_task.finished.connect(self._on_connect_finished)
         self._refresh_status()
 
@@ -537,8 +561,12 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         # Either transport, and only a session this screen opened.
         self._cancel_pending_connect()
         self._uploads.stop()    # its socket is about to close; the failure is not news
-        registry.release(SLOT_VIEWER, self._owner)
-        registry.release(SLOT_WS_VIEWER, self._owner)
+        # The slots are free at once; closing the sockets (a join) runs off the GUI thread.
+        closes = [close for close in (registry.detach(SLOT_VIEWER, self._owner, only_own=True),
+                                      registry.detach(SLOT_WS_VIEWER, self._owner, only_own=True))
+                  if close is not None]
+        if closes:
+            self._stops.retire(functools.partial(stop_each, *closes))
         self._close_screen_window()
         self._refresh_status()
 
@@ -630,6 +658,9 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._refresh_viewer_status()
 
     def _refresh_host_status(self) -> None:
+        if self._host_op.busy:
+            self._host_badge.set_state("starting", _t(self._host_pending))
+            return
         status = registry.host_status()
         if status["running"]:
             host_id = status.get("host_id") or ""

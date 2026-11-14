@@ -331,7 +331,9 @@ def _host_tab():
 def test_starting_a_host_leaves_every_viewer_alone():
     tab, screen = _tab(), _quick("ws")
     _host_tab()
-    connection_screen.QuickConnectScreen()._start_hosting()
+    quick = connection_screen.QuickConnectScreen()
+    quick._start_hosting()
+    assert settle_op(quick._host_op)                 # the start runs off the GUI thread
     assert tab._own_viewer().connected
     assert screen._own_viewer().connected
 
@@ -343,6 +345,7 @@ def test_quick_connect_hosting_replaces_the_host_tabs_host_and_tells_it(qapp):
     assert registry.owner_of(SLOT_HOST) == tab._owner
     screen = connection_screen.QuickConnectScreen()
     screen._start_hosting()
+    assert settle_op(screen._host_op)
     assert not first.is_running
     assert registry.owner_of(SLOT_HOST) == screen._owner
     assert pump_until(lambda: tab._shared is None)   # no share text for a host it does not run
@@ -357,6 +360,7 @@ def test_stop_stops_the_host_on_show_and_tells_its_owner():
     screen = connection_screen.QuickConnectScreen()
     assert screen._host_id_label.text() != "---"     # it shows the host as running
     screen._stop_hosting()
+    assert settle_op(screen._host_op)
     assert not running.is_running
     assert registry.host is None
     assert pump_until(lambda: tab._shared is None)

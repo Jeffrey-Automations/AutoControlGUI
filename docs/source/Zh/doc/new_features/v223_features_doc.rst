@@ -157,8 +157,10 @@ GUI 設定檔):
 為 true——分頁這時顯示「正在停止…」——而 ``on_done`` 會在 ``busy`` 變回 false 之後於
 GUI 執行緒執行,原本接在阻塞呼叫後面的程式碼就放在這裡。排程、觸發器、熱鍵、E-mail
 觸發器、Webhooks、REST API、USB Sharing 分頁與遠端桌面的 host 面板都這樣停止(需要
-先停再啟動的也這樣啟動)。WebRTC 面板則是立刻放掉工作階段,把它的關閉交給
-``StopQueue``,所以舊的還在關閉時就能開始下一個。回呼以弱參照持有:請傳方法與
+先停再啟動的也這樣啟動),Quick Connect 的「開始主持」／「停止」也一樣,期間狀態顯示「正在啟動…」／
+「正在停止…」。WebRTC 面板則是立刻放掉工作階段,把它的關閉交給
+``StopQueue``,所以舊的還在關閉時就能開始下一個;Quick Connect 與 Viewer 分頁的「中斷連線」
+現在也經 ``registry.detach`` 這樣做,新的連線會先在自己的 worker 上關掉被取代的工作階段再連線。回呼以弱參照持有:請傳方法與
 ``args=``,不要傳 ``functools.partial`` 或閉包抓著分頁的 lambda。
 
 這是 GUI 內部 API(會 import ``PySide6``),套件 facade 不會重新匯出;分頁所呼叫的

@@ -167,9 +167,13 @@ outcome arrives -- the tab shows "Stopping…" meanwhile -- and ``on_done`` runs
 on the GUI thread once it is false again, which is where the code that used to
 follow the blocking call goes. The Scheduler, Triggers, Hotkeys, E-mail
 Triggers, Webhooks, REST API and USB Sharing tabs and the Remote Desktop host
-panel stop (and, where a start first stops, start) this way. The WebRTC panels
-let go of their session at once and hand its shutdown to a ``StopQueue``, so
-the next session can start while the old one closes. Callbacks are held
+panel stop (and, where a start first stops, start) this way, and so does Quick
+Connect's *Start hosting* / *Stop*, whose badge reads *Starting…* / *Stopping…*
+meanwhile. The WebRTC panels let go of their session at once and hand its
+shutdown to a ``StopQueue``, so the next session can start while the old one
+closes; Quick Connect's and the Viewer tab's *Disconnect* now do the same
+through ``registry.detach``, and a new connect closes the session it replaces
+on its own worker before connecting. Callbacks are held
 weakly: pass a method and ``args=``, not a ``functools.partial`` or a lambda
 that closes over the tab.
 

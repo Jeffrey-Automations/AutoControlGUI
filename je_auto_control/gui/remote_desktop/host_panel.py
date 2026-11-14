@@ -2,7 +2,7 @@
 import functools
 import secrets
 import ssl
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QImage
@@ -16,6 +16,7 @@ from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
+from je_auto_control.gui.remote_desktop._host_ops import release_host, replace_host, stop_host
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui.remote_desktop._helpers import (
     _CollapsibleSection, _StatusBadge, _t,
@@ -32,31 +33,6 @@ from je_auto_control.utils.remote_desktop.registry import (
     SLOT_HOST, new_owner, registry,
 )
 
-
-def _replace_host(owner: str, build: Callable[[], Any],
-                  on_displaced: Callable[[str, str], None]) -> Any:
-    """Worker thread: stop the running host, start the new one and register it for ``owner``.
-
-    In this order because the old host has to let go of its port before the
-    new one binds it; the stop joins the old host's threads (2 s).
-    """
-    # Whoever started the running host is told it was replaced. Viewers
-    # are left alone: they belong to other panels or to a script.
-    registry.evict(SLOT_HOST, by=owner)
-    host = build()
-    host.start()
-    registry.adopt(SLOT_HOST, host, owner, on_displaced)
-    return host
-
-
-def _stop_host(owner: str) -> bool:
-    """Worker thread: stop the machine's host, whoever started it."""
-    return registry.evict(SLOT_HOST, by=owner)
-
-
-def _release_host(owner: str, _host: Any) -> None:
-    """A host that came up for a panel that is gone: nobody is left to stop it."""
-    registry.release(SLOT_HOST, owner)
 
 
 class _HostPanel(TranslatableMixin, QWidget):
@@ -344,9 +320,9 @@ class _HostPanel(TranslatableMixin, QWidget):
         self._starting = {"bind": bind, "transport": transport, "token": token}
         self._pending_key = "gui_op_starting"
         self._host_op.run(
-            functools.partial(_replace_host, self._owner, build, self._view.callback("_on_displaced")),
+            functools.partial(replace_host, self._owner, build, self._view.callback("_on_displaced")),
             on_done=self._on_started, on_error=self._on_start_failed,
-            discard=functools.partial(_release_host, self._owner))
+            discard=functools.partial(release_host, self._owner))
         self._refresh_status()
 
     def _on_started(self, host: Any) -> None:
@@ -366,7 +342,7 @@ class _HostPanel(TranslatableMixin, QWidget):
         if self._host_op.busy:          # a second click while the first is still stopping
             return
         self._pending_key = "gui_op_stopping"
-        self._host_op.run(functools.partial(_stop_host, self._owner), on_done=self._on_stopped,
+        self._host_op.run(functools.partial(stop_host, self._owner), on_done=self._on_stopped,
                           on_error=self._on_stop_failed)
         self._refresh_status()
 

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Remote desktop: `remote_desktop_registry.detach(slot, by, only_own=False)` frees a slot at
+  once and returns the blocking shutdown of what it held (or `None`), for a caller that must
+  not block. GUI: Quick Connect starts and stops its host off the GUI thread (*Starting…* /
+  *Stopping…* meanwhile); Quick Connect's and the Viewer tab's Disconnect, and a connect that
+  replaces a session, close the old one on a worker. `connect_viewer` takes `before=`, run on
+  its worker ahead of the connect. The Host panel's start/stop helpers moved to
+  `gui/remote_desktop/_host_ops.py`.
+
 - GUI: switching theme restyles the window once instead of twice (the theme's style sheet,
   then again with the font rules); with every tab open the switch took 1.9 s on `dev` and
   now takes 0.95 s, the release's level.
