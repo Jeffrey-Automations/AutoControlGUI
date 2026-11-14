@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- GUI: the USB Browser tab's Fetch and Open run as one cancellable task with a 30 s deadline
+  (`REQUEST_DEADLINE_S`) and **Stop run** in the Actions menu; a stopped, timed-out or abandoned
+  request's answer is dropped, and a second request while one runs says *Already running*
+  instead of being ignored. `_fetch_thread` and `_open_thread` are gone; `_requests` is the task.
+
 - `AdminConsoleClient.broadcast_execute` rows carry `sent`: whether the actions went to that
   host. It takes `stop_event` and observes the caller's cancellation scope: once stopped, hosts
   not sent to yet are skipped with `sent: false` and `error` `NOT_SENT_STOPPED` (exported from

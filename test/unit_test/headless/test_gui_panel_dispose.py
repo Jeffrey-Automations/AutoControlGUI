@@ -331,9 +331,9 @@ def test_a_released_usb_browser_tab_drops_the_open_still_out(monkeypatch):
     tab._start_local_open("1234", "5678", None)
     before = tab._status_label.text()
     tab.dispose()
+    assert not tab._requests.running
     release.set()
-    assert pump_until(lambda: tab._open_thread is None)
-    assert tab._status_label.text() == before
+    assert pump_until(lambda: tab._status_label.text() != before, timeout=0.5) is False
 
 
 # --- the helper --------------------------------------------------------------------------------------------------
