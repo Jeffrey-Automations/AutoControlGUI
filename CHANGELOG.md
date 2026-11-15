@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- `uv.lock` resolves dnspython 2.9.2 (the `[tool.uv]` floor is now `>=2.9.2`), which fixes the
+  excessive memory and CPU use advisory in earlier releases; the wheel metadata is unchanged. The
+  lock also records the `gui` extra's split PySide6 pin (6.12.0 on 3.12+, 6.11.2 on 3.11).
+
 - The `gui` extra pins PySide6 6.12.0 again on Python 3.12 and later (it was held at 6.11.2
   because the test process crashed at interpreter exit under 6.12; the cause, tabs kept alive
   by slots holding themselves, was fixed in U-20261114-44). Python 3.11 keeps 6.11.2: under

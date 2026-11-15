@@ -126,9 +126,10 @@ locale = ["babel>=2.12"]
 audio = ["pycaw>=20240210"]
 
 # Lock-only security floor for a transitive dependency (uv.lock; the wheel
-# metadata is unchanged). dnspython 2.9.0 fixes the advisory in 2.8.0.
+# metadata is unchanged). dnspython 2.9.0 fixes the advisory in 2.8.0, and 2.9.2
+# the excessive memory and CPU use in earlier releases.
 [tool.uv]
-constraint-dependencies = ["dnspython>=2.9.0"]
+constraint-dependencies = ["dnspython>=2.9.2"]
 
 # CLAUDE.md's 120-character line limit. Without this table CI's `ruff check`
 # ran the default rule set, which has no E501, so the documented limit was
