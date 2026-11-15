@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- `AC_shell_to_var` and MCP `ac_shell`: inside a stoppable run or a cancellation scope, a stop,
+  `ac_stop_execution` or `notifications/cancelled` kills the command's process tree within about
+  0.1 s and ends the call (`ExecutionStopped`, or `-32800` for a client cancel), instead of waiting
+  for the program or its timeout. Outside a run the single bounded wait is unchanged.
+
 - Diagnostics (`run_diagnostics`, `ac_diagnose`): the `audit_chain` check verifies the audit log
   through a read-only SQLite connection (`verify_audit_chain_read_only`) and no longer creates
   `~/.je_auto_control/audit.db`, its schema or the one-off chain backfill. With no chained log yet

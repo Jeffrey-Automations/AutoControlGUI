@@ -169,3 +169,18 @@ def test_failure_screenshot_is_still_looked_up_on_the_server_module(monkeypatch)
     assert "RuntimeError: boom" in result["content"][0]["text"]
     assert "(error screenshot saved to shot.png)" in result["content"][0]["text"]
     assert shots == ["broken"]
+
+
+def test_cancel_ends_an_ac_shell_command_mid_run():
+    import subprocess
+    import sys
+    tools = [tool for tool in build_default_tool_registry() if tool.name == "ac_shell"]
+    server = MCPServer(tools=tools)
+    command = subprocess.list2cmdline([sys.executable, "-c", "import time; time.sleep(60)"])
+    thread, holder = _start(server, 21, "ac_shell", {"command": command, "timeout": 60})
+    _cancel(server, 21)
+    thread.join(timeout=20.0)
+    assert not thread.is_alive()
+    assert holder["response"]["error"]["code"] == -32800
+    assert holder["finished"] - holder["started"] < 20.0
+    assert active_executions() == []

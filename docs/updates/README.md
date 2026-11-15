@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261115-23 | 2026-11-15 | A stop or cancel kills a captured shell command instead of waiting for it | #done #executor #mcp | [2026-11-b](2026-11-b.md) |
 | U-20261115-22 | 2026-11-15 | ac_diagnose verifies the audit chain read-only and creates no audit database | #done #diagnostics #security | [2026-11-b](2026-11-b.md) |
 | U-20261115-21 | 2026-11-15 | Decode GUI frames through loadFromData; drop the five fromData type-ignores | #done #typing #gui | [2026-11-b](2026-11-b.md) |
 | U-20261115-20 | 2026-11-15 | PopenLauncher measures the owned child through Popen's own handle | #done #process-memory | [2026-11-b](2026-11-b.md) |

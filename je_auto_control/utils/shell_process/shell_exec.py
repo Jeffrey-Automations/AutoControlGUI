@@ -5,10 +5,15 @@ import shlex
 import signal
 import subprocess  # nosec B404  # reason: ShellManager intentionally invokes user-supplied subprocesses without shell
 import sys
+import time
 from threading import Thread
 from typing import IO, List, Optional
 
+from je_auto_control.utils.exception.cancellation import (
+    cancellation_checkpoint, current_cancellation_token,
+)
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
+from je_auto_control.utils.executor.run_control import checkpoint, current_stop_token
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 
@@ -100,6 +105,28 @@ def _kill_tree(process: subprocess.Popen[bytes]) -> None:
         pass
 
 
+_STOP_POLL_SECONDS = 0.1
+
+
+def _communicate_stoppable(process: subprocess.Popen[bytes], argv: str | List[str], timeout_s: float,
+                           input_bytes: Optional[bytes]) -> tuple[bytes, bytes]:
+    """``communicate`` within ``timeout_s``, checking for a stop or a cancellation between short waits."""
+    if current_stop_token() is None and current_cancellation_token() is None:
+        return process.communicate(input_bytes, timeout=timeout_s)
+    deadline = time.monotonic() + timeout_s
+    pending = input_bytes
+    while True:
+        cancellation_checkpoint()
+        checkpoint()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(argv, timeout_s)
+        try:
+            return process.communicate(pending, timeout=min(remaining, _STOP_POLL_SECONDS))
+        except subprocess.TimeoutExpired:
+            pending = None  # communicate keeps feeding what it was given; it refuses input a second time
+
+
 def run_captured(argv: str | List[str], timeout_s: float,
                  input_bytes: Optional[bytes] = None) -> subprocess.CompletedProcess[bytes]:
     """Run ``argv`` (no shell), capturing stdout and stderr as bytes, for at most ``timeout_s``.
@@ -109,6 +136,11 @@ def run_captured(argv: str | List[str], timeout_s: float,
     program that started one of its own (``cmd /c ping -n 9 ...`` took 8 s
     with a 1 s timeout) held the caller until it ended. On timeout the
     whole process tree is killed, then ``TimeoutExpired`` is raised.
+
+    Inside a stoppable run or a cancellation scope the wait wakes every
+    ``_STOP_POLL_SECONDS``: a stop or a cancellation kills the tree the same
+    way and propagates (``ExecutionStopped`` / the token's own error) instead
+    of holding the caller until the program or the timeout ends.
     """
     # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
     process = subprocess.Popen(argv, stdin=subprocess.PIPE if input_bytes is not None else None,  # nosec B603  # reason: argv list or CreateProcess line, never a shell
@@ -116,8 +148,8 @@ def run_captured(argv: str | List[str], timeout_s: float,
                                # its own process group on POSIX, so the timeout can end all of it
                                start_new_session=sys.platform != "win32")
     try:
-        stdout, stderr = process.communicate(input_bytes, timeout=timeout_s)
-    except subprocess.TimeoutExpired:
+        stdout, stderr = _communicate_stoppable(process, argv, timeout_s, input_bytes)
+    except BaseException:  # reason: end the tree on a timeout, a stop or any other escape, then re-raise
         _kill_tree(process)
         try:
             process.communicate(timeout=5)
