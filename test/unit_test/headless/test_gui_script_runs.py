@@ -13,7 +13,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 
-from PySide6.QtCore import QCoreApplication, QEvent, QTimer  # noqa: E402
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, Signal, Slot  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox, QWidget  # noqa: E402
 
 from headless._qt_settle import settle  # noqa: E402
@@ -176,6 +176,28 @@ def test_the_auto_click_stop_also_stops_scripts(script):
 
 # --- re-entrancy: a script that drives this window ----------------------------------------------------------
 
+class _GuiThread(QObject):
+    """Run a callable on the GUI thread, posted from the script's worker thread.
+
+    The worker is a plain ``threading.Thread``: ``QTimer.singleShot`` called there
+    makes Qt timer state on a thread Qt never started and that ends with the
+    script; it is the likeliest cause of an abort this test once hit on Windows /
+    Python 3.14, about 10 ms in. A signal
+    of an object made on the GUI thread is queued there, as the tabs themselves
+    do it (``presence_tab._registry_changed``).
+    """
+
+    posted = Signal(object)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.posted.connect(self._run)
+
+    @Slot(object)
+    def _run(self, call) -> None:
+        call()
+
+
 def test_a_script_that_clicks_this_tabs_run_does_not_deadlock_or_nest(script, monkeypatch):
     """The script asks the GUI thread to run again and waits for the answer.
 
@@ -183,6 +205,7 @@ def test_a_script_that_clicks_this_tabs_run_does_not_deadlock_or_nest(script, mo
     is free: it answers (and refuses the nested run) while the script waits.
     """
     host = ScriptHost()
+    gui = _GuiThread()
     answered = threading.Event()
     seen = []
 
@@ -191,7 +214,7 @@ def test_a_script_that_clicks_this_tabs_run_does_not_deadlock_or_nest(script, mo
             host._execute_manual_script()
             seen.append(host.script_result_text.toPlainText())
             answered.set()
-        QTimer.singleShot(0, host, on_gui_thread)
+        gui.posted.emit(on_gui_thread)
         return "answered" if answered.wait(_WAIT) else "the GUI thread never answered"
 
     monkeypatch.setitem(executor.event_dict, "AC_fake_click_run", click_run_again)
@@ -206,9 +229,10 @@ def test_a_script_that_clicks_this_tabs_run_does_not_deadlock_or_nest(script, mo
 
 def test_a_script_that_clicks_stop_stops_itself(script, monkeypatch):
     host = ScriptHost()
+    gui = _GuiThread()
 
     def click_stop() -> None:
-        QTimer.singleShot(0, host, host._stop_script)
+        gui.posted.emit(host._stop_script)
 
     monkeypatch.setitem(executor.event_dict, "AC_fake_click_stop", click_stop)
     host.script_editor.setPlainText(json.dumps(
