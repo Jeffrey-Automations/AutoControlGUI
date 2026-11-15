@@ -3,6 +3,7 @@
 Offscreen Qt. Every command a script runs here is a fake registered on the
 executor for the test: nothing touches the mouse, the keyboard or the screen.
 """
+import gc
 import json
 import os
 import threading
@@ -16,7 +17,7 @@ pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, Signal, Slot  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox, QWidget  # noqa: E402
 
-from headless._qt_settle import settle  # noqa: E402
+from headless._qt_settle import deleting, settle  # noqa: E402
 from headless._tab_hosts import RecordHost, ScriptHost  # noqa: E402
 from je_auto_control.gui._tab_task import TabTask, stop_all_script_runs, was_stopped  # noqa: E402
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper  # noqa: E402
@@ -67,6 +68,28 @@ class _Script:
         self.calls.append("after")
 
 
+class _Owner(QWidget):
+    """A tab stand-in, its own class so :func:`deleting` can find every one a test built."""
+
+
+@pytest.fixture(autouse=True)
+def widgets_die_on_the_gui_thread():
+    """Collect, then delete what each test built, on the GUI thread and never on a script's worker.
+
+    The scripts here run long Python work on worker threads, and cyclic garbage
+    is collected by whichever thread allocates when the collector runs. A
+    leaked widget collected there is queued by PySide and deleted later on the
+    main thread; on Windows / Python 3.14 one such deferred delete aborted the
+    interpreter inside ``QObject::~QObject`` (see ``conftest.py``,
+    ``collect_qt_garbage_on_the_gui_thread``). So each test starts with nothing
+    left to collect and ends with its widgets scheduled for deletion here.
+    """
+    from je_auto_control.gui._auto_click_tab import AutoClickTab
+    gc.collect()
+    with deleting(_Owner, ScriptHost, RecordHost, AutoClickTab):
+        yield
+
+
 @pytest.fixture
 def script(monkeypatch):
     _app = QApplication.instance() or QApplication([])
@@ -86,7 +109,7 @@ def script(monkeypatch):
 # --- TabTask ---------------------------------------------------------------------------------------------
 
 def test_one_run_at_a_time_and_the_outcome_arrives_on_the_gui_thread(script):
-    owner = QWidget()
+    owner = _Owner()
     runs = TabTask(owner)
     delivered = []
     runs.result.connect(lambda value: delivered.append((threading.get_ident(), value)))
@@ -110,7 +133,7 @@ def test_one_run_at_a_time_and_the_outcome_arrives_on_the_gui_thread(script):
 
 
 def test_stop_ends_a_waiting_script_and_reports_it_once_the_worker_has_unwound(script):
-    owner = QWidget()
+    owner = _Owner()
     runs = TabTask(owner)
     errors, finished = [], []
     runs.error.connect(errors.append)
@@ -131,7 +154,7 @@ def test_stop_ends_a_waiting_script_and_reports_it_once_the_worker_has_unwound(s
 
 
 def test_destroying_the_owner_stops_its_script(script):
-    owner = QWidget()
+    owner = _Owner()
     runs = TabTask(owner)
     seen = []
 
@@ -149,7 +172,7 @@ def test_destroying_the_owner_stops_its_script(script):
 
 
 def test_ctrl_4_stops_every_running_script(script):
-    first, second = QWidget(), QWidget()
+    first, second = _Owner(), _Owner()
     runs = [TabTask(first), TabTask(second)]
     for run in runs:
         assert run.start_script(lambda: executor.execute_action([["AC_sleep", {"seconds": 60}]]))
@@ -160,7 +183,7 @@ def test_ctrl_4_stops_every_running_script(script):
 
 def test_the_auto_click_stop_also_stops_scripts(script):
     from je_auto_control.gui._auto_click_tab import AutoClickTab
-    owner = QWidget()
+    owner = _Owner()
     runs = TabTask(owner)
     errors = []
     runs.error.connect(errors.append)

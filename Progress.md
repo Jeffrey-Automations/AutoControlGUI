@@ -216,19 +216,17 @@ Windows 3.11 在 `test_gui_offthread_sites.py::test_a_failed_upload_is_reported_
 
 ---
 
-## Windows 3.14：`test_gui_script_runs.py` 在完整 suite 中 abort
+## PySide6 6.12 跨執行緒回收的延後刪除會在 `QObject::~QObject` abort（GUI 本身的風險）
 
-`WIP` — `test/unit_test/headless/test_gui_script_runs.py::test_a_script_that_clicks_this_tabs_run_does_not_deadlock_or_nest`
-在 Windows 2022 / Python 3.14.10 / PySide6 6.12.0 的 `coverage run -m pytest` 中連兩輪 `Fatal Python error: Aborted`（exit 3），
-都在測試開始約 10 ms、主執行緒停在 `_qt_settle.py:22`（3.14 的 eval breaker 會在這種點跑循環回收），
-其餘方格與更早的 3.14 輪次都通過（run 43716232950 於 `ab490b26`、43733918302 於 `9796d590`）。
-已排除：`QTimer.singleShot` 跨執行緒呼叫（U-20261116-01 換成 GUI 執行緒 signal 後照樣 abort）；
-單獨跑這個模組、或依 CI 順序只跑前面 25 個 GUI 模組，本機 Windows 3.14.7 都通過。
-abort 不經 WER 所以沒有 minidump，Qt 寫到 stderr 的原因被 pytest 的 fd capture 吞掉；
-U-20261116-02 起 `ci_native_diagnostics.py` 把 artifact 目錄交給子程序，headless conftest 把 Qt 訊息寫進
-`native-windows-2022-3.14` artifact 的 `qt-messages.log`。
-待辦：下次 abort 時讀那份檔案的最後一行找出原因；若是 PySide6 6.12.0 的參考計數問題（同上一節），
-比照 3.11 的處理評估 3.14 的固定版本。
+`DECIDE` — 原因已由本機 minidump 確認（U-20261116-04）：Python 擁有的 Qt 物件若被 worker 執行緒的循環回收收走，
+PySide6 6.12 不在那裡刪，而是排進 `Shiboken::BindingManager::runDeletionInMainThread` 之後在主執行緒刪；
+其中一個被留下的頂層 `QWidget`（`wasWidget`、`wasDeleted` 已設、無 parent、無 Qt 訊息）在 `QObject::~QObject` 裡呼叫 `abort()`。
+測試端已處理：headless conftest 在每個模組開始時於主執行緒 `gc.collect()`，`test_gui_script_runs.py` 每個測試先回收、結束時刪掉自己建的 widget；
+照 CI 順序的完整本機重跑由 3/3 abort 變成 8,856 通過。
+未解：觸發的確切前提還沒用最小範例重現（單純跨執行緒回收、留下的 `TabTask` owner、兩種雙重刪除順序都正常），
+所以產品 GUI 在 worker 執行緒跑 Python 時（`_worker_thread`、`DaemonThread`、`tab_task_controller`）仍可能遇到同一條路徑。
+待決定：(1) 是否向 PySide 回報（附 minidump 的堆疊與物件狀態）；(2) 是否比照 3.11 把 3.14 固定回 PySide6 6.11.2
+（6.11.1 起就有延後刪除，但升到 6.12 前 3.14 沒有出現過這個 abort）；(3) 或在 GUI 端讓主執行緒定期回收、減少留給 worker 的垃圾。
 
 ---
 

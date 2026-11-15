@@ -1,4 +1,5 @@
 """Shared teardown for the headless suite."""
+import gc
 import os
 import sys
 
@@ -52,6 +53,26 @@ def _record_qt_messages():
             return
 
     core.qInstallMessageHandler(handler)
+
+
+@pytest.fixture(autouse=True, scope="module")
+def collect_qt_garbage_on_the_gui_thread():
+    """Collect what earlier modules left, on the main thread, before this module starts any worker.
+
+    Cyclic garbage is collected by whichever thread happens to allocate when
+    the collector runs. A Python-owned Qt object collected on a worker thread
+    is not deleted there: PySide 6.12 queues it and deletes it later on the
+    main thread (``Shiboken::BindingManager::runDeletionInMainThread``). On
+    Windows / Python 3.14 one such deferred delete of a leaked top-level
+    ``QWidget`` aborted the interpreter inside ``QObject::~QObject`` -- a
+    minidump showed that frame, the object's ``wasWidget`` / ``wasDeleted``
+    bits and no Qt message -- in ``test_gui_script_runs.py``, whose scripts run
+    long Python work on worker threads. Collecting here keeps leaked widgets on
+    the thread that owns them. About 40 ms a module, and only once Qt is loaded.
+    """
+    if "PySide6.QtCore" in sys.modules:
+        gc.collect()
+    yield
 
 
 @pytest.fixture(autouse=True)
