@@ -113,7 +113,10 @@ def test_real_http_multi_file_chunks_publish_only_a_complete_verified_generation
 @pytest.mark.parametrize('boundary', ['before-chunks', 'after-cache'])
 def test_independent_source_expiry_refuses_surviving_chunks_without_expiring_the_destination(
         tmp_path, monkeypatch, boundary):
-    source_directory = tmp_path / 'independent-source'
+    # Short on purpose: the child's evidence cache nests a 64- and a 32-hex directory and a temp
+    # file under it, which under 'independent-source' reached 263 characters on a local Windows
+    # basetemp and failed with WinError 206 / Errno 2 where long paths are off (MAX_PATH 260).
+    source_directory = tmp_path / 'src'
     with owned_transfer_process(source_directory, 'headless._transfer_source_process', {}) as source:
         with import_hosts(tmp_path, monkeypatch) as (host, server, _unused, _body, token, root, _actor):
             book = admin_client.AdminConsoleClient(persist_path=root / 'independent-source-hosts.json')
