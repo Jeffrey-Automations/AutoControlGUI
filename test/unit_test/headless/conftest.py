@@ -1,4 +1,5 @@
 """Shared teardown for the headless suite."""
+import os
 import sys
 
 import pytest
@@ -15,6 +16,42 @@ def _live_qt_application():
     if widgets is None:
         return None
     return widgets.QApplication.instance()
+
+
+_QT_EVIDENCE_DIR = "AUTOCONTROL_NATIVE_ARTIFACT_DIR"
+_qt_log = []
+
+
+def _record_qt_messages():
+    """In CI, append Qt's own messages to ``qt-messages.log`` in the native artifact folder.
+
+    A ``qFatal`` aborts the interpreter right after Qt prints its reason to
+    stderr, and pytest's fd capture holds that stderr until the test ends --
+    which it never does. Windows 3.14 has lost the reason that way
+    ("Fatal Python error: Aborted" and nothing else, in
+    ``test_gui_script_runs.py``). Qt calls the handler before it aborts, and
+    each line is written and closed at once, so the reason survives the
+    process. Installed once, the first time a test finds Qt loaded, and only
+    when ``scripts/ci_native_diagnostics.py`` names the folder.
+    """
+    folder = os.environ.get(_QT_EVIDENCE_DIR)
+    if _qt_log or not folder:
+        return
+    core = sys.modules.get("PySide6.QtCore")
+    if core is None:
+        return
+    path = os.path.join(folder, "qt-messages.log")
+    _qt_log.append(path)
+
+    def handler(mode, _context, message):
+        test = os.environ.get("PYTEST_CURRENT_TEST", "")
+        try:
+            with open(path, "a", encoding="utf-8") as log:
+                log.write(f"{getattr(mode, 'name', mode)} [{test}] {message}\n")
+        except OSError:
+            return
+
+    core.qInstallMessageHandler(handler)
 
 
 @pytest.fixture(autouse=True)
@@ -37,6 +74,7 @@ def flush_qt_deferred_deletes():
     and therefore torn down *after* it — the module's own ``deleteLater()``
     calls have already been made by the time this runs.
     """
+    _record_qt_messages()
     yield
     app = _live_qt_application()
     if app is None:

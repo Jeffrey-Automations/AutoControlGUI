@@ -216,6 +216,22 @@ Windows 3.11 在 `test_gui_offthread_sites.py::test_a_failed_upload_is_reported_
 
 ---
 
+## Windows 3.14：`test_gui_script_runs.py` 在完整 suite 中 abort
+
+`WIP` — `test/unit_test/headless/test_gui_script_runs.py::test_a_script_that_clicks_this_tabs_run_does_not_deadlock_or_nest`
+在 Windows 2022 / Python 3.14.10 / PySide6 6.12.0 的 `coverage run -m pytest` 中連兩輪 `Fatal Python error: Aborted`（exit 3），
+都在測試開始約 10 ms、主執行緒停在 `_qt_settle.py:22`（3.14 的 eval breaker 會在這種點跑循環回收），
+其餘方格與更早的 3.14 輪次都通過（run 43716232950 於 `ab490b26`、43733918302 於 `9796d590`）。
+已排除：`QTimer.singleShot` 跨執行緒呼叫（U-20261116-01 換成 GUI 執行緒 signal 後照樣 abort）；
+單獨跑這個模組、或依 CI 順序只跑前面 25 個 GUI 模組，本機 Windows 3.14.7 都通過。
+abort 不經 WER 所以沒有 minidump，Qt 寫到 stderr 的原因被 pytest 的 fd capture 吞掉；
+U-20261116-02 起 `ci_native_diagnostics.py` 把 artifact 目錄交給子程序，headless conftest 把 Qt 訊息寫進
+`native-windows-2022-3.14` artifact 的 `qt-messages.log`。
+待辦：下次 abort 時讀那份檔案的最後一行找出原因；若是 PySide6 6.12.0 的參考計數問題（同上一節），
+比照 3.11 的處理評估 3.14 的固定版本。
+
+---
+
 ## Agent 電腦接管與任務自動化
 
 `WIP` — **依使用者恢復目標繼續交付；個別原生／真機／24 小時驗收仍暫緩。**

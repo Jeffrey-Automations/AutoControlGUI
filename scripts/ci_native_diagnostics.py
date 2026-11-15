@@ -66,7 +66,10 @@ def run(command: Sequence[str], directory: Path, *, native: bool = False) -> int
     }
     report = directory / 'runtime.json'
     report.write_text(json.dumps(record, indent=2), encoding='utf-8')
-    environment = dict(os.environ, PYTHONFAULTHANDLER='1', PYTHONUNBUFFERED='1')
+    # The child may add evidence of its own here (the headless conftest writes Qt's
+    # fatal messages, which pytest's fd capture would otherwise lose with the process).
+    environment = dict(os.environ, PYTHONFAULTHANDLER='1', PYTHONUNBUFFERED='1',
+                       AUTOCONTROL_NATIVE_ARTIFACT_DIR=str(directory.resolve()))
     started = time.monotonic()
     with (
         _debugger_argv(command, debugger) as actual,

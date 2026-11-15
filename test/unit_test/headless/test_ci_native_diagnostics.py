@@ -42,6 +42,14 @@ def test_child_result_output_and_runtime_versions_survive_the_wrapper(tmp_path, 
     assert 'AC_CONTROLLED_PRIVATE_TEST_VALUE' not in log + raw
 
 
+def test_the_child_is_told_where_to_leave_its_own_evidence(tmp_path):
+    directory = tmp_path / 'evidence'
+    code = "import os;print('dir=' + os.environ['AUTOCONTROL_NATIVE_ARTIFACT_DIR'])"
+    result = run_child(directory, code)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f'dir={directory.resolve()}' in result.stdout
+
+
 @pytest.mark.skipif(sys.platform != 'linux' or shutil.which('gdb') is None, reason='requires Linux GDB')
 def test_real_native_abort_retains_a_backtrace_and_fails(tmp_path):
     directory = tmp_path / 'native-abort'
