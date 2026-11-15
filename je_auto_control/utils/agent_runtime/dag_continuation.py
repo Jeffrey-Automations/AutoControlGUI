@@ -23,7 +23,7 @@ FIELDS = {"pause_batch": {"batch_id"}, "review_continuation": {"batch_id", "defi
           "validate_node": {"batch_id", "attempt", "node_id"}}
 
 
-def _decisions(value: Any, batch: dict) -> dict[str, dict] | None:
+def _decisions(value: Any, batch: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
     if value is None:
         return None
     if not isinstance(value, list) or len(value) != len(batch["definition"]["nodes"]):
@@ -40,13 +40,13 @@ def _decisions(value: Any, batch: dict) -> dict[str, dict] | None:
     return result
 
 
-def _deadline(request: dict) -> float:
+def _deadline(request: dict[str, Any]) -> float:
     timeout = request.get('timeout_seconds', 30)
     positive(timeout, 'DAG continuation timeout_seconds', 300)
     return time.monotonic() + timeout
 
 
-def _input_matches(batch: dict, definition: Any) -> None:
+def _input_matches(batch: dict[str, Any], definition: Any) -> None:
     if request_spec_digest(batch_definition(definition)) != request_spec_digest(batch["input_definition"]):
         raise AgentTaskError("DAG continuation input graph changed")
 
@@ -55,10 +55,10 @@ def _input_matches(batch: dict, definition: Any) -> None:
 class DagContinuation:
     """Bind explicit decisions to local claims, current authority and fresh destination receipts."""
 
-    def __init__(self, batches: Any, actor: dict) -> None:
+    def __init__(self, batches: Any, actor: dict[str, Any]) -> None:
         self.batches, self.actor = batches, actor
 
-    def control(self, operation: str, batch: dict, request: dict) -> dict:
+    def control(self, operation: str, batch: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
         """Review without writes, approve without dispatch, or acquire exactly one approved attempt."""
         if operation == "pause_batch":
             return self._pause(batch)
@@ -74,13 +74,13 @@ class DagContinuation:
         baseline = self._baseline(batch)
         return self._gather(baseline, request.get("decisions"), request.get("timeout_seconds", 30))["public"]
 
-    def _baseline(self, batch: dict) -> dict:
+    def _baseline(self, batch: dict[str, Any]) -> dict[str, Any]:
         with self.batches.runtime.store.connection() as connection:
             nodes = [dict(row) for row in connection.execute(
                 "SELECT * FROM agent_dag_nodes WHERE batch_id=? ORDER BY node_id", (batch["id"],))]
         return detached({"batch": batch, "nodes": nodes, "actor": self.actor})
 
-    def _gather(self, baseline: dict, decisions: Any, timeout: float) -> dict:
+    def _gather(self, baseline: dict[str, Any], decisions: Any, timeout: float) -> dict[str, Any]:
         batch = baseline["batch"]
         selected = _decisions(decisions, batch)
         evidence = ContinuationEvidence(batch, timeout, self.batches.runtime)
@@ -99,8 +99,8 @@ class DagContinuation:
                              "issue": item.get("issue", "")} for item in reports]}
         return {"public": public, "baseline": baseline, "reports": reports}
 
-    def _review_node(self, node: dict, phase: str, choice: dict | None,
-                     evidence: ContinuationEvidence, snapshot: str) -> dict:
+    def _review_node(self, node: dict[str, Any], phase: str, choice: dict[str, Any] | None,
+                     evidence: ContinuationEvidence, snapshot: str) -> dict[str, Any]:
         try:
             original = evidence.original(node)
             if choice is None:
@@ -110,7 +110,8 @@ class DagContinuation:
             decision = choice or {"node_id": node["id"], "action": "wait"}
             return {"decision": decision, "ready": False, "issue": "destination_or_decision_requires_review"}
 
-    def _default(self, node: dict, phase: str, original: dict | None, snapshot: str) -> dict:
+    def _default(self, node: dict[str, Any], phase: str, original: dict[str, Any] | None,
+                 snapshot: str) -> dict[str, Any]:
         if original is not None:
             completion(original, node)
             return {"node_id": node["id"], "action": "adopt", "task_id": original["task_id"]}
@@ -119,7 +120,7 @@ class DagContinuation:
             return {"node_id": node["id"], "action": "dispatch", "spec": spec}
         return {"node_id": node["id"], "action": "wait"}
 
-    def _pause(self, batch: dict) -> dict:
+    def _pause(self, batch: dict[str, Any]) -> dict[str, Any]:
         with self.batches.runtime.store.connection(write=True) as connection:
             connection.execute("UPDATE agent_dag_batches SET state='waiting_review',attempt='',updated=? WHERE id=?",
                                (time.time(), batch["id"]))
@@ -129,7 +130,7 @@ class DagContinuation:
         # pylint: disable-next=protected-access  # reason: preserve the registry's owner-scoped public projection
         return self.batches._describe(self.batches._row(batch["id"]))
 
-    def _approve(self, batch: dict, request: dict) -> dict:
+    def _approve(self, batch: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
         deadline = _deadline(request)
         note = request["note"]
         if not isinstance(note, str) or not note.strip() or len(note) > 4000:
@@ -153,7 +154,8 @@ class DagContinuation:
             raise AgentTaskError("DAG continuation evidence or decisions changed; review again")
         return self._save_approval(batch, request, review, plan_hash, deadline)
 
-    def _save_approval(self, batch: dict, request: dict, review: dict, plan_hash: str, deadline: float) -> dict:
+    def _save_approval(self, batch: dict[str, Any], request: dict[str, Any], review: dict[str, Any], plan_hash: str,
+                       deadline: float) -> dict[str, Any]:
         identifier = uuid.uuid4().hex
         details = {**review, "note": request['note'], "actor": self.actor}
         checks = (DagTransferChecks(self.batches.runtime.store, batch,
@@ -173,14 +175,16 @@ class DagContinuation:
                               self._commit_approval(connection, batch, identifier, review['reports']))
         return {"batch_id": batch["id"], "approval_id": identifier, "approval_state": "ready"}
 
-    def _commit_approval(self, connection: Any, batch: dict, identifier: str, reports: list) -> None:
+    def _commit_approval(self, connection: Any, batch: dict[str, Any], identifier: str,
+                         reports: list[dict[str, Any]]) -> None:
         self._apply(connection, batch, identifier, reports)
         connection.execute("UPDATE agent_dag_approvals SET state='ready' WHERE id=?", (identifier,))
         connection.execute("UPDATE agent_dag_batches SET state='approved',attempt='',updated=? WHERE id=?",
                            (time.time(), batch['id']))
         self._handoff_checks(connection, batch, reports)
 
-    def _resume_approval(self, batch: dict, request: dict, previous: dict, deadline: float) -> dict:
+    def _resume_approval(self, batch: dict[str, Any], request: dict[str, Any], previous: dict[str, Any],
+                         deadline: float) -> dict[str, Any]:
         details = json.loads(previous['details'])
         if batch['state'] != 'waiting_review' or details['actor'] != self.actor or details['note'] != request['note']:
             raise AgentTaskError('provisional adoption requires its original explicit approval request')
@@ -194,7 +198,7 @@ class DagContinuation:
         return {'batch_id': batch['id'], 'approval_id': previous['id'], 'approval_state': 'ready'}
 
     @staticmethod
-    def _apply(connection: Any, batch: dict, identifier: str, reports: list[dict]) -> None:
+    def _apply(connection: Any, batch: dict[str, Any], identifier: str, reports: list[dict[str, Any]]) -> None:
         for report in reports:
             decision = report["decision"]
             node_id = decision["node_id"]
@@ -212,7 +216,7 @@ class DagContinuation:
                 connection.execute("INSERT OR REPLACE INTO agent_dag_adoptions VALUES (?,?,?,?,?)",
                     (batch["id"], node_id, decision["task_id"], report["original"]["task_id"], identifier))
 
-    def _start(self, batch: dict, request: dict) -> dict:
+    def _start(self, batch: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
         deadline = _deadline(request)
         with self.batches.runtime.store.connection() as connection:
             row = connection.execute("SELECT * FROM agent_dag_approvals WHERE id=? AND batch_id=?",
@@ -232,7 +236,8 @@ class DagContinuation:
                 "max_parallel": batch["max_parallel"],
                 "definition": bind_definition(batch["definition"], batch["id"], batch["graph_hash"], batch["bindings"])}
 
-    def _activate(self, batch: dict, identifier: str, reports: list, deadline: float, baseline: dict | None) -> str:
+    def _activate(self, batch: dict[str, Any], identifier: str, reports: list[dict[str, Any]], deadline: float,
+                  baseline: dict[str, Any] | None) -> str:
         attempt = uuid.uuid4().hex
         checks = (DagTransferChecks(self.batches.runtime.store, batch,
             lambda: self._remote_checks(batch, reports, deadline), baseline=baseline)
@@ -250,19 +255,20 @@ class DagContinuation:
                               self._commit_start(connection, batch, identifier, attempt, reports))
         return attempt
 
-    def _commit_start(self, connection: Any, batch: dict, identifier: str, attempt: str, reports: list) -> None:
+    def _commit_start(self, connection: Any, batch: dict[str, Any], identifier: str, attempt: str,
+                      reports: list[dict[str, Any]]) -> None:
         connection.execute("UPDATE agent_dag_approvals SET state='used' WHERE id=?", (identifier,))
         connection.execute("UPDATE agent_dag_batches SET state='running',attempt=?,updated=? WHERE id=?",
                            (attempt, time.time(), batch['id']))
         self._handoff_checks(connection, batch, reports)
 
-    def _start_context(self, batch: dict, request: dict, details: dict) -> None:
+    def _start_context(self, batch: dict[str, Any], request: dict[str, Any], details: dict[str, Any]) -> None:
         parallel = request["max_parallel"]
         if (details["actor"] != self.actor or not isinstance(parallel, int) or isinstance(parallel, bool)
                 or parallel != batch["max_parallel"]):
             raise AgentTaskError("DAG continuation actor or parallelism changed")
 
-    def validate_node(self, batch: dict, node_id: str, attempt: str) -> dict:
+    def validate_node(self, batch: dict[str, Any], node_id: str, attempt: str) -> dict[str, Any]:
         """Recheck adopted dependency evidence under the active attempt without dispatch or input."""
         if batch["state"] != "running" or batch["attempt"] != attempt:
             raise AgentTaskError("DAG continuation attempt is inactive")
@@ -288,7 +294,7 @@ class DagContinuation:
         return {"outcome": "completed", "task_id": adoption["task_id"],
                 "task_state": "succeeded", "input_released": True}
 
-    def _validate_adoption(self, batch: dict, node_id: str, adoption: dict) -> None:
+    def _validate_adoption(self, batch: dict[str, Any], node_id: str, adoption: dict[str, Any]) -> None:
         node = bound_node(batch, node_id)
         evidence = ContinuationEvidence(batch, runtime=self.batches.runtime)
         original = evidence.original(node)
@@ -303,13 +309,13 @@ class DagContinuation:
             if approval is None:
                 raise AgentTaskError('DAG adoption approval evidence is missing')
             decisions = json.loads(approval[0])['public']['decisions']
-            decision: dict = next((item for item in decisions if item['node_id'] == node_id), {})
+            decision: dict[str, Any] = next((item for item in decisions if item['node_id'] == node_id), {})
             if 'handoff_id' in decision:
                 evidence.successor(node, original, adoption['task_id'], decision['handoff_id'])
             else:
                 evidence.successor(node, original, adoption['task_id'])
 
-    def _remote_grant(self, batch: dict, node_id: str, adoption: dict) -> bool:
+    def _remote_grant(self, batch: dict[str, Any], node_id: str, adoption: dict[str, Any]) -> bool:
         if bound_node(batch, node_id)['host'] == 'local':
             return False
         with self.batches.runtime.store.connection() as connection:
@@ -318,14 +324,14 @@ class DagContinuation:
         return row is not None and any(item['node_id'] == node_id and 'handoff_id' in item
             for item in json.loads(row['details'])['public']['decisions'])
 
-    def _handoff_checks(self, connection: Any, batch: dict, reports: list[dict]) -> None:
+    def _handoff_checks(self, connection: Any, batch: dict[str, Any], reports: list[dict[str, Any]]) -> None:
         for report in reports:
             decision = report['decision']
             if 'handoff_id' in decision and bound_node(batch, decision['node_id'])['host'] == 'local':
                 self.batches.runtime.recovery.handoff_evidence(batch['id'], decision['node_id'],
                     report['original']['task_id'], decision['task_id'], decision['handoff_id'], connection=connection)
 
-    def _remote_checks(self, batch: dict, reports: list[dict], deadline: float) -> None:
+    def _remote_checks(self, batch: dict[str, Any], reports: list[dict[str, Any]], deadline: float) -> None:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise AgentTaskError('remote adoption confirmation deadline expired')

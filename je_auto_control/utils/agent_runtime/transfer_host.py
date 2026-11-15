@@ -19,31 +19,33 @@ from je_auto_control.utils.agent_runtime.transfer_destination_scope import desti
 from je_auto_control.utils.rbac.authorization import AuthorizationContext, current_authorization
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
+_Link = tuple[dict[str, Any], dict[str, Any], dict[str, Any]]
 
-def principal() -> dict:
+
+def principal() -> dict[str, Any]:
     """Capture only the actual local authenticated identity, never a request-authored principal."""
     with DeferredAuthorization.capture().scope():
         current = current_authorization()
         return asdict(current) if current is not None else {}
 
 
-def actor_key(actor: dict) -> str:
+def actor_key(actor: dict[str, Any]) -> str:
     """Bind stable principal provenance while checking current roles separately on each operation."""
     return sha256(_canonical({'user_id': actor.get('user_id'), 'store_path': actor.get('store_path')})).hexdigest()
 
 
-def _refresh(actor: dict) -> DeferredAuthorization:
+def _refresh(actor: dict[str, Any]) -> DeferredAuthorization:
     return DeferredAuthorization(AuthorizationContext(**actor) if actor else None)
 
 
-def _manager(actor: dict, owner: dict) -> None:
+def _manager(actor: dict[str, Any], owner: dict[str, Any]) -> None:
     with _refresh(actor).scope():
         current = current_authorization()
         if current is not None and current.role != 'admin' and actor_key(asdict(current)) != actor_key(owner):
             raise AgentTaskError('source task does not exist or belongs to another caller')
 
 
-def _with_origin_scope(spec: dict, scope: list[str] | None) -> dict:
+def _with_origin_scope(spec: dict[str, Any], scope: list[str] | None) -> dict[str, Any]:
     if scope is None:
         return spec
     options = spec['options']
@@ -56,8 +58,8 @@ def _with_origin_scope(spec: dict, scope: list[str] | None) -> dict:
 class TransferHost:
     """Actual runtime callbacks supply policy, private completion checks and lifecycle observations."""
 
-    def __init__(self, runtime: Any, policy: tuple[Callable, ...],
-                 completion: Callable, available: Callable[[], bool], retired: Callable[[str], bool]) -> None:
+    def __init__(self, runtime: Any, policy: tuple[Callable[..., Any], ...],
+                 completion: Callable[..., Any], available: Callable[[], bool], retired: Callable[[str], bool]) -> None:
         self.runtime, self.completion = runtime, completion
         self._callbacks = policy
         _policy, submitted, digest, ownership, _paths = policy[:5]
@@ -65,23 +67,23 @@ class TransferHost:
         self.available, self.retired = available, retired
 
     @property
-    def policy(self) -> Callable:
+    def policy(self) -> Callable[..., Any]:
         """Use the injected source policy factory without a reverse dependency on task models."""
         return self._callbacks[0]
 
     @property
-    def private_paths(self) -> Callable:
+    def private_paths(self) -> Callable[..., Any]:
         """Inspect actual host-private paths through the source host's existing collaborator."""
         return self._callbacks[4]
 
-    def destination_context(self, target: str, directory: str, *, reviewed: dict | None = None,
-                            connection: Any = None) -> dict:
+    def destination_context(self, target: str, directory: str, *, reviewed: dict[str, Any] | None = None,
+                            connection: Any = None) -> dict[str, Any]:
         """Validate a destination against actual local profile and retained live origin constraints."""
         self.check_open()
         return destination_scope(self._callbacks[5], self._callbacks[6], target, directory,
                                  reviewed=reviewed, connection=connection)
 
-    def managed(self, source_task: str, actor: dict, *, connection: Any = None) -> dict:
+    def managed(self, source_task: str, actor: dict[str, Any], *, connection: Any = None) -> dict[str, Any]:
         """Authorize source management without requiring still-active export or input authority."""
         self.check_open()
         _hex(source_task, 32)
@@ -91,8 +93,8 @@ class TransferHost:
             _manager(actor, row['owner'])
             return row
 
-    def context(self, source_task: str, issuer: dict, *, connection: Any = None,
-                origin_scope: list[str] | None = None) -> dict:
+    def context(self, source_task: str, issuer: dict[str, Any], *, connection: Any = None,
+                origin_scope: list[str] | None = None) -> dict[str, Any]:
         """Recheck actual completion and current source/issuer rights without exporting private evidence."""
         self.check_open()
         transaction = self.runtime.store.connection() if connection is None else nullcontext(connection)
@@ -134,8 +136,8 @@ class TransferHost:
             if private not in self.runtime.source_private_files:
                 self.runtime.source_private_files += (private,)
 
-    def evidence_proof(self, source_task: str, task_id: str, issuer: dict, *, connection: Any = None,
-                       reviewed: dict | None = None, issuing: bool = False) -> dict:
+    def evidence_proof(self, source_task: str, task_id: str, issuer: dict[str, Any], *, connection: Any = None,
+                       reviewed: dict[str, Any] | None = None, issuing: bool = False) -> dict[str, Any]:
         """Reuse actual recovery/completion authority while keeping all private proof on its source host."""
         self.check_open()
         _hex(source_task, 32)
@@ -150,7 +152,8 @@ class TransferHost:
                 issuer_policies=previous.get('issuer_policies'), authorization=previous.get('completion_authorization'))
             return self._evidence_projection(reading, row, task_id, *described[:2])
 
-    def _evidence_engine(self, connection: Any, row: dict, issuer: dict, origins: list | None) -> tuple:
+    def _evidence_engine(self, connection: Any, row: dict[str, Any], issuer: dict[str, Any],
+                         origins: list[str] | None) -> tuple[EvidenceHandoffs, dict[str, Any]]:
         context = self.lineage.evidence_context(connection, row, issuer, origins)
         local = 'admission' in context['binding']
         engine = EvidenceHandoffs(self.runtime, lambda *_args, **_kwargs: context,
@@ -160,13 +163,15 @@ class TransferHost:
             request.update({name: context['binding'][name] for name in ('batch_id', 'node_id')})
         return engine, request
 
-    def _handoff_scope(self, connection: Any, context: dict, links: list, issuer_policies: list | None,
-                       authorization: dict | None, *, issuing: bool = False) -> dict:
+    def _handoff_scope(self, connection: Any, context: dict[str, Any], links: list[_Link],
+                       issuer_policies: list[str] | None,
+                       authorization: dict[str, Any] | None, *, issuing: bool = False) -> dict[str, Any]:
         """Revalidate this host's retained private consent while the engine still checks issuance state."""
         return self.runtime.recovery.handoff_scope(connection, context, links, issuer_policies, authorization,
             issuing=issuing and authorization is None)
 
-    def _evidence_projection(self, connection: Any, row: dict, task_id: str, proof: dict, tasks: list) -> dict:
+    def _evidence_projection(self, connection: Any, row: dict[str, Any], task_id: str, proof: dict[str, Any],
+                             tasks: list[dict[str, Any]]) -> dict[str, Any]:
         requests = self.lineage.accepted_requests(connection, row)
         if not requests:
             raise AgentTaskError('portable evidence requires an actual original accepted request witness')
@@ -180,7 +185,7 @@ class TransferHost:
                 'submitted_spec_digest': submitted[0] if submitted else self.lineage.submitted(row['spec']),
                 'node': row['spec']['options'].get('dag_batch')}
 
-    def skill_evidence(self, connection: Any, record: dict) -> HandoffAccess:
+    def skill_evidence(self, connection: Any, record: dict[str, Any]) -> HandoffAccess:
         """Build a source-private skill view from current portable consent without creating a local grant."""
         scope = record['scope']
         previous = scope['context']['proof']

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import threading
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Mapping, Optional, Tuple
 
@@ -55,6 +56,7 @@ from je_auto_control.utils.remote_desktop.webrtc_host_media import (
 )
 
 if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
+    from pathlib import Path
     from je_auto_control.utils.remote_desktop.webrtc_audio import (
         OpusMicAudioTrack, OpusMicReceiver,
     )
@@ -64,7 +66,7 @@ if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
     from je_auto_control.utils.remote_desktop.webrtc_mic import (
         MicUplinkReceiver,
     )
-    from je_auto_control.utils.usb.passthrough import UsbChannelHost
+    from je_auto_control.utils.usb.passthrough import UsbChannelHost, UsbPassthroughSession
 
 
 _AUTH_GRACE_S = 5.0
@@ -97,11 +99,11 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
                  trust_list: Optional[TrustList] = None,
                  read_only: bool = False,
                  permissions: Optional[SessionPermissions] = None,
-                 external_video_track=None,
-                 inbox_dir=None,
-                 ip_whitelist: Optional[list] = None,
+                 external_video_track: Any = None,
+                 inbox_dir: Optional[Path] = None,
+                 ip_whitelist: Optional[list[str]] = None,
                  rate_limit: Optional[RateLimitConfig] = None,
-                 on_annotation: Optional[Callable[[dict], None]] = None) -> None:
+                 on_annotation: Optional[Callable[[dict[str, Any]], None]] = None) -> None:
         if not token:
             raise ValueError("WebRTC host requires a non-empty token")
         self._token = token
@@ -136,8 +138,8 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         self._file_callbacks = FileReceiveCallbacks(
             audit=lambda path: default_audit_log().log(
                 'file_received', viewer_id=self._pending_viewer_id, detail=str(path)))
-        self._on_viewer_video_frame: Optional[Callable] = None
-        self._viewer_video_task: Optional[asyncio.Task] = None
+        self._on_viewer_video_frame: Optional[Callable[[Any], None]] = None
+        self._viewer_video_task: Optional[asyncio.Task[Any]] = None
         self._opus_audio_receiver: Optional[OpusMicReceiver] = None
         # Outbound host voice, when the host shares its own microphone.
         self._host_voice_track: Optional[OpusMicAudioTrack] = None
@@ -147,7 +149,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         # Hold strong refs to fire-and-forget tasks so the asyncio event
         # loop doesn't garbage-collect them mid-flight (S7502). Tasks
         # remove themselves from this set in their done callback.
-        self._background_tasks: set = set()
+        self._background_tasks: set[asyncio.Task[Any]] = set()
         self._retirement = PeerRetirement()
         self._media_owners = PeerMediaOwners()
         self._closed = threading.Event()
@@ -263,7 +265,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
     async def _stop_peer(self) -> None:
         await stop_host(self)
 
-    def _spawn_bg(self, coro) -> "asyncio.Task":
+    def _spawn_bg(self, coro: Coroutine[Any, Any, Any]) -> "asyncio.Task[Any]":
         """Schedule ``coro`` and pin a strong ref while it runs (S7502)."""
         task = asyncio.ensure_future(coro)
         self._background_tasks.add(task)
@@ -274,7 +276,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
 
     def _wire_viewer_video_handler(self, pc: RTCPeerConnection) -> None:
         @pc.on("track")
-        def _on_track(track) -> None:
+        def _on_track(track: Any) -> None:
             if self._pc is not pc or self._closed.is_set():
                 return
             if track.kind == "video":
@@ -287,7 +289,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
                     return
                 self._start_opus_audio_receive(track)
 
-    def _start_opus_audio_receive(self, track) -> None:
+    def _start_opus_audio_receive(self, track: Any) -> None:
         from je_auto_control.utils.remote_desktop.webrtc_audio import (
             OpusMicReceiver,
         )
@@ -301,7 +303,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         self._media_owners.activate("opus receiver", lambda: receiver.consume(track), receiver)
         autocontrol_logger.info("webrtc host: receiving Opus audio from viewer")
 
-    async def _consume_viewer_video(self, track) -> None:
+    async def _consume_viewer_video(self, track: Any) -> None:
         from aiortc.mediastreams import MediaStreamError
         try:
             while True:
@@ -321,7 +323,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         finally:
             self._viewer_video_task = None
 
-    def set_viewer_video_callback(self, callback) -> None:
+    def set_viewer_video_callback(self, callback: Optional[Callable[[Any], None]]) -> None:
         """Register ``cb(av.VideoFrame)`` for incoming viewer-screen frames."""
         self._on_viewer_video_frame = callback
 
@@ -361,7 +363,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
             autocontrol_logger.info("webrtc host: remote ip = %s", ip)
 
     @staticmethod
-    def _extract_remote_ip(report) -> Optional[str]:
+    def _extract_remote_ip(report: Mapping[str, Any]) -> Optional[str]:
         for entry in report.values():
             if (getattr(entry, "type", None) != "candidate-pair"
                     or not getattr(entry, "selected", False)):
@@ -374,16 +376,16 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
             return str(ip) if ip else None
         return None
 
-    def _wire_mic_channel(self, channel) -> None:
+    def _wire_mic_channel(self, channel: Any) -> None:
         @channel.on("message")
-        def _on_message(message) -> None:
+        def _on_message(message: Any) -> None:
             if not self._authenticated or self._mic_receiver is None:
                 return
             if not self._permissions.allow_audio:
                 return
             self._mic_receiver.on_chunk(message)
 
-    def _wire_files_channel(self, channel) -> None:
+    def _wire_files_channel(self, channel: Any) -> None:
         from je_auto_control.utils.remote_desktop.webrtc_files import FileTransferReceiver
         close_file_receiver(self._files_receiver, self._files_channel)
         receiver = self._files_receiver = FileTransferReceiver(self._inbox_dir)
@@ -403,7 +405,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         bind_file_receiver(channel, receiver, active, self._on_file_done, accept_begin,
                            received=self._file_callbacks.received)
 
-    def _wire_usb_channel(self, channel) -> None:
+    def _wire_usb_channel(self, channel: Any) -> None:
         """Carry USB passthrough over the ``usb`` DataChannel.
 
         Gated on viewer authentication *and* the global passthrough flag
@@ -414,7 +416,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         """
         from je_auto_control.utils.usb.passthrough import UsbChannelHost
 
-        def _factory():
+        def _factory() -> UsbPassthroughSession:
             from je_auto_control.utils.usb.passthrough import (
                 UsbAcl, UsbPassthroughSession, default_passthrough_backend,
             )
@@ -441,7 +443,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
             if self._usb_host is usb_host:
                 self._usb_host = None
 
-    def set_file_received_callback(self, callback) -> None:
+    def set_file_received_callback(self, callback: Optional[Callable[[Path], None]]) -> None:
         """Register a sync callback ``cb(path: Path)`` for completed transfers."""
         self._file_callbacks.on_file = callback
 
@@ -449,7 +451,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         """Register an inert local publication-receipt listener; None clears it."""
         self._file_callbacks.on_receipt = callback
 
-    def push_file(self, local_path, remote_name=None, *,
+    def push_file(self, local_path: str | os.PathLike[str], remote_name: Optional[str] = None, *,
                   cancelled: Optional[Callable[[], bool]] = None, require_commit: bool = False) -> None:
         """Send to the viewer, optionally requiring its matching atomic-publication receipt."""
         if self._files_channel is None or not self._authenticated:
@@ -461,7 +463,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
             local_path, remote_name=remote_name, cancelled=cancelled, require_commit=require_commit,
         )
 
-    def _on_file_done(self, path) -> None:
+    def _on_file_done(self, path: Path) -> None:
         self._file_callbacks.published(path)
 
     def enable_mic_receive(self) -> None:
@@ -485,13 +487,13 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
             self._media_owners.stop_field("mic receiver", self._mic_receiver)
             self._mic_receiver = None
 
-    def _wire_control_channel(self, channel) -> None:
+    def _wire_control_channel(self, channel: Any) -> None:
         @channel.on("open")
         def _on_open() -> None:
             autocontrol_logger.info("webrtc host: control channel open")
 
         @channel.on("message")
-        def _on_message(message) -> None:
+        def _on_message(message: Any) -> None:
             if self._control_channel is channel:
                 self._handle_ctrl_message(message)
 
@@ -508,6 +510,8 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         if data is None:
             return
         msg_type = data.get("type")
+        if not isinstance(msg_type, str):  # {"type": []} raised TypeError in the lookup below
+            return
         if not self._authenticated:
             if msg_type == "auth":
                 self._handle_auth(data)
@@ -517,7 +521,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
             handler(data)
 
     @staticmethod
-    def _parse_ctrl_envelope(message: Any) -> Optional[dict]:
+    def _parse_ctrl_envelope(message: Any) -> Optional[dict[str, Any]]:
         if not isinstance(message, str):
             return None
         try:
@@ -527,7 +531,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
             return None
         return data if isinstance(data, dict) else None
 
-    def _authenticated_handlers(self) -> dict:
+    def _authenticated_handlers(self) -> dict[str, Callable[[dict[str, Any]], object]]:
         return {
             "input": self._handle_input_message,
             "send_sas": self._handle_send_sas_message,
@@ -540,7 +544,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
             "renegotiate_answer": self._handle_renegotiate_answer,
         }
 
-    def _handle_input_message(self, data: dict) -> None:
+    def _handle_input_message(self, data: dict[str, Any]) -> None:
         if not self._permissions.allow_input:
             return
         if not self._rate_limiter.allow_input():
@@ -549,12 +553,12 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
             return
         self._dispatch_input_safely(data.get("payload"))
 
-    def _handle_send_sas_message(self, _data: dict) -> None:
+    def _handle_send_sas_message(self, _data: dict[str, Any]) -> None:
         if not self._permissions.allow_input:
             return
         self._handle_send_sas()
 
-    def _handle_annotate(self, data: dict) -> None:
+    def _handle_annotate(self, data: dict[str, Any]) -> None:
         if self._on_annotation is None:
             return
         try:
@@ -564,7 +568,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         except (RuntimeError, OSError) as error:
             autocontrol_logger.debug("annotation cb: %r", error)
 
-    def _handle_renegotiate_answer(self, data: dict) -> None:
+    def _handle_renegotiate_answer(self, data: dict[str, Any]) -> None:
         sdp = data.get("sdp")
         if isinstance(sdp, str) and self._pc is not None:
             self._spawn_bg(self._async_apply_renegotiate_answer(sdp))
@@ -582,7 +586,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
     def _async_apply_renegotiate_answer(self, sdp: str) -> Coroutine[Any, Any, None]:
         return self._apply_renegotiate_answer(self._pc, sdp)
 
-    async def _apply_renegotiate_answer(self, peer, sdp: str) -> None:
+    async def _apply_renegotiate_answer(self, peer: Any, sdp: str) -> None:
         if self._pc is not peer:
             return
         async with self._retirement.starting():

@@ -5,8 +5,13 @@ they survive the JSON-RPC boundary, with every project import lazy -- split out
 by theme because ``_handlers.py`` is over the 750-line limit.
 """
 import os
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Union
 
+if TYPE_CHECKING:
+    from je_auto_control.utils.agent_memory import AgentMemory
+    from je_auto_control.utils.feature_flags import FlagStore
+    from je_auto_control.utils.skill_library import SkillLibrary
+    from je_auto_control.utils.work_queue import WorkQueue
 
 
 #: Where approval artefacts are written when the caller names no directory.
@@ -15,47 +20,49 @@ _DEFAULT_APPROVALS_DIR = ".approvals"
 #: Named token buckets shared by every ``rate_limit`` call.
 
 
-def watchdog_add(title, action="close", case_sensitive=False, name=None):
+def watchdog_add(title: str, action: str = "close", case_sensitive: bool = False,
+                 name: Optional[str] = None) -> Dict[str, List[str]]:
     from je_auto_control.utils.watchdog import default_popup_watchdog
     default_popup_watchdog.add_window_rule(
         title, action=action, case_sensitive=bool(case_sensitive), name=name)
     return {"rules": default_popup_watchdog.rule_names()}
 
 
-def watchdog_start():
+def watchdog_start() -> Dict[str, bool]:
     from je_auto_control.utils.watchdog import default_popup_watchdog
     default_popup_watchdog.start()
     return {"running": True}
 
 
-def watchdog_stop():
+def watchdog_stop() -> Dict[str, bool]:
     from je_auto_control.utils.watchdog import default_popup_watchdog
     default_popup_watchdog.stop()
     return {"running": False}
 
 
-def watchdog_list():
+def watchdog_list() -> Dict[str, Any]:
     from je_auto_control.utils.watchdog import default_popup_watchdog
     w = default_popup_watchdog
     return {"running": w.running, "rules": w.rule_names(), "hits": w.hits}
 
 
-def generate_otp(secret, step=30, digits=6):
+def generate_otp(secret: str, step: int = 30, digits: int = 6) -> str:
     from je_auto_control.utils.otp import generate_totp
     return generate_totp(secret, step=int(step), digits=int(digits))
 
 
-def assert_session_active():
+def assert_session_active() -> Dict[str, bool]:
     from je_auto_control.utils.session_guard import ensure_interactive_session
     return {"interactive": ensure_interactive_session()}
 
 
-def _work_queue(db, name):
+def _work_queue(db: str, name: str) -> "WorkQueue":
     from je_auto_control.utils.work_queue import WorkQueue
     return WorkQueue(db, name)
 
 
-def generate_data(schema, count=10, path=None, fmt=None, seed=None):
+def generate_data(schema: Dict[str, Any], count: int = 10, path: Optional[str] = None,
+                  fmt: Optional[str] = None, seed: Optional[int] = None) -> Dict[str, Any]:
     from je_auto_control.utils.test_data import generate_rows, write_dataset
     rows = generate_rows(schema, int(count), seed=seed)
     if path:
@@ -63,7 +70,7 @@ def generate_data(schema, count=10, path=None, fmt=None, seed=None):
     return {"rows": rows, "count": len(rows)}
 
 
-def mcp_manifest(path=None, include_tools=False):
+def mcp_manifest(path: Optional[str] = None, include_tools: bool = False) -> Dict[str, Any]:
     from je_auto_control.utils.mcp_registry import (
         build_server_manifest, write_server_manifest)
     if path:
@@ -73,52 +80,54 @@ def mcp_manifest(path=None, include_tools=False):
         include_tools=bool(include_tools))}
 
 
-def rank_tests(flows, history_path=None, window=10):
+def rank_tests(flows: List[str], history_path: Optional[str] = None,
+               window: int = 10) -> Dict[str, List[Dict[str, Any]]]:
     from je_auto_control.utils.test_select import rank_flows
     return {"ranked": rank_flows(flows, history_path=history_path,
                                  window=int(window))}
 
 
-def select_tests(flows, k=None, threshold=None, history_path=None, window=10):
+def select_tests(flows: List[str], k: Optional[int] = None, threshold: Optional[float] = None,
+                 history_path: Optional[str] = None, window: int = 10) -> Dict[str, List[str]]:
     from je_auto_control.utils.test_select import select_flows
     return {"selected": select_flows(
         flows, k=k, threshold=threshold, history_path=history_path,
         window=int(window))}
 
 
-def debug_trace(actions, dry_run=False):
+def debug_trace(actions: List[Any], dry_run: bool = False) -> Dict[str, List[Dict[str, Any]]]:
     from je_auto_control.utils.flow_debugger import trace_actions
     return {"trace": trace_actions(actions, dry_run=bool(dry_run))}
 
 
-def _skill_lib(path):
+def _skill_lib(path: str) -> "SkillLibrary":
     from je_auto_control.utils.skill_library import SkillLibrary
     return SkillLibrary(path)
 
 
-def guard_text(text, threshold=2):
+def guard_text(text: str, threshold: int = 2) -> Dict[str, Any]:
     from je_auto_control.utils.guardrail import assess_text
     return assess_text(text, threshold=int(threshold))
 
 
-def agent_card(path=None):
+def agent_card(path: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.a2a import build_agent_card, write_agent_card
     if path:
         return {"path": write_agent_card(path)}
     return {"card": build_agent_card()}
 
 
-def _agent_memory(db):
+def _agent_memory(db: str) -> "AgentMemory":
     from je_auto_control.utils.agent_memory import AgentMemory
     return AgentMemory(db)
 
 
-def seed_everything(seed=0):
+def seed_everything(seed: int = 0) -> Dict[str, int]:
     from je_auto_control.utils.deterministic import seed_everything as _seed
     return {"seed": _seed(int(seed))}
 
 
-def generate_sbom(path=None, root="je_auto_control"):
+def generate_sbom(path: Optional[str] = None, root: Optional[str] = "je_auto_control") -> Dict[str, Any]:
     from je_auto_control.utils.sbom import build_sbom, write_sbom
     root_arg = root or None
     if path:
@@ -126,41 +135,44 @@ def generate_sbom(path=None, root="je_auto_control"):
     return {"sbom": build_sbom(root_arg)}
 
 
-def shard_suite(flows, shards=2, history_path=None, window=20):
+def shard_suite(flows: List[str], shards: int = 2, history_path: Optional[str] = None,
+                window: int = 20) -> Dict[str, List[List[str]]]:
     from je_auto_control.utils.test_shard import shard_flows
     return {"shards": shard_flows(flows, int(shards),
                                   history_path=history_path,
                                   window=int(window))}
 
 
-def merge_results(reports):
+def merge_results(reports: List[Dict[str, Any]]) -> Dict[str, Any]:
     from je_auto_control.utils.test_shard import merge_results as _merge
     return _merge(reports)
 
 
-def validate_rows(rows, schema):
+def validate_rows(rows: List[Dict[str, Any]], schema: Dict[str, Any]) -> Dict[str, Any]:
     from je_auto_control.utils.data_quality import validate_rows as _validate
     return _validate(rows, schema)
 
 
-def extract_fields(text, fields=None, patterns=None):
+def extract_fields(text: str, fields: Optional[List[str]] = None,
+                   patterns: Optional[Dict[str, str]] = None) -> Dict[str, Dict[str, List[str]]]:
     from je_auto_control.utils.data_quality import extract_fields as _extract
     return {"fields": _extract(text, fields=fields, patterns=patterns)}
 
 
-def mask_rows(rows, rules):
+def mask_rows(rows: List[Dict[str, Any]], rules: Dict[str, str]) -> Dict[str, List[Dict[str, Any]]]:
     from je_auto_control.utils.data_quality import mask_rows as _mask
     return {"rows": _mask(rows, rules)}
 
 
-def run_resumable(actions, run_id, db, variables=None):
+def run_resumable(actions: List[Any], run_id: str, db: str,
+                  variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     from je_auto_control.utils.checkpoint import (
         CheckpointStore, run_resumable as _run)
     return _run(actions, run_id=run_id, store=CheckpointStore(db),
                 variables=variables)
 
 
-def checkpoint_status(run_id, db):
+def checkpoint_status(run_id: str, db: str) -> Dict[str, Any]:
     if not os.path.exists(db):   # read-only: never create the store
         return {"checkpoint": None}
     from je_auto_control.utils.checkpoint import CheckpointStore
@@ -171,7 +183,7 @@ def checkpoint_status(run_id, db):
                            "variables": cp.variables}}
 
 
-def checkpoint_clear(run_id, db):
+def checkpoint_clear(run_id: str, db: str) -> Dict[str, bool]:
     from je_auto_control.utils.checkpoint import CheckpointStore
     return {"cleared": CheckpointStore(db).clear(run_id)}
 
@@ -182,107 +194,109 @@ def ci_annotations(annotations: List[Dict[str, Any]]) -> Dict[str, List[str]]:
     return {"lines": [format_annotation(item) for item in annotations]}
 
 
-def scan_secrets(data):
+def scan_secrets(data: Any) -> Dict[str, List[Dict[str, Any]]]:
     from je_auto_control.utils.secrets_scan import scan_secrets as _scan
     return {"findings": _scan(data)}
 
 
-def list_plugins(group="je_auto_control.commands"):
+def list_plugins(group: str = "je_auto_control.commands") -> Dict[str, List[str]]:
     from je_auto_control.utils.plugin_sdk import discover_plugins
     return {"commands": sorted(discover_plugins(group))}
 
 
-def load_plugins(group="je_auto_control.commands"):
+def load_plugins(group: str = "je_auto_control.commands") -> Dict[str, List[str]]:
     from je_auto_control.utils.plugin_sdk import load_plugins as _load
     return {"loaded": _load(group)}
 
 
 def approval_request(action: str, requester: str = "",
-                     db: Optional[str] = None):
+                     db: Optional[str] = None) -> Dict[str, str]:
     from je_auto_control.utils.governance import approval_gate
     return {"token": approval_gate(db).request(action, requester)}
 
 
-def approval_approve(token: str, approver: str, db: Optional[str] = None):
+def approval_approve(token: str, approver: str, db: Optional[str] = None) -> Dict[str, bool]:
     from je_auto_control.utils.governance import approval_gate
     return {"approved": approval_gate(db).approve(token, approver)}
 
 
-def approval_reject(token: str, approver: str, db: Optional[str] = None):
+def approval_reject(token: str, approver: str, db: Optional[str] = None) -> Dict[str, bool]:
     from je_auto_control.utils.governance import approval_gate
     return {"rejected": approval_gate(db).reject(token, approver)}
 
 
-def approval_status(token: str, db: Optional[str] = None):
+def approval_status(token: str, db: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.governance import approval_gate
     gate = approval_gate(db)
     return {"status": gate.status(token), "approved": gate.is_approved(token)}
 
 
-def lease_secret(name: str, ttl: float = 300.0):
+def lease_secret(name: str, ttl: float = 300.0) -> Dict[str, Any]:
     from je_auto_control.utils.governance import default_broker
     return {"token": default_broker.lease(name, ttl), "ttl": float(ttl)}
 
 
-def lease_valid(token: str):
+def lease_valid(token: str) -> Dict[str, bool]:
     from je_auto_control.utils.governance import default_broker
     return {"valid": default_broker.is_valid(token)}
 
 
-def revoke_lease(token: str):
+def revoke_lease(token: str) -> Dict[str, bool]:
     from je_auto_control.utils.governance import default_broker
     return {"revoked": default_broker.revoke(token)}
 
 
-def lease_active():
+def lease_active() -> Dict[str, List[Dict[str, object]]]:
     from je_auto_control.utils.governance import default_broker
     return {"leases": default_broker.active()}
 
 
-def user_add(user_id: str, role: str = "viewer", display_name: str = "", tags=None):
+def user_add(user_id: str, role: str = "viewer", display_name: str = "",
+             tags: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     from je_auto_control.utils.rbac.admin import add_user
     return dict(add_user(user_id, role=role, display_name=display_name, tags=tags))
 
 
-def user_remove(user_id: str):
+def user_remove(user_id: str) -> Dict[str, Any]:
     from je_auto_control.utils.rbac.admin import remove_user
     return remove_user(user_id)
 
 
-def user_set_role(user_id: str, role: str):
+def user_set_role(user_id: str, role: str) -> Dict[str, Any]:
     from je_auto_control.utils.rbac.admin import set_user_role
     return set_user_role(user_id, role)
 
 
-def user_rotate_token(user_id: str):
+def user_rotate_token(user_id: str) -> Dict[str, Any]:
     from je_auto_control.utils.rbac.admin import rotate_user_token
     return dict(rotate_user_token(user_id))
 
 
-def user_list():
+def user_list() -> Dict[str, List[Dict[str, Any]]]:
     from je_auto_control.utils.rbac.admin import list_users
     return {"users": list_users()}
 
 
-def egress_allow(allow=None, deny=None):
+def egress_allow(allow: Union[str, Sequence[str], None] = None,
+                 deny: Union[str, Sequence[str], None] = None) -> Dict[str, Any]:
     from je_auto_control.utils.egress import set_egress_policy
     policy = set_egress_policy(allow, deny)
     return {"allow": policy.allow, "deny": policy.deny}
 
 
-def egress_check(url: str):
+def egress_check(url: str) -> Dict[str, bool]:
     from je_auto_control.utils.egress import get_egress_policy
     return {"allowed": get_egress_policy().is_allowed(url)}
 
 
-def egress_reset():
+def egress_reset() -> Dict[str, Any]:
     from je_auto_control.utils.egress import set_egress_policy
     set_egress_policy(None, None)
     return {"allow": None, "deny": []}
 
 
-def verify_artifact(name: str, content, approvals_dir: str = _DEFAULT_APPROVALS_DIR,
-                    extension: str = "txt"):
+def verify_artifact(name: str, content: Any, approvals_dir: str = _DEFAULT_APPROVALS_DIR,
+                    extension: str = "txt") -> Dict[str, Any]:
     from je_auto_control.utils.approval import verify_artifact as _verify
     result = _verify(name, content, approvals_dir, extension)
     return {"status": result.status, "match": result.match,
@@ -291,23 +305,25 @@ def verify_artifact(name: str, content, approvals_dir: str = _DEFAULT_APPROVALS_
 
 
 def approve_artifact(name: str, approvals_dir: str = _DEFAULT_APPROVALS_DIR,
-                     extension: str = "txt"):
+                     extension: str = "txt") -> Dict[str, str]:
     from je_auto_control.utils.approval import approve_artifact as _approve
     return {"approved": _approve(name, approvals_dir, extension)}
 
 
-def pending_artifacts(approvals_dir: str = _DEFAULT_APPROVALS_DIR):
+def pending_artifacts(approvals_dir: str = _DEFAULT_APPROVALS_DIR) -> Dict[str, List[str]]:
     from je_auto_control.utils.approval import pending_artifacts as _pending
     return {"pending": _pending(approvals_dir)}
 
 
-def evaluate_trajectory(trajectory, rubric):
+def evaluate_trajectory(trajectory: Sequence[Mapping[str, Any]],
+                        rubric: Mapping[str, Any]) -> Dict[str, Any]:
     from je_auto_control.utils.trajectory_eval import (
         evaluate_trajectory as _evaluate)
     return _evaluate(trajectory, rubric)
 
 
-def compliance_report(evidence, frameworks=None, path=None, fmt="json"):
+def compliance_report(evidence: Mapping[str, Any], frameworks: Optional[Sequence[str]] = None,
+                      path: Optional[str] = None, fmt: str = "json") -> Dict[str, Any]:
     from je_auto_control.utils.compliance import (
         build_compliance_report, write_compliance_report)
     report = build_compliance_report(evidence, frameworks)
@@ -316,9 +332,10 @@ def compliance_report(evidence, frameworks=None, path=None, fmt="json"):
     return report
 
 
-def trace_record(operation, model=None, system=None, input_tokens=None,
-                 output_tokens=None, tool_name=None, duration_s=0.0,
-                 status="ok"):
+def trace_record(operation: str, model: Optional[str] = None, system: Optional[str] = None,
+                 input_tokens: Optional[int] = None, output_tokens: Optional[int] = None,
+                 tool_name: Optional[str] = None, duration_s: float = 0.0,
+                 status: str = "ok") -> Dict[str, Any]:
     from je_auto_control.utils.agent_trace import default_trace
     return default_trace.record(
         operation, model=model, system=system, input_tokens=input_tokens,
@@ -326,62 +343,64 @@ def trace_record(operation, model=None, system=None, input_tokens=None,
         duration_s=duration_s, status=status)
 
 
-def trace_summary():
+def trace_summary() -> Dict[str, Any]:
     from je_auto_control.utils.agent_trace import default_trace
     return default_trace.summary()
 
 
-def trace_export():
+def trace_export() -> Dict[str, List[Dict[str, Any]]]:
     from je_auto_control.utils.agent_trace import default_trace
     return {"spans": default_trace.to_otel()}
 
 
-def trace_reset():
+def trace_reset() -> Dict[str, bool]:
     from je_auto_control.utils.agent_trace import reset_trace
     reset_trace()
     return {"reset": True}
 
 
-def write_step_video(steps, output, fps=10, seconds_per_step=2.0):
+def write_step_video(steps: Sequence[Any], output: str, fps: int = 10,
+                     seconds_per_step: float = 2.0) -> Dict[str, Any]:
     from je_auto_control.utils.video_report import (
         write_step_video as _write)
     return _write(steps, output, fps=fps, seconds_per_step=seconds_per_step)
 
 
-def s3_upload(local_path, key=None):
+def s3_upload(local_path: str, key: Optional[str] = None) -> Dict[str, str]:
     from je_auto_control.utils.artifact_store import get_default_store
     return {"key": get_default_store().upload(local_path, key)}
 
 
-def s3_download(key, local_path):
+def s3_download(key: str, local_path: str) -> Dict[str, str]:
     from je_auto_control.utils.artifact_store import get_default_store
     return {"path": get_default_store().download(key, local_path)}
 
 
-def s3_list(prefix=None):
+def s3_list(prefix: Optional[str] = None) -> Dict[str, List[str]]:
     from je_auto_control.utils.artifact_store import get_default_store
     return {"keys": get_default_store().list(prefix)}
 
 
-def s3_delete(key):
+def s3_delete(key: str) -> Dict[str, bool]:
     from je_auto_control.utils.artifact_store import get_default_store
     return {"deleted": get_default_store().delete(key)}
 
 
-def loop_guard_observe(tool, args=None, result_digest=""):
+def loop_guard_observe(tool: str, args: Any = None, result_digest: str = "") -> Dict[str, Any]:
     from je_auto_control.utils.loop_guard import default_loop_guard
     verdict = default_loop_guard.observe(tool, args, result_digest)
     return {"pattern": verdict.pattern, "level": verdict.level,
             "count": verdict.count}
 
 
-def loop_guard_reset():
+def loop_guard_reset() -> Dict[str, bool]:
     from je_auto_control.utils.loop_guard import default_loop_guard
     default_loop_guard.reset()
     return {"reset": True}
 
 
-def mine_actions(actions, min_len=2, max_len=5, min_count=3):
+def mine_actions(actions: Sequence[Any], min_len: int = 2, max_len: int = 5,
+                 min_count: int = 3) -> Dict[str, Any]:
     from je_auto_control.utils.process_mining import mine_action_log
     report = mine_action_log(actions, min_len=min_len, max_len=max_len,
                              min_count=min_count)
@@ -395,24 +414,25 @@ def mine_actions(actions, min_len=2, max_len=5, min_count=3):
     }
 
 
-def set_asset(name, value, asset_type="text", environment="default", db=None):
+def set_asset(name: str, value: Any, asset_type: str = "text", environment: str = "default",
+              db: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.assets.assets import store_set
     return store_set(name, value, asset_type=asset_type,
                      environment=environment, db=db)
 
 
-def get_asset(name, environment="default", db=None):
+def get_asset(name: str, environment: str = "default", db: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.assets.assets import store_get
     return store_get(name, environment=environment, db=db)
 
 
-def list_assets(environment=None, db=None):
+def list_assets(environment: Optional[str] = None, db: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.assets.assets import store_list
     return store_list(environment=environment, db=db)
 
 
-def emit_event(event_type, data=None, source="je_auto_control",
-               subject=None, url=None):
+def emit_event(event_type: str, data: Any = None, source: str = "je_auto_control",
+               subject: Optional[str] = None, url: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.events import post_cloudevent, to_cloudevent
     event = to_cloudevent(event_type, source, data, subject=subject)
     result: Dict[str, Any] = {"event": event}
@@ -421,7 +441,8 @@ def emit_event(event_type, data=None, source="je_auto_control",
     return result
 
 
-def notify_webhook(url, text, transport="raw", title=None):
+def notify_webhook(url: str, text: str, transport: str = "raw",
+                   title: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.notify_channels import (
         notify_webhook as _notify)
     outcome = _notify(url, text, transport=transport, title=title)
@@ -429,7 +450,8 @@ def notify_webhook(url, text, transport="raw", title=None):
             "transport": outcome.transport}
 
 
-def scan_vulns(components, advisories=None):
+def scan_vulns(components: Any,
+               advisories: Optional[Sequence[Mapping[str, Any]]] = None) -> Dict[str, Any]:
     from je_auto_control.utils.vuln_scan import scan_components
     if isinstance(components, dict):
         components = components.get("components", [])
@@ -437,13 +459,15 @@ def scan_vulns(components, advisories=None):
     return {"findings": findings, "count": len(findings)}
 
 
-def apply_vex(findings, vex):
+def apply_vex(findings: Sequence[Mapping[str, Any]], vex: Mapping[str, Any]) -> Dict[str, Any]:
     from je_auto_control.utils.vex import apply_vex as _apply
     kept = _apply(findings, vex)
     return {"findings": kept, "count": len(kept)}
 
 
-def check_licenses(components, allow=None, deny=None):
+def check_licenses(components: Any,
+                   allow: Optional[Sequence[str]] = None,
+                   deny: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     from je_auto_control.utils.license_policy import evaluate_sbom
     if isinstance(components, dict):
         components = components.get("components", [])
@@ -451,12 +475,13 @@ def check_licenses(components, allow=None, deny=None):
     return {"violations": violations, "count": len(violations)}
 
 
-def jwt_encode(claims, key, alg="HS256"):
+def jwt_encode(claims: Mapping[str, Any], key: Union[str, bytes], alg: str = "HS256") -> Dict[str, str]:
     from je_auto_control.utils.jwt import encode_jwt
     return {"token": encode_jwt(claims, key, alg=alg)}
 
 
-def jwt_decode(token, key, algorithms=None, audience=None, leeway=0.0):
+def jwt_decode(token: str, key: Union[str, bytes], algorithms: Optional[Sequence[str]] = None,
+               audience: Any = None, leeway: float = 0.0) -> Dict[str, Any]:
     from je_auto_control.utils.jwt import ClaimsPolicy, JwtError, decode_jwt
     policy = ClaimsPolicy(algorithms=tuple(algorithms) if algorithms
                           else ("HS256",), audience=audience, leeway=leeway)
@@ -467,44 +492,47 @@ def jwt_decode(token, key, algorithms=None, audience=None, leeway=0.0):
     return {"ok": True, "claims": claims}
 
 
-def rate_limit(name, rate=1.0, capacity=1.0, n=1.0):
+def rate_limit(name: str, rate: float = 1.0, capacity: float = 1.0, n: float = 1.0) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _rate_limit
     return _rate_limit(name, rate, capacity, n)
 
 
-def describe_stats(values):
+def describe_stats(values: Sequence[float]) -> Dict[str, float]:
     from je_auto_control.utils.stats import describe
     return describe(values)
 
 
-def ab_significance(a_conv, a_n, b_conv, b_n):
+def ab_significance(a_conv: int, a_n: int, b_conv: int, b_n: int) -> Dict[str, Any]:
     from je_auto_control.utils.stats import two_proportion_z_test
     return two_proportion_z_test(int(a_conv), int(a_n), int(b_conv), int(b_n))
 
 
-def evaluate_slo(records, target, window_s=None):
+def evaluate_slo(records: Sequence[Mapping[str, Any]], target: float,
+                 window_s: Optional[float] = None) -> Dict[str, Any]:
     from je_auto_control.utils.slo import evaluate_slo as _slo
     return _slo(records, float(target), window_s=window_s)
 
 
-def burn_alerts(records, target):
+def burn_alerts(records: Sequence[Mapping[str, Any]], target: float) -> Dict[str, Any]:
     from je_auto_control.utils.slo import burn_alerts as _alerts
     alerts = _alerts(records, float(target))
     return {"alerts": alerts, "firing": bool(alerts)}
 
 
-def percentiles(samples, qs=None):
+def percentiles(samples: Sequence[float],
+                qs: Optional[Sequence[float]] = None) -> Dict[str, Dict[str, float]]:
     from je_auto_control.utils.percentiles import exact_percentiles
     result = exact_percentiles(samples, qs=tuple(qs) if qs else (50, 90, 95, 99))
     return {"percentiles": {str(q): value for q, value in result.items()}}
 
 
-def retry_after(response):
+def retry_after(response: Mapping[str, Any]) -> Dict[str, float]:
     from je_auto_control.utils.bulkhead import next_delay
     return {"delay": next_delay(response)}
 
 
-def http_replay(cassette, url, method="GET"):
+def http_replay(cassette: Union[Dict[str, Any], Sequence[Mapping[str, Any]]], url: str,
+                method: str = "GET") -> Dict[str, Dict[str, Any]]:
     from je_auto_control.utils.http_cassette import Cassette
     interactions = (cassette.get("interactions", [])
                     if isinstance(cassette, dict) else cassette)
@@ -513,44 +541,49 @@ def http_replay(cassette, url, method="GET"):
     return {"response": response}
 
 
-def build_provenance(paths, builder_id="je_auto_control"):
+def build_provenance(paths: Sequence[str],
+                     builder_id: str = "je_auto_control") -> Dict[str, Dict[str, Any]]:
     from je_auto_control.utils.provenance import build_provenance, subject_for
     subjects = [subject_for(path) for path in paths]
     return {"statement": build_provenance(subjects, builder_id=builder_id)}
 
 
-def verify_provenance(statement, files):
+def verify_provenance(statement: Mapping[str, Any], files: Mapping[str, str]) -> Dict[str, Any]:
     from je_auto_control.utils.provenance import verify_provenance as _verify
     mismatches = _verify(statement, files)
     return {"ok": not mismatches, "mismatches": mismatches}
 
 
-def evaluate_flag(flags, key, context=None):
+def evaluate_flag(flags: Union[Dict[str, Any], "FlagStore"], key: str,
+                  context: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
     from je_auto_control.utils.feature_flags import (
         FlagStore, evaluate_flag as _ev)
     store = FlagStore.from_dict(flags) if isinstance(flags, dict) else flags
     return _ev(store, key, context or {})
 
 
-def flag_enabled(flags, key, context=None, default=False):
+def flag_enabled(flags: Union[Dict[str, Any], "FlagStore"], key: str,
+                 context: Optional[Mapping[str, Any]] = None,
+                 default: bool = False) -> Dict[str, bool]:
     from je_auto_control.utils.feature_flags import FlagStore, is_enabled
     store = FlagStore.from_dict(flags) if isinstance(flags, dict) else flags
     return {"enabled": is_enabled(store, key, context or {}, bool(default))}
 
 
-def run_saga(steps):
+def run_saga(steps: Any) -> Dict[str, Any]:
     # The executor's adapter: this copy dropped compensation_errors, so a
     # failed rollback read as "no compensation defined".
     from je_auto_control.utils.executor.action_executor import _run_saga
     return _run_saga(steps)
 
 
-def decision_table(spec, context):
+def decision_table(spec: Mapping[str, Any], context: Mapping[str, Any]) -> Dict[str, Any]:
     from je_auto_control.utils.decision_table import evaluate_table
     return {"result": evaluate_table(spec, context)}
 
 
-def export_sarif(findings, path=None, tool_name="AutoControl"):
+def export_sarif(findings: Sequence[Mapping[str, Any]], path: Optional[str] = None,
+                 tool_name: str = "AutoControl") -> Dict[str, Any]:
     from je_auto_control.utils.sarif import to_sarif, write_sarif
     result: Dict[str, Any] = {"sarif": to_sarif(findings, tool_name=tool_name)}
     if path:

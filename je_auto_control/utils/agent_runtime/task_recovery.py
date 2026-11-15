@@ -39,9 +39,10 @@ _CAPTURE_KEY = "$capture"
 _STOPPED = frozenset({"paused", "waiting_user", "recovering", "cancelled", "timed_out", "failed"})
 _POINTER_TOOLS = ("AC_click_mouse", "AC_set_mouse_position", "AC_mouse_scroll", "AC_press_mouse", "AC_release_mouse",
                   "AC_android_tap", "AC_android_swipe")
+_Link = tuple[dict[str, Any], dict[str, Any], dict[str, Any]]
 
 
-def recovery_link(store: Any, task_id: str) -> dict:
+def recovery_link(store: Any, task_id: str) -> dict[str, Any]:
     """Return durable successor provenance, without treating the source as completed."""
     with store.connection() as connection:
         row = connection.execute("SELECT r.source_task,r.snapshot,r.note,r.created,a.details,o.details AS ownership "
@@ -82,7 +83,7 @@ class AgentRecovery:
         return EvidenceHandoffs(self.runtime, context, self.handoff_witness, self.handoff_scope,
                                 HandoffRecords(standalone))
 
-    def _handoffs_for(self, operation: str, request: dict) -> EvidenceHandoffs:
+    def _handoffs_for(self, operation: str, request: dict[str, Any]) -> EvidenceHandoffs:
         # pylint: disable-next=protected-access  # reason: resolve no private storage family after service shutdown
         if self.runtime._closed:
             raise AgentTaskError('runtime is closed')
@@ -97,8 +98,9 @@ class AgentRecovery:
         """Adopt only a validated explicit non-DAG projection without ordinary task access."""
         return self._handoffs(standalone=True).consume_task(source_task, task_id, handoff_id, connection=connection)
 
-    def handoff_scope(self, connection: Any, context: dict, links: list, issuer_policies: list[str] | None,
-                      authorization: dict | None, *, issuing: bool = False) -> dict:
+    def handoff_scope(self, connection: Any, context: dict[str, Any], links: list[_Link],
+                      issuer_policies: list[str] | None,
+                      authorization: dict[str, Any] | None, *, issuing: bool = False) -> dict[str, Any]:
         """Derive historical input policy or explicitly reviewed read-only evidence policy on the host."""
         # pylint: disable-next=import-outside-toplevel  # reason: only explicit handoff proof needs completion renewal validation
         from je_auto_control.utils.agent_runtime.completion_recovery import handoff_completion_scope
@@ -112,7 +114,8 @@ class AgentRecovery:
             return {'policy': self._task_handoff_policy(context, links, issuer_policies), 'evidence_scope': True}
         return {'policy': self.runtime.batches.handoff_policy(context['source'], issuer_policies)}
 
-    def _task_handoff_policy(self, context: dict, links: list, issuer_policies: list[str] | None) -> TaskPolicy:
+    def _task_handoff_policy(self, context: dict[str, Any], links: list[_Link],
+                             issuer_policies: list[str] | None) -> TaskPolicy:
         template = detached(context['source']['spec'])
         origins = set(issuer_policies or [])
         for row in (links[0][0], *(child for _source, child, _link in links)):
@@ -127,15 +130,16 @@ class AgentRecovery:
         return TaskPolicy(self.runtime._validated_spec(template))
 
     def handoff_evidence(self, batch_id: str, node_id: str, source_task: str,
-                         task_id: str, handoff_id: str, *, connection: Any = None) -> tuple[dict, list]:
+                         task_id: str, handoff_id: str, *,
+                         connection: Any = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """Read one explicitly granted completion projection without changing ordinary runtime access."""
         return self._handoffs().consume(batch_id, node_id, source_task, task_id, handoff_id, connection=connection)
 
-    def handoff_snapshot(self, connection: Any, row: dict) -> dict:
+    def handoff_snapshot(self, connection: Any, row: dict[str, Any]) -> dict[str, Any]:
         """Supply the existing private task/completion snapshot to host-owned evidence collaborators."""
         return self._handoff_snapshot(connection, row)
 
-    def _handoff_snapshot(self, connection: Any, row: dict) -> dict:
+    def _handoff_snapshot(self, connection: Any, row: dict[str, Any]) -> dict[str, Any]:
         actions = self.runtime.store.read_actions(connection, row['id'])
         reviews = [dict(item) for item in connection.execute(
             'SELECT * FROM agent_reviews WHERE task_id=? ORDER BY action_id', (row['id'],))]
@@ -145,18 +149,20 @@ class AgentRecovery:
         return {'actions': actions, 'snapshot': snapshot, 'completion_snapshot': request_spec_digest({
             'snapshot': snapshot, 'retirement': dict(retired) if retired is not None else None})}
 
-    def handoff_witness(self, connection: Any, source: dict, child: dict, link: dict, *, scope: Any = None) -> dict:
+    def handoff_witness(self, connection: Any, source: dict[str, Any], child: dict[str, Any], link: dict[str, Any], *,
+                        scope: Any = None) -> dict[str, Any]:
         """Bind real historical recovery snapshots and current authority without target probes."""
         before, after = self._handoff_snapshot(connection, source), self._handoff_snapshot(connection, child)
         evidence = {'source_snapshot': before['snapshot'], 'source_actions': before['actions'],
                     'snapshot': after['snapshot'], 'actions': after['actions'],
                     'completion_snapshot': after['completion_snapshot']}
-        def reader(active: Any, parent: dict, task: dict) -> Any:
+        def reader(active: Any, parent: dict[str, Any], task: dict[str, Any]) -> Any:
             return self._handoff_reader(active, parent, task, scope=scope)
         check_handoff_history(self.runtime, connection, source, child, link, evidence, reader)
         return evidence
 
-    def _handoff_reader(self, connection: Any, source: dict, child: dict, *, scope: Any = None) -> bool | HandoffScope:
+    def _handoff_reader(self, connection: Any, source: dict[str, Any], child: dict[str, Any], *,
+                        scope: Any = None) -> bool | HandoffScope:
         # pylint: disable-next=import-outside-toplevel  # reason: reuse privately admitted read-only scope without a reverse import
         from je_auto_control.utils.agent_runtime.completion_recovery import check_completion_authority, completion_spec
         if scope is not None:
@@ -179,7 +185,8 @@ class AgentRecovery:
             raise AgentTaskError('handoff read-only verification scope changed')
         return True
 
-    def review_evidence(self, connection: Any, source: dict, child: dict, link: dict) -> dict:
+    def review_evidence(self, connection: Any, source: dict[str, Any], child: dict[str, Any],
+                        link: dict[str, Any]) -> dict[str, Any]:
         """Read exact source/child snapshots for skill publication without input or clock renewal."""
         # pylint: disable-next=protected-access  # reason: do not adopt live or unwinding source/child input
         with self.runtime._mutex:
@@ -205,7 +212,7 @@ class AgentRecovery:
                     'retirement': dict(retired) if retired is not None else None}),
                 'source_actions': actions, 'actions': child_actions}
 
-    def control(self, operation: str, request: Any = None) -> dict:
+    def control(self, operation: str, request: Any = None) -> dict[str, Any]:
         """Preview without target access, or create an owner-scoped, deduplicated successor."""
         request = durable_payload(detached(request))
         if not isinstance(operation, str) or operation not in OPERATIONS or not isinstance(request, dict):
@@ -233,7 +240,7 @@ class AgentRecovery:
                 return self._preview(row, receipts, reviews, reauthorize=operation == "review_authorization",
                                      ownership=ownership)
 
-    def _read(self, row: dict) -> tuple[list[dict], list[dict]]:
+    def _read(self, row: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         # pylint: disable-next=protected-access  # reason: a successor cannot bypass an unretired input owner
         if row["state"] not in _STOPPED or row["id"] in self.runtime._leases:
             raise AgentTaskError("recovery requires a stopped task with no active input owner")
@@ -244,7 +251,7 @@ class AgentRecovery:
                 "SELECT * FROM agent_reviews WHERE task_id=? ORDER BY action_id", (row["id"],))]
         return self.runtime.store.actions(row["id"]), reviews
 
-    def _template(self, row: dict, authorization: dict | None = None) -> dict:
+    def _template(self, row: dict[str, Any], authorization: dict[str, Any] | None = None) -> dict[str, Any]:
         spec = detached(row["spec"])
         spec["goal"] = "Reviewed remainder: " + spec["goal"][:15940]
         spec["options"].pop("skill_pin", None)
@@ -255,8 +262,8 @@ class AgentRecovery:
         # pylint: disable-next=protected-access  # reason: the shared host policy must normalize every review template
         return self.runtime._validated_spec(spec).to_dict()
 
-    def _preview(self, row: dict, receipts: list[dict], reviews: list[dict], *, reauthorize: bool = False,
-                 ownership: dict | None = None) -> dict:
+    def _preview(self, row: dict[str, Any], receipts: list[dict[str, Any]], reviews: list[dict[str, Any]], *,
+                 reauthorize: bool = False, ownership: dict[str, Any] | None = None) -> dict[str, Any]:
         active = effective_actions(receipts)
         source = AgentTaskSpec.from_dict(row["spec"])
         snapshot = _snapshot(row, receipts, reviews)
@@ -284,7 +291,7 @@ class AgentRecovery:
             self._review_authorized_actions(result, template)
         return result
 
-    def _review_authorized_actions(self, result: dict, template: dict) -> None:
+    def _review_authorized_actions(self, result: dict[str, Any], template: dict[str, Any]) -> None:
         if result["source_mode"] != "skill":
             return
         candidate = result["draft"]
@@ -298,7 +305,8 @@ class AgentRecovery:
             result.update(draft=None, review_template=candidate)
             result["issues"].append("action_scope_requires_review")
 
-    def _creation_scope(self, row: dict, request: dict) -> tuple[dict, dict | None]:
+    def _creation_scope(self, row: dict[str, Any],
+                        request: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None]:
         if "authorization_review" not in request:
             return self._template(row), None
         authorization = prepare_authorization(AgentTaskSpec.from_dict(row["spec"]), request["snapshot"])
@@ -306,7 +314,8 @@ class AgentRecovery:
             raise AgentTaskError("source authorization context changed; review authorization again")
         return self._template(row, authorization), authorization
 
-    def _create(self, row: dict, request: dict, ownership: dict | None = None) -> dict:
+    def _create(self, row: dict[str, Any], request: dict[str, Any],
+                ownership: dict[str, Any] | None = None) -> dict[str, Any]:
         # pylint: disable-next=import-outside-toplevel  # reason: ordinary recovery cannot upgrade a read-only admission
         from je_auto_control.utils.agent_runtime.completion_recovery import require_executable_task
         require_executable_task(self.runtime.store, row["id"])
@@ -337,8 +346,8 @@ class AgentRecovery:
         return {"task_id": task.task_id, "state": task.state,
                 "recovery": recovery_link(self.runtime.store, task.task_id)}
 
-    def _existing(self, source: str, snapshot: Any, spec: dict, review: str | None = None,
-                  ownership: dict | None = None) -> dict | None:
+    def _existing(self, source: str, snapshot: Any, spec: dict[str, Any], review: str | None = None,
+                  ownership: dict[str, Any] | None = None) -> dict[str, Any] | None:
         with self.runtime.store.connection() as connection:
             record = connection.execute("SELECT task_id,snapshot FROM agent_task_recoveries WHERE source_task=?",
                                         (source,)).fetchone()
@@ -356,7 +365,7 @@ class AgentRecovery:
                 "recovery": link}
 
 
-def _snapshot(row: dict, receipts: list[dict], reviews: list[dict]) -> str:
+def _snapshot(row: dict[str, Any], receipts: list[dict[str, Any]], reviews: list[dict[str, Any]]) -> str:
     return request_spec_digest({"task": row, "actions": receipts, "reviews": reviews})
 
 
@@ -366,7 +375,7 @@ def _review_note(note: Any) -> str:
     return note
 
 
-def _successor(store: Any, source: str) -> dict | None:
+def _successor(store: Any, source: str) -> dict[str, Any] | None:
     with store.connection() as connection:
         row = connection.execute("SELECT task_id FROM agent_task_recoveries WHERE source_task=?", (source,)).fetchone()
     return {"task_id": row["task_id"], "recovery": recovery_link(store, row["task_id"])} if row is not None else None
@@ -378,7 +387,7 @@ def _require_operator() -> None:
         raise AuthorizationError("reviewing task recovery requires drive_input")
 
 
-def _source_issues(spec: AgentTaskSpec, receipts: list[dict]) -> list[str]:
+def _source_issues(spec: AgentTaskSpec, receipts: list[dict[str, Any]]) -> list[str]:
     if any(item["status"] != "confirmed" for item in receipts):
         return ["unknown_source_effects"]
     if spec.mode != "skill":
@@ -389,7 +398,8 @@ def _source_issues(spec: AgentTaskSpec, receipts: list[dict]) -> list[str]:
         return ["source_readback_mismatch"]
 
 
-def _review_plan(source: AgentTaskSpec, receipts: list[dict], active: list[dict], template: dict) -> dict:
+def _review_plan(source: AgentTaskSpec, receipts: list[dict[str, Any]], active: list[dict[str, Any]],
+                 template: dict[str, Any]) -> dict[str, Any]:
     issues = _source_issues(source, active)
     if source.mode != "skill":
         template.update(goal="", actions=[])
@@ -422,7 +432,7 @@ def _capture_names(value: Any) -> set[str]:
     return set()
 
 
-def _capture_reference(value: dict) -> set[str]:
+def _capture_reference(value: dict[str, Any]) -> set[str]:
     if _CAPTURE_KEY not in value:
         return set()
     if set(value) - {_CAPTURE_KEY, "transform"} or not isinstance(value[_CAPTURE_KEY], str) or not value[_CAPTURE_KEY]:
@@ -431,7 +441,7 @@ def _capture_reference(value: dict) -> set[str]:
     return {value[_CAPTURE_KEY]}
 
 
-def _action_issues(actions: list[dict]) -> list[str]:
+def _action_issues(actions: list[dict[str, Any]]) -> list[str]:
     available: set[str] = set()
     issues = []
     for action in actions:
@@ -449,7 +459,7 @@ def _action_issues(actions: list[dict]) -> list[str]:
     return issues
 
 
-def _capture_declaration(action: dict) -> set[str]:
+def _capture_declaration(action: dict[str, Any]) -> set[str]:
     if "capture" not in action:
         return set()
     if not isinstance(action["capture"], str) or not action["capture"]:
@@ -463,7 +473,7 @@ def _check_transform(operation: Any) -> None:
     transformed("", operation)
 
 
-def _check_scope(template: dict, reviewed: dict) -> None:
+def _check_scope(template: dict[str, Any], reviewed: dict[str, Any]) -> None:
     # The reviewer may add fresh-state resume conditions; everything else must match the source.
     fixed = set(template) - {"goal", "actions", "resume_conditions"}
     if any(request_spec_digest({"value": template[key]}) != request_spec_digest({"value": reviewed[key]})

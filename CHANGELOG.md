@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Remote desktop: a WebRTC control message whose `type` is not a string (`{"type": []}`) is
+  ignored by the host and the viewer; it raised `TypeError: unhashable type` from the data
+  channel's message callback.
+
 - MCP: `ac_wait_for_pixel`'s `target_rgb` schema declares `minItems: 3`, which the handler
   already required (it raises on fewer channels and reads the first three of more).
 

@@ -21,16 +21,16 @@ _INVALID_PRINCIPAL = 'invalid recovery execution principal'
 class RecoveryBinding:
     """An internal atomic envelope, never accepted as caller-authored JSON authority."""
 
-    authorization: dict | None
-    ownership: dict
+    authorization: dict[str, Any] | None
+    ownership: dict[str, Any]
 
 
 @dataclass(frozen=True)
 class CompletionBinding:
     """Host-derived read-only proof admitted atomically with the real recovery lineage."""
 
-    recovery: dict | RecoveryBinding | None
-    details: dict
+    recovery: dict[str, Any] | RecoveryBinding | None
+    details: dict[str, Any]
     validate: Callable[[Any], None] | None = None
 
 
@@ -43,7 +43,7 @@ class HandoffScope:
     child_readonly: bool
 
 
-def validate_ownership_request(operation: str, request: dict, fields: set[str]) -> None:
+def validate_ownership_request(operation: str, request: dict[str, Any], fields: set[str]) -> None:
     """Accept an explicit source-owner policy and its reviewed token, never an arbitrary owner identity."""
     expected = set(fields)
     if "owner_policy" in request:
@@ -57,7 +57,7 @@ def validate_ownership_request(operation: str, request: dict, fields: set[str]) 
 
 
 @contextmanager
-def ownership_scope(row: dict, request: dict) -> Iterator[dict | None]:
+def ownership_scope(row: dict[str, Any], request: dict[str, Any]) -> Iterator[dict[str, Any] | None]:
     """Bind explicit recovery to the current source owner, preserving the actual reviewer separately."""
     if "owner_policy" not in request:
         yield None
@@ -72,7 +72,7 @@ def ownership_scope(row: dict, request: dict) -> Iterator[dict | None]:
         yield value
 
 
-def ownership_review(value: dict | None, snapshot: str) -> dict | None:
+def ownership_review(value: dict[str, Any] | None, snapshot: str) -> dict[str, Any] | None:
     """Freeze both identities and current roles against the reviewed source snapshot."""
     if value is None:
         return None
@@ -81,13 +81,14 @@ def ownership_review(value: dict | None, snapshot: str) -> dict | None:
     return {**data, "review": digest}
 
 
-def public_ownership(value: dict) -> dict:
+def public_ownership(value: dict[str, Any]) -> dict[str, Any]:
     """Project audit identity without exposing private user-store paths or input capabilities."""
     return {"contract": 1, "policy": value["policy"], "review": value["review"],
             "owner": value["owner"].get("user_id", "local"), "actor": value["actor"].get("user_id", "local")}
 
 
-def recovery_binding(authorization: dict | None, ownership: dict | None) -> dict | RecoveryBinding | None:
+def recovery_binding(authorization: dict[str, Any] | None,
+                     ownership: dict[str, Any] | None) -> dict[str, Any] | RecoveryBinding | None:
     """Retain legacy authorization metadata while carrying trusted ownership into the same transaction."""
     if ownership is None:
         return authorization
@@ -97,7 +98,7 @@ def recovery_binding(authorization: dict | None, ownership: dict | None) -> dict
 
 
 def bind_recovery(connection: Any, task_id: str,
-                  binding: dict | RecoveryBinding | CompletionBinding | None, owner: dict) -> None:
+                  binding: dict[str, Any] | RecoveryBinding | CompletionBinding | None, owner: dict[str, Any]) -> None:
     """Atomically record ownership beside lineage and any separately reviewed origin renewal."""
     validate = binding.validate if isinstance(binding, CompletionBinding) else None
     if isinstance(binding, CompletionBinding):
@@ -116,7 +117,7 @@ def bind_recovery(connection: Any, task_id: str,
         validate(connection)
 
 
-def require_matching_ownership(store: Any, task_id: str, expected: dict | None) -> None:
+def require_matching_ownership(store: Any, task_id: str, expected: dict[str, Any] | None) -> None:
     """A retry cannot change the ownership policy, reviewer or source-owner review of an accepted child."""
     with store.connection() as connection:
         row = connection.execute("SELECT details FROM agent_recovery_owners WHERE task_id=?", (task_id,)).fetchone()
@@ -149,7 +150,7 @@ def _principal(value: Any) -> None:
         raise AgentTaskError(_INVALID_PRINCIPAL)
 
 
-def recorded_recovery_owner(connection: Any, task_id: str) -> dict | None:
+def recorded_recovery_owner(connection: Any, task_id: str) -> dict[str, Any] | None:
     """Decode actual host-owned recovery principals and validate their complete reviewed binding."""
     row = connection.execute('SELECT details FROM agent_recovery_owners WHERE task_id=?', (task_id,)).fetchone()
     if row is None:
@@ -178,7 +179,8 @@ def _ownership_contract(value: Any) -> None:
         raise AgentTaskError('invalid recovery execution ownership contract')
 
 
-def check_recovery_authority(runtime: Any, connection: Any, source: dict, child: dict, link: dict) -> None:
+def check_recovery_authority(runtime: Any, connection: Any, source: dict[str, Any], child: dict[str, Any],
+                             link: dict[str, Any]) -> None:
     """Keep actual legacy/explicit reviewers, both owners and current effect scopes live."""
     _principal(source['owner'])
     _principal(child['owner'])
@@ -193,7 +195,7 @@ def check_recovery_authority(runtime: Any, connection: Any, source: dict, child:
         _task_effect_authority(runtime, connection, row)
 
 
-def _task_effect_identity(runtime: Any, connection: Any, row: dict, historical: bool) -> None:
+def _task_effect_identity(runtime: Any, connection: Any, row: dict[str, Any], historical: bool) -> None:
     recorded = recorded_recovery_owner(connection, row['id'])
     if recorded is not None and actor_identity(recorded['owner']) != actor_identity(row['owner']):
         raise AgentTaskError('recovery execution task ownership changed')
@@ -206,12 +208,13 @@ def _task_effect_identity(runtime: Any, connection: Any, row: dict, historical: 
         pass
 
 
-def _task_effect_authority(runtime: Any, connection: Any, row: dict, *, historical: bool = False) -> TaskPolicy:
+def _task_effect_authority(runtime: Any, connection: Any, row: dict[str, Any], *,
+                           historical: bool = False) -> TaskPolicy:
     _task_effect_identity(runtime, connection, row, historical)
     return _task_effect_policy(runtime, connection, row)
 
 
-def _task_effect_policy(runtime: Any, connection: Any, row: dict) -> TaskPolicy:
+def _task_effect_policy(runtime: Any, connection: Any, row: dict[str, Any]) -> TaskPolicy:
     # pylint: disable-next=protected-access  # reason: retain current host profiles and caller origin ceilings
     policy = TaskPolicy(runtime._validated_spec(row['spec']))
     policy.validate_snapshot()
@@ -221,7 +224,7 @@ def _task_effect_policy(runtime: Any, connection: Any, row: dict) -> TaskPolicy:
     return policy
 
 
-def check_historical_admission(connection: Any, row: dict) -> None:
+def check_historical_admission(connection: Any, row: dict[str, Any]) -> None:
     """Refresh actual original DAG principals without reopening their stopped input attempt."""
     found = connection.execute('SELECT a.actor,b.owner FROM agent_dag_local_tasks a '
         'JOIN agent_dag_batches b ON b.id=a.batch_id WHERE a.task_id=?', (row['id'],)).fetchone()
@@ -235,7 +238,7 @@ def check_historical_admission(connection: Any, row: dict) -> None:
     _check_pair({'actor': actor, 'owner': owner})
 
 
-def _handoff_scope(parent: dict, child: dict) -> None:
+def _handoff_scope(parent: dict[str, Any], child: dict[str, Any]) -> None:
     fixed = set(parent) - {'goal', 'actions', 'roots', 'options'}
     if (set(parent) != set(child) or
             json.dumps({key: parent[key] for key in fixed}, sort_keys=True) !=
@@ -252,7 +255,8 @@ def _handoff_scope(parent: dict, child: dict) -> None:
         raise AgentTaskError('handoff recovery changed fixed options')
 
 
-def _handoff_retired(runtime: Any, source: dict, child: dict, link: dict, evidence: dict,
+def _handoff_retired(runtime: Any, source: dict[str, Any], child: dict[str, Any], link: dict[str, Any],
+                     evidence: dict[str, Any],
                      scope: HandoffScope | None = None) -> None:
     # pylint: disable-next=protected-access  # reason: only inspect short owned runtime retirement witnesses
     with runtime._mutex:
@@ -267,7 +271,8 @@ def _handoff_retired(runtime: Any, source: dict, child: dict, link: dict, eviden
         raise AgentTaskError('handoff source recovery snapshot changed')
 
 
-def check_historical_recovery_identity(runtime: Any, connection: Any, source: dict, child: dict, link: dict) -> None:
+def check_historical_recovery_identity(runtime: Any, connection: Any, source: dict[str, Any], child: dict[str, Any],
+                                       link: dict[str, Any]) -> None:
     """Refresh actual historical ownership/admission without reviving unavailable input policies."""
     ownership = recorded_recovery_owner(connection, child['id'])
     _check_pair(ownership or {'owner': source['owner'], 'actor': child['owner']})
@@ -278,7 +283,7 @@ def check_historical_recovery_identity(runtime: Any, connection: Any, source: di
         _task_effect_identity(runtime, connection, row, True)
 
 
-def _handoff_owners(runtime: Any, connection: Any, source: dict, child: dict, link: dict,
+def _handoff_owners(runtime: Any, connection: Any, source: dict[str, Any], child: dict[str, Any], link: dict[str, Any],
                     scope: HandoffScope | None = None) -> TaskPolicy:
     check_historical_recovery_identity(runtime, connection, source, child, link)
     if scope is not None:
@@ -289,8 +294,9 @@ def _handoff_owners(runtime: Any, connection: Any, source: dict, child: dict, li
     return source_policy
 
 
-def check_handoff_history(runtime: Any, connection: Any, source: dict, child: dict,
-                          link: dict, evidence: dict, reader: Callable) -> None:
+def check_handoff_history(runtime: Any, connection: Any, source: dict[str, Any], child: dict[str, Any],
+                          link: dict[str, Any], evidence: dict[str, Any],
+                          reader: Callable[[Any, dict[str, Any], dict[str, Any]], HandoffScope | bool]) -> None:
     """Validate historical authority and effects without reopening a stopped DAG input attempt."""
     reviewed = reader(connection, source, child)
     scope = reviewed if isinstance(reviewed, HandoffScope) else None
@@ -306,7 +312,7 @@ def check_handoff_history(runtime: Any, connection: Any, source: dict, child: di
                 source_policy.check(action['command'], action['arguments'])
 
 
-def _check_pair(value: dict) -> None:
+def _check_pair(value: dict[str, Any]) -> None:
     owner, actor = value["owner"], value["actor"]
     with DeferredAuthorization(AuthorizationContext(**actor) if actor else None).scope():
         if not owns_task(owner, current_authorization()):

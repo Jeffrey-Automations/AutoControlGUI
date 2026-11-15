@@ -5,11 +5,3 @@
 # (which may not grow). Each is debt, not an exemption: this list may only
 # shrink. Move a module into the strict block once mypy passes it there, and
 # delete its line.
-je_auto_control.utils.agent_runtime.completion_recovery
-je_auto_control.utils.agent_runtime.dag_batches
-je_auto_control.utils.agent_runtime.dag_continuation
-je_auto_control.utils.agent_runtime.evidence_handoff
-je_auto_control.utils.agent_runtime.task_authority
-je_auto_control.utils.agent_runtime.task_recovery
-je_auto_control.utils.agent_runtime.task_skills
-je_auto_control.utils.agent_runtime.transfer_host

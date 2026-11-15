@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import threading
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Mapping, Optional
 
@@ -15,7 +16,7 @@ from je_auto_control.utils.remote_desktop.webrtc_media_owners import MediaFailur
 from je_auto_control.utils.remote_desktop.media_retirement import raise_cleanup_failures
 from je_auto_control.utils.remote_desktop.webrtc_peer_cleanup import stop_viewer
 from je_auto_control.utils.remote_desktop.webrtc_retirement import (
-    PeerRetirement, PeerStopFailed, stop_resource,
+    PeerRetirement, PeerStopFailed, Stoppable, stop_resource,
 )
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -31,6 +32,7 @@ from je_auto_control.utils.remote_desktop.webrtc_transport import (
 )
 
 if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
+    from pathlib import Path
     from je_auto_control.utils.remote_desktop.webrtc_audio import (
         OpusMicAudioTrack, OpusMicReceiver,
     )
@@ -51,7 +53,7 @@ FrameCallback = Callable[["object"], None]
 StateCallback = Callable[[str], None]
 AuthCallback = Callable[[bool], None]
 FingerprintCallback = Callable[[str], None]
-InboxListingCallback = Callable[[list], None]
+InboxListingCallback = Callable[[list[Any]], None]
 InboxOpResultCallback = Callable[[str, bool, Optional[str]], None]
 FileReceivedCallback = Callable[[Any], None]
 
@@ -94,7 +96,7 @@ class WebRTCDesktopViewer:
         self._viewer_screen_track: Optional[ScreenVideoTrack] = None
         self._opus_audio_track: Optional[OpusMicAudioTrack] = None
         self._host_voice_receiver: Optional[OpusMicReceiver] = None
-        self._receive_task: Optional[asyncio.Task] = None
+        self._receive_task: Optional[asyncio.Task[None]] = None
         self._authenticated = False
         self._read_only = False
         self._host_fingerprint: Optional[str] = None
@@ -103,7 +105,7 @@ class WebRTCDesktopViewer:
         self._closed = threading.Event()
         # Pin fire-and-forget asyncio tasks so they aren't reaped before
         # they finish (S7502). Tasks self-discard via a done callback.
-        self._background_tasks: set = set()
+        self._background_tasks: set[asyncio.Task[None]] = set()
 
     def _require_pc(self) -> RTCPeerConnection:
         """Return the live peer connection, or raise if there isn't one yet."""
@@ -112,7 +114,7 @@ class WebRTCDesktopViewer:
             raise RuntimeError("viewer has no peer connection; connect first")
         return pc
 
-    def _spawn_bg(self, coro) -> "asyncio.Task":
+    def _spawn_bg(self, coro: Coroutine[Any, Any, None]) -> "asyncio.Task[None]":
         task = asyncio.ensure_future(coro)
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
@@ -175,7 +177,7 @@ class WebRTCDesktopViewer:
     def mic_active(self) -> bool:
         return self._mic_sender is not None and self._mic_sender.is_running()
 
-    def send_file(self, local_path, remote_name: Optional[str] = None,
+    def send_file(self, local_path: str | os.PathLike[str], remote_name: Optional[str] = None,
                   on_progress: Optional[Callable[[int, int], None]] = None, *,
                   cancelled: Optional[Callable[[], bool]] = None, require_commit: bool = False) -> None:
         """Stream to the host inbox, optionally requiring its matching atomic-publication receipt."""
@@ -189,7 +191,7 @@ class WebRTCDesktopViewer:
             require_commit=require_commit,
         )
 
-    def set_file_received_callback(self, callback) -> None:
+    def set_file_received_callback(self, callback: Optional[Callable[[Path], None]]) -> None:
         """Register ``cb(path)`` for files the host pushes to the viewer."""
         self._file_callbacks.on_file = callback
 
@@ -197,11 +199,11 @@ class WebRTCDesktopViewer:
         """Register an inert local publication-receipt listener; None clears it."""
         self._file_callbacks.on_receipt = callback
 
-    def set_inbox_listing_callback(self, callback) -> None:
+    def set_inbox_listing_callback(self, callback: Optional[InboxListingCallback]) -> None:
         """Register ``cb(files: list[dict])`` for list_inbox responses."""
         self._on_inbox_listing = callback
 
-    def set_inbox_op_result_callback(self, callback) -> None:
+    def set_inbox_op_result_callback(self, callback: Optional[InboxOpResultCallback]) -> None:
         """Register ``cb(name: str, ok: bool, error: Optional[str])``."""
         self._on_inbox_op_result = callback
 
@@ -272,7 +274,7 @@ class WebRTCDesktopViewer:
         if peer is not None and track is not None:
             get_bridge().call_soon(lambda: self._detach_media_track(peer, attr, track))
 
-    def _detach_media_track(self, peer: RTCPeerConnection, attr: str, track) -> None:
+    def _detach_media_track(self, peer: RTCPeerConnection, attr: str, track: Stoppable) -> None:
         label = "screen track" if attr == "_viewer_screen_track" else "opus mic track"
         with self._media_owners.operation_lock(label):
             if not self._current_media_peer(peer) or getattr(self, attr) is not track:
@@ -291,7 +293,7 @@ class WebRTCDesktopViewer:
             setattr(self, attr, None)
 
     @staticmethod
-    def _detach_sender(peer, kind: str, track) -> list[BaseException]:
+    def _detach_sender(peer: RTCPeerConnection, kind: str, track: object) -> list[BaseException]:
         for transceiver in peer.getTransceivers():
             if transceiver.kind == kind and transceiver.sender.track is track:
                 try:
@@ -304,7 +306,7 @@ class WebRTCDesktopViewer:
     def _async_handle_renegotiate(self, offer_sdp: str) -> Coroutine[Any, Any, None]:
         return self._handle_renegotiate(self._pc, offer_sdp)
 
-    async def _handle_renegotiate(self, peer, offer_sdp: str) -> None:
+    async def _handle_renegotiate(self, peer: Optional[RTCPeerConnection], offer_sdp: str) -> None:
         """Apply the offer only to its original peer generation."""
         if self._pc is not peer:
             return
@@ -333,7 +335,7 @@ class WebRTCDesktopViewer:
             })
             autocontrol_logger.info("webrtc viewer: sent renegotiate answer")
 
-    def _wire_files_channel(self, channel) -> None:
+    def _wire_files_channel(self, channel: Any) -> None:
         from je_auto_control.utils.remote_desktop.webrtc_files import FileTransferReceiver
         close_file_receiver(self._files_receiver, self._files_channel)
         receiver = self._files_receiver = FileTransferReceiver()
@@ -346,7 +348,7 @@ class WebRTCDesktopViewer:
         bind_file_receiver(channel, receiver, active, self._on_viewer_file_done,
                            received=self._file_callbacks.received)
 
-    def _wire_usb_channel(self, channel) -> None:
+    def _wire_usb_channel(self, channel: Any) -> None:
         """Attach a USB passthrough client to the ``usb`` DataChannel.
 
         Exposed via :meth:`usb_client` so the GUI can drive
@@ -355,11 +357,11 @@ class WebRTCDesktopViewer:
         from je_auto_control.utils.usb.passthrough import UsbChannelClient
         self._usb_client = UsbChannelClient(channel)
 
-    def usb_client(self):
+    def usb_client(self) -> Optional[UsbChannelClient]:
         """Return the live USB passthrough client, or None if not wired."""
         return self._usb_client
 
-    def _on_viewer_file_done(self, path) -> None:
+    def _on_viewer_file_done(self, path: Path) -> None:
         self._file_callbacks.published(path)
 
     def stop(self) -> None:
@@ -527,7 +529,7 @@ class WebRTCDesktopViewer:
                     autocontrol_logger.warning("state cb: %r", error)
 
         @pc.on("track")
-        def _on_track(track) -> None:
+        def _on_track(track: Any) -> None:
             if self._pc is not pc or self._closed.is_set():
                 return
             autocontrol_logger.info("webrtc viewer: got %s track", track.kind)
@@ -539,12 +541,12 @@ class WebRTCDesktopViewer:
                 self._start_host_voice_play(track)
 
         @pc.on("datachannel")
-        def _on_datachannel(channel) -> None:
+        def _on_datachannel(channel: Any) -> None:
             if self._pc is not pc or self._closed.is_set():
                 return
             self._attach_datachannel(channel)
 
-    def _attach_datachannel(self, channel) -> None:
+    def _attach_datachannel(self, channel: Any) -> None:
         """Route an inbound data channel to its handler by label."""
         autocontrol_logger.info(
             "webrtc viewer: data channel %r open", channel.label,
@@ -563,13 +565,13 @@ class WebRTCDesktopViewer:
         self._control_channel = channel
         self._wire_control_channel(channel)
 
-    def _wire_control_channel(self, channel) -> None:
+    def _wire_control_channel(self, channel: Any) -> None:
         @channel.on("open")
         def _on_open() -> None:
             self._send_auth()
 
         @channel.on("message")
-        def _on_message(message) -> None:
+        def _on_message(message: Any) -> None:
             if self._control_channel is channel:
                 self._handle_ctrl_message(message)
 
@@ -584,7 +586,7 @@ class WebRTCDesktopViewer:
         if getattr(channel, "readyState", "") == "open":
             self._send_auth()
 
-    def _start_host_voice_play(self, track) -> None:
+    def _start_host_voice_play(self, track: Any) -> None:
         from je_auto_control.utils.remote_desktop.webrtc_audio import (
             OpusMicReceiver,
         )
@@ -598,7 +600,7 @@ class WebRTCDesktopViewer:
         self._media_owners.activate("host voice", lambda: receiver.consume(track), receiver)
         autocontrol_logger.info("webrtc viewer: playing host voice")
 
-    async def _consume_video(self, track) -> None:
+    async def _consume_video(self, track: Any) -> None:
         # CancelledError is intentionally not caught — it must propagate
         # so the awaiter knows the consumer ended via cancellation
         # rather than a stream error (S7497).
@@ -641,6 +643,8 @@ class WebRTCDesktopViewer:
         if not isinstance(data, dict):
             return
         msg_type = data.get("type")
+        if not isinstance(msg_type, str):  # {"type": []} raised TypeError in the lookup below
+            return
         handler = self._ctrl_dispatch.get(msg_type)
         if handler is not None:
             handler(data)
@@ -648,7 +652,7 @@ class WebRTCDesktopViewer:
             self._handle_inbox_op_result(data)
 
     @property
-    def _ctrl_dispatch(self) -> dict:
+    def _ctrl_dispatch(self) -> dict[str, Callable[[dict[str, Any]], None]]:
         return {
             "auth_ok": self._handle_auth_ok,
             "auth_fail": self._handle_auth_fail,
@@ -658,7 +662,7 @@ class WebRTCDesktopViewer:
             "renegotiate_offer": self._handle_renegotiate_offer,
         }
 
-    def _handle_auth_ok(self, data: dict) -> None:
+    def _handle_auth_ok(self, data: dict[str, Any]) -> None:
         self._authenticated = True
         self._read_only = bool(data.get("read_only", False))
         fingerprint = data.get("fingerprint")
@@ -671,19 +675,19 @@ class WebRTCDesktopViewer:
                     autocontrol_logger.debug("fingerprint cb: %r", error)
         self._fire_auth_result(True)
 
-    def _handle_auth_fail(self, _data: dict) -> None:
+    def _handle_auth_fail(self, _data: dict[str, Any]) -> None:
         self._authenticated = False
         self._fire_auth_result(False)
 
-    def _handle_read_only_msg(self, data: dict) -> None:
+    def _handle_read_only_msg(self, data: dict[str, Any]) -> None:
         self._read_only = bool(data.get("value", False))
 
-    def _handle_permissions_msg(self, data: dict) -> None:
+    def _handle_permissions_msg(self, data: dict[str, Any]) -> None:
         value = data.get("value")
         if isinstance(value, dict):
             self._read_only = not bool(value.get("allow_input", True))
 
-    def _handle_list_inbox_response(self, data: dict) -> None:
+    def _handle_list_inbox_response(self, data: dict[str, Any]) -> None:
         if self._on_inbox_listing is None:
             return
         files = data.get("files") or []
@@ -692,12 +696,12 @@ class WebRTCDesktopViewer:
         except (RuntimeError, OSError) as error:
             autocontrol_logger.debug("inbox listing cb: %r", error)
 
-    def _handle_renegotiate_offer(self, data: dict) -> None:
+    def _handle_renegotiate_offer(self, data: dict[str, Any]) -> None:
         sdp = data.get("sdp")
         if isinstance(sdp, str) and self._pc is not None:
             self._spawn_bg(self._async_handle_renegotiate(sdp))
 
-    def _handle_inbox_op_result(self, data: dict) -> None:
+    def _handle_inbox_op_result(self, data: dict[str, Any]) -> None:
         if self._on_inbox_op_result is None:
             return
         try:

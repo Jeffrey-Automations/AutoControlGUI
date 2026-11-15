@@ -10,7 +10,7 @@ colour contrast, change ranking, widget classification and the clipboard.
 """
 import base64
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
 from je_auto_control.utils.mcp_server.tools._base import MCPContent
@@ -290,137 +290,138 @@ def shell_command(command: str, timeout: float = 30.0
     }
 
 
-def open_path(target, verb="open"):
+def open_path(target: str, verb: str = "open") -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _open_path
     return _open_path(target, verb)
 
 
-def plan_open(target, verb="open"):
+def plan_open(target: str, verb: str = "open") -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _plan_open
     return _plan_open(target, verb)
 
 
-def idle_seconds():
+def idle_seconds() -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _idle_seconds
     return _idle_seconds()
 
 
-def is_idle(threshold):
+def is_idle(threshold: float) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _is_idle
     return _is_idle(threshold)
 
 
-def plan_keep_awake(display=True, system=True):
+def plan_keep_awake(display: bool = True, system: bool = True) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _plan_keep_awake
     return _plan_keep_awake(display, system)
 
 
-def keep_awake_on(display=True, system=True):
+def keep_awake_on(display: bool = True, system: bool = True) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _keep_awake_on
     return _keep_awake_on(display, system)
 
 
-def allow_sleep():
+def allow_sleep() -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _allow_sleep
     return _allow_sleep()
 
 
-def get_volume():
+def get_volume() -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _get_volume
     return _get_volume()
 
 
-def set_volume(level):
+def set_volume(level: float) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _set_volume
     return _set_volume(level)
 
 
-def change_volume(delta):
+def change_volume(delta: float) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _change_volume
     return _change_volume(delta)
 
 
-def set_mute(muted=True):
+def set_mute(muted: bool = True) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _set_mute
     return _set_mute(muted)
 
 
-def toggle_mute():
+def toggle_mute() -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _toggle_mute
     return _toggle_mute()
 
 
-def lock_session():
+def lock_session() -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _lock_session
     return _lock_session()
 
 
-def plan_lock_session():
+def plan_lock_session() -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _plan_lock_session,
     )
     return _plan_lock_session()
 
 
-def wait_for_unlock(timeout=30.0, interval=0.5):
+def wait_for_unlock(timeout: float = 30.0, interval: float = 0.5) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _wait_for_unlock
     return _wait_for_unlock(timeout, interval)
 
 
-def classify_lock_transitions(states):
+def classify_lock_transitions(states: List[bool]) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _classify_lock_transitions,
     )
     return _classify_lock_transitions(states)
 
 
-def ime_state():
+def ime_state() -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _ime_state
     return _ime_state()
 
 
-def is_composing():
+def is_composing() -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _is_composing
     return _is_composing()
 
 
-def wait_for_composition_commit(timeout=5.0, interval=0.1):
+def wait_for_composition_commit(timeout: float = 5.0, interval: float = 0.1) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _wait_for_composition_commit,
     )
     return _wait_for_composition_commit(timeout, interval)
 
 
-def decode_conversion_mode(flags):
+def decode_conversion_mode(flags: int) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _decode_conversion_mode,
     )
     return _decode_conversion_mode(flags)
 
 
-def retry_delay(attempt, base=0.1, max_delay=5.0, multiplier=2.0,
-                jitter="none"):
+def retry_delay(attempt: int, base: float = 0.1, max_delay: float = 5.0, multiplier: float = 2.0,
+                jitter: str = "none") -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _retry_delay
     return _retry_delay(attempt, base, max_delay, multiplier, jitter)
 
 
-def plan_retry_delays(attempts, base=0.1, max_delay=5.0, multiplier=2.0,
-                      jitter="none"):
+def plan_retry_delays(attempts: int, base: float = 0.1, max_delay: float = 5.0, multiplier: float = 2.0,
+                      jitter: str = "none") -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _plan_retry_delays,
     )
     return _plan_retry_delays(attempts, base, max_delay, multiplier, jitter)
 
 
-def compare_field_value(expected, actual, mode="exact"):
+def compare_field_value(expected: Any, actual: Any, mode: str = "exact") -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _compare_field_value,
     )
     return _compare_field_value(expected, actual, mode)
 
 
-def verify_field_value(expected, name=None, role=None, app_name=None,
-                       automation_id=None, mode="exact"):
+def verify_field_value(expected: Any, name: Optional[str] = None, role: Optional[str] = None,
+                       app_name: Optional[str] = None, automation_id: Optional[str] = None,
+                       mode: str = "exact") -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _verify_field_value,
     )
@@ -428,22 +429,23 @@ def verify_field_value(expected, name=None, role=None, app_name=None,
                                mode)
 
 
-def adaptive_timeout(durations, percentile_q=95.0, factor=1.5, min_s=1.0,
-                     max_s=60.0):
+def adaptive_timeout(durations: List[float], percentile_q: float = 95.0, factor: float = 1.5,
+                     min_s: float = 1.0, max_s: float = 60.0) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _adaptive_timeout,
     )
     return _adaptive_timeout(durations, percentile_q, factor, min_s, max_s)
 
 
-def timeout_stats(durations, percentile_q=95.0, factor=1.5, min_s=1.0,
-                  max_s=60.0):
+def timeout_stats(durations: List[float], percentile_q: float = 95.0, factor: float = 1.5,
+                  min_s: float = 1.0, max_s: float = 60.0) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _timeout_stats
     return _timeout_stats(durations, percentile_q, factor, min_s, max_s)
 
 
-def ensure_field_value(desired, name=None, role=None, app_name=None,
-                       automation_id=None, attempts=2):
+def ensure_field_value(desired: str, name: Optional[str] = None, role: Optional[str] = None,
+                       app_name: Optional[str] = None, automation_id: Optional[str] = None,
+                       attempts: int = 2) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _ensure_field_value,
     )
@@ -451,112 +453,117 @@ def ensure_field_value(desired, name=None, role=None, app_name=None,
                                attempts)
 
 
-def wait_until_app_idle(quiet_samples=3, timeout=10.0, interval=0.1):
+def wait_until_app_idle(quiet_samples: int = 3, timeout: float = 10.0,
+                        interval: float = 0.1) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _wait_until_app_idle,
     )
     return _wait_until_app_idle(quiet_samples, timeout, interval)
 
 
-def idle_point(busy_samples, quiet_samples=3):
+def idle_point(busy_samples: List[bool], quiet_samples: int = 3) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _idle_point
     return _idle_point(busy_samples, quiet_samples)
 
 
-def simulate_cvd(rgb, kind="deuteranopia", severity=1.0):
+def simulate_cvd(rgb: Sequence[int], kind: str = "deuteranopia", severity: float = 1.0) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _simulate_cvd
     return _simulate_cvd(rgb, kind, severity)
 
 
-def colors_collide(left, right, kind="deuteranopia", severity=1.0,
-                   threshold=40.0):
+def colors_collide(left: Sequence[int], right: Sequence[int], kind: str = "deuteranopia",
+                   severity: float = 1.0, threshold: float = 40.0) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _colors_collide
     return _colors_collide(left, right, kind, severity, threshold)
 
 
-def place_labels(marks, label_width=22, label_height=16, bounds=None):
+def place_labels(marks: List[Dict[str, Any]], label_width: int = 22, label_height: int = 16,
+                 bounds: Optional[Sequence[int]] = None) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _place_labels
     return _place_labels(marks, label_width, label_height, bounds)
 
 
-def label_color(background):
+def label_color(background: Sequence[int]) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _label_color
     return _label_color(background)
 
 
-def grade_contrast(foreground, background):
+def grade_contrast(foreground: Sequence[int], background: Sequence[int]) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _grade_contrast
     return _grade_contrast(foreground, background)
 
 
-def dominant_pair(pixels):
+def dominant_pair(pixels: List[Sequence[int]]) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _dominant_pair
     return _dominant_pair(pixels)
 
 
-def region_contrast(region=None):
+def region_contrast(region: Optional[Sequence[int]] = None) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _region_contrast
     return _region_contrast(region)
 
 
-def match_theme(template, region=None, method="sobel", min_score=0.5):
+def match_theme(template: str, region: Optional[Sequence[int]] = None, method: str = "sobel",
+                min_score: float = 0.5) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _match_theme
     return _match_theme(template, region, method, min_score)
 
 
-def rank_changes(scored_boxes, threshold=0.1):
+def rank_changes(scored_boxes: List[Dict[str, Any]], threshold: float = 0.1) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _rank_changes
     return _rank_changes(scored_boxes, threshold)
 
 
-def localize_changes(reference, boxes, current=None, threshold=0.1,
-                     region=None):
+def localize_changes(reference: str, boxes: List[Sequence[int]], current: Optional[str] = None,
+                     threshold: float = 0.1,
+                     region: Optional[Sequence[int]] = None) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _localize_changes,
     )
     return _localize_changes(reference, boxes, current, threshold, region)
 
 
-def classify_widget(features):
+def classify_widget(features: Dict[str, Any]) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _classify_widget
     return _classify_widget(features)
 
 
-def classify_icon(source, box):
+def classify_icon(source: str, box: Sequence[int]) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _classify_icon
     return _classify_icon(source, box)
 
 
-def propose_elements(region=None, min_area=80, iou_threshold=0.5):
+def propose_elements(region: Optional[Sequence[int]] = None, min_area: int = 80,
+                     iou_threshold: float = 0.5) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import (
         _propose_elements,
     )
     return _propose_elements(region, min_area, iou_threshold)
 
 
-def tag_kinds(elements):
+def tag_kinds(elements: List[Dict[str, Any]]) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _tag_kinds
     return _tag_kinds(elements)
 
 
-def act_in_view(target, kind="image", direction="down", max_scrolls=10,
-                scroll_amount=3, button="left"):
+def act_in_view(target: str, kind: str = "image", direction: str = "down", max_scrolls: int = 10,
+                scroll_amount: int = 3, button: str = "left") -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _act_in_view
     return _act_in_view(target, kind, direction, max_scrolls, scroll_amount,
                         button)
 
 
-def act_with_mode(x, y, mode="auto", button="left"):
+def act_with_mode(x: int, y: int, mode: str = "auto", button: str = "left") -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _act_with_mode
     return _act_with_mode(x, y, mode, button)
 
 
-def normalize_ext(target):
+def normalize_ext(target: str) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _normalize_ext
     return _normalize_ext(target)
 
 
-def file_association(target):
+def file_association(target: str) -> Dict[str, Any]:
     from je_auto_control.utils.executor.action_executor import _file_association
     return _file_association(target)
 
