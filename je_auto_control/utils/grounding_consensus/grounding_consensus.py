@@ -13,11 +13,12 @@ Pure-stdlib geometry; deterministic and unit-testable with no device. Imports no
 """
 import math
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from je_auto_control.utils.accessibility.element import element_box
 
-Candidate = Any
+#: A proposed point: ``{"x", "y"[, "weight"]}`` or ``[x, y[, weight]]``.
+Candidate = Union[Dict[str, Any], Sequence[float]]
 Element = Dict[str, Any]
 
 

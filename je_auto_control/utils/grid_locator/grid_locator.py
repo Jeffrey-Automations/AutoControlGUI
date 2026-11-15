@@ -12,7 +12,10 @@ real screen. Imports no ``PySide6``.
 """
 from typing import Any, Dict, List, Sequence, Tuple
 
-Box = Any
+#: A list / tuple box in one of :data:`BOX_FORMATS`, or anything
+#: :func:`~je_auto_control.utils.accessibility.element.element_box` reads
+#: (a dict, a match object, an accessibility element).
+Box = object
 #: How a list box is laid out: ``locate_all_image`` answers ``ltrb``.
 BOX_FORMATS = ("xywh", "ltrb")
 
@@ -40,7 +43,7 @@ def _checked_format(box_format: str) -> str:
     return box_format
 
 
-def _center(box: Box) -> Tuple[int, int]:
+def _center(box: Sequence[int]) -> Tuple[int, int]:
     """Return the integer centre ``(x, y)`` of an ``(x, y, w, h)`` box."""
     x, y, width, height = (int(value) for value in box[:4])
     return x + width // 2, y + height // 2

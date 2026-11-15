@@ -24,8 +24,6 @@ je_auto_control.utils.accessibility.backends.windows_backend
 je_auto_control.utils.actionability.actionability
 je_auto_control.utils.codegen.codegen
 je_auto_control.utils.executor.action_executor
-je_auto_control.utils.grid_locator.grid_locator
-je_auto_control.utils.grounding_consensus.grounding_consensus
 je_auto_control.utils.json_schema.json_schema
 je_auto_control.utils.logging.logging_instance
 je_auto_control.utils.mcp_server.tools._handlers

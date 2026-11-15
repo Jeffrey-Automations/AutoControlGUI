@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,545 |
-| 程式碼總行數 | 237,845 |
+| 程式碼總行數 | 237,849 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -437,7 +437,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.6 OCR 與文字理解
 
-> 19 個套件、約 3,829 行。
+> 19 個套件、約 3,832 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -446,7 +446,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/confusables/` | 146 | 易混淆／同形字偵測（Unicode 欺騙骨架） |
 | `utils/form_fields/` | 134 | 多方向關聯表單標籤與值，並讀取核取方塊狀態 |
 | `utils/fuzzy/` | 111 | 模糊字串比對與去重（預設 difflib，有 rapidfuzz 則優先） |
-| `utils/grid_locator/` | 100 | 以 (row, column) 從邊界框定址表格／網格儲存格 |
+| `utils/grid_locator/` | 103 | 以 (row, column) 從邊界框定址表格／網格儲存格 |
 | `utils/guardrail/` | 117 | 針對畫面／OCR 文字的啟發式 prompt-injection 防護 |
 | `utils/heading_segment/` | 71 | 判定 OCR 行是標題或內文，建出文件大綱 |
 | `utils/near_dup/` | 108 | 近似重複文字偵測（SimHash／MinHash） |
@@ -486,7 +486,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.8 元素定位、自我修復與智慧等待
 
-> 23 個套件、約 6,343 行。
+> 23 個套件、約 6,344 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -501,7 +501,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/element_proposal/` | 92 | 免樣板、免模型地從原始像素提出乾淨元素清單 |
 | `utils/element_scoring/` | 105 | 加權候選評分（角色 + 名稱相似度 + 鄰近度 + 啟用狀態） |
 | `utils/expect_poll/` | 150 | 反覆取值直到符合條件（Playwright `expect.poll` 風格） |
-| `utils/grounding_consensus/` | 173 | 對同一目標的多個接地提案做自我一致性投票 |
+| `utils/grounding_consensus/` | 174 | 對同一目標的多個接地提案做自我一致性投票 |
 | `utils/heal_analytics/` | 120 | 自癒事件記錄的分析（治癒率、脆弱定位器） |
 | `utils/locator_chain/` | 112 | 可組合／可過濾的候選定位器（chained-locator 慣用法） |
 | `utils/locator_repair/` | 147 | 自癒回寫：把修正後的定位器持久化 |
@@ -1569,8 +1569,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,008 | 103,625 |
-| **總計** | **1,533** | **237,100** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,008 | 103,629 |
+| **總計** | **1,533** | **237,104** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
