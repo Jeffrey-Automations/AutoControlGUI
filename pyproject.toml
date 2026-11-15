@@ -450,6 +450,7 @@ module = [
     "je_auto_control.utils.rbac.admin",
     "je_auto_control.utils.rbac.authorization",
     "je_auto_control.utils.rbac.cli",
+    "je_auto_control.utils.rbac.command_review",
     "je_auto_control.utils.rbac.deferred",
     "je_auto_control.utils.rbac.policy",
     "je_auto_control.utils.script_vars.execution",

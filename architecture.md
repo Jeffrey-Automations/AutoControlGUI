@@ -691,6 +691,12 @@ TCP client authentication marks rejection terminal before writing AUTH_FAIL. Adm
 reaping therefore releases its client slot before an immediate retry can arrive, while
 the separate handshake semaphore bounds outstanding cleanup and authentication threads.
 
+Executor commands follow one rule: submitting an action list needs drive_input, and
+the executor checks `COMMAND_CAPABILITIES` for every action, nested blocks and
+parallel branches included. Every other `AC_*` command is reviewed in
+`utils/rbac/command_review.py` as reaching nothing admin-only, and a test fails on a
+command in neither table.
+
 MCP capability policy uses an explicit reviewed screen/caller-data catalogue in
 `utils/rbac/tool_classification.py`; unknown read-only hints require read_data.
 Canonical aliases and stronger overrides share base and argument requirements at

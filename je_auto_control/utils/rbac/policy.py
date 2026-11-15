@@ -95,7 +95,8 @@ DATA_ROUTES = frozenset(
     route for route, needed in REST_ROUTE_CAPABILITIES.items() if needed == _DATA)
 
 #: Explicit command requirements, including audited host-data reads. Unlisted
-#: commands still rely on the capability of the surface submitting the action list.
+#: commands still rely on the capability of the surface submitting the action list;
+#: every one of them is reviewed in :mod:`je_auto_control.utils.rbac.command_review`.
 COMMAND_CAPABILITIES: Dict[str, str] = {
     "AC_agent_target": _HOSTS,
     "AC_agent_target_recover": _HOSTS,
@@ -262,7 +263,6 @@ TOOL_CAPABILITIES: Dict[str, str] = {
     "ac_agent_task_recovery": _DRIVE,
     "ac_agent_trigger_list": _DRIVE,
     "ac_journal_capture": _DRIVE,
-    "ac_journal_read": _DRIVE,
     "ac_remote_host_start": _HOSTS,
     "ac_remote_host_stop": _HOSTS,
     "ac_usb_acl_add": _HOSTS,
@@ -291,6 +291,8 @@ TOOL_CAPABILITIES: Dict[str, str] = {
     "ac_clip_history_list": _DRIVE,
     "ac_clip_history_search": _DRIVE,
     "ac_assert_clipboard": _DRIVE,
+    # AC_journal_read's requirement; above the DATA_TOOLS spread it was overwritten
+    "ac_journal_read": _DRIVE,
     "ac_read_action_file": _DRIVE,
     "ac_load_dotenv": _DRIVE,
     "ac_sql_query": _DRIVE,

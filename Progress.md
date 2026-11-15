@@ -135,7 +135,7 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：
   - `ac_list_plugins` 的外掛 factory，以及 `ac_web_list_commands`／`ac_web_current_url` 的實際相依版本初始化契約尚待審查；目前不列入唯讀目錄，完整目錄仍要求 `read_data`。本機 sibling 原始碼不代表部署版本驗收。
   - `ac_diagnose` 的預設 audit-log 初始化可能建立固定目錄及 SQLite schema；全域零寫入診斷與外部 SDK 初始化副作用仍未驗證。
-  - 尚需完整審查未列入 `COMMAND_CAPABILITIES` 的 executor 指令；未列指令目前仍依賴提交入口授權，不能把已核對的指令視為完整分類。若改為執行時預設拒絕，須同時處理預檢中的動作清單與一般資料串列，避免誤拒正常資料。
+  - executor 指令已全部分類（U-20261115-03：`utils/rbac/command_review.py`，新指令未分類時 CI 失敗；執行時仍不預設拒絕，維護者 2026-11-15 決定）。審查留下兩個設計問題（`DECIDE`）：`AC_approval_approve`／`ac_approval_approve` 的 approver 是呼叫者給的字串而不是 RBAC 使用者，同一個 operator 換個名字就能核准自己的請求（目前主機上沒有東西依核准結果放行）；presence 角色只是提示，沒有主機呼叫 `PresenceRegistry.can_control()`——哪天主機依角色擋輸入，presence 指令要升到 `manage_hosts`。
   - 沒對真的 client（Claude Desktop、VS Code、內建 dashboard）試過；回送測試的 SSE、無狀態、`subscriptions/listen` 與 TLS 結果不代表真實客戶端通過。
 - **MCP 路徑根目錄**（`JE_AUTOCONTROL_MCP_PATH_ROOTS`，預設關閉）：`path-or-other` 已檢查
   `ac_open_path`／`ac_plan_open`／`ac_file_association`／`ac_act_in_view` 的 `target` 與 `ac_handle_file_dialog` 的 `path`，

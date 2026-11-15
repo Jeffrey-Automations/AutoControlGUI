@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261115-03 | 2026-11-15 | Every AC_* command has an RBAC decision | #done #rbac #security | [2026-11-b](2026-11-b.md) |
 | U-20261115-02 | 2026-11-15 | dnspython 2.9.2 in uv.lock for Dependabot alert 177 | #release #security #dependencies | [2026-11-b](2026-11-b.md) |
 | U-20261115-01 | 2026-11-15 | PySide6 6.12.0 on Python 3.12+, 6.11.2 kept on 3.11 | #done #gui #pyside6 #dependencies | [2026-11-b](2026-11-b.md) |
 | U-20261114-44 | 2026-11-14 | The PySide6 6.12 exit crash: tabs no longer keep themselves alive | #done #gui #pyside6 | [2026-11-b](2026-11-b.md) |

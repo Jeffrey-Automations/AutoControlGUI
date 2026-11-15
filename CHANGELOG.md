@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- RBAC: every `AC_*` command now has a recorded decision. The 817 commands not in
+  `COMMAND_CAPABILITIES` were reviewed as reaching nothing admin-only and are listed in
+  `utils/rbac/command_review.py` (33 of them with the reason); a new command in neither table
+  fails CI. Nothing changes at run time for them. `ac_journal_read` now needs `drive_input`
+  like `AC_journal_read`: its override sat above the `DATA_TOOLS` spread and was overwritten
+  (operators hold both capabilities, so no role gains or loses access).
+
 - `uv.lock` resolves dnspython 2.9.2 (the `[tool.uv]` floor is now `>=2.9.2`), which fixes the
   excessive memory and CPU use advisory in earlier releases; the wheel metadata is unchanged. The
   lock also records the `gui` extra's split PySide6 pin (6.12.0 on 3.12+, 6.11.2 on 3.11).
