@@ -6,7 +6,7 @@ import signal
 import subprocess  # nosec B404  # reason: ShellManager intentionally invokes user-supplied subprocesses without shell
 import sys
 from threading import Thread
-from typing import List, Optional
+from typing import IO, List, Optional
 
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -84,7 +84,7 @@ def _taskkill_path() -> str:
     return os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "taskkill.exe")
 
 
-def _kill_tree(process: subprocess.Popen) -> None:
+def _kill_tree(process: subprocess.Popen[bytes]) -> None:
     """Kill ``process`` and everything it started."""
     if sys.platform == "win32":
         taskkill = [_taskkill_path(), "/T", "/F", "/PID", str(process.pid)]
@@ -101,7 +101,7 @@ def _kill_tree(process: subprocess.Popen) -> None:
 
 
 def run_captured(argv: str | List[str], timeout_s: float,
-                 input_bytes: Optional[bytes] = None) -> subprocess.CompletedProcess:
+                 input_bytes: Optional[bytes] = None) -> subprocess.CompletedProcess[bytes]:
     """Run ``argv`` (no shell), capturing stdout and stderr as bytes, for at most ``timeout_s``.
 
     ``subprocess.run(timeout=...)`` kills only the program itself and then
@@ -136,7 +136,7 @@ class ShellManager:
     - 將輸出放入 queue，供 pull_text() 取出
     """
 
-    def __init__(self, shell_encoding: Optional[str] = None, program_buffer: int = 10240000):
+    def __init__(self, shell_encoding: Optional[str] = None, program_buffer: int = 10240000) -> None:
         """
         :param shell_encoding: shell command read output encoding; by default
             the locale's, which is what a console program writes on Windows
@@ -146,9 +146,9 @@ class ShellManager:
         self.read_program_error_output_from_thread: Thread | None = None
         self.read_program_output_from_thread: Thread | None = None
         self.still_run_shell: bool = False
-        self.process: subprocess.Popen | None = None
-        self.run_output_queue: queue.Queue = queue.Queue()
-        self.run_error_queue: queue.Queue = queue.Queue()
+        self.process: subprocess.Popen[bytes] | None = None
+        self.run_output_queue: queue.Queue[str] = queue.Queue()
+        self.run_error_queue: queue.Queue[str] = queue.Queue()
         self.program_encoding: str = shell_encoding or console_encoding()
         self.program_buffer: int = program_buffer
 
@@ -235,7 +235,7 @@ class ShellManager:
 
         self.log_and_clear_queue()
 
-    def _terminate_and_reap(self, process: subprocess.Popen) -> None:
+    def _terminate_and_reap(self, process: subprocess.Popen[bytes]) -> None:
         """Terminate ``process``, wait for the real exit code, and reap it."""
         process.terminate()
         try:
@@ -264,7 +264,8 @@ class ShellManager:
         self.run_output_queue = queue.Queue()
         self.run_error_queue = queue.Queue()
 
-    def _read_stream(self, stream, target_queue: queue.Queue) -> None:
+    def _read_stream(self, stream: Optional[IO[bytes]], target_queue: queue.Queue[str]) -> None:
+
         """
         Read stream line by line and put into queue.
         讀取輸出流並放入 queue

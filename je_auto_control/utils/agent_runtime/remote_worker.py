@@ -35,10 +35,10 @@ class RemoteDeviceAdapter(Protocol):
     def ready(self, spec: AgentTaskSpec) -> tuple[bool, str]:
         """Validate fixed host app/tool scope and trusted presence/held-input providers without input."""
 
-    def observe(self) -> dict:
+    def observe(self) -> dict[str, Any]:
         """Read only reviewed device/app evidence; never dispatch input."""
 
-    def prepare(self, name: str, arguments: dict) -> PreparedRemoteAction:
+    def prepare(self, name: str, arguments: dict[str, Any]) -> PreparedRemoteAction:
         """Read fresh identity, routing and security evidence and return one finite host-only call."""
 
     def checkpoint(self) -> None:
@@ -64,7 +64,7 @@ class RemoteWorker:  # pylint: disable=too-many-instance-attributes  # reason: o
         self._expires = 0.0
         adapter.set_takeover_handler(self.notify_physical_input)
 
-    def _send(self, payload: dict) -> None:
+    def _send(self, payload: dict[str, Any]) -> None:
         packet = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8") + b"\n"
         if len(packet) > _LIMIT:
             raise AgentTaskError("remote worker packet exceeds its bound")
@@ -77,7 +77,7 @@ class RemoteWorker:  # pylint: disable=too-many-instance-attributes  # reason: o
         self._takeover.set()
         self._send({"control": "physical_input"})
 
-    def _read(self) -> dict:
+    def _read(self) -> dict[str, Any]:
         line = self._source.readline(_LIMIT + 1)
         if not line or len(line) > _LIMIT or not line.endswith(b"\n"):
             raise AgentTaskError("remote worker request is missing or exceeds its bound")
@@ -86,7 +86,7 @@ class RemoteWorker:  # pylint: disable=too-many-instance-attributes  # reason: o
             raise AgentTaskError("remote worker requires a closed object")
         return value
 
-    def _notify(self, event: dict) -> None:
+    def _notify(self, event: dict[str, Any]) -> None:
         self._send({"id": self._request_id, "event": event})
         ack = self._read()
         if set(ack) != {"ack"} or ack["ack"] is not True:
@@ -110,14 +110,14 @@ class RemoteWorker:  # pylint: disable=too-many-instance-attributes  # reason: o
                 return
 
     @staticmethod
-    def _validate_request(request: dict) -> None:
+    def _validate_request(request: dict[str, Any]) -> None:
         if (set(request) != {"id", "operation", "payload"} or not isinstance(request["id"], str)
                 or re.fullmatch("[0-9a-f]{32}", request["id"]) is None):
             raise AgentTaskError("remote worker request has an invalid identity")
         if not isinstance(request["operation"], str) or not isinstance(request["payload"], dict):
             raise AgentTaskError("remote worker request has invalid operation fields")
 
-    def _dispatch(self, operation: str, payload: dict) -> Any:
+    def _dispatch(self, operation: str, payload: dict[str, Any]) -> Any:
         if operation in {"bootstrap", "remote_capabilities"}:
             if payload:
                 raise AgentTaskError("remote worker negotiation accepts no configuration")
@@ -134,7 +134,7 @@ class RemoteWorker:  # pylint: disable=too-many-instance-attributes  # reason: o
             stack.enter_context(operation_scope(TaskOperation(self._spec, self._checkpoint, self._authority.context)))
             return self._operation(operation, payload)
 
-    def _configure(self, payload: dict) -> None:
+    def _configure(self, payload: dict[str, Any]) -> None:
         if set(payload) != {"spec", "owner", "remote_guard"}:
             raise AgentTaskError("remote worker configuration has unreviewed fields")
         if not isinstance(payload["owner"], dict):
@@ -181,7 +181,7 @@ class RemoteWorker:  # pylint: disable=too-many-instance-attributes  # reason: o
 
         return self._controller.perform(replace(action, invoke=invoke), self._notify, self._checkpoint)
 
-    def _ready_adapter(self) -> dict:
+    def _ready_adapter(self) -> dict[str, Any]:
         if self._spec is None:
             raise AgentTaskError("remote worker has no task specification")
         ready, reason = self._adapter.ready(self._spec)
@@ -192,7 +192,7 @@ class RemoteWorker:  # pylint: disable=too-many-instance-attributes  # reason: o
             self._checkpoint()
         return {"ready": ready, "reason": reason}
 
-    def _operation(self, operation: str, payload: dict) -> Any:
+    def _operation(self, operation: str, payload: dict[str, Any]) -> Any:
         if operation == "configure":
             return self._ready_adapter()
         if not self._ready:

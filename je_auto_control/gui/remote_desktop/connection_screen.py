@@ -18,7 +18,7 @@ the Advanced sub-tabs.
 import functools
 import secrets
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QImage
@@ -338,7 +338,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._refresh_status()
         QMessageBox.warning(self, _t("rd_quick_stop_host"), str(error))
 
-    def _host_approval_callback(self, pending: PendingViewer):
+    def _host_approval_callback(self, pending: PendingViewer) -> str | bool:
         """Bridge incoming viewers to a GUI Allow/View-only/Deny dialog.
 
         Runs on the host's accept thread — we ship the request over to
@@ -455,7 +455,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
             self, _t("rd_quick_connect_btn"), _t("rd_quick_bad_target"),
         )
 
-    def _take_slot(self, slot: str) -> Optional[functools.partial]:
+    def _take_slot(self, slot: str) -> Optional[functools.partial[None]]:
         """Clear ``slot`` for a new session and let go of this screen's other one.
 
         Both slots are free when this returns; the shutdown of what they held
@@ -466,7 +466,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
                                       registry.detach(slot, self._owner)) if close is not None]
         return functools.partial(stop_each, *closes) if closes else None
 
-    def _own_viewer(self):
+    def _own_viewer(self) -> Optional[Any]:
         """The viewer this screen opened, or None once it is gone or replaced."""
         return (registry.owned(SLOT_VIEWER, self._owner)
                 or registry.owned(SLOT_WS_VIEWER, self._owner))
@@ -478,7 +478,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
             self._close_screen_window()
         self._refresh_status()
 
-    def _viewer_callbacks(self) -> dict:
+    def _viewer_callbacks(self) -> dict[str, Any]:
         """Callbacks for a new viewer session; they carry its number, and only the current session's land."""
         self._session += 1
         return {"on_frame": self._view.tagged("_on_session_frame", self._session),
@@ -497,7 +497,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         if session == self._session:        # an error from a session already replaced or closed is not news
             self._on_error(message)
 
-    def _begin_connect(self, slot: str, build, on_live) -> None:
+    def _begin_connect(self, slot: str, build: Callable[[], Any], on_live: Callable[[], None]) -> None:
         """Take ``slot``, build the viewer, and connect it off the GUI thread (see ``_connect_task``).
 
         ``on_live`` is a method of this screen or a partial of one; it is held weakly.
@@ -518,7 +518,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._connect_task.finished.connect(self._on_connect_finished)
         self._refresh_status()
 
-    def _on_viewer_live(self, slot: str, on_live: WeakCall, live_viewer) -> None:
+    def _on_viewer_live(self, slot: str, on_live: WeakCall, live_viewer: Any) -> None:
         """GUI thread: the connect succeeded; register the viewer and show it."""
         registry.adopt(slot, live_viewer, self._owner, self._view.callback("_on_displaced"))
         on_live()
@@ -627,7 +627,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._screen_window.raise_()
         self._screen_window.activateWindow()
 
-    def _send_input(self, action: dict) -> None:
+    def _send_input(self, action: dict[str, Any]) -> None:
         """Forward one input action from the popup to the live viewer."""
         viewer = self._own_viewer()
         if viewer is None or not viewer.connected:
@@ -637,7 +637,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         except OSError as error:
             self._error_arrived.emit(str(error))
 
-    def _on_files_dropped(self, paths) -> None:
+    def _on_files_dropped(self, paths: List[str]) -> None:
         """Upload each dropped file to the host's home directory."""
         viewer = self._own_viewer()
         if viewer is None or not viewer.connected:

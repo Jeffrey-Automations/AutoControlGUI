@@ -1,7 +1,8 @@
 """Triggers tab: image / window / pixel / file event watchers."""
-from typing import Any, Dict, Iterable, List, Optional, Sequence, TypedDict
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, TypedDict
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QLabel, QLineEdit,
     QMessageBox, QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem,
@@ -19,7 +20,7 @@ from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
 from je_auto_control.utils.triggers.trigger_engine import (
     AllOfTrigger, AnyOfTrigger, CronTrigger, FilePathTrigger,
     ImageAppearsTrigger, PixelColorTrigger, SequenceTrigger,
-    WindowAppearsTrigger, default_trigger_engine,
+    WindowAppearsTrigger, _TriggerBase, default_trigger_engine,
 )
 
 
@@ -117,7 +118,7 @@ class TriggersTab(TranslatableMixin, QWidget):
             self._timer.stop()
         self._apply_status()
 
-    def showEvent(self, event) -> None:  # noqa: N802  # reason: Qt override
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802  # reason: Qt override
         """Catch up with an engine started or stopped elsewhere while hidden."""
         super().showEvent(event)
         self.sync_with_engine()
@@ -177,7 +178,7 @@ class TriggersTab(TranslatableMixin, QWidget):
             layout.addWidget(row)
         self._stack.addWidget(page)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("browse", self._browse_script),
@@ -190,7 +191,7 @@ class TriggersTab(TranslatableMixin, QWidget):
             ("tr_stop_engine", self._on_stop),
         ]
 
-    def _build_image_form(self) -> dict:
+    def _build_image_form(self) -> Dict[str, QLineEdit]:
         path_input = QLineEdit()
         threshold_input = QLineEdit("0.8")
         browse = self._tr(QPushButton(), "browse")
@@ -202,12 +203,12 @@ class TriggersTab(TranslatableMixin, QWidget):
         self._add_page(self._field_row("tr_image_label", path_input, browse), threshold)
         return {"path": path_input, "threshold": threshold_input}
 
-    def _build_window_form(self) -> dict:
+    def _build_window_form(self) -> Dict[str, QLineEdit]:
         title_input = QLineEdit()
         self._add_page(self._field_row("tr_title_contains_label", title_input))
         return {"title": title_input}
 
-    def _build_pixel_form(self) -> dict:
+    def _build_pixel_form(self) -> Dict[str, QLineEdit]:
         x_input = QLineEdit("0")
         y_input = QLineEdit("0")
         r_input = QLineEdit("0")
@@ -223,7 +224,7 @@ class TriggersTab(TranslatableMixin, QWidget):
         return {"x": x_input, "y": y_input, "r": r_input,
                 "g": g_input, "b": b_input, "tol": tol_input}
 
-    def _build_file_form(self) -> dict:
+    def _build_file_form(self) -> Dict[str, QLineEdit]:
         path_input = QLineEdit()
         browse = self._tr(QPushButton(), "browse")
         browse.setProperty("line_edit", path_input)
@@ -278,7 +279,7 @@ class TriggersTab(TranslatableMixin, QWidget):
         default_trigger_engine.add(trigger)
         self._refresh()
 
-    def _build_trigger(self, script: str):
+    def _build_trigger(self, script: str) -> _TriggerBase:
         idx = self._type_combo.currentIndex()
         common: _TriggerOptions = {"trigger_id": "", "script_path": script,
                                    "repeat": self._repeat_check.isChecked()}
@@ -305,12 +306,12 @@ class TriggersTab(TranslatableMixin, QWidget):
             **common,
         )
 
-    def _build_cron_form(self) -> dict:
+    def _build_cron_form(self) -> Dict[str, QLineEdit]:
         cron_input = QLineEdit("* * * * *")
         self._add_page(self._field_row("tr_cron_label", cron_input))
         return {"cron": cron_input}
 
-    def _build_pixel_trigger(self, common: _TriggerOptions):
+    def _build_pixel_trigger(self, common: _TriggerOptions) -> PixelColorTrigger:
         w = self._pixel_widgets
         return PixelColorTrigger(
             x=int(w["x"].text() or "0"), y=int(w["y"].text() or "0"),
@@ -389,7 +390,7 @@ class TriggersTab(TranslatableMixin, QWidget):
                 self._table.setItem(row, col, QTableWidgetItem(value))
 
 
-def _describe(trigger) -> str:
+def _describe(trigger: _TriggerBase) -> str:
     if isinstance(trigger, ImageAppearsTrigger):
         return f"img={trigger.image_path} th={trigger.threshold}"
     if isinstance(trigger, WindowAppearsTrigger):

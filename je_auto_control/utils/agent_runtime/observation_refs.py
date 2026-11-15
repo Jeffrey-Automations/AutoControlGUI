@@ -46,7 +46,8 @@ def _size(value: Any) -> list[float]:
     return result
 
 
-def _element(data: Mapping, index: int, *, require_actionable: bool = False) -> tuple[list[int], dict]:
+def _element(data: Mapping[str, Any], index: int, *,
+             require_actionable: bool = False) -> tuple[list[int], dict[str, Any]]:
     elements = data.get("elements", ())
     if not isinstance(elements, (list, tuple)) or index >= len(elements):
         raise AgentTaskError("element index is outside this observation")
@@ -62,11 +63,11 @@ def _element(data: Mapping, index: int, *, require_actionable: bool = False) -> 
     return [math.floor(x + width / 2), math.floor(y + height / 2)], detached(evidence)
 
 
-def _element_enabled(item: Mapping, require_actionable: bool) -> bool:
+def _element_enabled(item: Mapping[str, Any], require_actionable: bool) -> bool:
     return item.get("enabled", True) is True and (not require_actionable or item.get("actionable") is True)
 
 
-def _image_point(data: Mapping, value: Any) -> list[int]:
+def _image_point(data: Mapping[str, Any], value: Any) -> list[int]:
     image = data.get("image")
     if not isinstance(image, Mapping) or image.get("redacted_by") != "strict":
         raise AgentTaskError("image reference requires trusted redacted observation geometry")
@@ -83,9 +84,10 @@ def _image_point(data: Mapping, value: Any) -> list[int]:
             for start, position, full, scaled in zip(origin, point, original, rendered)]
 
 
-def resolve_action(tool: str, arguments: Mapping, reference: Any, data: Mapping) -> tuple[dict, dict]:
+def resolve_action(tool: str, arguments: Mapping[str, Any], reference: Any,
+                   data: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     """Resolve only reviewed point tools, preserving original arguments and non-image provenance."""
-    kwargs: dict = detached(arguments)
+    kwargs: dict[str, Any] = detached(arguments)
     evidence = {"requested_arguments": kwargs, "identity": detached(data.get("identity"))}
     image = data.get("image")
     if isinstance(image, Mapping):
@@ -98,7 +100,8 @@ def resolve_action(tool: str, arguments: Mapping, reference: Any, data: Mapping)
     return _point_reference(tool, kwargs, reference, data, evidence)
 
 
-def _point_reference(tool: str, kwargs: dict, reference: Mapping, data: Mapping, evidence: dict) -> tuple[dict, dict]:
+def _point_reference(tool: str, kwargs: dict[str, Any], reference: Mapping[str, Any], data: Mapping[str, Any],
+                     evidence: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     if tool not in POINT_TOOLS:
         raise AgentTaskError("observation references require a reviewed point action")
     if {"x", "y"} & set(kwargs):
@@ -116,7 +119,7 @@ def _point_reference(tool: str, kwargs: dict, reference: Mapping, data: Mapping,
     return {**kwargs, "x": point[0], "y": point[1]}, evidence
 
 
-def _android_reference(reference: Mapping, data: Mapping) -> None:
+def _android_reference(reference: Mapping[str, Any], data: Mapping[str, Any]) -> None:
     identity = data.get("identity")
     if not isinstance(identity, Mapping) or "element_index" not in reference:
         raise AgentTaskError("Android references require a semantic element observation")
@@ -127,7 +130,8 @@ def _android_reference(reference: Mapping, data: Mapping) -> None:
         raise AgentTaskError("Android element observation has no verified hierarchy signature")
 
 
-def _browser_element(tool: str, kwargs: dict, reference: Mapping, data: Mapping, evidence: dict) -> tuple[dict, dict]:
+def _browser_element(tool: str, kwargs: dict[str, Any], reference: Mapping[str, Any], data: Mapping[str, Any],
+                     evidence: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     if "element_index" not in reference or {"selector", "frame"} & set(kwargs):
         raise AgentTaskError("browser reference requires one DOM index without explicit selector or frame")
     index = reference["element_index"]
@@ -139,7 +143,7 @@ def _browser_element(tool: str, kwargs: dict, reference: Mapping, data: Mapping,
     return {**kwargs, "selector": selector, "frame": frame}, evidence
 
 
-def _observed_dom_element(index: int, data: Mapping, *, require_enabled: bool) -> Mapping:
+def _observed_dom_element(index: int, data: Mapping[str, Any], *, require_enabled: bool) -> Mapping[str, Any]:
     elements = data.get("elements", ())
     if not isinstance(elements, (list, tuple)) or index >= len(elements):
         raise AgentTaskError("DOM index is outside this observation")

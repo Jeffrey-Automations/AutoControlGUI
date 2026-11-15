@@ -15,7 +15,7 @@ synthetic arrays. OpenCV + NumPy come in via ``je_open_cv``; reuses the shared
 connected-component helper and the RGB loader. Imports no ``PySide6``.
 """
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 # Reuse the RGB loader (single source of truth, no copy).
 from je_auto_control.utils.color_region.color_region import _to_rgb
@@ -39,13 +39,13 @@ class PerceptualDiffResult:
     regions: List[Dict[str, Any]]
 
 
-def _yiq_delta(first, second):
+def _yiq_delta(first: Any, second: Any) -> Any:
     """Return the per-pixel squared YIQ colour distance between two RGB float images."""
     weights_y = (0.29889531, 0.58662247, 0.11448223)
     weights_i = (0.59597799, -0.27417610, -0.32180189)
     weights_q = (0.21147017, -0.52261711, 0.31114694)
 
-    def channel(image, weights):
+    def channel(image: Any, weights: Tuple[float, float, float]) -> Any:
         return (image[..., 0] * weights[0] + image[..., 1] * weights[1]
                 + image[..., 2] * weights[2])
 
@@ -59,14 +59,14 @@ def _yiq_delta(first, second):
 _CHUNK = 1 << 18
 
 
-def _padded(image):
+def _padded(image: Any) -> Any:
     """``image`` with a one-pixel NaN border, so neighbours off the edge compare unequal."""
     import numpy as np
     pad = ((1, 1), (1, 1)) + ((0, 0),) * (image.ndim - 2)
     return np.pad(image, pad, constant_values=np.nan)
 
 
-def _sibling_map(image):
+def _sibling_map(image: Any) -> Any:
     """pixelmatch ``hasManySiblings`` for every pixel: 3+ identical neighbours.
 
     A pixel on the border starts its count at one, as in pixelmatch.
@@ -88,14 +88,14 @@ class _Image:
     mapped for the whole frame once many pixels differ (cheaper per point).
     """
 
-    def __init__(self, rgb, whole_frame: bool) -> None:
+    def __init__(self, rgb: Any, whole_frame: bool) -> None:
         import numpy as np
         self.shape = rgb.shape[:2]
         self.luma = _padded(rgb @ np.array(_LUMA))
         self._rgb: Any = None if whole_frame else _padded(rgb)
         self._map: Any = _sibling_map(rgb) if whole_frame else None
 
-    def many_siblings(self, ys, xs):
+    def many_siblings(self, ys: Any, xs: Any) -> Any:
         """pixelmatch ``hasManySiblings`` at the pixels ``(ys, xs)``."""
         import numpy as np
         if self._map is not None:
@@ -108,7 +108,7 @@ class _Image:
         return count > 2
 
 
-def _antialiased(image: _Image, other: _Image, ys, xs):
+def _antialiased(image: _Image, other: _Image, ys: Any, xs: Any) -> Any:
     """pixelmatch ``antialiased()`` for the pixels ``(ys, xs)`` of ``image``.
 
     True where the pixel has at most two equal-brightness neighbours, both a
@@ -135,7 +135,8 @@ def _antialiased(image: _Image, other: _Image, ys, xs):
     return candidate & flat
 
 
-def _drop_antialiased(mask, first, second) -> None:
+def _drop_antialiased(mask: Any, first: Any, second: Any) -> None:
+
     """Clear the pixels of ``mask`` that either image renders as anti-aliasing."""
     import numpy as np
     ys, xs = np.nonzero(mask)

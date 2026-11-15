@@ -12,10 +12,10 @@ converts native pixels to that screen's logical ones.
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPen, QPolygonF
+from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPaintEvent, QPen, QPolygonF
 from PySide6.QtWidgets import QWidget
 
 from je_auto_control.gui._screen_geometry import logical_point, screen_at_native
@@ -28,7 +28,7 @@ _MAX_WIDTH = 32
 _DEFAULT_WIDTH = 3
 
 
-def _point(event: dict) -> Optional[Tuple[float, float]]:
+def _point(event: Dict[str, Any]) -> Optional[Tuple[float, float]]:
     """The event's finite (x, y), or ``None``."""
     try:
         x, y = float(event.get("x", 0)), float(event.get("y", 0))
@@ -37,7 +37,7 @@ def _point(event: dict) -> Optional[Tuple[float, float]]:
     return (x, y) if math.isfinite(x) and math.isfinite(y) else None
 
 
-def _origin(value) -> Tuple[int, int]:
+def _origin(value: Any) -> Tuple[int, int]:
     """The host-stamped frame origin; (0, 0) when missing or malformed."""
     try:
         x, y = value
@@ -46,7 +46,7 @@ def _origin(value) -> Tuple[int, int]:
         return 0, 0
 
 
-def _width(value) -> int:
+def _width(value: Any) -> int:
     """A pen width between 1 and ``_MAX_WIDTH``."""
     try:
         return min(_MAX_WIDTH, max(1, int(value or _DEFAULT_WIDTH)))
@@ -67,8 +67,8 @@ class HostAnnotationOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self._strokes: List[dict] = []
-        self._current: Optional[dict] = None
+        self._strokes: List[Dict[str, Any]] = []
+        self._current: Optional[Dict[str, Any]] = None
         # The primary screen until a point lands on another one.
         self._target = QGuiApplication.primaryScreen()
         if self._target is not None:
@@ -78,7 +78,7 @@ class HostAnnotationOverlay(QWidget):
         if not self.isVisible():
             self.showFullScreen()
 
-    def apply(self, event: dict) -> None:
+    def apply(self, event: Dict[str, Any]) -> None:
         """Apply one ``begin`` / ``point`` / ``end`` / ``clear`` event from a viewer.
 
         The event comes from the remote viewer: a coordinate or width that is
@@ -148,7 +148,7 @@ class HostAnnotationOverlay(QWidget):
         self._current = None
         self.update()
 
-    def paintEvent(self, _event) -> None:  # noqa: N802 Qt override
+    def paintEvent(self, _event: QPaintEvent) -> None:  # noqa: N802 Qt override
         painter = QPainter(self)
         try:
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -158,7 +158,7 @@ class HostAnnotationOverlay(QWidget):
             painter.end()
 
     @staticmethod
-    def _paint_stroke(painter: QPainter, stroke: dict) -> None:
+    def _paint_stroke(painter: QPainter, stroke: Dict[str, Any]) -> None:
         points: List[Tuple[float, float]] = stroke.get("points") or []
         if len(points) < 2:
             return

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import socket
 import threading
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -151,9 +151,9 @@ class HostAdvertiser:
 class _BrowseListener:
     """Adapter that pumps zeroconf events into the user callback."""
 
-    def __init__(self, on_change: Callable[[Dict[str, dict]], None]) -> None:
-        self._on_change: Optional[Callable[[Dict[str, dict]], None]] = on_change
-        self._services: Dict[str, dict] = {}
+    def __init__(self, on_change: Callable[[Dict[str, Dict[str, Any]]], None]) -> None:
+        self._on_change: Optional[Callable[[Dict[str, Dict[str, Any]]], None]] = on_change
+        self._services: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
         self._publishing = 0
 
@@ -168,7 +168,7 @@ class _BrowseListener:
         with self._lock:
             return self._publishing == 0
 
-    def _publish(self, snapshot: Dict[str, dict]) -> None:
+    def _publish(self, snapshot: Dict[str, Dict[str, Any]]) -> None:
         with self._lock:
             callback = self._on_change
             if callback is None:
@@ -196,7 +196,7 @@ class _BrowseListener:
         self._publish(snapshot)
 
     @staticmethod
-    def _service_record(info: "ServiceInfo", name: str) -> dict:
+    def _service_record(info: "ServiceInfo", name: str) -> Dict[str, Any]:
         props = info.properties or {}
         host_id = (props.get(b"host_id") or b"").decode(
             "utf-8", errors="replace",
@@ -236,7 +236,7 @@ class HostBrowser:
     Cancel via :meth:`stop`.
     """
 
-    def __init__(self, on_change: Callable[[Dict[str, dict]], None]) -> None:
+    def __init__(self, on_change: Callable[[Dict[str, Dict[str, Any]]], None]) -> None:
         if not _AVAILABLE:
             raise ImportError(
                 "LAN discovery needs the 'discovery' extra: "
@@ -357,13 +357,13 @@ class HostBrowser:
             self._failures.discard("browser.observe")
 
 
-def list_local_services(timeout_s: float = 2.0) -> List[dict]:
+def list_local_services(timeout_s: float = 2.0) -> List[Dict[str, Any]]:
     """One-shot synchronous browse (collects whatever shows up in ``timeout``)."""
     if not _AVAILABLE:
         return []
-    snapshot: Dict[str, dict] = {}
+    snapshot: Dict[str, Dict[str, Any]] = {}
     done = threading.Event()
-    def _on(services: Dict[str, dict]) -> None:
+    def _on(services: Dict[str, Dict[str, Any]]) -> None:
         snapshot.clear()
         snapshot.update(services)
     browser = HostBrowser(on_change=_on)

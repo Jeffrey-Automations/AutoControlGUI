@@ -14,7 +14,7 @@ from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 _ERRORS = (AutoControlException, OSError, RuntimeError, ValueError, TypeError, LookupError)
 
 
-def _dependents(nodes: list, source: str) -> set[str]:
+def _dependents(nodes: list[dict[str, Any]], source: str) -> set[str]:
     selected = {source}
     for _index in range(len(nodes)):
         enlarged = selected | {node['id'] for node in nodes if selected.intersection(node['depends_on'])}
@@ -24,7 +24,7 @@ def _dependents(nodes: list, source: str) -> set[str]:
     return selected - {source}
 
 
-def _accepted(reply: dict) -> str:
+def _accepted(reply: dict[str, Any]) -> str:
     version = reply.get('spec_match_contract')
     if (not isinstance(version, int) or isinstance(version, bool) or version != 1 or
             reply.get('found') is not True or reply.get('spec_match') != 'matches'):
@@ -41,12 +41,12 @@ class _OwnedPause:
     """Carry the actual coordinator account and one finite cleanup deadline across dependent lookups."""
 
     runtime: Any
-    batch: dict
-    connect: Callable
+    batch: dict[str, Any]
+    connect: Callable[[str], Any]
     owner: DeferredAuthorization = field(default_factory=DeferredAuthorization.capture)
     deadline: float = field(default_factory=lambda: time.monotonic() + 5)
 
-    def _call(self, node: dict, operation: str, body: dict) -> dict:
+    def _call(self, node: dict[str, Any], operation: str, body: dict[str, Any]) -> dict[str, Any]:
         remaining = self.deadline - time.monotonic()
         if remaining <= 0:
             raise AgentTaskError('dependent pause cleanup deadline expired')
@@ -57,7 +57,7 @@ class _OwnedPause:
             call = self.connect(node['host'])
             return call(operation, body, remaining)
 
-    def request(self, node: dict, receipt: dict) -> dict:
+    def request(self, node: dict[str, Any], receipt: dict[str, Any]) -> dict[str, Any]:
         """Pause only an independently matched accepted request while retaining unknown retirement."""
         result = {'outcome': 'requires_review', 'task_id': receipt.get('task_id')}
         try:
@@ -73,7 +73,7 @@ class _OwnedPause:
             pass
         return result
 
-    def _local_admission(self, node: dict, identifier: str) -> None:
+    def _local_admission(self, node: dict[str, Any], identifier: str) -> None:
         with self.runtime.store.connection() as connection:
             row = connection.execute('SELECT batch_id,node_id FROM agent_dag_local_tasks WHERE task_id=?',
                                      (identifier,)).fetchone()
@@ -81,7 +81,8 @@ class _OwnedPause:
             raise AgentTaskError('local dependent pause requires its original private admission')
 
 
-def pause_dependents(runtime: Any, batch: dict, source: str, nodes: list, connections: Callable) -> None:
+def pause_dependents(runtime: Any, batch: dict[str, Any], source: str, nodes: list[dict[str, Any]],
+                     connections: Callable[[str], Any]) -> None:
     """Preserve possible effects and never pause unrelated work, replay a claim or invent a retirement ACK."""
     selected = _dependents(nodes, source)
     pending = {}

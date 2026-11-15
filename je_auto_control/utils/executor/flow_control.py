@@ -73,14 +73,14 @@ def _pixel_matches(x: int, y: int, rgb: Sequence[int], tolerance: int) -> bool:
     return all(abs(int(color[i]) - int(rgb[i])) <= tolerance for i in range(3))
 
 
-def _run_branch(executor: Any, body: Optional[list]) -> Any:
+def _run_branch(executor: Any, body: Optional[list[Any]]) -> Any:
     """Execute a nested branch only when it is a non-empty list."""
     if not body:
         return None
     return executor.execute_action(body, _validated=True)
 
 
-def _run_strict(executor: Any, body: list) -> Any:
+def _run_strict(executor: Any, body: list[Any]) -> Any:
     """Execute a nested body, re-raising the first error.
 
     An empty body is a valid no-op (matching :func:`_run_branch`); it must
@@ -91,7 +91,7 @@ def _run_strict(executor: Any, body: list) -> Any:
     return executor.execute_action(body, raise_on_error=True, _validated=True)
 
 
-def _run_loop_body(executor: Any, body: Optional[list]) -> None:
+def _run_loop_body(executor: Any, body: Optional[list[Any]]) -> None:
     """Execute a loop body once, treating an empty body as a no-op.
 
     A loop with an empty ``body`` is valid (it does nothing each pass) and
@@ -441,14 +441,14 @@ def exec_for_each_row(executor: Any, args: Mapping[str, Any]) -> int:
     return iterations
 
 
-def _as_list(value: Any) -> list:
+def _as_list(value: Any) -> list[Any]:
     """Accept a native list or a JSON-string list (for the visual builder)."""
     if isinstance(value, str):
         return json.loads(value) if value.strip() else []
     return list(value) if value else []
 
 
-def _parallel_branches(executor: Any, raw_branches: Any) -> list:
+def _parallel_branches(executor: Any, raw_branches: Any) -> list[Any]:
     """The branch lists of an ``AC_parallel``, validated when they came as a string.
 
     A JSON-string list is parsed only here, after dispatch-time validation,
@@ -474,7 +474,7 @@ class _ParallelRun:
     here, on the parent thread, and handed to every branch.
     """
 
-    def __init__(self, executor: Any, branches: list) -> None:
+    def __init__(self, executor: Any, branches: list[Any]) -> None:
         from je_auto_control.utils.executor import action_executor as executor_module
         self._module = executor_module
         # Snapshot before spawning threads so branch workers never read the
@@ -503,8 +503,9 @@ class _ParallelRun:
         self._stop_token = current_stop_token()
         self._result_hook = capture_branch_hook()
         self._stopped: Optional[ExecutionStopped] = None
-        self.results: list = [None] * len(branches)
-        self._failures: list = [0] * len(branches)
+        self.results: list[Any] = [None] * len(branches)
+        self._failures: list[int] = [0] * len(branches)
+
         self._errors: Dict[int, str] = {}
         self._assertions: Dict[int, AutoControlAssertionException] = {}
         self._interruptions: list[Optional[BaseException]] = [None] * len(branches)

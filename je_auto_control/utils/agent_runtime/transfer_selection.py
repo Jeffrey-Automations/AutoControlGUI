@@ -39,7 +39,8 @@ class TextCriterion:
         self._tail = window[-(len(self._expected) - 1):] if len(self._expected) > 1 else ''
 
 
-def selected_files(context: dict, values: Any, checkpoint: Callable[[], None]) -> list[tuple[str, dict]]:
+def selected_files(context: dict[str, Any], values: Any,
+                   checkpoint: Callable[[], None]) -> list[tuple[str, dict[str, Any]]]:
     """Compile exact source criteria; no request path or replacement filename is accepted."""
     criteria = _criteria(context, values)
     _check_paths(context, criteria, checkpoint)
@@ -53,12 +54,13 @@ def selected_files(context: dict, values: Any, checkpoint: Callable[[], None]) -
     return result
 
 
-def check_source_paths(context: dict, values: Any, checkpoint: Callable[[], None]) -> None:
+def check_source_paths(context: dict[str, Any], values: Any, checkpoint: Callable[[], None]) -> None:
     """Recheck selected source path authority without rereading historical output or manifest bytes."""
     _check_paths(context, _criteria(context, values), checkpoint)
 
 
-def _check_paths(context: dict, criteria: list[tuple[TransferSelection, dict]], checkpoint: Callable[[], None]) -> None:
+def _check_paths(context: dict[str, Any], criteria: list[tuple[TransferSelection, dict[str, Any]]],
+                 checkpoint: Callable[[], None]) -> None:
     for selection, clause in criteria:
         paths = ([Path(clause['directory']) / name for name in selection.names]
                  if clause['kind'] == 'file_manifest' else [Path(clause['path'])])
@@ -68,7 +70,7 @@ def _check_paths(context: dict, criteria: list[tuple[TransferSelection, dict]], 
             checkpoint()
 
 
-def _criteria(context: dict, values: Any) -> list[tuple[TransferSelection, dict]]:
+def _criteria(context: dict[str, Any], values: Any) -> list[tuple[TransferSelection, dict[str, Any]]]:
     result = []
     count = 0
     for selection in _selections(values):
@@ -80,7 +82,7 @@ def _criteria(context: dict, values: Any) -> list[tuple[TransferSelection, dict]
     return result
 
 
-def _source_criterion(criteria: list, selection: TransferSelection) -> dict:
+def _source_criterion(criteria: list[dict[str, Any]], selection: TransferSelection) -> dict[str, Any]:
     if selection.criterion >= len(criteria):
         raise AgentTaskError('selected criterion is outside the completed source')
     clause = criteria[selection.criterion]
@@ -101,8 +103,8 @@ def _selections(values: Any) -> list[TransferSelection]:
     return selections
 
 
-def _manifest_selection(policy: Any, clause: dict, selection: TransferSelection,
-                        checkpoint: Callable[[], None]) -> list[tuple[str, dict]]:
+def _manifest_selection(policy: Any, clause: dict[str, Any], selection: TransferSelection,
+                        checkpoint: Callable[[], None]) -> list[tuple[str, dict[str, Any]]]:
     pieces: list[bytes] = []
     source = snapshot_file(policy, clause['path'], checkpoint, max_bytes=1_000_000, inspect=pieces.append)
     try:

@@ -14,7 +14,8 @@ from je_auto_control.utils.agent_runtime.dag_continuation_evidence import (
 )
 
 
-def dispatch_template(runtime: Any, node: dict, snapshot: str) -> tuple[dict, dict | None]:
+def dispatch_template(runtime: Any, node: dict[str, Any],
+                      snapshot: str) -> tuple[dict[str, Any], dict[str, Any] | None]:
     """Renew only local unavailable origin restrictions; remote authority stays at its destination."""
     source = node["task"]["spec"]
     if node["host"] != "local":
@@ -26,8 +27,8 @@ def dispatch_template(runtime: Any, node: dict, snapshot: str) -> tuple[dict, di
     return runtime._validated_spec(template).to_dict(), authority
 
 
-def validate_decision(runtime: Any, decision: dict, node: dict, phase: str,
-                      original: dict | None, evidence: ContinuationEvidence, snapshot: str) -> dict:
+def validate_decision(runtime: Any, decision: dict[str, Any], node: dict[str, Any], phase: str,
+                      original: dict[str, Any] | None, evidence: ContinuationEvidence, snapshot: str) -> dict[str, Any]:
     """Return frozen adoption/dispatch proof for one explicitly selected logical node."""
     action = decision.get("action")
     if not isinstance(action, str):
@@ -41,8 +42,8 @@ def validate_decision(runtime: Any, decision: dict, node: dict, phase: str,
     raise AgentTaskError("invalid DAG continuation decision")
 
 
-def _dispatch(runtime: Any, decision: dict, node: dict, phase: str,
-              original: dict | None, snapshot: str) -> dict:
+def _dispatch(runtime: Any, decision: dict[str, Any], node: dict[str, Any], phase: str,
+              original: dict[str, Any] | None, snapshot: str) -> dict[str, Any]:
     if set(decision) != {"node_id", "action", "spec"} or phase != "pending" or original is not None:
         raise AgentTaskError("DAG dispatch requires a never-claimed node with no accepted destination request")
     template, authority = dispatch_template(runtime, node, snapshot)
@@ -57,7 +58,7 @@ def _dispatch(runtime: Any, decision: dict, node: dict, phase: str,
     return {"decision": {**decision, "spec": spec}, "ready": True, "original": None, "authority": authority}
 
 
-def _adoption_fields(decision: dict) -> None:
+def _adoption_fields(decision: dict[str, Any]) -> None:
     fields = {'node_id', 'action', 'task_id'}
     if decision.get('action') == 'successor' and 'handoff_id' in decision:
         fields.add('handoff_id')
@@ -67,7 +68,8 @@ def _adoption_fields(decision: dict) -> None:
         raise AgentTaskError("DAG adoption requires a verified accepted original request")
 
 
-def _adopt(decision: dict, node: dict, phase: str, original: dict | None, evidence: ContinuationEvidence) -> dict:
+def _adopt(decision: dict[str, Any], node: dict[str, Any], phase: str, original: dict[str, Any] | None,
+           evidence: ContinuationEvidence) -> dict[str, Any]:
     _adoption_fields(decision)
     if original is None:
         raise AgentTaskError('DAG adoption requires a verified accepted original request')
@@ -76,7 +78,7 @@ def _adopt(decision: dict, node: dict, phase: str, original: dict | None, eviden
     identifier = decision["task_id"]
     if not isinstance(identifier, str) or not identifier or len(identifier) > 256:
         raise AgentTaskError("DAG adoption requires a bounded task identity")
-    chain: list[dict] = []
+    chain: list[dict[str, Any]] = []
     if decision["action"] == "adopt":
         if identifier != original.get("task_id"):
             raise AgentTaskError("DAG adoption task differs from the bound original request")

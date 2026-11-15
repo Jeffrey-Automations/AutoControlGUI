@@ -161,7 +161,7 @@ def _open_connection(driver: Any, path: str) -> Any:
         raise AgentTaskError("agent runtime database could not be opened") from error
 
 
-def _request_identity(owner: dict, key: str) -> tuple[str, str]:
+def _request_identity(owner: dict[str, Any], key: str) -> tuple[str, str]:
     if not isinstance(key, str) or not key or len(key) > 256:
         raise AgentTaskError("idempotency_key requires between one and 256 characters")
     owner_key = json.dumps([owner.get("user_id"), owner.get("store_path")])
@@ -172,7 +172,7 @@ def _request_identity(owner: dict, key: str) -> tuple[str, str]:
     return owner_key, digest
 
 
-def _request_key(connection: Any, owner: dict, key: str, spec: dict, identifier: str) -> str | None:
+def _request_key(connection: Any, owner: dict[str, Any], key: str, spec: dict[str, Any], identifier: str) -> str | None:
     owner_key, digest = _request_identity(owner, key)
     spec_hash = request_spec_digest(spec)
     row = connection.execute("SELECT task_id,spec_hash FROM agent_request_keys WHERE owner_key=? AND key_hash=?",
@@ -186,7 +186,7 @@ def _request_key(connection: Any, owner: dict, key: str, spec: dict, identifier:
     return None
 
 
-def request_spec_digest(spec: dict) -> str:
+def request_spec_digest(spec: dict[str, Any]) -> str:
     """Hash the exact normalized specification used by accepted request keys."""
     return hashlib.sha256(json.dumps(spec, sort_keys=True).encode("utf-8")).hexdigest()
 
@@ -236,10 +236,10 @@ class AgentTaskStore:
         finally:
             connection.close()
 
-    def create(self, spec: dict | TaskAdmission, owner: dict, *, idempotency_key: str | None = None,
+    def create(self, spec: dict[str, Any] | TaskAdmission, owner: dict[str, Any], *, idempotency_key: str | None = None,
                trigger_event: tuple[str, str, str] | None = None,
                recovery: tuple[str, str, str] | None = None,
-               authorization: dict | RecoveryBinding | CompletionBinding | None = None) -> str:
+               authorization: dict[str, Any] | RecoveryBinding | CompletionBinding | None = None) -> str:
         """Persist an immutable authorized task snapshot before it can execute."""
         identifier = uuid.uuid4().hex
         now = time.time()
@@ -270,12 +270,12 @@ class AgentTaskStore:
                 bind_recovery(connection, identifier, authorization, owner)
         return identifier
 
-    def lookup_request(self, owner: dict, key: str) -> str | None:
+    def lookup_request(self, owner: dict[str, Any], key: str) -> str | None:
         """Read the exact owner's request key without creating or resubmitting a task."""
         record = self.request_record(owner, key)
         return record["task_id"] if record else None
 
-    def request_record(self, owner: dict, key: str, *, connection: Any = None) -> dict[str, Any] | None:
+    def request_record(self, owner: dict[str, Any], key: str, *, connection: Any = None) -> dict[str, Any] | None:
         """Read accepted identity and immutable spec digest from the same request snapshot."""
         identity = _request_identity(owner, key)
         transaction = self.connection() if connection is None else nullcontext(connection)
@@ -366,7 +366,8 @@ class AgentTaskStore:
             if cursor.rowcount != 1:
                 raise AgentTaskError("task stopped before control activation")
 
-    def prepare(self, task_id: str, command: str, arguments: dict, *, grounding: dict | None = None) -> str:
+    def prepare(self, task_id: str, command: str, arguments: dict[str, Any], *,
+                grounding: dict[str, Any] | None = None) -> str:
         """Durably record the next operation before any external side effect."""
         identifier = uuid.uuid4().hex
         with self.connection(write=True) as connection:
@@ -421,7 +422,7 @@ class AgentTaskStore:
             connection.execute("UPDATE agent_control SET owner=''")
 
 
-def _receipt(row: Any) -> dict:
+def _receipt(row: Any) -> dict[str, Any]:
     result = dict(row)
     result["arguments"] = json.loads(result["arguments"])
     result["result"] = json.loads(result["result"]) if result["result"] is not None else None

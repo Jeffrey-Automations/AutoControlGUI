@@ -12,8 +12,8 @@ from je_auto_control.utils.agent_runtime.retained_browser import RetainedBrowser
 class RetainedBrowserTarget:
     """Read only the private effect binding's real original context, never a new helper or page."""
 
-    def __init__(self, pool: RetainedBrowsers, source: Mapping, spec: Any,
-                 current_source: Callable[[], dict], current_operation: Callable[[], Any]) -> None:
+    def __init__(self, pool: RetainedBrowsers, source: Mapping[str, Any], spec: Any,
+                 current_source: Callable[[], dict[str, Any]], current_operation: Callable[[], Any]) -> None:
         self._pool, self._source, self._spec = pool, deepcopy(dict(source)), spec
         self._current_source = current_source
         self._current_operation = current_operation
@@ -47,7 +47,7 @@ class RetainedBrowserTarget:
         if self._pool.require(self._current_source()) is not entry:
             raise AgentTaskError("retained browser context is unavailable")
 
-    def _request(self, operation: str, payload: dict) -> Any:
+    def _request(self, operation: str, payload: dict[str, Any]) -> Any:
         self._check()
         if self._entry is None:
             raise AgentTaskError("retained browser reader is unavailable")
@@ -56,12 +56,12 @@ class RetainedBrowserTarget:
         self._check()
         return result
 
-    def _capabilities(self) -> dict:
+    def _capabilities(self) -> dict[str, Any]:
         if self._entry is None or self._entry.proof is None:
             raise AgentTaskError("retained browser context is unavailable")
         return retirement_proof(self._request("readonly_capabilities", {}), self._entry.proof["context_id"])
 
-    def _call(self, operation: str, payload: dict) -> Any:
+    def _call(self, operation: str, payload: dict[str, Any]) -> Any:
         try:
             self._capabilities()
             result = self._request(operation, payload)
@@ -77,17 +77,17 @@ class RetainedBrowserTarget:
         finally:
             self.cleanup()
 
-    def observe(self) -> dict:
+    def observe(self) -> dict[str, Any]:
         """Return fresh scoped DOM observation from the retained original SDK page."""
         return self._call("observe", {})
 
-    def verify_browser(self, clause: Mapping) -> Any:
+    def verify_browser(self, clause: Mapping[str, Any]) -> Any:
         """Read only this task's unchanged pinned independent browser criterion."""
         if clause not in self._spec.success_criteria:
             raise AgentTaskError("browser criterion is not pinned to this read-only task")
         return self._call("verify_browser", {"clause": dict(clause)})
 
-    def perform(self, _name: str, _arguments: dict) -> Any:
+    def perform(self, _name: str, _arguments: dict[str, Any]) -> Any:
         """Read borrowers cannot execute tools or reuse the ordinary target."""
         raise AgentTaskError("read-only browser cannot perform tools")
 

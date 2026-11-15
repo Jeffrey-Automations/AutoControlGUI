@@ -12,9 +12,12 @@ import threading
 from concurrent.futures import Future
 from enum import Enum, auto
 from dataclasses import asdict, dataclass
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+
+if TYPE_CHECKING:
+    from aiortc import RTCPeerConnection
 
 
 _DEFAULT_INTERVAL_S = 1.0
@@ -29,7 +32,7 @@ class StatsSnapshot:
     packet_loss_pct: Optional[float] = None
     jitter_ms: Optional[float] = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Optional[float]]:
         return asdict(self)
 
 
@@ -43,7 +46,7 @@ class _PollState(Enum):
 class StatsPoller:
     """Drive a periodic ``getStats()`` poll on the asyncio bridge."""
 
-    def __init__(self, pc, callback: Callable[[StatsSnapshot], None],
+    def __init__(self, pc: RTCPeerConnection, callback: Callable[[StatsSnapshot], None],
                  interval_s: float = _DEFAULT_INTERVAL_S) -> None:
         self._pc = pc
         self._callback: Optional[Callable[[StatsSnapshot], None]] = callback
@@ -156,7 +159,7 @@ class StatsPoller:
             self._absorb_entry(entry, delta_t, snap)
         return snap
 
-    def _absorb_entry(self, entry, delta_t,
+    def _absorb_entry(self, entry: Any, delta_t: Optional[float],
                       snap: StatsSnapshot) -> None:
         stat_type = getattr(entry, "type", None)
         if stat_type == "inbound-rtp" and getattr(entry, "kind", "") == "video":
@@ -169,7 +172,7 @@ class StatsPoller:
                 snap.rtt_ms = float(rtt) * 1000.0
 
     @staticmethod
-    def _absorb_remote_inbound(entry, snap: StatsSnapshot) -> None:
+    def _absorb_remote_inbound(entry: Any, snap: StatsSnapshot) -> None:
         rtt = getattr(entry, "roundTripTime", None)
         if rtt is not None:
             snap.rtt_ms = float(rtt) * 1000.0
@@ -178,11 +181,11 @@ class StatsPoller:
             snap.jitter_ms = float(jitter) * 1000.0
 
     @staticmethod
-    def _int_attr(entry, name: str) -> int:
+    def _int_attr(entry: Any, name: str) -> int:
         """Read a numeric WebRTC stat attribute as an int (missing -> 0)."""
         return int(getattr(entry, name, 0) or 0)
 
-    def _update_inbound(self, entry, delta_t, snap: StatsSnapshot) -> None:
+    def _update_inbound(self, entry: Any, delta_t: Optional[float], snap: StatsSnapshot) -> None:
         bytes_received = self._int_attr(entry, "bytesReceived")
         frames_decoded = self._int_attr(entry, "framesDecoded")
         packets_received = self._int_attr(entry, "packetsReceived")
@@ -195,7 +198,7 @@ class StatsPoller:
         self._prev_packets_lost = packets_lost
 
     def _update_rates(self, bytes_received: int, frames_decoded: int,
-                      delta_t, snap: StatsSnapshot) -> None:
+                      delta_t: Optional[float], snap: StatsSnapshot) -> None:
         """Derive bitrate + fps from inter-sample deltas."""
         if not delta_t or delta_t <= 0:
             return

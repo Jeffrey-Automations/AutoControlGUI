@@ -12,7 +12,7 @@ import re
 import sys
 import warnings
 from contextlib import contextmanager
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Optional, Sequence, Tuple
 
 from je_auto_control.utils.exception.exception_tags import (
     keyboard_press_key_error_message, keyboard_release_key_error_message,
@@ -32,7 +32,7 @@ from je_auto_control.wrapper.platform_wrapper import (
 )
 from je_auto_control.wrapper._input_observer import input_event, has_input_observer
 
-def get_keyboard_keys_table() -> dict:
+def get_keyboard_keys_table() -> dict[str, int]:
     """
     取得鍵盤對應表
     Get keyboard keys table
@@ -105,7 +105,7 @@ def _shift_held(is_shift: bool) -> Iterator[None]:
     if not is_shift or sys.platform == "darwin":
         yield
         return
-    still_held: list = []
+    still_held: list[int | str] = []
     try:
         press_keyboard_key("shift", skip_record=True)
         still_held.append("shift")
@@ -195,7 +195,7 @@ def release_keyboard_key(keycode: int | str, is_shift: bool = False,
         raise AutoControlKeyboardException(f"{keyboard_release_key_error_message} {repr(error)}") from error
 
 
-def _release_still_held(still_held: list, is_shift: bool) -> None:
+def _release_still_held(still_held: list[int | str], is_shift: bool) -> None:
     """把「已經按下去、還沒放開」的鍵**倒著**放開。清空 ``still_held``。
     Release keys that are still held down, in reverse order.
 
@@ -232,7 +232,7 @@ def type_keyboard(keycode: int | str, is_shift: bool = False,
     of every subsequent click and keystroke.
     """
     autocontrol_logger.info(f"type_keyboard, keycode={keycode}, is_shift={is_shift}, skip_record={skip_record}")
-    still_held: list = []
+    still_held: list[int | str] = []
     backend_shift = _backend_shift(is_shift)
     try:
         with _shift_held(is_shift):
@@ -463,7 +463,7 @@ def write_secret(secret: str) -> None:
     record_action_to_list("write_secret", {"secret": _RECORD_MASK})
 
 
-def hotkey(key_code_list: list, is_shift: bool = False) -> Tuple[str, str]:
+def hotkey(key_code_list: Sequence[int | str], is_shift: bool = False) -> Tuple[str, str]:
     """
     模擬組合鍵 (依序按下，再反向放開)
     Simulate hotkey (press all keys, then release in reverse order)
@@ -474,7 +474,7 @@ def hotkey(key_code_list: list, is_shift: bool = False) -> Tuple[str, str]:
     """
     autocontrol_logger.info(f"hotkey, key_code_list={key_code_list}, is_shift={is_shift}")
     # 已經按下去、還沒放開的鍵，**依按下的順序**。放開時倒著走。
-    still_held: list = []
+    still_held: list[int | str] = []
     backend_shift = _backend_shift(is_shift)
     try:
         press_list = []
@@ -559,7 +559,7 @@ def send_key_event_to_window(window_title: str, keycode: int | str) -> None:
         )
 
 
-def __getattr__(name: str) -> dict:
+def __getattr__(name: str) -> dict[str, int]:
     """Preserve explicit table access and caller replacement of that attribute."""
     if name == "keyboard_keys_table":
         return get_keyboard_keys_table()

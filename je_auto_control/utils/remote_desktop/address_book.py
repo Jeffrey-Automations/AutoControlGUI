@@ -20,7 +20,7 @@ import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from je_auto_control.utils.json_store.json_store import (
     atomic_write_text, load_json_or_quarantine, quarantine_file,
@@ -36,7 +36,7 @@ def default_address_book_path() -> Path:
     return home / _DEFAULT_PATH_RELATIVE
 
 
-def _normalised(entry: dict) -> dict:
+def _normalised(entry: Dict[str, Any]) -> Dict[str, Any]:
     """Keep the tag and timestamp shapes the address book writes itself.
 
     From a hand-edited file, ``"tags": "work"`` matched the tag filter by
@@ -59,7 +59,7 @@ class AddressBook:
         self._path = (Path(path) if path is not None
                       else default_address_book_path())
         self._lock = threading.Lock()
-        self._entries: List[dict] = []
+        self._entries: List[Dict[str, Any]] = []
         self._load()
 
     def _load(self) -> None:
@@ -87,7 +87,7 @@ class AddressBook:
 
     # --- public API ---------------------------------------------------------
 
-    def list_entries(self) -> List[dict]:
+    def list_entries(self) -> List[Dict[str, Any]]:
         with self._lock:
             return [dict(entry) for entry in self._entries]
 
@@ -116,7 +116,7 @@ class AddressBook:
             self._save()
 
     def _find_entry_locked(self, host_id: str,
-                           server_url: str) -> Optional[dict]:
+                           server_url: str) -> Optional[Dict[str, Any]]:
         for entry in self._entries:
             if (entry.get("host_id") == host_id
                     and entry.get("server_url") == server_url):
@@ -124,7 +124,7 @@ class AddressBook:
         return None
 
     @staticmethod
-    def _refresh_entry_locked(entry: dict, *, now: str, label: str,
+    def _refresh_entry_locked(entry: Dict[str, Any], *, now: str, label: str,
                               mac_address: Optional[str],
                               broadcast_address: Optional[str]) -> None:
         entry["last_used"] = now
@@ -140,7 +140,7 @@ class AddressBook:
     def _build_entry(*, host_id: str, server_url: str,
                      label: str, now: str,
                      mac_address: Optional[str],
-                     broadcast_address: Optional[str]) -> dict:
+                     broadcast_address: Optional[str]) -> Dict[str, Any]:
         new_entry = {
             "label": label,
             "server_url": server_url,
@@ -155,7 +155,7 @@ class AddressBook:
         return new_entry
 
     def set_tags(self, *, host_id: str, server_url: str,
-                 tags: list) -> None:
+                 tags: List[Any]) -> None:
         """Replace ``tags`` on the matching entry.
 
         A JSON ``null`` reaches here as None, and ``str(None)`` is the
@@ -172,7 +172,7 @@ class AddressBook:
                     self._save()
                     return
 
-    def all_tags(self) -> list:
+    def all_tags(self) -> List[str]:
         """Return distinct tags across all entries (sorted)."""
         seen = set()
         with self._lock:

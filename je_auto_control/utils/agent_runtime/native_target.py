@@ -47,7 +47,7 @@ class NativeDesktopTarget:
     _worker_module = "je_auto_control.utils.agent_runtime.native_worker"
 
     def __init__(self, *, argv: Sequence[str] | None = None, resource_path: Path | None = None,
-                 recovery_probe: Callable[[], None] = no_held_input, profile: dict | None = None) -> None:
+                 recovery_probe: Callable[[], None] = no_held_input, profile: dict[str, Any] | None = None) -> None:
         self._profile = AgentTargetProfile.from_dict(profile) if profile is not None else None
         self._argv = tuple(argv) if argv is not None else (
             sys.executable, "-u", "-m", self._worker_module)
@@ -84,7 +84,7 @@ class NativeDesktopTarget:
             self._channel_control = control
         return self._channel
 
-    def check_resume(self, spec: AgentTaskSpec, receipts: list[dict]) -> None:
+    def check_resume(self, spec: AgentTaskSpec, receipts: list[dict[str, Any]]) -> None:
         """Fence UI prefixes before launching a replacement helper; file recovery uses persistent evidence."""
         if self._profile is not None:
             kind = self._profile.kind
@@ -110,7 +110,7 @@ class NativeDesktopTarget:
         return self.is_managed_browser and self._channel is not None and not self._channel.retired
 
     @property
-    def presence_status(self) -> dict:
+    def presence_status(self) -> dict[str, Any]:
         """Return passive source/binding metadata without any monitor, helper or native probe."""
         result = self._presence.status()
         if self._channel_control is not None:
@@ -149,7 +149,7 @@ class NativeDesktopTarget:
         return (self._channel is not None and not self._channel.retired
                 and self._ledger.empty and self._pending is None)
 
-    def _request(self, operation: str, payload: dict, *, deadline: float | None = None) -> Any:
+    def _request(self, operation: str, payload: dict[str, Any], *, deadline: float | None = None) -> Any:
         context = current_operation()
         if context is None:
             raise AgentTaskError("native targets require an explicitly managed operation scope")
@@ -172,11 +172,11 @@ class NativeDesktopTarget:
         if self._journal is not None:
             self._journal.update(self._ledger.snapshot(), self._pending)
 
-    def _input(self, event: dict, *, cleanup: bool = False) -> None:
+    def _input(self, event: dict[str, Any], *, cleanup: bool = False) -> None:
         self._ledger.consume(event, cleanup=cleanup)
         self._persist()
 
-    def recover(self, note: str, *, actor: str) -> dict:
+    def recover(self, note: str, *, actor: str) -> dict[str, Any]:
         """Review a stale witness while exclusively owning the resource; never replay old input."""
         path = self._resource_path or _desktop_lock_path()
         lock = RuntimeLock(path)
@@ -251,7 +251,7 @@ class NativeDesktopTarget:
             raise AgentTaskError("browser retirement requires its original input ownership")
         return channel
 
-    def detach_readonly(self) -> tuple[HelperChannel, dict] | None:
+    def detach_readonly(self) -> tuple[HelperChannel, dict[str, Any]] | None:
         """Transfer only the actual frozen browser channel after confirmed empty input ownership."""
         channel = self._readonly_source_channel()
         if channel is None:

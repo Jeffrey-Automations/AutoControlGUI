@@ -19,10 +19,14 @@ they are honest about being best-effort.
 """
 import sys
 import time
-from typing import Any, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.wrapper.window_backends.base import WindowManageBackend
+
+if TYPE_CHECKING:
+    from Xlib.display import Display
+    from Xlib.xobject.drawable import Window
 
 #: ``ShowWindow`` codes this backend can honour, mapped to what X11 calls the
 #: same idea. The Win32 numbering is the project's cross-platform spelling of
@@ -60,8 +64,8 @@ class X11WindowBackend(WindowManageBackend):
     name = "x11-ewmh"
 
     def __init__(self) -> None:
-        self._connection = None
-        self._atoms: dict = {}
+        self._connection: Optional["Display"] = None
+        self._atoms: Dict[str, int] = {}
         self.available = _is_linux() and self._probe()
 
     # --- connection --------------------------------------------------------
@@ -75,7 +79,7 @@ class X11WindowBackend(WindowManageBackend):
                 "X11 window backend unavailable: %r", error)
             return False
 
-    def _display(self):
+    def _display(self) -> "Display":
         """The X connection, opened once and kept.
 
         Its own connection rather than the input backend's: this module is
@@ -95,13 +99,13 @@ class X11WindowBackend(WindowManageBackend):
             self._atoms[name] = self._display().intern_atom(name)
         return self._atoms[name]
 
-    def _root(self):
+    def _root(self) -> "Window":
         return self._display().screen().root
 
-    def _window(self, window_id: int):
+    def _window(self, window_id: int) -> "Window":
         return self._display().create_resource_object("window", int(window_id))
 
-    def _property(self, window, name: str, kind: Optional[int] = None):
+    def _property(self, window: "Window", name: str, kind: Optional[int] = None) -> Any:
         """Read a property's value list, or ``None`` when it is absent."""
         from Xlib import X
 
@@ -109,7 +113,7 @@ class X11WindowBackend(WindowManageBackend):
             self._atom(name), X.AnyPropertyType if kind is None else kind)
         return None if found is None else found.value
 
-    def _client_message(self, window, name: str, data: List[int]) -> None:
+    def _client_message(self, window: "Window", name: str, data: List[int]) -> None:
         """Send an EWMH client message to the root window.
 
         EWMH requests are addressed to the root with
@@ -166,7 +170,7 @@ class X11WindowBackend(WindowManageBackend):
 
     # --- reading one window ------------------------------------------------
 
-    def _frame(self, window_id: int):
+    def _frame(self, window_id: int) -> "Window":
         """The window manager's frame around a client, or the client itself.
 
         A reparenting window manager makes the client a grandchild of the

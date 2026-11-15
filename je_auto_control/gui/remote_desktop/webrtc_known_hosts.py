@@ -7,7 +7,7 @@ and timestamp formatters live in ``_helpers``.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
@@ -22,11 +22,16 @@ from je_auto_control.gui.remote_desktop._helpers import (
     _format_last_seen, _short_fp, _t,
 )
 
+if TYPE_CHECKING:
+    from datetime import datetime, timedelta
+
+    from je_auto_control.utils.remote_desktop.fingerprint import KnownHosts
+
 
 class KnownHostsDialog(QDialog):
     """Browse + forget the persistent KnownHosts (TOFU app + DTLS fingerprints)."""
 
-    def __init__(self, known_hosts, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, known_hosts: KnownHosts, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._known = known_hosts
         self.setWindowTitle(_t("rd_webrtc_known_hosts_title"))
@@ -90,8 +95,8 @@ class KnownHostsDialog(QDialog):
                                now=now, stale_after=stale_after,
                                stale_color=stale_color)
 
-    def _populate_row(self, row: int, host_id: str, fps: dict, *,
-                      now, stale_after, stale_color) -> None:
+    def _populate_row(self, row: int, host_id: str, fps: Dict[str, Optional[str]], *,
+                      now: datetime, stale_after: timedelta, stale_color: QColor) -> None:
         items = [
             QTableWidgetItem(host_id),
             QTableWidgetItem(_short_fp(fps.get("app_fp"))),
@@ -108,7 +113,7 @@ class KnownHostsDialog(QDialog):
             self._table.setItem(row, col, item)
 
     @staticmethod
-    def _is_stale(last_seen, *, now, stale_after) -> bool:
+    def _is_stale(last_seen: Optional[str], *, now: datetime, stale_after: timedelta) -> bool:
         if not last_seen:
             return False
         from datetime import datetime, timezone
@@ -205,7 +210,7 @@ class KnownHostsDialog(QDialog):
         )
         self._refresh()
 
-    def _prompt_import_data(self):
+    def _prompt_import_data(self) -> Optional[Dict[str, Any]]:
         import json
         path, _filter = QFileDialog.getOpenFileName(
             self, _t("rd_webrtc_kh_import"), "", "JSON (*.json);;All (*)",
@@ -225,7 +230,8 @@ class KnownHostsDialog(QDialog):
             return None
         return data
 
-    def _import_one(self, host_id, value, existing) -> str:
+    def _import_one(self, host_id: object, value: object,
+                    existing: Dict[str, Dict[str, Optional[str]]]) -> str:
         """Return ``"added"``, ``"skipped"``, or ``"ignored"`` per entry."""
         if not isinstance(host_id, str):
             return "ignored"
@@ -241,7 +247,7 @@ class KnownHostsDialog(QDialog):
         return "added"
 
     @staticmethod
-    def _extract_fingerprints(value):
+    def _extract_fingerprints(value: object) -> Tuple[object, object]:
         if isinstance(value, str):
             return value, None
         if isinstance(value, dict):
@@ -331,7 +337,7 @@ class _ManualKnownHostDialog(QDialog):
         button_row.addWidget(ok)
         layout.addLayout(button_row)
 
-    def values(self) -> tuple:
+    def values(self) -> Tuple[str, str, str]:
         return (
             self._host_edit.text().strip(),
             self._app_edit.text().strip(),

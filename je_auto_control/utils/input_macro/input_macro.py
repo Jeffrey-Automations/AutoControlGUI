@@ -160,7 +160,7 @@ class _HeldInputs:
     a mouse button) held down after the call returned.
     """
 
-    def __init__(self, dispatch: Callable) -> None:
+    def __init__(self, dispatch: Callable[[Dict[str, Any]], None]) -> None:
         self._dispatch = dispatch
         self._held: List[Tuple[str, str, Any]] = []
 
@@ -204,8 +204,8 @@ def _finite_seconds(milliseconds: Any, name: str) -> float:
 
 
 def replay_timeline(events: List[Dict[str, Any]], *, speed: float = 1.0,
-                    sink: Optional[Callable] = None,
-                    sleep: Optional[Callable] = None,
+                    sink: Optional[Callable[[Dict[str, Any]], None]] = None,
+                    sleep: Optional[Callable[[float], None]] = None,
                     min_gap: float = 0.0,
                     max_gap: Optional[float] = None) -> int:
     """Replay ``events`` honoring per-event ``delta_ms`` gaps; return count.
@@ -242,8 +242,8 @@ def _stoppable_sleep(seconds: float) -> None:
     pause(seconds, time.sleep)
 
 
-def _run_steps(steps: List[Dict[str, Any]], dispatch: Callable,
-               sleeper: Callable, log: List[Dict[str, Any]]) -> None:
+def _run_steps(steps: List[Dict[str, Any]], dispatch: Callable[[Dict[str, Any]], None],
+               sleeper: Callable[[float], None], log: List[Dict[str, Any]]) -> None:
     for step in steps:
         op = step.get("op")
         if op == "repeat":
@@ -259,8 +259,9 @@ def _run_steps(steps: List[Dict[str, Any]], dispatch: Callable,
 
 
 def run_sequence(steps: List[Dict[str, Any]], *,
-                 sink: Optional[Callable] = None,
-                 sleep: Optional[Callable] = None) -> List[Dict[str, Any]]:
+                 sink: Optional[Callable[[Dict[str, Any]], None]] = None,
+                 sleep: Optional[Callable[[float], None]] = None) -> List[Dict[str, Any]]:
+
     """Run a declarative input sequence; return the flattened executed log.
 
     Steps are ``{op: press|release|key|click|move|scroll}`` plus control ops

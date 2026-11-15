@@ -61,7 +61,7 @@ CACHED_PROPERTIES = (
 )
 
 
-def search_root(automation, window_title: Optional[str]):
+def search_root(automation: Any, window_title: Optional[str]) -> Any:
     """The element to search from: one window by title substring, else the desktop."""
     if not window_title:
         return automation.GetRootElement()
@@ -85,7 +85,7 @@ def search_root(automation, window_title: Optional[str]):
         f"no visible window title contains {window_title!r}")
 
 
-def search_roots(automation, window_title: Optional[str]) -> Iterator[Any]:
+def search_roots(automation: Any, window_title: Optional[str]) -> Iterator[Any]:
     """The roots to search, one at a time, front-most window first.
 
     Unscoped, this yields each visible top-level window rather than the desktop
@@ -110,7 +110,7 @@ def search_roots(automation, window_title: Optional[str]) -> Iterator[Any]:
             yield element
 
 
-def cache_request(automation):
+def cache_request(automation: Any) -> Any:
     """A cache request for every property the element conversion reads."""
     request = automation.CreateCacheRequest()
     for prop in CACHED_PROPERTIES:
@@ -118,7 +118,7 @@ def cache_request(automation):
     return request
 
 
-def _is_null(element) -> bool:
+def _is_null(element: object) -> bool:
     """Whether a walker returned "no such element".
 
     ``comtypes`` hands back a **wrapper around a NULL pointer**, not ``None``,
@@ -129,7 +129,7 @@ def _is_null(element) -> bool:
     return element is None or not bool(element)
 
 
-def focused_raw(automation):
+def focused_raw(automation: Any) -> Any:
     """The raw element holding keyboard focus, or ``None`` when none does.
 
     ``GetFocusedElement`` answers with an error rather than an empty result
@@ -145,14 +145,14 @@ def focused_raw(automation):
     return None if _is_null(element) else element
 
 
-def _children(walker, node, request, limit: int) -> list:
+def _children(walker: Any, node: Any, request: Any, limit: int) -> List[Any]:
     """Up to ``limit`` control-view children of ``node``, properties cached.
 
     Capped because the caller can never need more siblings from one node than
     its whole remaining budget — and a node with tens of thousands of children
     would otherwise cost that many calls before the walk could descend.
     """
-    out: list = []
+    out: List[Any] = []
     if limit <= 0:
         return out
     try:
@@ -168,7 +168,7 @@ def _children(walker, node, request, limit: int) -> list:
     return out
 
 
-def walk_elements(automation, root, limit: int) -> Iterator[Any]:
+def walk_elements(automation: Any, root: Any, limit: int) -> Iterator[Any]:
     """Yield up to ``limit`` control elements under ``root``, in reading order.
 
     The point is that it can be **stopped**. ``FindAll`` is one call that

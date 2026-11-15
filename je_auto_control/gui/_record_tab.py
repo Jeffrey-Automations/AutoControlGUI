@@ -6,8 +6,9 @@ import copy
 import functools
 import json
 
-from typing import Callable
+from typing import Any, Callable, Optional
 
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
     QFileDialog, QLabel, QMessageBox, QTextEdit, QVBoxLayout, QWidget,
 )
@@ -30,7 +31,7 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _play_actions(actions: list) -> object:
+def _play_actions(actions: list[Any]) -> object:
     """Worker thread: replay a recording."""
     return execute_action(actions)
 
@@ -43,10 +44,10 @@ def _start_recording() -> None:
 class RecordTab(TranslatableMixin, QWidget):
     """Owns playback and view state; the shared recorder outlives this page."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
-        self._record_data: list = []
+        self._record_data: list[Any] = []
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
@@ -95,7 +96,7 @@ class RecordTab(TranslatableMixin, QWidget):
         )
         self._apply_record_status_label()
 
-    def showEvent(self, event) -> None:
+    def showEvent(self, event: QShowEvent) -> None:
         self.sync_with_engine()
         super().showEvent(event)
 
@@ -103,10 +104,10 @@ class RecordTab(TranslatableMixin, QWidget):
         self._work.start(work, tag=tag)
         self.sync_with_engine()
 
-    def _start_record(self):
+    def _start_record(self) -> None:
         self._start_work(_start_recording, tag="start")
 
-    def _stop_record(self):
+    def _stop_record(self) -> None:
         self._start_work(stop_record, tag="data")
 
     def _on_result(self, result: object) -> None:
@@ -114,7 +115,7 @@ class RecordTab(TranslatableMixin, QWidget):
             self._record_data = result
             self.record_list_text.setText(json.dumps(result, indent=2, ensure_ascii=False))
 
-    def _playback_record(self):
+    def _playback_record(self) -> None:
         if not self._record_data:
             QMessageBox.warning(self, "Warning", "No recorded data")
             return
@@ -137,7 +138,7 @@ class RecordTab(TranslatableMixin, QWidget):
     def _on_playback_finished(self) -> None:
         self.sync_with_engine()
 
-    def _save_record(self):
+    def _save_record(self) -> None:
         try:
             if not self._record_data:
                 QMessageBox.warning(self, "Warning", "No recorded data")
@@ -148,7 +149,7 @@ class RecordTab(TranslatableMixin, QWidget):
         except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
             QMessageBox.warning(self, "Error", str(error))
 
-    def _load_record(self):
+    def _load_record(self) -> None:
         try:
             path, _ = QFileDialog.getOpenFileName(self, _t("load_record"), "", _JSON_FILE_FILTER)
             if path:
@@ -156,7 +157,7 @@ class RecordTab(TranslatableMixin, QWidget):
         except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
             QMessageBox.warning(self, "Error", str(error))
 
-    def menu_actions(self) -> list[tuple[str, Callable]]:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         return [("start_record", self._start_record), ("stop_record", self._stop_record),
                 ("playback", self._playback_record), ("stop_playback", self._stop_playback),
                 ("save_record", self._save_record), ("load_record", self._load_record)]

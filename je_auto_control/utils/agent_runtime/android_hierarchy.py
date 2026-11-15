@@ -71,7 +71,7 @@ class AndroidHierarchyView:
         """Compare private source witnesses without publishing a reusable fingerprint of hidden values."""
         return hmac.compare_digest(self.signature, other.signature)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Return detached semantic readback without the raw source or any text-authority token."""
         return detached({'elements': self.elements, 'text': self.text,
                          'text_redacted': self.text_redacted, 'semantic_observation': True})
@@ -160,7 +160,7 @@ class _HierarchyBuilder:
         self.evidence, self.grants = evidence, grants
         self.stack: list[_Frame] = []
         self.seen: set[str] = set()
-        self.elements: list[dict] = []
+        self.elements: list[dict[str, Any]] = []
         self.count = 0
         self.root_seen = False
 
@@ -198,7 +198,7 @@ class _HierarchyBuilder:
         self.root_seen = True
         self.stack.append(_Frame(''))
 
-    def _element(self, attrs: dict, flags: dict, frame: _Frame, parent_visible: bool) -> None:
+    def _element(self, attrs: dict[str, str], flags: dict[str, bool], frame: _Frame, parent_visible: bool) -> None:
         bounds = _bounds(attrs['bounds'], self.evidence.size)
         frame.visible = _visible(parent_visible, flags, bounds)
         if frame.skipped:
@@ -213,14 +213,14 @@ class _HierarchyBuilder:
                     actionable=data['actionable'] and _point_allowed(self.evidence, bounds))
         self.elements.append(data)
 
-    def finish(self) -> list[dict]:
+    def finish(self) -> list[dict[str, Any]]:
         """Never accept missing grants, empty/multiple roots or unfinished XML state."""
         if self.stack or not self.root_seen or not self.elements or not self.grants.issubset(self.seen):
             raise AgentTaskError('Android hierarchy is incomplete or has stale text grants')
         return self.elements
 
 
-def _node_frame(parent: _Frame, attrs: dict, flags: dict, package: str) -> _Frame:
+def _node_frame(parent: _Frame, attrs: dict[str, str], flags: dict[str, bool], package: str) -> _Frame:
     index = attrs['index']
     if index in parent.indices or (not parent.path and index != '0'):
         raise AgentTaskError('Android hierarchy sibling index is ambiguous')
@@ -231,11 +231,11 @@ def _node_frame(parent: _Frame, attrs: dict, flags: dict, package: str) -> _Fram
                   or attrs['class'] == 'android.widget.EditText', parent.enabled and flags['enabled'])
 
 
-def _visible(parent: bool, flags: dict, bounds: list[int]) -> bool:
+def _visible(parent: bool, flags: dict[str, bool], bounds: list[int]) -> bool:
     return parent and flags.get('visible-to-user', True) and bounds[2] > 0 and bounds[3] > 0
 
 
-def _node_data(attrs: dict, flags: dict, frame: _Frame, grants: frozenset[str]) -> dict:
+def _node_data(attrs: dict[str, str], flags: dict[str, bool], frame: _Frame, grants: frozenset[str]) -> dict[str, Any]:
     name, text = '', ''
     reviewed = frame.path in grants and not frame.protected and frame.visible
     if reviewed:
@@ -248,7 +248,7 @@ def _node_data(attrs: dict, flags: dict, frame: _Frame, grants: frozenset[str]) 
             'text_redacted': not reviewed}
 
 
-def _attributes(attrs: dict) -> tuple[dict, dict[str, bool]]:
+def _attributes(attrs: dict[str, str]) -> tuple[dict[str, str], dict[str, bool]]:
     if _FIELDS - set(attrs) or set(attrs) - (_FIELDS | _OPTIONAL):
         raise AgentTaskError('Android hierarchy node attributes are unsupported')
     if any(len(value) > 512 for value in attrs.values()) or _INDEX.fullmatch(attrs['index']) is None:

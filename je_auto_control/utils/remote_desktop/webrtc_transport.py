@@ -14,7 +14,7 @@ import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple, TypedDict
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Sequence, Tuple, TypedDict, TypeVar
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -33,7 +33,7 @@ except ImportError as exc:  # pragma: no cover - optional dependency
     ) from exc
 
 try:
-    import mss  # type: ignore  # noqa: F401  # reason: annotations + install probe
+    import mss  # noqa: F401  # reason: annotations + install probe
 except ImportError as exc:  # pragma: no cover - mss is a base dep
     raise ImportError("mss is required for screen capture") from exc
 
@@ -51,6 +51,7 @@ _DEFAULT_STUN_SERVERS = (
     "stun:openrelay.metered.ca:80",
 )
 _ICE_GATHER_TIMEOUT_S = 8.0
+_T = TypeVar("_T")
 
 
 # Maps bandwidth preset names to (fps, jpeg-equivalent quality hint).
@@ -141,11 +142,11 @@ class _AsyncioBridge:
         asyncio.set_event_loop(loop)
         loop.run_forever()
 
-    def submit(self, coro) -> Future:
+    def submit(self, coro: Coroutine[Any, Any, _T]) -> Future[_T]:
         """Schedule a coroutine; returns ``concurrent.futures.Future``."""
         return asyncio.run_coroutine_threadsafe(coro, self.start())
 
-    def call_soon(self, callback, *args) -> None:
+    def call_soon(self, callback: Callable[..., object], *args: Any) -> None:
         """Schedule a sync callable from any thread."""
         self.start().call_soon_threadsafe(callback, *args)
 
@@ -207,11 +208,11 @@ def _get_cursor_position() -> Optional[Tuple[int, int]]:
                 return point.x, point.y
             return None
         if sys.platform == "darwin":
-            from Quartz import CGEventSourceGetMouseState  # type: ignore
+            from Quartz import CGEventSourceGetMouseState
             location = CGEventSourceGetMouseState(0)
             return int(location.x), int(location.y)
         try:
-            from Xlib import display as _xdisplay  # type: ignore
+            from Xlib import display as _xdisplay
             data = _xdisplay.Display().screen().root.query_pointer()._data
             return data["root_x"], data["root_y"]
         except ImportError:
@@ -240,7 +241,7 @@ def _draw_cursor_overlay(arr_bgr: "np.ndarray", x: int, y: int) -> None:
     region[core] = black
 
 
-def _resolve_monitor(sct: "mss.base.MSSBase", index: int) -> dict:
+def _resolve_monitor(sct: "mss.base.MSSBase", index: int) -> Dict[str, int]:
     monitors = sct.monitors
     if not monitors:
         raise RuntimeError("mss reported no monitors")
@@ -249,7 +250,7 @@ def _resolve_monitor(sct: "mss.base.MSSBase", index: int) -> dict:
     return monitors[index]
 
 
-def _capture_frame(monitor: dict) -> "np.ndarray":
+def _capture_frame(monitor: Dict[str, int]) -> "np.ndarray":
     sct = getattr(_capture_local, "sct", None)
     if sct is None:
         sct = mss_grabber()
@@ -275,7 +276,7 @@ class ScreenVideoTrack(VideoStreamTrack):
         self._period = 1.0 / self._fps
         self._region = region
         self._show_cursor = show_cursor
-        self._monitor: Optional[dict] = None
+        self._monitor: Optional[Dict[str, int]] = None
         # The last resolved monitor's corner, kept across set_target_monitor
         # so input in between still maps somewhere sensible.
         self._origin: Tuple[int, int] = (
@@ -317,7 +318,7 @@ class ScreenVideoTrack(VideoStreamTrack):
         self._monitor_index = int(index)
         self._monitor = None  # invalidate cache
 
-    def _resolve(self) -> dict:
+    def _resolve(self) -> Dict[str, int]:
         if self._monitor is not None:
             return self._monitor
         if self._region is not None:
@@ -349,7 +350,7 @@ class ScreenVideoTrack(VideoStreamTrack):
         self._last_pts = pts
         return pts, fractions.Fraction(1, VIDEO_CLOCK_RATE)
 
-    async def recv(self):
+    async def recv(self) -> av.VideoFrame:
         if self._last_emit is None:
             self._last_emit = time.monotonic()
         else:
@@ -391,7 +392,7 @@ async def wait_for_ice_gathering(
     """Block until the PeerConnection has gathered all local ICE candidates."""
     if pc.iceGatheringState == "complete":
         return
-    future: asyncio.Future = asyncio.get_running_loop().create_future()
+    future: asyncio.Future[None] = asyncio.get_running_loop().create_future()
 
     @pc.on("icegatheringstatechange")
     def _on_change() -> None:

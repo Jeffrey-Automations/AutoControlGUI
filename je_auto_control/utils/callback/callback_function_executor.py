@@ -64,9 +64,9 @@ class CallbackFunctionExecutor:
     - 執行後可呼叫 callback_function
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # 事件字典，對應字串名稱到實際函式
-        self.event_dict: dict = {
+        self.event_dict: dict[str, Callable[..., Any]] = {
             # mouse 滑鼠相關
             **MOUSE_BUTTON_COMMANDS,
             "AC_click_mouse": click_mouse,
@@ -144,10 +144,10 @@ class CallbackFunctionExecutor:
     def callback_function(
             self,
             trigger_function_name: str,
-            callback_function: Callable,
-            callback_function_param: dict | None = None,
+            callback_function: Callable[..., Any],
+            callback_function_param: dict[str, Any] | None = None,
             callback_param_method: str = "kwargs",
-            **kwargs
+            **kwargs: Any
     ) -> Any:
         """
         Execute trigger and callback with one run-local diagnostic mask
@@ -197,8 +197,9 @@ class CallbackFunctionExecutor:
         return execute_return_value
 
     @staticmethod
-    def _invoke_callback(callback_function: Callable,
-                         callback_function_param: dict | None,
+    def _invoke_callback(callback_function: Callable[..., Any],
+                         callback_function_param: dict[str, Any] | None,
+
                          callback_param_method: str) -> None:
         """Invoke ``callback_function`` with the configured parameter passing."""
         if callback_function_param is None:

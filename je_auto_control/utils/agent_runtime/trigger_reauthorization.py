@@ -22,7 +22,7 @@ from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 OPERATIONS = ("review_authorization", "create_authorized")
 
 
-def authorization_metadata(connection: Any, identifier: str) -> dict:
+def authorization_metadata(connection: Any, identifier: str) -> dict[str, Any]:
     """Expose only an authorized binding's lineage proof and durable replacement identity."""
     result = {}
     row = connection.execute("SELECT details,source_trigger FROM agent_trigger_authorizations WHERE trigger_id=?",
@@ -36,7 +36,7 @@ def authorization_metadata(connection: Any, identifier: str) -> dict:
     return result
 
 
-def _snapshot(connection: Any, source: dict) -> tuple[str, int]:
+def _snapshot(connection: Any, source: dict[str, Any]) -> tuple[str, int]:
     live = connection.execute("SELECT * FROM agent_triggers WHERE id=?", (source["id"],)).fetchone()
     if live is None:
         raise AgentTaskError("trigger snapshot changed; review authorization again")
@@ -51,7 +51,7 @@ class TriggerReauthorization:
     def __init__(self, triggers: Any) -> None:
         self.triggers = triggers
 
-    def control(self, operation: str, request: dict) -> dict:
+    def control(self, operation: str, request: dict[str, Any]) -> dict[str, Any]:
         """Require current owner/operator review; old tasks and native input ownership are never resumed."""
         fields = {"trigger_id"}
         if operation == "create_authorized":
@@ -67,7 +67,7 @@ class TriggerReauthorization:
                 return self._review(source)
             return self._create(source, request)
 
-    def _review(self, source: dict) -> dict:
+    def _review(self, source: dict[str, Any]) -> dict[str, Any]:
         runtime = self.triggers.runtime
         with runtime.store.connection() as connection:
             metadata = authorization_metadata(connection, source["id"])
@@ -77,7 +77,7 @@ class TriggerReauthorization:
                     "spec": None, "issues": ["already_reauthorized"], "approval_required": False}
         authorization = prepare_authorization(AgentTaskSpec.from_dict(source["spec"]), snapshot)
         template = self._template(source, authorization)
-        reviewed: dict | None = None
+        reviewed: dict[str, Any] | None = None
         issues = []
         try:
             # pylint: disable-next=protected-access  # reason: renewal cannot advertise a template outside current scope
@@ -93,12 +93,12 @@ class TriggerReauthorization:
                 "approval_required": True, "activation": "future_events"}
 
     @staticmethod
-    def _template(source: dict, authorization: dict) -> dict:
+    def _template(source: dict[str, Any], authorization: dict[str, Any]) -> dict[str, Any]:
         template = authorized_template(source["spec"], authorization)
         template["actions"] = source["spec"]["actions"]
         return template
 
-    def _create(self, source: dict, request: dict) -> dict:
+    def _create(self, source: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
         runtime = self.triggers.runtime
         note = request["note"]
         if not isinstance(note, str) or not note.strip() or len(note) > 4000:
@@ -117,7 +117,8 @@ class TriggerReauthorization:
         with DeferredAuthorization(owner).scope():
             return self._insert(source, request, spec, config, details)
 
-    def _insert(self, source: dict, request: dict, spec: AgentTaskSpec, config: dict, details: dict) -> dict:
+    def _insert(self, source: dict[str, Any], request: dict[str, Any], spec: AgentTaskSpec, config: dict[str, Any],
+                details: dict[str, Any]) -> dict[str, Any]:
         with self.triggers.runtime.store.connection(write=True) as connection:
             previous = connection.execute("SELECT * FROM agent_trigger_authorizations WHERE source_trigger=?",
                                           (source["id"],)).fetchone()
@@ -137,7 +138,7 @@ class TriggerReauthorization:
                 "kind": source["kind"], "reauthorization": details}
 
     @staticmethod
-    def _existing(connection: Any, previous: Any, request: dict, spec_hash: str) -> dict:
+    def _existing(connection: Any, previous: Any, request: dict[str, Any], spec_hash: str) -> dict[str, Any]:
         details = json.loads(previous["details"])
         if (previous["snapshot"] != request["snapshot"] or previous["spec_hash"] != spec_hash
                 or details["review"] != request["authorization_review"]):
