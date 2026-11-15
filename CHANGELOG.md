@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- The `gui` extra pins PySide6 6.12.0 again on Python 3.12 and later (it was held at 6.11.2
+  because the test process crashed at interpreter exit under 6.12; the cause, tabs kept alive
+  by slots holding themselves, was fixed in U-20261114-44). Python 3.11 keeps 6.11.2: under
+  6.12.0 its CI squares still abort (a `None` refcount underflow, harmless where `None` is
+  immortal). Dependabot no longer ignores 6.12.0.
+
 - GUI: no tab keeps itself alive any more. Lambdas over `self` connected to Qt signals -- one per
   Script Builder Add-step action (714), the Triggers tab's two Browse buttons, the step form's
   Browse and the one-time-values dialog's Copy -- and closures connected to `destroyed` that
