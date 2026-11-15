@@ -64,7 +64,7 @@ def current_origin() -> str | None:
     return ",".join(origins) if origins else None
 
 
-def origin_ceilings(retained: tuple[str, ...] | list[str] = ()) -> list[dict]:
+def origin_ceilings(retained: tuple[str, ...] | list[str] = ()) -> list[dict[str, Any]]:
     """Read retained and current live ceilings for non-task operations without granting task authority."""
     if not isinstance(retained, (tuple, list)) or len(retained) > 16:
         raise AgentTaskError('retained origin ceilings require at most sixteen policies')
@@ -164,7 +164,7 @@ def review_origin_policies(spec: AgentTaskSpec) -> dict[str, Any]:
     return {"source": list(source), "current": current, "retained": retained, "unavailable": unavailable}
 
 
-def _origin_record(identifier: str) -> dict:
+def _origin_record(identifier: str) -> dict[str, Any]:
     return {"id": identifier, "roots": _read(identifier)["roots"]}
 
 
@@ -177,7 +177,7 @@ def _identifiers(spec: AgentTaskSpec) -> tuple[str, ...]:
     return tuple(identifiers)
 
 
-def _read(identifier: str) -> dict:
+def _read(identifier: str) -> dict[str, Any]:
     path = _path(identifier)
     try:
         if path.is_symlink() or path.stat().st_size > 65536:

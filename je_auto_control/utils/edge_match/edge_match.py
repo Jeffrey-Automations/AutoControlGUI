@@ -25,12 +25,13 @@ ImageSource = Any
 _DEFAULT_CANNY = (50, 150)
 
 
-def _edges(gray, canny: Sequence[int]):
+def _edges(gray: Any, canny: Sequence[int]) -> Any:
     import cv2
     return cv2.Canny(gray, int(canny[0]), int(canny[1]))
 
 
-def _chamfer_score_map(template_gray, scene_gray, canny: Sequence[int]):
+def _chamfer_score_map(template_gray: Any, scene_gray: Any,
+                       canny: Sequence[int]) -> Tuple[Any, Tuple[int, int]]:
     """Return ``(score_map, (w, h))`` where higher = better edge alignment, or ``(None, _)``."""
     import cv2
     import numpy as np
@@ -48,7 +49,7 @@ def _chamfer_score_map(template_gray, scene_gray, canny: Sequence[int]):
     return score_map, (template_edges.shape[1], template_edges.shape[0])
 
 
-def _best(score_map, size: Tuple[int, int], scale: float, min_score: float,
+def _best(score_map: Any, size: Tuple[int, int], scale: float, min_score: float,
           current: Optional[Match]) -> Optional[Match]:
     import cv2
     _, max_val, _, max_loc = cv2.minMaxLoc(score_map)

@@ -10,7 +10,7 @@ module does not import it.
 import collections
 import json
 import threading
-from typing import TYPE_CHECKING, Deque, NoReturn, Optional
+from typing import TYPE_CHECKING, Deque, NoReturn, Optional, Any, Set, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
@@ -52,7 +52,7 @@ class _ClientHandler:
     _AUDIO_QUEUE_MAXLEN = 50  # ~2.5 s of buffered chunks at 50 ms each
 
     def __init__(self, host: "RemoteDesktopHost",
-                 channel: MessageChannel, address) -> None:
+                 channel: MessageChannel, address: Tuple[Any, ...]) -> None:
         self._host = host
         self._channel = channel
         self._address = address
@@ -71,14 +71,14 @@ class _ClientHandler:
         self.clipboard_guard = ClipboardEchoGuard()
         # Transfers this viewer began: aborted if it disconnects mid-file,
         # which used to leave the .part file and its open handle behind.
-        self._transfer_ids: set = set()
+        self._transfer_ids: Set[str] = set()
         # Phase 5.3: per-client permission set by the approval callback.
         # Default is full control so legacy callers (no callback) keep
         # the prior behaviour.
         self.permission = PERMISSION_FULL
 
     @property
-    def address(self):
+    def address(self) -> Tuple[Any, ...]:
         return self._address
 
     def start(self) -> None:

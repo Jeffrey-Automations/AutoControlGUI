@@ -43,7 +43,7 @@ def plan_actions(description: str,
                  examples: Optional[List[Dict[str, Any]]] = None,
                  backend: Optional[LLMBackend] = None,
                  model: Optional[str] = None,
-                 max_tokens: int = 2048) -> List[list]:
+                 max_tokens: int = 2048) -> List[List[Any]]:
     """Translate ``description`` into a validated action list.
 
     ``examples`` is an optional list of ``{"description": ..., "actions": [...]}``
@@ -113,7 +113,7 @@ def _build_user_prompt(description: str,
     return "\n".join(parts)
 
 
-def _parse_actions(raw: str) -> List[list]:
+def _parse_actions(raw: str) -> List[List[Any]]:
     """Extract a JSON array from ``raw`` and ensure it's a list of lists."""
     if not raw or not raw.strip():
         raise LLMPlanError("LLM returned empty response")

@@ -11,7 +11,7 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
 
 
-def check_pointer(hwnd: int, event: dict) -> None:
+def check_pointer(hwnd: int, event: dict[str, Any]) -> None:
     """Require coordinates within the actual owned window; no desktop-wide fallback."""
     if sys.platform != "win32":
         raise AgentTaskError("window-scoped pointer geometry needs a platform adapter")
@@ -42,7 +42,7 @@ def _point_window(x: int, y: int) -> int | None:
     return int(user.GetAncestor(hit, 2) or 0) if hit else None  # GA_ROOT retains owned child controls.
 
 
-def check_window_arguments(arguments: dict, spec: AgentTaskSpec | None) -> None:
+def check_window_arguments(arguments: dict[str, Any], spec: AgentTaskSpec | None) -> None:
     """Reject ambiguous or foreign explicit window selections before native dispatch."""
     from je_auto_control.wrapper.auto_control_window import list_windows, window_process_id
     for name in ("title", "title_substring", "window_title"):

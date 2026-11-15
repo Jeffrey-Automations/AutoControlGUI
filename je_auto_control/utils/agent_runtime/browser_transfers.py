@@ -56,7 +56,7 @@ def _same_file(path: Path, opened: os.stat_result) -> None:
         raise AgentTaskError("browser upload file identity changed")
 
 
-def sdk_transfer(session: Any, operation: str, arguments: dict) -> Any:
+def sdk_transfer(session: Any, operation: str, arguments: dict[str, Any]) -> Any:
     """Use only the SDK transfer contract; no browser engine or ambient HTTP client is imported."""
     if operation == "link":
         url = session.link(arguments["selector"], arguments["frame"])
@@ -85,10 +85,10 @@ def sdk_transfer(session: Any, operation: str, arguments: dict) -> Any:
     return metadata
 
 
-def _receive_download(session: Any, url: str, path: Path, expected: str) -> dict:
+def _receive_download(session: Any, url: str, path: Path, expected: str) -> dict[str, Any]:
     # Keep host authority/cancellation errors out of the foreign SDK's broad context-manager containment.
     failure: BaseException | None = None
-    result: dict = {}
+    result: dict[str, Any] = {}
     try:
         with session.open_download(url) as response:
             try:

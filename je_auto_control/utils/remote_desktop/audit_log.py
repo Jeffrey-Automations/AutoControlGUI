@@ -24,7 +24,7 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -236,7 +236,7 @@ class AuditLog:
     def query(self, *,
               event_type: Optional[str] = None,
               host_id: Optional[str] = None,
-              limit: int = 500) -> List[dict]:
+              limit: int = 500) -> List[Dict[str, Any]]:
         sql, args = _build_query_sql(
             event_type=event_type, host_id=host_id, limit=int(limit),
         )
@@ -324,7 +324,7 @@ _QUERY_SQL = (
 
 
 def _build_query_sql(*, event_type: Optional[str], host_id: Optional[str],
-                     limit: int) -> Tuple[str, list]:
+                     limit: int) -> Tuple[str, List[Any]]:
     """Return a static SQL string + bound args for an audit-log query.
 
     The SQL is a single fixed template; optional filters are toggled
@@ -332,7 +332,7 @@ def _build_query_sql(*, event_type: Optional[str], host_id: Optional[str],
     literal-only means there is no string concatenation for static
     analysers to mistake for SQL injection.
     """
-    args: list = [event_type, event_type, host_id, host_id, int(limit)]
+    args: List[Any] = [event_type, event_type, host_id, host_id, int(limit)]
     return _QUERY_SQL, args
 
 

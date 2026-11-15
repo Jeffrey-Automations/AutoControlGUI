@@ -349,7 +349,7 @@ class OwnerServiceChannel:
         raise TimeoutError
 
     def _receive(self, request_id: str, deadline: float, check: Callable[[], None],
-                 on_event: Callable[[dict], None] | None, operation: str) -> Any:
+                 on_event: Callable[[dict[str, Any]], None] | None, operation: str) -> Any:
         try:
             while True:
                 message = self._next_line(deadline, check)
@@ -373,7 +373,7 @@ class OwnerServiceChannel:
 
     def request(self, operation: str, payload: Any, *, timeout: float,
                 check: Callable[[], None] = cancellation_checkpoint,
-                on_event: Callable[[dict], None] | None = None) -> Any:
+                on_event: Callable[[dict[str, Any]], None] | None = None) -> Any:
         """Validate one proposal, wait within its deadline, and retire the helper on every failed operation."""
         positive(timeout, "native deadline", 3600)
         deadline = time.monotonic() + timeout

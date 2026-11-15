@@ -31,7 +31,7 @@ class PresenceProtocol:
         live = {'monitoring', 'waiting_idle', 'locked'}
         return 'lease_lost' if isinstance(status, dict) and status.get('state') in live else 'source_lost'
 
-    def _operation(self, operation: str, body: dict) -> dict:
+    def _operation(self, operation: str, body: dict[str, Any]) -> dict[str, Any]:
         if operation == 'release':
             if self._issued.get(body['lease_id']) != body['generation']:
                 raise AgentTaskError('physical presence token is not owned by this connection')
@@ -40,7 +40,7 @@ class PresenceProtocol:
             return {'released': True}
         return self._source.request(operation, body)
 
-    def request(self, value: dict) -> dict:
+    def request(self, value: dict[str, Any]) -> dict[str, Any]:
         """Dispatch one sequential closed request, returning expected gate outcomes as normal data."""
         with self._mutex:
             if self._closed:

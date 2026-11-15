@@ -36,7 +36,7 @@ _FORMAT_PRESETS = {
 }
 
 
-def preset_for_path(path) -> dict:
+def preset_for_path(path: str | Path) -> dict[str, str]:
     """Return codec defaults for a path's extension, or empty dict."""
     suffix = str(path).rsplit(".", 1)[-1].lower()
     return _FORMAT_PRESETS.get(suffix, {})
@@ -63,7 +63,7 @@ class SessionRecorder:
         self._close_attempted = False
         self._failures: tuple[str, ...] = ()
 
-    def _open(self, frame) -> Tuple[
+    def _open(self, frame: av.VideoFrame) -> Tuple[
         "av.container.OutputContainer", "av.video.stream.VideoStream",
     ]:
         """Return the open (container, stream) pair, creating it on first use."""
@@ -91,7 +91,7 @@ class SessionRecorder:
         )
         return container, stream
 
-    def write_frame(self, frame) -> None:
+    def write_frame(self, frame: av.VideoFrame) -> None:
         """Encode one ``av.VideoFrame``; lazy-init the container."""
         if self._closed:
             return

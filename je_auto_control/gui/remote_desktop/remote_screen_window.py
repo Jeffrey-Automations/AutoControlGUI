@@ -17,8 +17,8 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QImage
-from PySide6.QtWidgets import QDialog, QLabel, QProgressBar, QVBoxLayout
+from PySide6.QtGui import QCloseEvent, QImage
+from PySide6.QtWidgets import QDialog, QLabel, QProgressBar, QVBoxLayout, QWidget
 
 from je_auto_control.gui.remote_desktop._helpers import _t
 from je_auto_control.gui.remote_desktop.frame_display import _FrameDisplay
@@ -39,7 +39,7 @@ class RemoteScreenWindow(QDialog):
     annotation_event = Signal(str, int, int)
     closed = Signal()
 
-    def __init__(self, title: str, parent=None) -> None:
+    def __init__(self, title: str, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
         # Modeless: the operator can keep poking the control panel while
@@ -127,12 +127,12 @@ class RemoteScreenWindow(QDialog):
 
     # --- close handling --------------------------------------------------
 
-    def closeEvent(self, event) -> None:  # noqa: N802 Qt override
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 Qt override
         self.closed.emit()
         super().closeEvent(event)
 
 
-def make_remote_screen_window(parent=None) -> RemoteScreenWindow:
+def make_remote_screen_window(parent: Optional[QWidget] = None) -> RemoteScreenWindow:
     """Factory that picks a sensible default title from the i18n table."""
     return RemoteScreenWindow(_t("rd_remote_screen_title"), parent=parent)
 

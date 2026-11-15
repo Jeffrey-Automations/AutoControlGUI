@@ -11,7 +11,7 @@ from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 class DagServiceClient:
     """Never consult a process-global connection file for a service's local managed destinations."""
 
-    def __init__(self, runtime: Any, delivery: dict) -> None:
+    def __init__(self, runtime: Any, delivery: dict[str, Any]) -> None:
         self.runtime, self.started = runtime, delivery["started"]
         self.owner = DeferredAuthorization(AuthorizationContext(**delivery["owner"]) if delivery["owner"] else None)
         self.actor = DeferredAuthorization(AuthorizationContext(**delivery["actor"]) if delivery["actor"] else None)
@@ -24,7 +24,7 @@ class DagServiceClient:
         if row is None or row["state"] != "running" or row["attempt"] != self.started["attempt"]:
             raise AgentTaskError("background DAG attempt is inactive")
 
-    def call(self, operation: str, body: dict | None = None, *, timeout: float = 30) -> dict:
+    def call(self, operation: str, body: dict[str, Any] | None = None, *, timeout: float = 30) -> dict[str, Any]:
         """Use only the closed coordinator protocol on this owning runtime."""
         del timeout
         if operation != "dag" or not isinstance(body, dict) or set(body) != {"operation", "request"}:
@@ -33,7 +33,7 @@ class DagServiceClient:
         with self.actor.scope():
             return self.runtime.batches.control(body["operation"], body["request"])
 
-    def task_call(self, operation: str, body: dict, timeout: float) -> dict:
+    def task_call(self, operation: str, body: dict[str, Any], timeout: float) -> dict[str, Any]:
         """Route finite destination operations locally; owned pause remains available for retirement."""
         del timeout
         if operation not in {"submit", "get", "lookup", "pause"}:

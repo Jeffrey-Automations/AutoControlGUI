@@ -8,7 +8,7 @@ hides that distinction so the rest of the codebase deals with
 """
 import socket
 import threading
-from typing import Tuple
+from typing import Optional, Tuple
 
 from je_auto_control.utils.remote_desktop.protocol import (
     HEADER_SIZE, MessageType, ProtocolError,
@@ -30,7 +30,7 @@ class MessageChannel:
     def read_typed(self) -> Tuple[MessageType, bytes]:
         raise NotImplementedError
 
-    def settimeout(self, timeout) -> None:
+    def settimeout(self, timeout: Optional[float]) -> None:
         raise NotImplementedError
 
     def close(self) -> None:
@@ -52,7 +52,7 @@ class TcpMessageChannel(MessageChannel):
     def read_typed(self) -> Tuple[MessageType, bytes]:
         return read_message(self._sock)
 
-    def settimeout(self, timeout) -> None:
+    def settimeout(self, timeout: Optional[float]) -> None:
         self._sock.settimeout(timeout)
 
     def close(self) -> None:
@@ -104,7 +104,7 @@ class WsMessageChannel(MessageChannel):
             )
         return msg_type, body
 
-    def settimeout(self, timeout) -> None:
+    def settimeout(self, timeout: Optional[float]) -> None:
         self._sock.settimeout(timeout)
 
     def close(self) -> None:

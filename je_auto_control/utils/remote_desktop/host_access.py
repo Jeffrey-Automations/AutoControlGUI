@@ -9,7 +9,7 @@ in either.
 """
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, Iterator, List, Optional, Sequence, Tuple
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -26,7 +26,7 @@ class PendingViewer:
     * ``"view_only"``             → admit, but drop incoming INPUT messages
     * ``False`` / ``None`` / etc. → reject
     """
-    address: tuple
+    address: Tuple[Any, ...]
     host_id: str
     transport: str = "tcp"
 
@@ -52,7 +52,7 @@ def _interpret_approval(result: Any) -> str:
 
 _AUTH_TIMEOUT_S = 60.0
 
-def _candidate_totp_codes(secret: str):
+def _candidate_totp_codes(secret: str) -> Iterator[str]:
     """Yield TOTP codes within ±1 step of the current 30-second window."""
     from je_auto_control.utils.remote_desktop.totp import generate_code
     now = time.time()

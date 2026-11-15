@@ -6,7 +6,7 @@ whole duration and the video check decodes the file, so both run off the GUI
 thread, one at a time.
 """
 import functools
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtWidgets import (
     QCheckBox, QDoubleSpinBox, QFileDialog, QLabel, QLineEdit,
@@ -28,12 +28,12 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _check_audio(options: dict) -> Any:
+def _check_audio(options: dict[str, Any]) -> Any:
     """Worker thread: record and measure."""
     return ac.assert_audio_activity(raise_on_fail=False, **options)
 
 
-def _check_video(path: str, options: dict) -> Any:
+def _check_video(path: str, options: dict[str, Any]) -> Any:
     """Worker thread: decode the file and measure."""
     return ac.assert_video_changes(path, raise_on_fail=False, **options)
 
@@ -94,7 +94,7 @@ class MediaChecksTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("media_audio_run", self._on_audio),

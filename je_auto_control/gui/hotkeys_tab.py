@@ -1,7 +1,8 @@
 """Hotkeys tab: bind global hotkeys to action JSON files."""
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
     QFileDialog, QFormLayout, QLabel, QLineEdit, QMessageBox,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
@@ -55,7 +56,7 @@ class HotkeysTab(TranslatableMixin, QWidget):
         set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("browse", self._browse),
@@ -78,7 +79,7 @@ class HotkeysTab(TranslatableMixin, QWidget):
             self._timer.stop()
         self._apply_status_label()
 
-    def showEvent(self, event) -> None:  # noqa: N802  # reason: Qt override
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802  # reason: Qt override
         """Catch up with an engine started or stopped elsewhere while hidden."""
         super().showEvent(event)
         self.sync_with_engine()

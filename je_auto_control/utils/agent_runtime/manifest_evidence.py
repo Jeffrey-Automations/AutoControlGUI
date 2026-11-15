@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.policy import TaskPolicy
 
 
-def manifest_matches(clause: Mapping, policy: TaskPolicy) -> bool:
+def manifest_matches(clause: Mapping[str, Any], policy: TaskPolicy) -> bool:
     """Require exact reviewed filenames, paths, sizes and current content digests, within read bounds."""
     manifest = Path(policy.path(clause["path"]))
     if not manifest.is_file():
@@ -25,7 +25,7 @@ def manifest_matches(clause: Mapping, policy: TaskPolicy) -> bool:
     return _files_match(entries, names, clause, policy)
 
 
-def _files_match(entries: list, names: list[str], clause: Mapping, policy: TaskPolicy) -> bool:
+def _files_match(entries: list[Any], names: list[str], clause: Mapping[str, Any], policy: TaskPolicy) -> bool:
     from je_auto_control.utils.agent_runtime.workflow_files import _destination, _entry
     total = 0
     for name, entry in zip(names, entries):
@@ -40,7 +40,7 @@ def _files_match(entries: list, names: list[str], clause: Mapping, policy: TaskP
     return True
 
 
-def validate_manifest_clause(clause: Mapping) -> None:
+def validate_manifest_clause(clause: Mapping[str, Any]) -> None:
     """Reject incomplete or duplicate manifest filename contracts before executing a task."""
     names = clause.get("names")
     if not isinstance(names, (tuple, list)) or not 1 <= len(names) <= 500:

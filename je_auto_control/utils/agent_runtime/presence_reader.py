@@ -48,8 +48,8 @@ class _Lifetime:
 class PresenceReader:
     """One permanent lease binding; only its private I/O owner touches blocking native resources."""
 
-    def __init__(self, binding: dict, takeover: Callable[[], None], *, pipe: Any = None,
-                 security: Any = None, endpoint: dict | None = None) -> None:
+    def __init__(self, binding: dict[str, Any], takeover: Callable[[], None], *, pipe: Any = None,
+                 security: Any = None, endpoint: dict[str, Any] | None = None) -> None:
         self._binding = presence_body('check', binding)
         self._takeover = takeover
         if pipe is None:

@@ -14,6 +14,8 @@ Public surface::
     summary = summarise_llm_costs()
     print(summary.total_usd, summary.by_model)
 """
+from typing import Iterable, Optional
+
 from je_auto_control.utils.cost_telemetry.pricing import (
     Pricing, estimate_usd as estimate_llm_usd, known_models, pricing_for,
 )
@@ -22,7 +24,7 @@ from je_auto_control.utils.cost_telemetry.store import (
 )
 
 
-def summarise_llm_costs(events=None) -> CostSummary:
+def summarise_llm_costs(events: Optional[Iterable[CostEvent]] = None) -> CostSummary:
     """Summarise ``events``, or ``default_cost_store``'s recorded calls when omitted.
 
     It was an alias of ``summarise_events(events)``, whose argument is
@@ -33,7 +35,8 @@ def summarise_llm_costs(events=None) -> CostSummary:
 
 def record_llm_call(*, provider: str, model: str,
                     input_tokens: int, output_tokens: int,
-                    label=None, run_id=None, user=None) -> CostEvent:
+                    label: Optional[str] = None, run_id: Optional[str] = None,
+                    user: Optional[str] = None) -> CostEvent:
     """Convenience wrapper around ``default_cost_store.record``."""
     return default_cost_store.record(
         provider=provider, model=model,

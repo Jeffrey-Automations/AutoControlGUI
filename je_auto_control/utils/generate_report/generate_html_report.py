@@ -1,5 +1,6 @@
 import html
 from threading import Lock
+from typing import Any, Dict
 
 from je_auto_control.utils.exception.exception_tags import html_generate_no_data_tag_error_message
 from je_auto_control.utils.exception.exceptions import AutoControlHTMLException
@@ -99,7 +100,7 @@ _event_table = r"""
 """.strip()
 
 
-def make_html_table(event_str: str, record_data: dict, table_head: str) -> str:
+def make_html_table(event_str: str, record_data: Dict[str, Any], table_head: str) -> str:
     """
     建立單一事件的 HTML 表格
     Create HTML table for a single event
@@ -116,7 +117,7 @@ def make_html_table(event_str: str, record_data: dict, table_head: str) -> str:
     return event_str + _event_html(record_data, table_head)
 
 
-def _event_html(record_data: dict, table_head: str) -> str:
+def _event_html(record_data: Dict[str, Any], table_head: str) -> str:
     """One event's table, its recorded values escaped."""
     return _event_table.format(
         table_head_class=table_head,

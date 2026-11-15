@@ -1,5 +1,5 @@
 """WebRTC inspector tab: live summary + recent stat samples."""
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
@@ -35,7 +35,7 @@ class InspectorTab(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         self._summary_label = QLabel()
-        self._metric_labels: dict = {}
+        self._metric_labels: dict[str, QLabel] = {}
         self._table = QTableWidget(0, 6)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setSectionResizeMode(
@@ -67,7 +67,7 @@ class InspectorTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("inspector_refresh", self._refresh),
@@ -120,7 +120,7 @@ class InspectorTab(TranslatableMixin, QWidget):
         self._refresh()
 
 
-def _format_metric_row(stats: dict) -> str:
+def _format_metric_row(stats: dict[str, Optional[float]]) -> str:
     if not stats or stats.get("last") is None:
         return "-"
     return (f"last={stats['last']:.2f} "

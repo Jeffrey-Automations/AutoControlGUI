@@ -6,6 +6,7 @@ to allocate gigabyte buffers. Helpers here only deal with bytes — auth
 and high-level semantics live in :mod:`auth`, :mod:`host`, :mod:`viewer`.
 """
 import enum
+import socket
 import struct
 from typing import Tuple
 
@@ -77,7 +78,7 @@ def decode_frame_header(header: bytes) -> Tuple[MessageType, int]:
         raise ProtocolError(f"unknown message type 0x{type_byte:02x}") from error
 
 
-def read_exact(sock, length: int) -> bytes:
+def read_exact(sock: socket.socket, length: int) -> bytes:
     """Read exactly ``length`` bytes from ``sock`` or raise ConnectionError."""
     chunks = []
     remaining = length
@@ -90,7 +91,7 @@ def read_exact(sock, length: int) -> bytes:
     return b"".join(chunks)
 
 
-def read_message(sock) -> Tuple[MessageType, bytes]:
+def read_message(sock: socket.socket) -> Tuple[MessageType, bytes]:
     """Read one full ``(type, payload)`` message from ``sock``."""
     header = read_exact(sock, HEADER_SIZE)
     msg_type, length = decode_frame_header(header)

@@ -4,7 +4,7 @@ Fire a template-first / VLM-fallback locate from the GUI and browse the
 audit log, or compare explicit versions on provided PNG samples without device effects.
 """
 import json
-from typing import Optional
+from typing import Callable, Optional, Sequence
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent
@@ -126,7 +126,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         form.addRow(QLabel(), self._click_check)
         return group
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("self_heal_browse", self._on_browse_template),
@@ -177,7 +177,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         if path:
             self._template_input.setText(path)
 
-    def _collect_inputs(self):
+    def _collect_inputs(self) -> Optional[tuple[Optional[str], Optional[str], float, Optional[list[int]]]]:
         template = self._template_input.text().strip() or None
         description = self._description_input.text().strip() or None
         if template is None and description is None:
@@ -284,7 +284,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         super().closeEvent(event)
 
 
-def _format_coordinates(coords) -> str:
+def _format_coordinates(coords: Optional[Sequence[int]]) -> str:
     if coords is None:
         return ""
     return f"({coords[0]}, {coords[1]})"

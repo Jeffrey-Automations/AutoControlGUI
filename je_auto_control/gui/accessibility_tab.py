@@ -6,7 +6,7 @@ includes this window, which can only answer while its own thread is free. The
 backend gives each thread its own automation object, so the worker is safe.
 """
 import functools
-from typing import List, Optional
+from typing import Any, Callable, List, Optional, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -92,7 +92,7 @@ class AccessibilityTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def _start(self, tag: str, work) -> None:
+    def _start(self, tag: str, work: Callable[[], Any]) -> None:
         """Run ``work`` off the GUI thread as the command ``tag``; say so, or that one is still running."""
         self._task.start(work, tag=tag)     # False while busy: the status below is true either way
         self._status.setText(_t("task_running"))
@@ -128,7 +128,7 @@ class AccessibilityTab(TranslatableMixin, QWidget):
         set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("a11y_refresh", self._refresh),
@@ -168,7 +168,7 @@ class AccessibilityTab(TranslatableMixin, QWidget):
         elif tag == _CLICK and isinstance(error, AccessibilityNotAvailableError):
             QMessageBox.warning(self, _t("a11y_click_selected"), str(error))
 
-    def _populate(self, elements) -> None:
+    def _populate(self, elements: List[AccessibilityElement]) -> None:
         self._table.setRowCount(len(elements))
         for row, element in enumerate(elements):
             values = (

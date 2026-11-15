@@ -89,7 +89,7 @@ class AgentObservationView(QWidget):
         if isinstance(image, dict):
             self._present_image(image)
 
-    def _present_elements(self, elements: list) -> None:
+    def _present_elements(self, elements: list[Any]) -> None:
         for index, element in enumerate(elements):
             if not isinstance(element, dict) or element.get("index", index) != index:
                 raise AgentTaskError("observation preview element index is ambiguous")
@@ -101,7 +101,7 @@ class AgentObservationView(QWidget):
                     value = {"selector": element["selector"], "frame": element.get("frame", "")}
                 self._elements.setItem(index, column, QTableWidgetItem(str(value)))
 
-    def _present_image(self, image: dict) -> None:
+    def _present_image(self, image: dict[str, Any]) -> None:
         try:
             pixels = observation_image_bytes(image)
             pixmap = QPixmap()

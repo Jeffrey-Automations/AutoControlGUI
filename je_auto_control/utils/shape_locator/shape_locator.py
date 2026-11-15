@@ -24,7 +24,7 @@ _CANNY_LOW = 50
 _CANNY_HIGH = 150
 
 
-def _contours(gray):
+def _contours(gray: Any) -> Any:
     """Canny edges (dilated to close gaps) -> external contours, version-agnostic."""
     import cv2
     edges = cv2.Canny(gray, _CANNY_LOW, _CANNY_HIGH)
@@ -34,7 +34,7 @@ def _contours(gray):
     return found[0] if len(found) == 2 else found[1]
 
 
-def _box(contour) -> Dict[str, Any]:
+def _box(contour: Any) -> Dict[str, Any]:
     """Bounding box of one contour as ``{x,y,width,height,area,center,aspect}``."""
     import cv2
     x, y, width, height = cv2.boundingRect(contour)
@@ -57,7 +57,7 @@ def _passes(box: Dict[str, Any], min_area: int, max_area: Optional[int],
     return True
 
 
-def _is_rectangle(contour, epsilon: float) -> bool:
+def _is_rectangle(contour: Any, epsilon: float) -> bool:
     """True when the contour approximates to a convex 4-gon (a rectangle)."""
     import cv2
     perimeter = cv2.arcLength(contour, True)

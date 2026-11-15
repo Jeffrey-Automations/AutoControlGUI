@@ -17,7 +17,7 @@ from je_auto_control.utils.work_queue.work_queue import WorkQueue
 _ERRORS = (AutoControlException, OSError, RuntimeError, TypeError, ValueError, LookupError)
 
 
-def fence_delivery(runtime: Any, started: dict) -> None:
+def fence_delivery(runtime: Any, started: dict[str, Any]) -> None:
     """Retire only this delivery's scheduling attempt, preserving all node delivery evidence."""
     # pylint: disable-next=protected-access  # reason: serialize internal retirement with public batch transitions
     with runtime._lock("dag:" + started["batch_id"]), runtime.store.connection(write=True) as connection:
@@ -46,7 +46,7 @@ class BackgroundDags:
         with self._lock:
             self._enabled = True
 
-    def enqueue(self, started: dict, owner: dict, actor: DeferredAuthorization) -> None:
+    def enqueue(self, started: dict[str, Any], owner: dict[str, Any], actor: DeferredAuthorization) -> None:
         """Persist one already-authorized attempt; never reset a previous delivery or node claim."""
         data = {"started": started, "owner": owner,
                 "actor": asdict(actor.context) if actor.context is not None else {}}
@@ -130,7 +130,7 @@ class BackgroundDags:
                                ("service stopped; explicit DAG review required", time.time()))
 
 
-def delivery_status(runtime: Any, batch_id: str) -> dict | None:
+def delivery_status(runtime: Any, batch_id: str) -> dict[str, Any] | None:
     """Publish bounded delivery state, withholding stored authority and coordination capabilities."""
     with runtime.store.connection() as connection:
         if connection.execute("SELECT 1 FROM sqlite_master WHERE name='work_items'").fetchone() is None:

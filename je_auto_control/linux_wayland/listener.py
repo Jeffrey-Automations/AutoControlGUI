@@ -17,8 +17,10 @@ that starts when a script asks.
 """
 from __future__ import annotations
 
+from typing import Any, NoReturn
 
-def check_key_press(*_args, **_kwargs):
+
+def check_key_press(*_args: Any, **_kwargs: Any) -> NoReturn:
     """Wayland clients cannot read the global key state. Raise explicitly."""
     raise NotImplementedError(
         "Wayland forbids global key-state queries from unprivileged "
@@ -30,7 +32,7 @@ def check_key_press(*_args, **_kwargs):
     )
 
 
-def hook_keyboard(*_args, **_kwargs):
+def hook_keyboard(*_args: Any, **_kwargs: Any) -> NoReturn:
     """Wayland clients cannot install a global key hook."""
     raise NotImplementedError(
         "Wayland forbids global key hooks. See check_key_press for "

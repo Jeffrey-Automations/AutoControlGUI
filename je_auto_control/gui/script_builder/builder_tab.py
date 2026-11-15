@@ -15,7 +15,7 @@ it had issued by then.
 import functools
 from contextlib import nullcontext
 import json
-from typing import Callable, ContextManager, List, Optional, Sequence
+from typing import Any, Callable, ContextManager, Dict, List, Optional, Sequence
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent
@@ -55,7 +55,7 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _run_actions(actions: list, collector: OneTimeCollector,
+def _run_actions(actions: List[Any], collector: OneTimeCollector,
                  capture: Callable[[], ContextManager[object]] = nullcontext) -> object:
     """Worker thread: execute the built action list, reporting each result to ``collector``.
 
@@ -88,7 +88,7 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
         self._add_btn: Optional[QToolButton] = None
         # The other top-level keys of a loaded {"auto_control": [...]} file,
         # written back on Save; None for a bare list.
-        self._file_extras: Optional[dict] = None
+        self._file_extras: Optional[Dict[str, Any]] = None
         self._source_path = "<script-builder>"
         self._capture = ManualRunControls()
         # The secrets of the last run, until they are revealed or the next run starts.

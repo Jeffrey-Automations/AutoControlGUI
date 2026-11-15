@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
-from typing import Any, Callable, List, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
@@ -30,7 +30,7 @@ def is_webrunner_available() -> bool:
         return False
 
 
-def _executor():
+def _executor() -> Any:
     try:
         from je_web_runner.utils.executor.action_executor import executor
     except ImportError as exc:  # pragma: no cover - optional dep
@@ -38,7 +38,7 @@ def _executor():
     return executor
 
 
-def _execute_one() -> Optional[Callable[[list], Any]]:
+def _execute_one() -> Optional[Callable[[List[Any]], Any]]:
     """WebRunner's ``execute_one``, or None on a release that predates it."""
     try:
         from je_web_runner.utils.executor.action_executor import execute_one
@@ -47,7 +47,7 @@ def _execute_one() -> Optional[Callable[[list], Any]]:
     return execute_one
 
 
-def _call(name: str, callable_obj: Callable[..., Any], params: dict) -> Any:
+def _call(name: str, callable_obj: Callable[..., Any], params: Dict[str, Any]) -> Any:
     """Run the command through ``execute_one`` when WebRunner has it, else directly.
 
     ``execute_one`` applies WebRunner's command gates, retry policy and failure

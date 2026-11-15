@@ -1,5 +1,5 @@
 import sys
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 from ctypes import windll  # type: ignore[attr-defined]  # reason: win32-only ctypes
 from je_auto_control.utils.exception.exception_tags import windows_import_error_message
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -49,7 +49,7 @@ _XBUTTON2_HI: int = 0x0002
 
 # Map a button tuple to (down_msg, down_wparam, up_msg, up_wparam). The X
 # buttons pack the button id into the wParam high word, per WM_XBUTTON*.
-_WINDOW_MESSAGE_TABLE: dict = {
+_WINDOW_MESSAGE_TABLE: Dict[Tuple[int, int, int], Tuple[int, int, int, int]] = {
     win32_mouse_left: (WM_LBUTTONDOWN, MK_LBUTTON, WM_LBUTTONUP, 0),
     win32_mouse_right: (WM_RBUTTONDOWN, MK_RBUTTON, WM_RBUTTONUP, 0),
     win32_mouse_middle: (WM_MBUTTONDOWN, MK_MBUTTON, WM_MBUTTONUP, 0),
@@ -201,8 +201,8 @@ def _resolve_window_messages(
     return (down_msg, down_wparam), (up_msg, up_wparam)
 
 
-def send_mouse_event_to_window(window, mouse_keycode: Tuple[int, int, int],
-                               x: int = 0, y: int = 0):
+def send_mouse_event_to_window(window: int, mouse_keycode: Tuple[int, int, int],
+                               x: int = 0, y: int = 0) -> None:
     """
     將滑鼠事件送到指定視窗
     Send mouse event to a specific window

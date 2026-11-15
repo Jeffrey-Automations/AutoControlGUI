@@ -20,7 +20,7 @@ def _translate(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _request(operation: str, request: dict, token: CancellationToken) -> dict:
+def _request(operation: str, request: dict[str, Any], token: CancellationToken) -> dict[str, Any]:
     token.checkpoint()
     return manage_agent_transfer(operation, request)
 
@@ -36,7 +36,7 @@ class _ViewState:
     generation: int = 0
     submitted: int = -1
     closed: bool = False
-    review: tuple[str, dict, dict] | None = None
+    review: tuple[str, dict[str, Any], dict[str, Any]] | None = None
     labels: list[tuple[QtWidgets.QLabel, str]] = field(default_factory=list)
 
 
@@ -95,7 +95,7 @@ class AgentTransferView(QtWidgets.QWidget):
         self.invalidate()
         self._controller.close()
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose explicit dispatch and editable preparation only through the common Actions menu."""
         return [('agent_transfer_apply', self.apply), ('agent_transfer_prepare_approval', self.prepare_approval),
                 *[('agent_transfer_example_' + name, partial(self.example, name)) for name in

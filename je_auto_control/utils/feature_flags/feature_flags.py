@@ -13,12 +13,12 @@ import hashlib
 import json
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 from je_auto_control.utils.vuln_scan.vuln_scan import version_key
 
 
-def _semver(value: Any) -> tuple:
+def _semver(value: Any) -> Tuple[Tuple[int, ...], int, Tuple[Tuple[int, Any], ...]]:
     # The digit groups alone made 1.2 < 1.2.0 and 1.0.0-rc.1 == 1.0.0.
     return version_key(str(value))
 
@@ -51,7 +51,7 @@ class Flag:
     default_variant: str = ""
     off_variant: str = ""
     enabled: bool = True
-    targeting: tuple = ()
+    targeting: Tuple[Dict[str, Any], ...] = ()
     fallthrough: Any = None
 
 

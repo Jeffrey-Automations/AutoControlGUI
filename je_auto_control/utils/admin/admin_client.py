@@ -16,10 +16,11 @@ import tempfile
 import threading
 import time
 import urllib.request
+from email.message import Message
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, IO, List, Optional
 
 from je_auto_control.utils.exception.cancellation import CancellationToken, current_cancellation_token
 from je_auto_control.utils.json_store.json_store import load_json_or_quarantine, quarantine_file
@@ -51,7 +52,8 @@ class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
     a host redirected -- another origin, or https downgraded to http.
     """
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
+    def redirect_request(self, req: urllib.request.Request, fp: IO[bytes], code: int, msg: str,
+                     headers: Message, newurl: str) -> None:  # noqa: D102
         return None
 
 
@@ -159,7 +161,7 @@ class AdminConsoleClient:
         if not targets:
             return {}
 
-        def grab(host: AdminHost) -> tuple:
+        def grab(host: AdminHost) -> tuple[str, Optional[bytes]]:
             try:
                 body = self._http_get(host, "/screenshot")
             except (OSError, ValueError, http.client.HTTPException) as error:

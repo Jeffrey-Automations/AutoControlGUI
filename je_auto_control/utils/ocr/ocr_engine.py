@@ -12,7 +12,7 @@ CJK games where tesseract.exe + language packs are a nuisance.
 import re
 import time
 from dataclasses import dataclass
-from typing import List, Optional, Pattern, Sequence, Tuple
+from typing import Any, List, Optional, Pattern, Sequence, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
 from je_auto_control.utils.executor.run_control import pause
@@ -28,7 +28,7 @@ from je_auto_control.utils.timeouts import deadline_after
 _image_grab = None
 
 
-def _load_image_grab():
+def _load_image_grab() -> Any:
     """Cache the platform's ``ImageGrab``-shaped grabber.
 
     Not Pillow directly: under Wayland the screen has to come from the
@@ -77,7 +77,7 @@ def set_tesseract_cmd(path: str) -> None:
         backend.set_cmd(path)
 
 
-def _grab(region: Optional[Sequence[int]]):
+def _grab(region: Optional[Sequence[int]]) -> Tuple[Any, int, int]:
     """Capture in mouse-coordinate space; returns ``(image, offset_x, offset_y)``.
 
     Delegated to :func:`monitor_layout.grab_logical` so the OCR and template

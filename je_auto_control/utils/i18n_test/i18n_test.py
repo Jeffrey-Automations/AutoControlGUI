@@ -14,7 +14,7 @@ Three pure-standard-library checks that compound:
 Imports no ``PySide6``; no third-party dependency.
 """
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 
 # Accent map for common Latin letters (pseudo-localization).
 _ACCENTS = str.maketrans(
@@ -69,7 +69,7 @@ class _Segmenter:
                 index += 1
         return index
 
-    def _icu(self, head: "re.Match") -> int:
+    def _icu(self, head: "re.Match[str]") -> int:
         self._add(True, head.group(0))
         plural = head.group(1) != "select"
         index = head.end()
@@ -147,7 +147,7 @@ def check_overflow(elements: List[Any], *,
     return issues
 
 
-def _placeholders(value: Any) -> set:
+def _placeholders(value: Any) -> Set[str]:
     """Printf conversions and ``{argument}`` names -- not ICU case keywords,
     which legitimately differ between languages."""
     text = str(value)

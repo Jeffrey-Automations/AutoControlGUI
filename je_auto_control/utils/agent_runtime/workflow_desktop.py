@@ -48,11 +48,11 @@ def _unique_control(selector: dict[str, Any]) -> None:
         raise AgentTaskError("workflow control is ambiguous, unavailable or disabled")
 
 
-def _native_id_matches(node: Any, selector: dict) -> bool:
+def _native_id_matches(node: Any, selector: dict[str, Any]) -> bool:
     return "automation_id" not in selector or node.native_id == selector["automation_id"]
 
 
-def _matches(node: Any, process_id: int | None, filters: dict, selector: dict) -> bool:
+def _matches(node: Any, process_id: int | None, filters: dict[str, Any], selector: dict[str, Any]) -> bool:
     from je_auto_control.utils.accessibility.element import element_matches
     return node.process_id == process_id and element_matches(node, **filters) and _native_id_matches(node, selector)
 

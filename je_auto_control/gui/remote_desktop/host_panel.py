@@ -53,7 +53,7 @@ class _HostPanel(TranslatableMixin, QWidget):
         self._host_op = SlowOp(self)
         self._pending_key = "gui_op_stopping"
         # The share details of the start that is out; they become _shared when it reports.
-        self._starting: dict = {}
+        self._starting: dict[str, str] = {}
         self._host_id_label = QLabel("---")
         self._host_id_label.setStyleSheet(
             "font-family: 'Consolas', 'Menlo', 'Courier New', monospace; "
@@ -84,7 +84,7 @@ class _HostPanel(TranslatableMixin, QWidget):
         if not self._audio_available:
             self._enable_audio.setEnabled(False)
         # What the share text quotes, taken at Start (see _copy_share_text).
-        self._shared: Optional[dict] = None
+        self._shared: Optional[dict[str, Any]] = None
         self._preview = _FrameDisplay()
         # Preview is read-only — a host watching their own stream shouldn't
         # trigger fake input on themselves through the local widget.

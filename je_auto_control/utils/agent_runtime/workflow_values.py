@@ -70,7 +70,7 @@ def verified_prefix(spec: AgentTaskSpec, receipts: Sequence[Mapping[str, Any]]) 
     return True
 
 
-def _matches_action(action: Mapping, receipt: Mapping, values: Mapping) -> bool:
+def _matches_action(action: Mapping[str, Any], receipt: Mapping[str, Any], values: Mapping[str, Any]) -> bool:
     if receipt["status"] != "confirmed" or receipt["command"] != action["tool"]:
         return False
     if not _arguments_match(action, receipt, values):
@@ -81,7 +81,7 @@ def _matches_action(action: Mapping, receipt: Mapping, values: Mapping) -> bool:
     return not required or receipt["result"] == value
 
 
-def _arguments_match(action: Mapping, receipt: Mapping, values: Mapping) -> bool:
+def _arguments_match(action: Mapping[str, Any], receipt: Mapping[str, Any], values: Mapping[str, Any]) -> bool:
     arguments = resolve(action.get("arguments", {}), values)
     if action.get("reference") is None:
         return receipt["arguments"] == arguments

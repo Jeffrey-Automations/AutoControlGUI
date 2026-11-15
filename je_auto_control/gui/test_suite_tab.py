@@ -6,7 +6,7 @@ runs off the GUI thread as a stoppable executor run, one at a time.
 """
 import functools
 import json
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -27,6 +27,7 @@ import je_auto_control as ac
 from je_auto_control.utils.quarantine import (
     auto_quarantine_from_flakiness, default_quarantine_store,
 )
+from je_auto_control.utils.test_suite import TestSuiteResult
 
 _COLS = ("suite_col_case", "suite_col_status", "suite_col_time",
          "suite_col_message")
@@ -91,7 +92,7 @@ class TestSuiteTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("suite_load_file", self._on_load_file),
@@ -104,7 +105,7 @@ class TestSuiteTab(TranslatableMixin, QWidget):
             ("suite_q_clear", self._on_clear_quarantine),
         ]
 
-    def _parse_spec(self):
+    def _parse_spec(self) -> Any:
         return json.loads(self._spec.toPlainText() or "{}")
 
     def _on_load_file(self) -> None:
@@ -145,7 +146,7 @@ class TestSuiteTab(TranslatableMixin, QWidget):
             return
         self._summary.setText(_t("suite_error").replace("{error}", str(error)))
 
-    def _render_result(self, result) -> None:
+    def _render_result(self, result: TestSuiteResult) -> None:
         self._table.setRowCount(len(result.cases))
         for row, case in enumerate(result.cases):
             values = (case.name, case.status, f"{case.duration_s:.3f}s",

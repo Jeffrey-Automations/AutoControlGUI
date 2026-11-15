@@ -1,6 +1,6 @@
 """VLM backend factory."""
 import os
-from typing import Optional
+from typing import Optional, Tuple
 
 from je_auto_control.utils.vision.backends.base import (
     VLMBackend, VLMNotAvailableError,
@@ -38,7 +38,7 @@ def _build_backend() -> VLMBackend:
     )
 
 
-def _preference_order(preferred: str):
+def _preference_order(preferred: str) -> Tuple[str, str]:
     if preferred == "anthropic":
         return ("anthropic", "openai")
     if preferred == "openai":
@@ -50,7 +50,7 @@ def _preference_order(preferred: str):
     return ("anthropic", "openai")
 
 
-def _try_build(name: str):
+def _try_build(name: str) -> Optional[VLMBackend]:
     if name == "anthropic":
         from je_auto_control.utils.vision.backends.anthropic_backend import (
             AnthropicVLMBackend,

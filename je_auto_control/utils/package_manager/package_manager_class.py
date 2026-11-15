@@ -4,10 +4,14 @@ import re
 from importlib.util import find_spec
 from inspect import getmembers, isfunction, isbuiltin, isclass
 from types import ModuleType
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from je_auto_control.utils.exception.exceptions import AutoControlExecuteActionException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.callback.callback_function_executor import CallbackFunctionExecutor
+    from je_auto_control.utils.executor.action_executor import Executor
 
 #: One name of a dotted module name. Each part is matched on its own, so no
 #: pattern here repeats a group that itself repeats.
@@ -49,10 +53,10 @@ class PackageManager:
     - 將套件中的函式/類別加入到 Executor 或 CallbackExecutor 的事件字典
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.installed_package_dict: dict[str, ModuleType] = {}
-        self.executor = None
-        self.callback_executor = None
+        self.executor: Optional["Executor"] = None
+        self.callback_executor: Optional["CallbackFunctionExecutor"] = None
         # Package gate (workspace X-12). False (the default) = only ``allowed_packages``;
         # True = any package. The allowlist starts from JE_AUTOCONTROL_ALLOWED_PACKAGES.
         self.allow_arbitrary_packages: bool = False
@@ -156,7 +160,8 @@ class PackageManager:
         self._check_allowed(package)
         self.add_package_to_target(package, self.callback_executor)
 
-    def get_member(self, package: str, predicate, target) -> None:
+    def get_member(self, package: str, predicate: Callable[[Any], bool],
+                   target: "Optional[Executor | CallbackFunctionExecutor]") -> None:
         """
         取得套件成員並加入事件字典
         Get package members and add to event_dict
@@ -174,7 +179,7 @@ class PackageManager:
         else:
             autocontrol_logger.error("Executor error %r", self.executor)
 
-    def add_package_to_target(self, package: str, target) -> None:
+    def add_package_to_target(self, package: str, target: "Optional[Executor | CallbackFunctionExecutor]") -> None:
         """
         將套件所有成員加入目標事件字典
         Add all package members to target event_dict

@@ -20,7 +20,7 @@ import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from je_auto_control.utils.json_store.json_store import (
     atomic_write_text, load_json_or_quarantine, quarantine_file,
@@ -42,7 +42,7 @@ class TrustList:
     def __init__(self, path: Optional[Path] = None) -> None:
         self._path = Path(path) if path is not None else default_trust_list_path()
         self._lock = threading.Lock()
-        self._entries: Dict[str, dict] = {}
+        self._entries: Dict[str, Dict[str, Any]] = {}
         self._load()
 
     # --- persistence --------------------------------------------------------
@@ -118,7 +118,7 @@ class TrustList:
             self._entries.clear()
             self._save()
 
-    def list_entries(self) -> List[dict]:
+    def list_entries(self) -> List[Dict[str, Any]]:
         with self._lock:
             return [dict(entry) for entry in self._entries.values()]
 

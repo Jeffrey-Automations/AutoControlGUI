@@ -20,7 +20,7 @@ import secrets
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.json_store.json_store import (
@@ -73,7 +73,7 @@ class KnownHosts:
     def __init__(self, path: Optional[Path] = None) -> None:
         self._path = (Path(path) if path is not None else _known_hosts_path())
         self._lock = threading.Lock()
-        self._entries: Dict[str, dict] = {}
+        self._entries: Dict[str, Dict[str, Optional[str]]] = {}
         self._load()
 
     def _load(self) -> None:
@@ -94,7 +94,7 @@ class KnownHosts:
                 self._entries[host_id] = entry
 
     @staticmethod
-    def _normalise_entry(value) -> Optional[dict]:
+    def _normalise_entry(value: Any) -> Optional[Dict[str, Optional[str]]]:
         """Coerce a stored known-hosts value into an entry, or ``None``."""
         if isinstance(value, str):
             return {"app_fp": value, "dtls_fp": None, "last_seen": None}
@@ -166,7 +166,7 @@ class KnownHosts:
                 self._save()
         return removed
 
-    def list_entries(self) -> Dict[str, dict]:
+    def list_entries(self) -> Dict[str, Dict[str, Optional[str]]]:
         with self._lock:
             return {hid: dict(entry) for hid, entry in self._entries.items()}
 

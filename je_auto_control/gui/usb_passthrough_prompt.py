@@ -22,7 +22,7 @@ wherever the collector runs — another thread, or the middle of a PySide call.
 from __future__ import annotations
 
 import threading
-from typing import Optional
+from typing import Any, Optional
 
 from PySide6.QtCore import QObject, Qt, Signal, Slot
 from PySide6.QtWidgets import (
@@ -123,7 +123,7 @@ class PromptBridge(QObject):
                *, viewer_id: Optional[str] = None,
                wait_timeout_s: float = 60.0) -> bool:
         """Worker-thread entry point. Blocks on the operator's choice."""
-        result: dict = {"allow": False, "remember": False}
+        result: dict[str, bool] = {"allow": False, "remember": False}
         done = threading.Event()
         self._request.emit(
             vendor_id, product_id, serial or "", viewer_id or "",
@@ -146,7 +146,7 @@ class PromptBridge(QObject):
     @Slot(str, str, str, str, object, object)
     def _show_dialog(self, vendor_id: str, product_id: str,
                      serial: str, viewer_id: str,
-                     result: dict, done: threading.Event) -> None:
+                     result: dict[str, bool], done: threading.Event) -> None:
         dialog = UsbPassthroughPromptDialog(
             vendor_id=vendor_id, product_id=product_id,
             serial=serial or None, viewer_id=viewer_id or None,
@@ -163,7 +163,7 @@ class PromptBridge(QObject):
             dialog.deleteLater()
 
 
-def attach_prompt_to_session(session, *,
+def attach_prompt_to_session(session: Any, *,
                              acl: Optional[UsbAcl] = None,
                              dialog_parent: Optional[QWidget] = None,
                              ) -> PromptBridge:

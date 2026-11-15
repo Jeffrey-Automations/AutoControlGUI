@@ -15,7 +15,7 @@ view-only session can't have someone shouting through the host.
 from __future__ import annotations
 
 import threading
-from typing import Optional
+from typing import Any, Optional
 
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -33,7 +33,7 @@ _DEFAULT_BLOCK_FRAMES = 800  # 50 ms at 16 kHz
 class MicUplinkSender:
     """Viewer side: stream microphone PCM to the host via a DataChannel."""
 
-    def __init__(self, channel, *,
+    def __init__(self, channel: Any, *,
                  sample_rate: int = _DEFAULT_SAMPLE_RATE,
                  channels: int = _DEFAULT_CHANNELS,
                  block_frames: int = _DEFAULT_BLOCK_FRAMES,
@@ -177,7 +177,7 @@ class MicUplinkReceiver:
     def is_running(self) -> bool:
         return self._player is not None and bool(self._player.is_running)
 
-    def on_chunk(self, chunk) -> None:
+    def on_chunk(self, chunk: object) -> None:
         """Feed a PCM chunk into the player. Tolerates non-bytes silently."""
         if not isinstance(chunk, (bytes, bytearray, memoryview)):
             return

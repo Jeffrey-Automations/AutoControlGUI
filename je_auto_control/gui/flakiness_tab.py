@@ -3,7 +3,7 @@
 Thin wrapper over :func:`je_auto_control.analyze_flakiness` — the table
 holds no business logic, it only renders the headless report.
 """
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -17,7 +17,7 @@ from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
-from je_auto_control.utils.flakiness import analyze_flakiness
+from je_auto_control.utils.flakiness import FlakyEntry, analyze_flakiness
 
 _COLUMN_KEYS = (
     "flaky_col_key", "flaky_col_runs", "flaky_col_ok", "flaky_col_error",
@@ -78,7 +78,7 @@ class FlakinessTab(TranslatableMixin, QWidget):
         set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("flaky_refresh", self._refresh),
@@ -102,7 +102,7 @@ class FlakinessTab(TranslatableMixin, QWidget):
         else:
             self._status.setText(_t("flaky_summary_empty"))
 
-    def _set_row(self, row: int, entry) -> None:
+    def _set_row(self, row: int, entry: FlakyEntry) -> None:
         values = (
             entry.key, str(entry.total_runs), str(entry.ok),
             str(entry.error), str(entry.flips), f"{entry.flip_rate:.0%}",

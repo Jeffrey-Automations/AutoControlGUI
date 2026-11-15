@@ -1,5 +1,5 @@
 """Webhooks tab: bind HTTP requests to action scripts."""
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
@@ -115,7 +115,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
 
         root.addWidget(Card().add(self._table, stretch=1), stretch=1)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("wh_start", self._on_start),
@@ -160,7 +160,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
         if path:
             self._script_input.setText(path)
 
-    def _selected_methods(self) -> list:
+    def _selected_methods(self) -> list[str]:
         return [m for m, c in self._method_checks.items() if c.isChecked()]
 
     def _on_register(self) -> None:

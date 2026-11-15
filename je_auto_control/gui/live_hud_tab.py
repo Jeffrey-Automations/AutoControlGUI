@@ -6,6 +6,7 @@ import threading
 import weakref
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QHideEvent, QShowEvent
 from PySide6.QtWidgets import (
     QGroupBox, QLabel, QTextEdit, QVBoxLayout, QWidget,
 )
@@ -101,7 +102,7 @@ class LiveHUDTab(TranslatableMixin, QWidget):
         log_card.add(self._log_view, stretch=1)
         root.addWidget(log_card, stretch=1)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("hud_start", self._start),
@@ -145,11 +146,11 @@ class LiveHUDTab(TranslatableMixin, QWidget):
     # The HUD samples the cursor and a pixel four times a second only while
     # it is on screen: a closed or switched-away tab kept polling. The log
     # tail stays attached, so lines logged meanwhile are there on return.
-    def hideEvent(self, event) -> None:  # noqa: N802  # reason: Qt override
+    def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802  # reason: Qt override
         self._timer.stop()
         super().hideEvent(event)
 
-    def showEvent(self, event) -> None:  # noqa: N802  # reason: Qt override
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802  # reason: Qt override
         if self._running:
             self._timer.start()
         super().showEvent(event)

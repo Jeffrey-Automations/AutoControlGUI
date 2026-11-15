@@ -50,7 +50,7 @@ class UsbIpServer:
         self._listen_sock: Optional[socket.socket] = None
         self._accept_thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
-        self._workers: list = []
+        self._workers: list[threading.Thread] = []
 
     @property
     def port(self) -> int:
@@ -281,7 +281,7 @@ _URB_IDLE_POLL_S = 1.0
 
 def _recv_exact(sock: socket.socket, n: int) -> bytes:
     """Block until ``n`` bytes are received or the peer hangs up."""
-    chunks: list = []
+    chunks: list[bytes] = []
     remaining = n
     while remaining > 0:
         chunk = sock.recv(remaining)

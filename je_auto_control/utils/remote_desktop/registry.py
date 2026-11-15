@@ -34,7 +34,7 @@ import functools
 import itertools
 import ssl
 import threading
-from typing import Any, Callable, Dict, NamedTuple, Optional, Sequence
+from typing import Any, Callable, Dict, NamedTuple, Optional, Sequence, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -79,7 +79,7 @@ class _Claim(NamedTuple):
     on_displaced: Optional[DisplacedCallback]
 
 
-def _load_webrtc_classes():
+def _load_webrtc_classes() -> Tuple[Any, Any, Any]:
     """Lazy import — aiortc/av are optional extras; absent ⇒ (None, None, None)."""
     try:
         from je_auto_control.utils.remote_desktop.webrtc_host import (
@@ -459,7 +459,7 @@ class _RemoteDesktopRegistry:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _require_webrtc():
+    def _require_webrtc() -> Tuple[Any, Any, Any]:
         host_cls, viewer_cls, config_cls = _load_webrtc_classes()
         if host_cls is None:
             raise RuntimeError(
@@ -563,7 +563,7 @@ class _RemoteDesktopRegistry:
             "authenticated": getattr(viewer, "authenticated", False),
         }
 
-    def webrtc_usb_client(self):
+    def webrtc_usb_client(self) -> Any:
         """Return the live WebRTC viewer's USB passthrough client, or None.
 
         The viewer exposes ``usb_client()`` once the host has opened the

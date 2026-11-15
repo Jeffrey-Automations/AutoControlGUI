@@ -4,7 +4,7 @@ A command is dispatched off the GUI thread (``/run`` executes a whole script),
 one at a time, as a stoppable executor run.
 """
 import functools
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtWidgets import (
     QFileDialog, QFormLayout, QLabel, QLineEdit, QTextEdit,
@@ -27,7 +27,7 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _dispatch(router: CommandRouter, message: str, context: dict) -> Any:
+def _dispatch(router: CommandRouter, message: str, context: dict[str, Any]) -> Any:
     """Worker thread: route one message; the router is not touched by the GUI meanwhile."""
     return router.dispatch(message, context=context)
 
@@ -79,7 +79,7 @@ class ChatOpsTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("chatops_browse_btn", self._on_browse),

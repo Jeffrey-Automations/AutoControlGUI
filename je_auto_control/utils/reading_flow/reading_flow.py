@@ -49,7 +49,7 @@ def _center_on(box: Box, axis: str) -> float:
     return (low + high) / 2.0
 
 
-def _widest_gap(boxes: Sequence[Box], axis: str, min_gap: int):
+def _widest_gap(boxes: Sequence[Box], axis: str, min_gap: int) -> Optional[Tuple[float, float]]:
     """Return ``(position, width)`` of the widest whitespace gap on ``axis``, or ``None``."""
     spans = sorted(_axis_bounds(box, axis) for box in boxes)
     best_pos: Optional[float] = None
@@ -65,7 +65,7 @@ def _widest_gap(boxes: Sequence[Box], axis: str, min_gap: int):
     return None
 
 
-def _choose_axis(boxes: Sequence[Box], min_gap: int):
+def _choose_axis(boxes: Sequence[Box], min_gap: int) -> Optional[Tuple[str, float]]:
     """Return ``(axis, position)`` of the widest gap across both axes, or ``None``."""
     candidates = []
     for axis in ("x", "y"):

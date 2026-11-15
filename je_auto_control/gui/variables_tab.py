@@ -6,7 +6,7 @@ shows the current scope and lets users seed a JSON bag before running a
 script that reads ``${var}`` placeholders.
 """
 import json
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtWidgets import (
     QFormLayout, QGroupBox, QHeaderView, QLabel, QLineEdit, QMessageBox,
@@ -89,7 +89,7 @@ class VariablesTab(TranslatableMixin, QWidget):
         set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("vars_refresh", self._refresh),
@@ -110,7 +110,7 @@ class VariablesTab(TranslatableMixin, QWidget):
         )
 
     @staticmethod
-    def _format_value(value) -> str:
+    def _format_value(value: Any) -> str:
         if isinstance(value, (dict, list, tuple)):
             try:
                 return json.dumps(value, ensure_ascii=False)
@@ -119,7 +119,7 @@ class VariablesTab(TranslatableMixin, QWidget):
         return repr(value) if isinstance(value, str) else str(value)
 
     @staticmethod
-    def _coerce_value(text: str):
+    def _coerce_value(text: str) -> Any:
         """Try JSON-decoding so '42' becomes int, fall back to raw string."""
         stripped = text.strip()
         if not stripped:

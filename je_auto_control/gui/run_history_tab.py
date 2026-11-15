@@ -1,10 +1,10 @@
 """Run History tab: browse recorded runs, artifacts and explicit journal links."""
 import datetime as _dt
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from PySide6.QtCore import QTimer, Qt, QUrl
-from PySide6.QtGui import QCloseEvent, QDesktopServices, QPixmap
+from PySide6.QtGui import QCloseEvent, QDesktopServices, QPixmap, QResizeEvent
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QFrame, QHeaderView, QLabel,
     QMessageBox, QSplitter, QTableWidget, QTableWidgetItem,
@@ -120,7 +120,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         self.dispose()
         super().closeEvent(event)
 
-    def resizeEvent(self, event) -> None:
+    def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
         self._refresh_preview()
 
@@ -176,7 +176,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         set_role(self._count_label, "hint")
         root.addWidget(self._count_label)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("rh_refresh", self._refresh),
@@ -220,7 +220,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         self._timeline.set_records(runs)
         self._refresh_preview()
 
-    def _set_row(self, row: int, record) -> None:
+    def _set_row(self, row: int, record: RunRecord) -> None:
         status_key = _STATUS_LABEL_KEYS.get(record.status, record.status)
         status_text = _t(status_key) if record.error_text is None \
             else f"{_t(status_key)}: {record.error_text}"

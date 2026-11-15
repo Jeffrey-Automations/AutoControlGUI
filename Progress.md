@@ -526,7 +526,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
 D2 仍缺原生半開交握資源回收與合成器釋放證據；D3 的錄製／全域停止／Windows 原生崩潰證據仍缺，詳見計畫與下方生命週期待辦。
 計畫 E 已有裝置 context、輸入／畫面、應用生命週期與共用命令入口；
 仍缺真實 SDK 契約核對、iOS 擴充 adapter 與裝置驗收，不能以 fake backend 測試結案。
-H 已有三平台型別 gate 與真實相依型別檢查；嚴格型別層已收進三平台都通過的舊模組（U-20261115-05、-06，共 1,182 個）。仍缺：`test/verify/typing_strict_baseline.txt` 227 個與 `typing_not_yet_strict.txt` 115 個模組要先修到通過`disallow_untyped_defs`／`disallow_any_generics`（三平台約 2,400 個錯誤，集中在 331 個檔案；其中 12 個影像／定位模組只差模組層級的 `X = Any` 別名，要先為 `ImageSource` 等定一個共用型別；`android/client.py`、`linux_wayland/libei.py`、`utils/logging/logging_instance.py`、`utils/accessibility/accessibility_api.py` 補上正確註記會露出真的型別錯誤），以及完整範例／文件與最終固定來源總驗收。
+H 已有三平台型別 gate 與真實相依型別檢查；嚴格型別層已收進三平台都通過的舊模組（U-20261115-05～07，共 1,309 個）。仍缺：`test/verify/typing_strict_baseline.txt` 134 個與 `typing_not_yet_strict.txt` 81 個模組要先修到通過`disallow_untyped_defs`／`disallow_any_generics`（三平台約 2,050 個錯誤，集中在 198 個檔案；其中 18 個影像／定位模組只差模組層級的 `ImageSource = Any` 之類的別名，要先定一個共用型別；另有 11 個補上正確註記會露出真的型別錯誤：`android/client.py`、`ios/client.py`、兩個 vision backend（`except (OSError, *_sdk_errors())` 的星號展開）、`linux_wayland/libei.py`、`utils/logging/logging_instance.py`、`utils/accessibility/accessibility_api.py`、`utils/actionability/actionability.py`、`utils/table_grid_fill/table_grid_fill.py`、`utils/tool_use_schema/schema.py`、`utils/remote_desktop/hw_codec.py`（PyAV 的 `bit_rate` 可能是 None）），以及完整範例／文件與最終固定來源總驗收。
 F 還缺：
 
 - **F2 GUI 重製（`WIP`，維護者 2026-11-14 決定：全面視覺改版；窄視窗時導覽與詳情改為浮層）**：

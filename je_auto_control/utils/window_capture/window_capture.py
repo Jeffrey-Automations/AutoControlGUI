@@ -23,7 +23,10 @@ import json
 import math
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.window_layout.window_layout import WindowRect
 
 Rect = Tuple[int, int, int, int]
 GeometryProvider = Callable[[str], Optional[Rect]]
@@ -220,7 +223,7 @@ def _exact_title_mover() -> LayoutMover:
     window's title contained -- and every duplicate title -- moved the same
     first window, leaving the others where they were.
     """
-    used: set = set()
+    used: Set[int] = set()
 
     def move(title: str, x: int, y: int, width: int, height: int, maximize: bool = False) -> bool:
         if sys.platform != "win32":
@@ -341,7 +344,7 @@ def snap_window(title: str, position: str = "left", *,
     return (mover or _default_mover)(title, x, y, w, h)
 
 
-def _move_into(titles: List[str], rects, move: WindowMover) -> int:
+def _move_into(titles: List[str], rects: Sequence["WindowRect"], move: WindowMover) -> int:
     """Move each title to the matching rectangle; return the number moved."""
     moved = 0
     for title, rect in zip(titles, rects):

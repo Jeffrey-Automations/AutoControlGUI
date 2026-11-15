@@ -110,7 +110,7 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
         self._status_key, self._status_value = key, value
         self._status.setText(_t(key).replace("{value}", value))
 
-    def _inputs_changed(self, *_args) -> None:
+    def _inputs_changed(self, *_args: object) -> None:
         if self._updating:
             return
         self.cancel()
@@ -121,7 +121,7 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
         self._details.clear()
         self._set_status("idle")
 
-    def _dataset_changed(self, *_args) -> None:
+    def _dataset_changed(self, *_args: object) -> None:
         if not self._updating:
             self.cancel()
             self._generation += 1

@@ -6,15 +6,18 @@ its ``tesseract_cmd`` global (:meth:`TesseractBackend.set_cmd`).
 from __future__ import annotations
 
 from subprocess import SubprocessError  # nosec B404  # reason: exception type only
-from typing import List
+from typing import TYPE_CHECKING, Any, List
 
 from je_auto_control.utils.ocr.backends.base import OCRBackendNotAvailableError
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.ocr.ocr_engine import TextMatch
 
 
 _pytesseract = None
 
 
-def _load():
+def _load() -> Any:
     global _pytesseract
     if _pytesseract is not None:
         return _pytesseract
@@ -94,8 +97,8 @@ class TesseractBackend:
             raise OCRBackendNotAvailableError(
                 f"Tesseract cannot list its languages: {error!r}") from error
 
-    def image_to_matches(self, image, lang: str,
-                         min_confidence: float) -> List:
+    def image_to_matches(self, image: Any, lang: str,
+                         min_confidence: float) -> List[TextMatch]:
         # Import inside to avoid circular import at module load.
         from je_auto_control.utils.ocr.ocr_engine import TextMatch
 

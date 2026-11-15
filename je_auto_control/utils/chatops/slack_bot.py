@@ -317,7 +317,7 @@ class SlackBot:
             payload["thread_ts"] = thread_ts
         return self._api_post("chat.postMessage", payload)
 
-    def _fetch_messages(self) -> list:
+    def _fetch_messages(self) -> List[Dict[str, Any]]:
         """Every message since ``last_seen_ts``, newest first, across pages.
 
         One page of 50 was read and ``last_seen_ts`` then moved past the
@@ -329,7 +329,7 @@ class SlackBot:
         }
         if self.last_seen_ts:
             params["oldest"] = self.last_seen_ts
-        messages: list = []
+        messages: List[Dict[str, Any]] = []
         for _ in range(_MAX_PAGES):
             body = self._api_get("conversations.history", params)
             messages.extend(message for message in body.get("messages") or []

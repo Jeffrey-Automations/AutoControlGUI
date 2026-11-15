@@ -9,7 +9,7 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 _UNCONFIRMED = "browser retirement is unconfirmed"
 
 
-def retirement_proof(value: Any, context_id: str | None = None) -> dict:
+def retirement_proof(value: Any, context_id: str | None = None) -> dict[str, Any]:
     """Validate a closed proof from the already owned helper, optionally pinning its actual context."""
     fields = {"contract", "input_supported", "network_retired", "context_id"}
     if not isinstance(value, dict) or set(value) != fields:
@@ -29,7 +29,7 @@ def _require_context(identity: Any, context_id: str | None) -> None:
         raise AgentTaskError("browser retirement context is unconfirmed")
 
 
-def refuse_browser_input(_event: dict) -> NoReturn:
+def refuse_browser_input(_event: dict[str, Any]) -> NoReturn:
     """Fail before the owned channel can acknowledge any unexpected native input event."""
     raise AgentTaskError("read-only browser cannot acknowledge input")
 

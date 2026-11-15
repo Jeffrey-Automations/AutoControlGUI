@@ -16,12 +16,15 @@ Anything other than the boolean ``True`` (``"yes"``, ``1``, a callable, an
 attribute that raises) leaves the tool mutating.
 """
 import inspect
-from typing import Any, Callable, Dict, List
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.mcp_server.tools._base import (
     DESTRUCTIVE, MCPTool, MCPToolAnnotations, schema,
 )
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.mcp_server.server import MCPServer
 
 #: Attribute a plugin sets to ``True`` on a callable to declare it read-only.
 PLUGIN_READ_ONLY_ATTRIBUTE = "mcp_read_only"
@@ -94,7 +97,7 @@ def make_plugin_tool(name: str,
     )
 
 
-def register_plugin_tools(server, commands: Dict[str, Callable[..., Any]]
+def register_plugin_tools(server: "MCPServer", commands: Dict[str, Callable[..., Any]]
                            ) -> List[str]:
     """Wrap each entry in ``commands`` and add it to ``server``.
 
@@ -117,7 +120,7 @@ _TYPE_FROM_ANNOTATION = {
 
 
 def _properties_from_signature(handler: Callable[..., Any]
-                               ) -> tuple:
+                               ) -> Tuple[Dict[str, Any], List[str]]:
     """Return (properties, required) derived from the callable signature."""
     try:
         signature = inspect.signature(handler)

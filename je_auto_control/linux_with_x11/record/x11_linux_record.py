@@ -39,9 +39,9 @@ class X11LinuxRecorder:
     - 將原始事件轉換成可讀的動作序列
     """
 
-    def __init__(self):
-        self.record_queue: Queue | None = None
-        self.result_queue: Queue | None = None
+    def __init__(self) -> None:
+        self.record_queue: Queue[tuple[int, int, int, int]] | None = None
+        self.result_queue: Queue[tuple[int, int, int, int]] | None = None
 
     @property
     def is_recording(self) -> bool:

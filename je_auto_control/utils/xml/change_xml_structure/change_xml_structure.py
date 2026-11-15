@@ -2,7 +2,7 @@ import re
 from collections import defaultdict
 from defusedxml import ElementTree as DefusedET  # nosec B405  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml  # reason: defusedxml is the safe replacement
 from xml.etree import ElementTree  # nosec B405  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml  # reason: only used to construct trees, not to parse untrusted data
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 # Characters XML 1.0 cannot hold at all, not even as a character reference:
 # the C0 controls except tab / LF / CR, the surrogates, and U+FFFE / U+FFFF.
@@ -30,7 +30,7 @@ def xml_safe_text(text: str) -> str:
     return _XML_INVALID.sub("\ufffd", text)
 
 
-def _initial_body(children: list, element: ElementTree.Element) -> Any:
+def _initial_body(children: List[ElementTree.Element], element: ElementTree.Element) -> Any:
     """Pick the starting body form: dict from children, empty dict, or None."""
     if children:
         return _children_to_dict(children)
@@ -39,9 +39,9 @@ def _initial_body(children: list, element: ElementTree.Element) -> Any:
     return None
 
 
-def _children_to_dict(children: list) -> Dict[str, Any]:
+def _children_to_dict(children: List[ElementTree.Element]) -> Dict[str, Any]:
     """Collapse children into ``{tag: value | [values]}`` form."""
-    grouped: Dict[str, list] = defaultdict(list)
+    grouped: Dict[str, List[Any]] = defaultdict(list)
     for child_dict in (elements_tree_to_dict(c) for c in children):
         for key, value in child_dict.items():
             grouped[key].append(value)

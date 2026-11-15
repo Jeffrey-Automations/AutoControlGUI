@@ -11,7 +11,7 @@ import socket
 import sys
 import threading
 import time
-from typing import Generic, Iterator, TypeVar
+from typing import Any, Generic, Iterator, TypeVar
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.presence_endpoint_linux import LinuxEndpoint, _EndpointCheck, _EndpointFiles
@@ -318,7 +318,7 @@ class LinuxChannel:
         with self._owner.operation(_deadline(1), None) as resources:
             return resources.connection.fileno()
 
-    def receive(self, *, timeout: float, cancel: threading.Event | None = None) -> dict:
+    def receive(self, *, timeout: float, cancel: threading.Event | None = None) -> dict[str, Any]:
         """Receive one finite JSON object from the still-live original writer."""
         deadline = _deadline(timeout)
         with self._owner.operation(deadline, cancel) as resources:
@@ -329,7 +329,7 @@ class LinuxChannel:
                 except (BlockingIOError, InterruptedError):
                     continue
 
-    def send(self, frame: dict, *, timeout: float, cancel: threading.Event | None = None) -> None:
+    def send(self, frame: dict[str, Any], *, timeout: float, cancel: threading.Event | None = None) -> None:
         """Send exactly one packet while retaining the original live peer."""
         deadline = _deadline(timeout)
         with self._owner.operation(deadline, cancel) as resources:

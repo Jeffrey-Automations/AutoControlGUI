@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 from je_auto_control.utils.cv2_utils import template_detection
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
@@ -9,7 +9,7 @@ from je_auto_control.utils.test_record.record_test_class import record_action_to
 from je_auto_control.wrapper.auto_control_mouse import click_mouse, set_mouse_position
 
 
-def locate_all_image(image, detect_threshold: float = 1.0,
+def locate_all_image(image: Any, detect_threshold: float = 1.0,
                      draw_image: bool = False) -> List[List[int]]:
     """
     找出螢幕上所有符合的影像位置
@@ -33,7 +33,7 @@ def locate_all_image(image, detect_threshold: float = 1.0,
         raise
 
 
-def locate_image_center(image, detect_threshold: float = 1.0,
+def locate_image_center(image: Any, detect_threshold: float = 1.0,
                         draw_image: bool = False) -> Tuple[int, int]:
     """
     找出單一影像並回傳中心座標
@@ -59,7 +59,7 @@ def locate_image_center(image, detect_threshold: float = 1.0,
         raise
 
 
-def locate_and_click(image, mouse_keycode: int | str,
+def locate_and_click(image: Any, mouse_keycode: int | str,
                      detect_threshold: float = 1.0,
                      draw_image: bool = False) -> Tuple[int, int]:
     """

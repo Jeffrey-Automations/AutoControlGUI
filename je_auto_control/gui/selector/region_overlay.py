@@ -5,10 +5,10 @@ desktop did not work: ``showFullScreen`` put it on one screen, while the
 result was still offset by the virtual desktop's origin, and Qt's logical
 coordinates are not the native pixels screenshots use on a scaled screen.
 """
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import QEventLoop, QPoint, QRect, Qt, Signal
-from PySide6.QtGui import QColor, QKeyEvent, QMouseEvent, QPainter, QPen, QScreen
+from PySide6.QtGui import QCloseEvent, QColor, QKeyEvent, QMouseEvent, QPaintEvent, QPainter, QPen, QScreen
 from PySide6.QtWidgets import QApplication, QWidget
 
 from je_auto_control.gui._screen_geometry import Region, native_region
@@ -50,7 +50,7 @@ class RegionOverlay(QWidget):
             return QRect()
         return QRect(self._origin, self._current).normalized()
 
-    def paintEvent(self, event) -> None:  # noqa: N802 Qt override
+    def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802 Qt override
         del event
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor(0, 0, 0, 90))
@@ -91,7 +91,7 @@ class RegionOverlay(QWidget):
         else:
             super().keyPressEvent(event)
 
-    def closeEvent(self, event) -> None:  # noqa: N802 Qt override
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 Qt override
         # Closed some other way (Alt+F4, the window manager): a cancel, so a
         # caller waiting for an answer is not left waiting.
         if not self._finished:
@@ -118,7 +118,7 @@ def pick_region_blocking(parent: Optional[QWidget] = None) -> Optional[Region]:
     """
     del parent
     overlays: List[RegionOverlay] = [RegionOverlay(screen) for screen in QApplication.screens()]
-    result: dict = {"region": None, "done": False}
+    result: Dict[str, Any] = {"region": None, "done": False}
     loop = QEventLoop()
 
     def finish(region: Optional[Region] = None) -> None:

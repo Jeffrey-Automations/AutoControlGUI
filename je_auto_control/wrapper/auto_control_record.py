@@ -9,7 +9,7 @@ fails where that is actually true, in the tap, naming the permission.
 """
 import os
 import threading
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.exception.exceptions import AutoControlJsonActionException
@@ -37,7 +37,7 @@ def record() -> bool:
         return False
 
 
-def stop_record() -> list:
+def stop_record() -> List[List[Any]]:
     """
     stop current record
 
@@ -68,7 +68,7 @@ def stop_record() -> list:
         return []
 
 
-def stop_record_timeline() -> list:
+def stop_record_timeline() -> List[Dict[str, Any]]:
     """
     停止錄製並回傳含放開、滾輪與間隔時間的完整事件
     Stop recording and return press *and* release, wheel, and ``delta_ms``
@@ -98,7 +98,7 @@ def stop_record_timeline() -> list:
 
 
 def record_to_json(output_path: str, *, stop_event: threading.Event,
-                   timeout: Optional[float] = None) -> list:
+                   timeout: Optional[float] = None) -> List[List[Any]]:
     """
     Record input until ``stop_event`` is set (or ``timeout``), saving to JSON.
 

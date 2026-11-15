@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional
+from typing import Any, Optional
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.logging.secret_scope import scrub_secret_data, scrub_secret_text
 from je_auto_control.utils.executor.action_redaction import redact_actions
@@ -13,7 +13,7 @@ class TestRecord:
     - 儲存測試紀錄清單
     """
 
-    def __init__(self, init_record: bool = False):
+    def __init__(self, init_record: bool = False) -> None:
         """
         初始化 TestRecord
         Initialize TestRecord
@@ -21,7 +21,7 @@ class TestRecord:
         :param init_record: 是否啟用紀錄 Flag to enable recording
         """
         self.init_record: bool = init_record
-        self.test_record_list: list[dict] = []
+        self.test_record_list: list[dict[str, Any]] = []
 
     def clean_record(self) -> None:
         """
@@ -45,7 +45,7 @@ class TestRecord:
 test_record_instance = TestRecord()
 
 
-def record_action_to_list(function_name: str, local_param,
+def record_action_to_list(function_name: str, local_param: Any,
                           program_exception: Optional[str] = None) -> None:
     """
     將動作紀錄加入清單

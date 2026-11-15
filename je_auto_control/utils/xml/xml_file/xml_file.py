@@ -11,6 +11,7 @@ from defusedxml.minidom import (  # nosemgrep: python.lang.security.use-defused-
 )
 from xml.etree import ElementTree  # nosec B405  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml  # reason: only used to construct trees, not to parse untrusted data
 from xml.etree.ElementTree import ParseError  # nosec B405  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml  # reason: exception type used for catching only
+from typing import Any
 
 from je_auto_control.utils.exception.exception_tags import (
     cant_read_xml_error_message, xml_type_error_message,
@@ -40,7 +41,7 @@ class XMLParser:
     - 可輸出 XML 檔案
     """
 
-    def __init__(self, xml_string: str, xml_type: str = "string"):
+    def __init__(self, xml_string: str, xml_type: str = "string") -> None:
         """
         Initialize XMLParser.
         初始化 XMLParser
@@ -62,7 +63,7 @@ class XMLParser:
         else:
             self.xml_parser_from_file()
 
-    def xml_parser_from_string(self, **kwargs) -> ElementTree.Element:
+    def xml_parser_from_string(self, **kwargs: Any) -> ElementTree.Element:
         """
         Parse XML from string.
         從字串解析 XML
@@ -75,7 +76,7 @@ class XMLParser:
             raise XMLException(f"{cant_read_xml_error_message}: {repr(error)}") from error
         return self.xml_root
 
-    def xml_parser_from_file(self, **kwargs) -> ElementTree.Element:
+    def xml_parser_from_file(self, **kwargs: Any) -> ElementTree.Element:
         """
         Parse XML from file.
         從檔案解析 XML

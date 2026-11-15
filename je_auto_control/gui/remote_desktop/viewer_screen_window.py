@@ -9,8 +9,8 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QImage
-from PySide6.QtWidgets import QDialog, QVBoxLayout
+from PySide6.QtGui import QCloseEvent, QImage
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QWidget
 
 from je_auto_control.gui.remote_desktop._helpers import _t
 from je_auto_control.gui.remote_desktop.frame_display import _FrameDisplay
@@ -21,7 +21,7 @@ class ViewerScreenWindow(QDialog):
 
     closed = Signal()
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(_t("rd_webrtc_viewer_screen_title"))
         self.setModal(False)
@@ -38,7 +38,7 @@ class ViewerScreenWindow(QDialog):
         else:
             self._display.clear()
 
-    def closeEvent(self, event) -> None:  # noqa: N802 Qt override
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 Qt override
         self.closed.emit()
         super().closeEvent(event)
 

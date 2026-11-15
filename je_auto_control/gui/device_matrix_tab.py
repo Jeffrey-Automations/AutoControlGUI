@@ -6,7 +6,7 @@ goes through the task controller: the window stays responsive, and a tab
 destroyed mid-run hears nothing of the result.
 """
 import json
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -88,7 +88,7 @@ class DeviceMatrixTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("dm_run", self._on_run),
@@ -120,7 +120,7 @@ class DeviceMatrixTab(TranslatableMixin, QWidget):
     def _show_error(self, error: object) -> None:
         self._summary.setText(_t("dm_error").replace("{error}", str(error)))
 
-    def _render(self, report: dict) -> None:
+    def _render(self, report: dict[str, Any]) -> None:
         results = report["results"]
         self._table.setRowCount(len(results))
         for row, res in enumerate(results):

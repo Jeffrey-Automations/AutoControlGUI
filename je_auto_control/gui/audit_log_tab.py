@@ -1,6 +1,6 @@
 """Audit log tab: browse and verify the tamper-evident chain."""
 from datetime import datetime
-from typing import List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from PySide6.QtWidgets import (
     QComboBox, QGroupBox, QHeaderView, QLabel, QLineEdit,
@@ -84,7 +84,7 @@ class AuditLogTab(TranslatableMixin, QWidget):
         set_role(self._verify_status, "hint")
         root.addWidget(self._verify_status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("audit_refresh", self._refresh),
@@ -119,7 +119,7 @@ class AuditLogTab(TranslatableMixin, QWidget):
                     row_index, col_index, QTableWidgetItem(text),
                 )
 
-    def _sync_event_type_dropdown(self, all_rows: List[dict]) -> None:
+    def _sync_event_type_dropdown(self, all_rows: List[Dict[str, Any]]) -> None:
         observed = [r.get("event_type", "") for r in all_rows]
         choices = build_event_type_choices(observed)
         current = self._type_filter.currentText()
@@ -173,7 +173,7 @@ class AuditLogTab(TranslatableMixin, QWidget):
         ])
 
 
-def _format_row(entry: dict) -> List[str]:
+def _format_row(entry: Dict[str, Any]) -> List[str]:
     ts = entry.get("ts", "")
     try:
         ts = datetime.fromisoformat(ts).astimezone().strftime(

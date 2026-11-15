@@ -8,7 +8,8 @@ verifying many fields of a form without stopping at the first failure.
 
 Pure-stdlib context manager; imports no ``PySide6``.
 """
-from typing import Any, List, Literal
+from types import TracebackType
+from typing import Any, List, Literal, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import (
     AutoControlActionException, AutoControlAssertionException,
@@ -28,8 +29,8 @@ class SoftAssertionsFailed(AutoControlAssertionException, AutoControlActionExcep
 class SoftAssertions:
     """A scope that records pass/fail checks and raises the aggregate on exit."""
 
-    def __init__(self, raise_on_exit: bool = True):
-        self._results: List[tuple] = []
+    def __init__(self, raise_on_exit: bool = True) -> None:
+        self._results: List[Tuple[bool, str]] = []
         self._raise_on_exit = bool(raise_on_exit)
 
     def check(self, condition: Any, message: str = "") -> bool:
@@ -64,7 +65,8 @@ class SoftAssertions:
     def __enter__(self) -> "SoftAssertions":
         return self
 
-    def __exit__(self, exc_type, exc, _tb) -> Literal[False]:
+    def __exit__(self, exc_type: Optional[type[BaseException]], exc: Optional[BaseException],
+                 _tb: Optional[TracebackType]) -> Literal[False]:
         if exc_type is None and self._raise_on_exit:
             self.assert_all()
         elif exc is not None and self.failures and hasattr(exc, "add_note"):

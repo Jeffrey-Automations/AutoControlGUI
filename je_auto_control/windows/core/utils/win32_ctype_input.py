@@ -8,7 +8,7 @@ if sys.platform not in ["win32", "cygwin", "msys"]:
 
 import ctypes
 from ctypes import wintypes
-from typing import Any
+from typing import Any, Tuple
 from je_auto_control.windows.core.utils.win32_vk import WIN32_EventF_UNICODE, WIN32_VkToVSC
 
 # Annotated: on a non-Windows target mypy 2.4 treats this module as unreachable
@@ -36,7 +36,7 @@ class KeyboardInput(ctypes.Structure):
                 ("time", wintypes.DWORD),
                 ("dwExtraInfo", ctypes.c_void_p))
 
-    def __init__(self, *args, **kwds):
+    def __init__(self, *args: Any, **kwds: Any) -> None:
         super(KeyboardInput, self).__init__(*args, **kwds)
         if not self.dwFlags & WIN32_EventF_UNICODE:
             self.wScan = user32.MapVirtualKeyExW(self.wVk, WIN32_VkToVSC, 0)
@@ -59,7 +59,7 @@ class Input(ctypes.Structure):
                 ("_input", INPUTUnion))
 
 
-def _check_count(result, func, args) -> list:
+def _check_count(result: Any, func: Any, args: Tuple[Any, ...]) -> Tuple[Any, ...]:
     if result == 0:
         raise ctypes.WinError(ctypes.get_last_error())  # type: ignore[attr-defined]  # reason: win32-only ctypes
     return args

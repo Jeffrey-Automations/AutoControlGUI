@@ -104,7 +104,7 @@ def _read_hunk(lines: List[str], index: int, old_left: int,
     return body, index
 
 
-def _hunk_start(match: "re.Match") -> int:
+def _hunk_start(match: "re.Match[str]") -> int:
     """0-based source line the hunk starts at.
 
     ``-N,0`` (a pure insertion, from ``-U0`` diffs) means "after line N",
@@ -145,7 +145,7 @@ def _changes(base: List[str], side: List[str]) -> List[Tuple[int, int, List[str]
             for tag, i1, i2, j1, j2 in matcher.get_opcodes() if tag != "equal"]
 
 
-def _overlap(ours: List[Tuple], theirs: List[Tuple]) -> bool:
+def _overlap(ours: List[Tuple[int, int, List[str]]], theirs: List[Tuple[int, int, List[str]]]) -> bool:
     """Whether two change lists touch the same base lines.
 
     Two insertions at the same point overlap too: which goes first is a

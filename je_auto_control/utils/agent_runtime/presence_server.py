@@ -41,7 +41,7 @@ class PresenceServer:
         self._mutex = threading.RLock()
         self._attempted = False
 
-    def start(self) -> dict:
+    def start(self) -> dict[str, Any]:
         """Start once, only after first-instance ownership; an occupied endpoint never starts a source."""
         with self._mutex:
             if self._attempted or self._life.stop.is_set():
@@ -67,7 +67,7 @@ class PresenceServer:
             self.close()
             raise
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         """Read coarse process-local diagnostics without starting native resources or granting a lease."""
         with self._mutex:
             thread = self._life.acceptor

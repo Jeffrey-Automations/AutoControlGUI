@@ -1,6 +1,6 @@
 """Top-level window: menu bar, feature navigation, tabbed workspace, themes, live language switching."""
 import sys
-from typing import cast
+from typing import Any, cast
 
 from PySide6.QtCore import QEvent, QObject, QSettings, Qt
 from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QKeySequence
@@ -82,7 +82,7 @@ class AutoControlGUIUI(QMainWindow):
 
         self._view_menu: QMenu | None = None
         self._actions_menu: QMenu | None = None
-        self._tab_actions: list = []
+        self._tab_actions: list[QAction] = []
         self._build_menu_bar()
         self.auto_control_gui_widget.tabs_changed.connect(self._rebuild_tabs_menu)
         self.auto_control_gui_widget.tabs_changed.connect(self._refresh_navigation)
@@ -299,7 +299,7 @@ class AutoControlGUIUI(QMainWindow):
             submenu.deleteLater()
         view_menu.clear()
         self._tab_actions = []
-        entries_by_cat: dict = {}
+        entries_by_cat: dict[str, list[dict[str, Any]]] = {}
         for entry in self.auto_control_gui_widget.list_registered_tabs():
             entries_by_cat.setdefault(entry["category"], []).append(entry)
         for cat_key, title_key, default in _TAB_CATEGORIES:
@@ -310,7 +310,7 @@ class AutoControlGUIUI(QMainWindow):
             if entries:
                 self._add_category_submenu(view_menu, cat_key.title(), entries)
 
-    def _add_category_submenu(self, view_menu: QMenu, label: str, entries: list) -> None:
+    def _add_category_submenu(self, view_menu: QMenu, label: str, entries: list[dict[str, Any]]) -> None:
         sub = view_menu.addMenu(label)
         for entry in entries:
             action = QAction(entry["title"], sub, checkable=True)

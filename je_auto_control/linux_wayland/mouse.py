@@ -13,7 +13,7 @@ import os
 import subprocess  # nosec B404  # reason: argv-list, no shell interpolation
 import time
 from functools import lru_cache
-from typing import Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Tuple
 
 from je_auto_control.linux_wayland._detect import WAYLAND_YDOTOOL, binary_path
 from je_auto_control.linux_wayland._layout import layout_origin
@@ -22,6 +22,9 @@ from je_auto_control.linux_wayland._input_state import raise_if_input_blocked
 from je_auto_control.linux_wayland._ydotool_cli import reject_legacy_cli
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+
+if TYPE_CHECKING:
+    from je_auto_control.linux_wayland.ei_protocol import InputBackend
 
 
 # ydotool ``click`` accepts hex bitmasks: the low nibble selects the
@@ -56,7 +59,7 @@ def _require_ydotool() -> str:
     return reject_legacy_cli(path)
 
 
-def _run(argv: list, *, timeout: float = 5.0) -> None:
+def _run(argv: list[str], *, timeout: float = 5.0) -> None:
     # argv comes from a private allow-list (ydotool absolute path via
     # shutil.which), never user input; no shell=True.
     try:
@@ -216,7 +219,7 @@ def _warn_about_acceleration() -> None:
     _warn_once(_ACCELERATION_WARNING)
 
 
-def _try_libei():
+def _try_libei() -> Optional[InputBackend]:
     """Return a connected :class:`LibeiBackend`, or None when CLI should win."""
     try:
         from je_auto_control.linux_wayland._select_input import active_backend
@@ -368,7 +371,7 @@ def scroll(scroll_value: int,
           "-x", str(delta_x), "-y", str(delta_y)])
 
 
-def send_mouse_event_to_window(*_args, **_kwargs) -> None:
+def send_mouse_event_to_window(*_args: Any, **_kwargs: Any) -> None:
     """Wayland has no per-window mouse injection."""
     raise NotImplementedError(
         "Wayland forbids per-window mouse injection (no XSendEvent "
