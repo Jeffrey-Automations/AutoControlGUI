@@ -10,7 +10,7 @@ when stopped. The Actions menu's Stop ends whichever is going.
 import copy
 import functools
 import json
-from typing import List, Optional
+from typing import Any, Callable, List, Optional, Tuple
 
 from PySide6.QtWidgets import (
     QFormLayout, QGroupBox, QLabel, QLineEdit, QMessageBox,
@@ -35,7 +35,7 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _run_plan(actions: list) -> object:
+def _run_plan(actions: List[List[Any]]) -> object:
     """Worker thread: execute the reviewed plan."""
     return execute_action(actions)
 
@@ -45,7 +45,7 @@ def _run_plan(actions: list) -> object:
 PLAN_DEADLINE_S = 200.0
 
 
-def _plan(description: str, model: Optional[str], known_commands: List[str]) -> list:
+def _plan(description: str, model: Optional[str], known_commands: List[str]) -> List[List[Any]]:
     """Worker thread: ask the model for a plan."""
     return plan_actions(description, known_commands=known_commands, model=model)
 
@@ -72,7 +72,7 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         self._result_view = QTextEdit()
         self._result_view.setReadOnly(True)
         self._status = QLabel()
-        self._planned_actions: Optional[list] = None
+        self._planned_actions: Optional[List[List[Any]]] = None
         self._plans = TabTask(self)
         self._plans.result.connect(self._on_plan_finished)
         self._plans.error.connect(self._on_plan_failed)
@@ -128,7 +128,7 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("llm_plan_btn", self._on_plan),
@@ -150,7 +150,7 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         self._actions_view.clear()
         self._planned_actions = None
 
-    def _on_plan_finished(self, actions: list) -> None:
+    def _on_plan_finished(self, actions: List[List[Any]]) -> None:
         self._planned_actions = actions
         self._actions_view.setText(
             json.dumps(actions, indent=2, ensure_ascii=False)

@@ -1,7 +1,7 @@
 """``_ViewerPanel``: the 'control another machine' Remote Desktop sub-tab."""
 import ssl
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QGuiApplication, QImage
@@ -316,7 +316,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         # UnicodeError, which once escaped the slot and left the click unanswered.
         QMessageBox.warning(self, _t("rd_viewer_connect"), str(error))
 
-    def _on_connected(self, viewer) -> None:
+    def _on_connected(self, viewer: RemoteDesktopViewer) -> None:
         """GUI thread: the viewer this panel asked for is connected."""
         registry.adopt(SLOT_VIEWER, viewer, self._owner, self._view.callback("_on_displaced"))
         self._clipboard_authority, self._connect_authority = self._connect_authority, None
@@ -375,7 +375,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         if player is not None:
             self._stops.retire(player.stop)
 
-    def _own_viewer(self):
+    def _own_viewer(self) -> Optional[Any]:
         """The viewer this panel opened, or None once it is gone or replaced."""
         return registry.owned(SLOT_VIEWER, self._owner)
 
@@ -542,7 +542,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
 
     # --- input forwarding ---------------------------------------------
 
-    def _send(self, action: dict) -> None:
+    def _send(self, action: Dict[str, Any]) -> None:
         viewer = self._own_viewer()
         if viewer is None or not viewer.connected:
             return
@@ -593,7 +593,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             return
         self._upload_file(source)
 
-    def _on_files_dropped(self, paths) -> None:
+    def _on_files_dropped(self, paths: List[str]) -> None:
         viewer = self._own_viewer()
         if viewer is None or not viewer.connected:
             return

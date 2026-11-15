@@ -18,7 +18,7 @@ and the config reader they share are in ``webrtc_panel_common``.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
@@ -81,6 +81,7 @@ from je_auto_control.gui.remote_desktop.webrtc_viewer_media import _ViewerMediaM
 from je_auto_control.gui.remote_desktop.webrtc_viewer_connection import _ViewerConnectionMixin
 
 if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
+    from je_auto_control.gui.remote_desktop.frame_display import _FrameDisplay
     from je_auto_control.utils.remote_desktop.file_sync import (
         FolderSyncEngine,
     )
@@ -104,10 +105,10 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         self._file_task: Optional[TaskHandle] = None       # the file push in progress, off-thread
         self._stops = StopQueue(self)
         self._stops.drained.connect(self._on_stops_drained)
-        self._stopping_sessions: set = set()
+        self._stopping_sessions: set[str] = set()
         self._adaptive_controller: Optional[AdaptiveBitrateController] = None
         self._adaptive_poller: Optional[StatsPoller] = None
-        self._session_pollers: dict = {}    # session_id -> StatsPoller
+        self._session_pollers: dict[str, StatsPoller] = {}    # session_id -> StatsPoller
         # Lock-protected cache replacing two raw dicts; mutated by the
         # asyncio bridge thread (StatsPoller cb) and read/cleared by the
         # Qt thread. See utils/remote_desktop/session_quality_cache.py.
@@ -193,7 +194,7 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         from PySide6.QtWidgets import QApplication
         QApplication.quit()
 
-    def _on_pending_viewer(self, session_id: str, viewer_id) -> None:
+    def _on_pending_viewer(self, session_id: str, viewer_id: object) -> None:
         if self._multi_host is None:
             return
         dialog = PendingViewerDialog(viewer_id if isinstance(viewer_id, str) else None,
@@ -308,7 +309,7 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
         # future.
         self._wire_display_input(self._frame_display)
 
-    def _wire_display_input(self, source) -> None:
+    def _wire_display_input(self, source: _FrameDisplay | RemoteScreenWindow) -> None:
         """Wire mouse / keyboard / annotation signals from ``source``.
 
         ``source`` can be a :class:`_FrameDisplay` or a
@@ -403,7 +404,7 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
         if state in ("failed", "disconnected"):
             self._maybe_schedule_auto_reconnect()
 
-    def _send(self, payload: dict) -> None:
+    def _send(self, payload: dict[str, Any]) -> None:
         if self._viewer is None or not self._viewer.authenticated:
             return
         try:

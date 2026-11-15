@@ -35,7 +35,7 @@ class AudioBackendError(AutoControlException, RuntimeError):
     """Raised when ``sounddevice`` cannot be loaded or an audio device fails."""
 
 
-def _load_sounddevice():
+def _load_sounddevice() -> Any:
     """Import ``sounddevice`` lazily; raise a helpful error if missing.
 
     ``OSError`` too: sounddevice raises it when the PortAudio library
@@ -51,7 +51,7 @@ def _load_sounddevice():
     return sounddevice
 
 
-def _device_errors(sd: Any) -> tuple:
+def _device_errors(sd: Any) -> tuple[type[BaseException], ...]:
     """What a PortAudio call may raise: ``PortAudioError`` derives from ``Exception`` directly."""
     return (OSError, RuntimeError, sd.PortAudioError)
 
@@ -178,7 +178,7 @@ class AudioCapture(_AudioOwner):
                 callback=lambda *args: self._raw_callback_for(lease, *args),
             ))
 
-    def _raw_callback_for(self, lease, *args) -> None:
+    def _raw_callback_for(self, lease: AudioLease, *args: Any) -> None:
         if not lease.enter():
             return
         try:
@@ -186,7 +186,7 @@ class AudioCapture(_AudioOwner):
         finally:
             lease.leave()
 
-    def _raw_callback(self, indata, frames, time_info, status) -> None:
+    def _raw_callback(self, indata: Any, frames: int, time_info: Any, status: Any) -> None:
         del frames, time_info  # unused — block size is fixed
         if status:
             # An overflow flag still comes with valid samples; dropping the
@@ -211,7 +211,7 @@ class AudioPlayer(_AudioOwner):
         self._sample_rate = int(sample_rate)
         self._channels = int(channels)
         self._lease: Optional[AudioLease] = None
-        self._write_errors: tuple = (OSError, RuntimeError)
+        self._write_errors: tuple[type[BaseException], ...] = (OSError, RuntimeError)
         self._lock = threading.Lock()
 
     @property

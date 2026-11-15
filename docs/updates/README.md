@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261115-08 | 2026-11-15 | 83 more modules join the strict typing tier (four to six fixes each) | #done #typing | [2026-11-b](2026-11-b.md) |
 | U-20261115-07 | 2026-11-15 | 127 more modules join the strict typing tier (two or three fixes each) | #done #typing | [2026-11-b](2026-11-b.md) |
 | U-20261115-06 | 2026-11-15 | 143 more modules join the strict typing tier after one-line fixes | #done #typing | [2026-11-b](2026-11-b.md) |
 | U-20261115-05 | 2026-11-15 | 896 older modules join the strict typing tier | #done #typing | [2026-11-b](2026-11-b.md) |

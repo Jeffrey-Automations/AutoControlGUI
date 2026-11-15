@@ -1,13 +1,16 @@
 """Small discovery tools query the active server registry instead of constructing another catalogue."""
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from je_auto_control.utils.mcp_server.context import ToolCallContext
 from je_auto_control.utils.mcp_server.tools._base import MCPTool, READ_ONLY, schema
 
+if TYPE_CHECKING:
+    from je_auto_control.utils.mcp_server.discovery import ToolSummary
 
-def _search(query: str, limit: int = 10, ctx: ToolCallContext | None = None) -> list:
+
+def _search(query: str, limit: int = 10, ctx: ToolCallContext | None = None) -> list[ToolSummary]:
     if ctx is not None and ctx.tool_catalog is not None:
         ctx.check_cancelled()
         return ctx.tool_catalog().search(query, limit=limit)
@@ -34,15 +37,15 @@ def _view(ctx: ToolCallContext | None) -> Any:
     return ctx.tool_catalog()
 
 
-def _state(ctx: ToolCallContext | None = None) -> dict:
+def _state(ctx: ToolCallContext | None = None) -> dict[str, Any]:
     return _view(ctx).state()
 
 
-def _enable(names: list[str], ctx: ToolCallContext | None = None) -> dict:
+def _enable(names: list[str], ctx: ToolCallContext | None = None) -> dict[str, Any]:
     return _view(ctx).enable(names)
 
 
-def _disable(names: list[str], ctx: ToolCallContext | None = None) -> dict:
+def _disable(names: list[str], ctx: ToolCallContext | None = None) -> dict[str, Any]:
     return _view(ctx).disable(names)
 
 

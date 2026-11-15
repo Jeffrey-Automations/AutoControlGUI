@@ -14,7 +14,7 @@ import json
 import time
 import urllib.parse
 from concurrent.futures import CancelledError
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from je_auto_control.utils.exception.cancellation import current_cancellation_token
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -30,9 +30,9 @@ class SignalingError(AutoControlException, RuntimeError):
 
 
 def _request(method: str, url: str, *,
-             body: Optional[dict] = None,
+             body: Optional[dict[str, Any]] = None,
              secret: Optional[str] = None,
-             timeout: float = _DEFAULT_TIMEOUT_S) -> Optional[dict]:
+             timeout: float = _DEFAULT_TIMEOUT_S) -> Optional[dict[str, Any]]:
     from je_auto_control.utils.http_client.http_client import build_call, perform_call
     headers = {"X-Signaling-Secret": secret} if secret else None
     try:
@@ -49,7 +49,7 @@ def _request(method: str, url: str, *,
     return _json_reply(method, url, response)
 
 
-def _json_reply(method: str, url: str, response: dict) -> Optional[dict]:
+def _json_reply(method: str, url: str, response: dict[str, Any]) -> Optional[dict[str, Any]]:
     """The reply's JSON object: ``None`` for a 404, ``{}`` for an empty body."""
     status = int(response["status"])
     if status == 404:
@@ -68,7 +68,7 @@ def _json_reply(method: str, url: str, response: dict) -> Optional[dict]:
     return payload
 
 
-def _sdp(response: Optional[dict]) -> Optional[str]:
+def _sdp(response: Optional[dict[str, Any]]) -> Optional[str]:
     """The ``sdp`` field of a fetch reply, which must be a string when present."""
     if response is None:
         return None

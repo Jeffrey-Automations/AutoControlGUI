@@ -1,6 +1,6 @@
 """Recording Editor tab: trim, filter and rescale recorded action lists."""
 import json
-from typing import Optional
+from typing import Any, Callable, Optional, Union
 
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
@@ -33,8 +33,8 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
-        self._actions: list = []
-        self._undo_stack: list = []
+        self._actions: list[list[Any]] = []
+        self._undo_stack: list[list[list[Any]]] = []
         self._path_input = QLineEdit()
         self._list = QListWidget()
         self._preview = QTextEdit()
@@ -55,7 +55,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
 
-    def _mutate(self, new_actions: list) -> None:
+    def _mutate(self, new_actions: list[list[Any]]) -> None:
         """Apply an edit, snapshotting the prior state for undo (Ctrl+Z)."""
         self._undo_stack.append(list(self._actions))
         self._actions = new_actions
@@ -93,7 +93,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("re_browse", self._browse),
@@ -244,8 +244,8 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
             return
         self._mutate(scale_coordinates(self._actions, fx, fy))
 
-    def _filter_prefix(self, prefix) -> None:
-        def keep(action: list) -> bool:
+    def _filter_prefix(self, prefix: Union[str, tuple[str, ...]]) -> None:
+        def keep(action: list[Any]) -> bool:
             if not (isinstance(action, list) and action):
                 return False
             name = action[0]

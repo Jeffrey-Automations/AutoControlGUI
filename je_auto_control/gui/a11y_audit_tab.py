@@ -6,7 +6,7 @@ tree, so it runs off the GUI thread (:class:`~je_auto_control.gui._tab_task.TabT
 the contrast check is arithmetic and stays where it is.
 """
 import functools
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -31,13 +31,13 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _ints(raw: str):
+def _ints(raw: str) -> list[int]:
     return [int(p.strip()) for p in raw.split(",") if p.strip()]
 
 
-def _audit(app: Optional[str]) -> dict:
+def _audit(app: Optional[str]) -> dict[str, Any]:
     """Worker thread: run the audit and hand back plain data."""
-    report: dict = ac.run_audit(app_name=app).to_dict()
+    report: dict[str, Any] = ac.run_audit(app_name=app).to_dict()
     return report
 
 
@@ -96,7 +96,7 @@ class A11yAuditTab(TranslatableMixin, QWidget):
         set_role(self._summary, "hint")
         root.addWidget(self._summary)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("audit_run", self._on_run),
@@ -111,7 +111,7 @@ class A11yAuditTab(TranslatableMixin, QWidget):
     def _on_audit_error(self, error: object) -> None:
         self._summary.setText(str(error))
 
-    def _render(self, report: dict) -> None:
+    def _render(self, report: dict[str, Any]) -> None:
         issues = report["issues"]
         self._table.setRowCount(len(issues))
         for row, issue in enumerate(issues):

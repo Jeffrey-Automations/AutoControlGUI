@@ -6,7 +6,7 @@ still the place to edit complex nested branches; this tab is a clear
 visual map of what the script will do.
 """
 import json
-from typing import List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -42,7 +42,7 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         self._view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         self._steps: List[Step] = []
         # The other keys of a wrapped file, written back by Save.
-        self._file_extras: Optional[dict] = None
+        self._file_extras: Optional[Dict[str, Any]] = None
         self._inspector = QTextEdit()
         self._inspector.setReadOnly(True)
         self._status = QLabel()
@@ -71,7 +71,7 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         root.addWidget(self._status)
         self._apply_translations()
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("flow_open_btn", self._on_open),
@@ -146,7 +146,7 @@ class FlowEditorTab(TranslatableMixin, QWidget):
             return
         self._view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
-    def _on_node_selected(self, path: Tuple) -> None:
+    def _on_node_selected(self, path: Tuple[object, ...]) -> None:
         step = _resolve_step(self._steps, path)
         if step is None:
             return
@@ -159,7 +159,7 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         )
 
 
-def _resolve_step(roots: List[Step], path: Tuple) -> Optional[Step]:
+def _resolve_step(roots: List[Step], path: Tuple[object, ...]) -> Optional[Step]:
     if not path:
         return None
     head, *tail = path

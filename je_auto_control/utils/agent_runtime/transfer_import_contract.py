@@ -17,7 +17,7 @@ IMPORT_FIELDS = {
 STATES = frozenset({'queued', 'receiving', 'verified', 'published', 'requires_review', 'cancelled', 'expired'})
 
 
-def import_request(operation: str, request: Mapping) -> dict:
+def import_request(operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
     """Validate exact finite fields; only the destination interprets its directory and registered source label."""
     if not isinstance(operation, str) or operation not in IMPORT_FIELDS:
         raise AgentTaskError('destination transfer management operation is unavailable')
@@ -40,7 +40,7 @@ def import_request(operation: str, request: Mapping) -> dict:
     return deepcopy(value)
 
 
-def import_reply(operation: str, reply: Mapping, request: dict) -> dict:
+def import_reply(operation: str, reply: Mapping[str, Any], request: dict[str, Any]) -> dict[str, Any]:
     """Retain only bounded public receipt fields, never remote issuer, store, origin or cache-account data."""
     if not isinstance(operation, str) or operation not in IMPORT_FIELDS:
         raise AgentTaskError('destination transfer management operation is unavailable')
@@ -57,7 +57,7 @@ def import_reply(operation: str, reply: Mapping, request: dict) -> dict:
     return {'import': receipt}
 
 
-def _review(reply: Mapping, request: dict) -> dict:
+def _review(reply: Mapping[str, Any], request: dict[str, Any]) -> dict[str, Any]:
     value, manifest = _review_envelope(reply)
     if manifest.export_id != request['export_id'] or manifest.digest != value['digest']:
         raise AgentTaskError('destination review does not bind the requested source manifest')
@@ -67,7 +67,7 @@ def _review(reply: Mapping, request: dict) -> dict:
             'review_expires': value['review_expires'], 'approval_required': True}
 
 
-def _receipt(reply: Any) -> dict:
+def _receipt(reply: Any) -> dict[str, Any]:
     value = _object(reply, {'import_id', 'state', 'expires', 'manifest_digest', 'files_directory'})
     _hex(value['import_id'], 32)
     _hex(value['manifest_digest'], 64)

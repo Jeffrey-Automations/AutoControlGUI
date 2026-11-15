@@ -20,7 +20,7 @@ SOURCE_FIELDS = {'review_export': {'source_task', 'selection', 'recipient_policy
                  'revoke_export': {'export_id'}, 'list_exports': {'source_task'}}
 
 
-def management_request(operation: str, request: Mapping[str, Any]) -> dict:
+def management_request(operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
     """Accept only the finite source operation's exact public fields, never a host or private principal."""
     if isinstance(operation, str) and operation in EVIDENCE_FIELDS:
         return evidence_request(operation, request)
@@ -40,7 +40,7 @@ def management_request(operation: str, request: Mapping[str, Any]) -> dict:
     return deepcopy(value)
 
 
-def _review_request(value: dict) -> None:
+def _review_request(value: dict[str, Any]) -> None:
     _hex(value['source_task'], 32)
     _text(value['idempotency_key'], 256, 'idempotency key')
     if value['recipient_policy'] not in ('caller', 'source_owner'):
@@ -51,7 +51,7 @@ def _review_request(value: dict) -> None:
         TransferSelection.from_dict(item)
 
 
-def management_reply(operation: str, reply: Mapping[str, Any], request: dict) -> dict:
+def management_reply(operation: str, reply: Mapping[str, Any], request: dict[str, Any]) -> dict[str, Any]:
     """Validate exact bounded public projections without granting source-task visibility or input authority."""
     if operation in EVIDENCE_FIELDS:
         return evidence_reply(operation, reply, request)
@@ -70,7 +70,7 @@ def management_reply(operation: str, reply: Mapping[str, Any], request: dict) ->
     return {'export': value}
 
 
-def _list_reply(reply: Mapping[str, Any], source_task: str) -> dict:
+def _list_reply(reply: Mapping[str, Any], source_task: str) -> dict[str, Any]:
     value = _object(reply, {'exports'})['exports']
     if not isinstance(value, list) or len(value) > 128:
         raise AgentTaskError('source export list exceeds its finite grant quota')
@@ -80,7 +80,7 @@ def _list_reply(reply: Mapping[str, Any], source_task: str) -> dict:
     return {'exports': exports}
 
 
-def _review_reply(reply: Mapping[str, Any], request: dict) -> dict:
+def _review_reply(reply: Mapping[str, Any], request: dict[str, Any]) -> dict[str, Any]:
     value, manifest = _review_envelope(reply)
     if (manifest.source_task != request['source_task'] or manifest.digest != value['digest']
             or value['approval_required'] is not True or min(value['review_expires'], manifest.expires) <= time.time()):
@@ -89,7 +89,7 @@ def _review_reply(reply: Mapping[str, Any], request: dict) -> dict:
             'review_expires': value['review_expires'], 'approval_required': True}
 
 
-def _export(reply: Any) -> dict:
+def _export(reply: Any) -> dict[str, Any]:
     value = _object(reply, {'export_id', 'state', 'manifest', 'cleanup_pending'})
     _hex(value['export_id'], 32)
     manifest = TransferManifest.from_dict(value['manifest'])

@@ -18,17 +18,17 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 ImageSource = Any
 
 
-def _gray(source: Optional[ImageSource], region: Optional[Sequence[int]]):
+def _gray(source: Optional[ImageSource], region: Optional[Sequence[int]]) -> Any:
     from je_auto_control.utils.visual_match.visual_match import _haystack_gray
     return _haystack_gray(source, region)
 
 
-def _gray_with_origin(source: Optional[ImageSource], region: Optional[Sequence[int]]):
+def _gray_with_origin(source: Optional[ImageSource], region: Optional[Sequence[int]]) -> Tuple[Any, int, int]:
     from je_auto_control.utils.visual_match.visual_match import _haystack_gray_with_origin
     return _haystack_gray_with_origin(source, region)
 
 
-def _saliency_from_gray(gray, size: int):
+def _saliency_from_gray(gray: Any, size: int) -> Any:
     import cv2
     import numpy as np
     small = cv2.resize(gray, (size, size),
@@ -45,7 +45,7 @@ def _saliency_from_gray(gray, size: int):
 
 
 def saliency_map(source: Optional[ImageSource] = None, *,
-                 region: Optional[Sequence[int]] = None, size: int = 64):
+                 region: Optional[Sequence[int]] = None, size: int = 64) -> Any:
     """Return the normalised (0–1) spectral-residual saliency map as an ndarray.
 
     The map is computed at ``size`` x ``size`` (the algorithm's native low
@@ -54,7 +54,7 @@ def saliency_map(source: Optional[ImageSource] = None, *,
     return _saliency_from_gray(_gray(source, region), int(size))
 
 
-def _regions_from_saliency(saliency, orig_shape: Tuple[int, int],
+def _regions_from_saliency(saliency: Any, orig_shape: Tuple[int, int],
                            threshold: Optional[float], min_area: int,
                            size: int) -> List[Dict[str, Any]]:
     from je_auto_control.utils.cv2_utils.blobs import connected_boxes

@@ -22,7 +22,7 @@ class LanguageWrapper:
 
     def __init__(self) -> None:
         autocontrol_logger.info("Init LanguageWrapper")
-        self._registry: Dict[str, dict] = {
+        self._registry: Dict[str, Dict[str, str]] = {
             "English": english_word_dict,
             "Traditional_Chinese": traditional_chinese_word_dict,
             "Simplified_Chinese": simplified_chinese_word_dict,
@@ -30,14 +30,14 @@ class LanguageWrapper:
         }
         self.language: str = "English"
         self._listeners: List[Callable[[str], None]] = []
-        self.language_word_dict: dict = self._merged(self.language)
+        self.language_word_dict: Dict[str, str] = self._merged(self.language)
 
     @property
     def available_languages(self) -> List[str]:
         """Sorted list of registered language names."""
         return sorted(self._registry.keys())
 
-    def register_language(self, name: str, words: dict) -> None:
+    def register_language(self, name: str, words: Dict[str, str]) -> None:
         """Add or replace a language dict at runtime (plugin-friendly)."""
         self._registry[name] = dict(words)
         if name == self.language:
@@ -55,12 +55,12 @@ class LanguageWrapper:
             except (OSError, RuntimeError) as error:
                 autocontrol_logger.error("language listener failed: %r", error)
 
-    def add_listener(self, callback) -> None:
+    def add_listener(self, callback: Callable[[str], None]) -> None:
         """Register ``callback(language)`` to fire when the language changes."""
         if callback not in self._listeners:
             self._listeners.append(callback)
 
-    def remove_listener(self, callback) -> None:
+    def remove_listener(self, callback: Callable[[str], None]) -> None:
         if callback in self._listeners:
             self._listeners.remove(callback)
 
@@ -74,7 +74,7 @@ class LanguageWrapper:
             return fallback
         return default or key
 
-    def _merged(self, language: str) -> dict:
+    def _merged(self, language: str) -> Dict[str, str]:
         merged = dict(english_word_dict)
         merged.update(self._registry.get(language, {}))
         return merged

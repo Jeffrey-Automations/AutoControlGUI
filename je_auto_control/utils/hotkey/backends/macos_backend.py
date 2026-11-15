@@ -4,11 +4,11 @@ Requires Accessibility permission (System Settings → Privacy & Security →
 Accessibility) for the Python interpreter or the host application. Without
 it ``CGEventTapCreate`` silently returns ``None`` and we log + exit.
 """
-from typing import Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.hotkey.backends.base import FailedCombos, HotkeyBackend
 from je_auto_control.utils.hotkey.hotkey_daemon import (
-    BackendContext, split_combo,
+    BackendContext, HotkeyBinding, split_combo,
 )
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -80,7 +80,7 @@ class MacOSHotkeyBackend(HotkeyBackend):
         # binding_id -> (combo, flags_mask, keycode)
         self._registered: Dict[str, Tuple[str, int, int]] = {}
         self._failed = FailedCombos()
-        self._pending_fires: list = []
+        self._pending_fires: List[str] = []
 
     def run_forever(self, context: BackendContext) -> None:
         try:
@@ -96,7 +96,7 @@ class MacOSHotkeyBackend(HotkeyBackend):
             CFRunLoopRunInMode, kCFRunLoopDefaultMode,
         )
 
-        def tap_callback(_proxy, _event_type, event, _refcon):
+        def tap_callback(_proxy: Any, _event_type: Any, event: Any, _refcon: Any) -> Any:
             keycode = Quartz.CGEventGetIntegerValueField(
                 event, Quartz.kCGKeyboardEventKeycode,
             )
@@ -137,7 +137,7 @@ class MacOSHotkeyBackend(HotkeyBackend):
                 run_loop, source, kCFRunLoopDefaultMode,
             )
 
-    def _sync(self, bindings) -> None:
+    def _sync(self, bindings: List[HotkeyBinding]) -> None:
         current_ids = {b.binding_id for b in bindings}
         for stale in [bid for bid in self._registered if bid not in current_ids]:
             self._registered.pop(stale, None)
@@ -170,6 +170,6 @@ class MacOSHotkeyBackend(HotkeyBackend):
                 return bid
         return None
 
-    def _drain_fires(self, fire) -> None:
+    def _drain_fires(self, fire: Callable[[str], None]) -> None:
         while self._pending_fires:
             fire(self._pending_fires.pop(0))

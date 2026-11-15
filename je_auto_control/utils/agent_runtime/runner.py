@@ -63,7 +63,7 @@ def _loop(runtime: Any, task_id: str, spec: AgentTaskSpec, backend: Any, guard: 
     return runtime.get(task_id)
 
 
-def _skill_proposal(spec: AgentTaskSpec, receipts: list[dict]) -> dict | None:
+def _skill_proposal(spec: AgentTaskSpec, receipts: list[dict[str, Any]]) -> dict[str, Any] | None:
     """Return the next declared workflow action, or None once every action has a receipt."""
     if not verified_prefix(spec, receipts):
         raise AgentTaskError("previous workflow read-back did not match; review before continuing")
@@ -72,7 +72,7 @@ def _skill_proposal(spec: AgentTaskSpec, receipts: list[dict]) -> dict | None:
     return thaw(spec.actions[len(receipts)])
 
 
-def _grounded_action(proposal: dict, values: dict, observation_id: str) -> dict:
+def _grounded_action(proposal: dict[str, Any], values: dict[str, Any], observation_id: str) -> dict[str, Any]:
     action = {"tool": proposal["tool"], "arguments": resolve(proposal.get("arguments", {}), values),
               "observation_id": observation_id}
     if proposal.get("reference") is not None:
@@ -85,7 +85,8 @@ def _can_reobserve(runtime: Any, task_id: str) -> bool:
     return getattr(target, "can_reobserve", False) is True
 
 
-def _check_step(proposal: dict, values: dict, result: Any, action: dict, guard: LoopGuard | None) -> None:
+def _check_step(proposal: dict[str, Any], values: dict[str, Any], result: Any, action: dict[str, Any],
+                guard: LoopGuard | None) -> None:
     if "expect_not_result" in proposal and thaw(result) == proposal["expect_not_result"]:
         raise AgentTaskError("workflow confirmation is stale; review before continuing")
     required, value = expected(proposal, values)
@@ -98,7 +99,7 @@ def _check_step(proposal: dict, values: dict, result: Any, action: dict, guard: 
 
 
 def _decision(runtime: Any, task_id: str, spec: AgentTaskSpec, backend: Any, observation: Any,
-              receipts: list[dict]) -> dict:
+              receipts: list[dict[str, Any]]) -> dict[str, Any]:
     last_error: AgentTaskError | None = None
     for _attempt in range(spec.budget.retries + 1):
         runtime._token(task_id).checkpoint()

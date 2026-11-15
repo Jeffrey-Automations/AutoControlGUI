@@ -13,7 +13,7 @@ from je_auto_control.utils.agent_runtime.store import request_spec_digest
 from je_auto_control.utils.rbac.authorization import current_authorization
 
 
-def prepare_authorization(spec: AgentTaskSpec, snapshot: str) -> dict:
+def prepare_authorization(spec: AgentTaskSpec, snapshot: str) -> dict[str, Any]:
     """Bind review to original task roots and effective live policy intersections, without input."""
     if not isinstance(snapshot, str) or re.fullmatch(r"[0-9a-f]{64}", snapshot) is None:
         raise AgentTaskError("authorization review requires a source snapshot")
@@ -31,7 +31,7 @@ def prepare_authorization(spec: AgentTaskSpec, snapshot: str) -> dict:
     return {"review": request_spec_digest(data), "context": data}
 
 
-def authorized_template(spec: dict, authorization: dict) -> dict:
+def authorized_template(spec: dict[str, Any], authorization: dict[str, Any]) -> dict[str, Any]:
     """Retain available prior constraints and bind new live origins within the original ceiling."""
     result = detached(spec)
     context = authorization["context"]
@@ -47,7 +47,7 @@ def authorized_template(spec: dict, authorization: dict) -> dict:
     return result
 
 
-def narrowed_template(template: dict, reviewed: dict) -> dict:
+def narrowed_template(template: dict[str, Any], reviewed: dict[str, Any]) -> dict[str, Any]:
     """Permit only equivalent or smaller roots inside the reviewed effective intersection."""
     roots = reviewed["roots"]
     if any(not any(Path(root).is_relative_to(Path(parent)) for parent in template["roots"]) for root in roots):
@@ -57,7 +57,7 @@ def narrowed_template(template: dict, reviewed: dict) -> dict:
     return result
 
 
-def authorization_details(authorization: dict, spec: AgentTaskSpec) -> dict:
+def authorization_details(authorization: dict[str, Any], spec: AgentTaskSpec) -> dict[str, Any]:
     """Freeze the exact policy review, approved roots and operator identity for durable provenance."""
     identity = current_authorization()
     return {**authorization, "approved_roots": list(spec.roots),
@@ -71,8 +71,8 @@ def _validate_roots(roots: Any) -> None:
         raise AgentTaskError("origin roots require a fresh authorization review") from None
 
 
-def _clipped_policies(roots: Any, policies: list[dict]) -> list[dict]:
-    result: dict[str, dict] = {}
+def _clipped_policies(roots: Any, policies: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
     for policy in policies:
         _validate_roots(policy["roots"])
         result[policy["id"]] = {"id": policy["id"], "roots": _intersect(roots, policy["roots"])}

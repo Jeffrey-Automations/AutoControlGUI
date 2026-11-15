@@ -80,11 +80,11 @@ def _enabled_state(after: Sequence[Element], param: Dict[str, Any],
     return False, "element not found"
 
 
-def _enabled(after, before, param):
+def _enabled(after: Sequence[Element], before: Optional[Sequence[Element]], param: Dict[str, Any]) -> Report:
     return _enabled_state(after, param, True)
 
 
-def _disabled(after, before, param):
+def _disabled(after: Sequence[Element], before: Optional[Sequence[Element]], param: Dict[str, Any]) -> Report:
     return _enabled_state(after, param, False)
 
 
@@ -93,15 +93,15 @@ def _text(after: Sequence[Element], text: Any, want_present: bool) -> Report:
     return found == want_present, "present" if found else "absent"
 
 
-def _text_present(after, before, param):
+def _text_present(after: Sequence[Element], before: Optional[Sequence[Element]], param: Any) -> Report:
     return _text(after, param, True)
 
 
-def _text_absent(after, before, param):
+def _text_absent(after: Sequence[Element], before: Optional[Sequence[Element]], param: Any) -> Report:
     return _text(after, param, False)
 
 
-def _count(after, before, param: Dict[str, Any]) -> Report:
+def _count(after: Sequence[Element], before: Optional[Sequence[Element]], param: Dict[str, Any]) -> Report:
     number = sum(1 for e in after if _matches(e, param.get("match", {})))
     if "equals" in param:
         return number == int(param["equals"]), f"count={number}"

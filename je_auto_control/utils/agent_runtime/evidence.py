@@ -74,7 +74,7 @@ class TaskEvidence:
         return {"task_id": task_id, "history_id": run_id, "journal_path": str(journal)}
 
     @staticmethod
-    def _current_link(connection: Any, task_id: str, journal: Path) -> dict | None:
+    def _current_link(connection: Any, task_id: str, journal: Path) -> dict[str, Any] | None:
         row = connection.execute('SELECT * FROM agent_evidence WHERE task_id=?', (task_id,)).fetchone()
         if row is None or Path(row['journal_path']) != journal:
             return None
@@ -150,7 +150,7 @@ class TaskEvidence:
                                "(SELECT 1 FROM agent_tasks WHERE id=? AND updated=?)",
                                (task_id, task_id, row["updated"]))
 
-    def image(self, task_id: str, observation_id: str, image: dict) -> None:
+    def image(self, task_id: str, observation_id: str, image: dict[str, Any]) -> None:
         """Persist only explicitly opted-in, strict-redacted target images under generated names."""
         if image.get("redacted_by") != "strict" or image.get("format") != "jpeg":
             raise AgentTaskError("persistent task images require strict target redaction")
@@ -195,7 +195,7 @@ def _owned_artifact(path: Path) -> bool:
         re.fullmatch(r"[0-9a-f]{32}\.jpg", path.name) is not None)
 
 
-def _summary(receipt: dict) -> dict:
+def _summary(receipt: dict[str, Any]) -> dict[str, Any]:
     outcome = json.dumps(receipt["result"], sort_keys=True).encode("utf-8")
     result = {"id": receipt["id"], "command": receipt["command"], "status": receipt["status"],
               "created": receipt["created"], "result_sha256": hashlib.sha256(outcome).hexdigest()}
@@ -204,7 +204,7 @@ def _summary(receipt: dict) -> dict:
     return result
 
 
-def _replay_reasons(receipt: dict) -> tuple[str, ...]:
+def _replay_reasons(receipt: dict[str, Any]) -> tuple[str, ...]:
     if receipt.get("reviewed_by"):
         return ("owner reviewed outcome",)
     return ("uncertain effect",) if receipt["status"] == "uncertain" else ()

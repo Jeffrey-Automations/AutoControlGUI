@@ -1,14 +1,14 @@
 """Independent auto-click controls with owned timer and cancellable background input."""
 from dataclasses import dataclass
 from functools import partial
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence, Tuple, Union
 
 from PySide6.QtCore import QTimer
 
 from PySide6.QtWidgets import (
     QWidget, QLineEdit, QComboBox, QVBoxLayout, QLabel, QFormLayout,
     QHBoxLayout, QRadioButton, QButtonGroup, QMessageBox,
-    QGroupBox,
+    QGroupBox, QLayout,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
@@ -38,7 +38,7 @@ class _Click:
     count: int
 
 
-def _form_panel(rows) -> QWidget:
+def _form_panel(rows: Sequence[Tuple[Optional[QWidget], Union[QWidget, QLayout]]]) -> QWidget:
     """A frameless panel holding ``(label, field)`` form rows; a ``None`` label spans the row."""
     panel = QWidget()
     panel.setProperty("role", "bare")
@@ -200,14 +200,14 @@ class AutoClickTab(TranslatableMixin, QWidget):
                 self._translate("current_position") + self._pos_label_suffix,
             )
 
-    def _update_click_mode(self):
+    def _update_click_mode(self) -> None:
         use_mouse = self.mouse_radio.isChecked()
         self.cursor_x_input.setEnabled(use_mouse)
         self.cursor_y_input.setEnabled(use_mouse)
         self.mouse_button_combo.setEnabled(use_mouse)
         self.keyboard_button_combo.setEnabled(not use_mouse)
 
-    def _start_auto_click(self):
+    def _start_auto_click(self) -> None:
         try:
             interval = int(self.interval_input.text())
         except ValueError:
@@ -227,7 +227,7 @@ class AutoClickTab(TranslatableMixin, QWidget):
         self.timer.start()
         self._refresh_status()
 
-    def _stop_auto_click(self):
+    def _stop_auto_click(self) -> None:
         """Stop the auto-clicker and ask every running script to stop (Ctrl+4)."""
         self.dispose()
         stop_all_script_runs()

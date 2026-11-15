@@ -17,12 +17,13 @@ from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 class DagLocalTasks:
     """Only exact bound local requests can be accepted, inspected or retired through a batch attempt."""
 
-    def __init__(self, runtime: Any, batch: dict, request: dict, actor: DeferredAuthorization) -> None:
+    def __init__(self, runtime: Any, batch: dict[str, Any], request: dict[str, Any],
+                 actor: DeferredAuthorization) -> None:
         self.runtime, self.batch, self.request, self.actor = runtime, batch, request, actor
         self.node = bound_node(batch, request["node_id"])
         self.owner = DeferredAuthorization(AuthorizationContext(**batch["owner"]) if batch["owner"] else None)
 
-    def control(self) -> dict:
+    def control(self) -> dict[str, Any]:
         """Validate closed fields, original authority and trusted request identity before any local operation."""
         operation, body = self.request["operation"], self.request["body"]
         if (not isinstance(operation, str) or self.node["host"] != "local"
@@ -47,13 +48,13 @@ class DagLocalTasks:
         if row is None or row["phase"] != "claimed":
             raise AgentTaskError("local DAG admission requires an unsettled pre-delivery claim")
 
-    def _request_key(self, body: dict) -> None:
+    def _request_key(self, body: dict[str, Any]) -> None:
         if body.get("idempotency_key") != self.node["task"]["idempotency_key"]:
             raise AgentTaskError("local DAG task request key changed")
         if "spec" in body and submitted_digest(body["spec"]) != submitted_digest(self.node["task"]["spec"]):
             raise AgentTaskError("local DAG task specification changed")
 
-    def _submit(self, body: dict) -> dict:
+    def _submit(self, body: dict[str, Any]) -> dict[str, Any]:
         if set(body) != {"spec", "idempotency_key"}:
             raise AgentTaskError("local DAG submit requires exact spec and request key only")
         self._request_key(body)
@@ -69,7 +70,7 @@ class DagLocalTasks:
         jobs.start(task.task_id)
         return {"task_id": task.task_id, "state": task.state}
 
-    def _read(self, operation: str, body: dict) -> dict:
+    def _read(self, operation: str, body: dict[str, Any]) -> dict[str, Any]:
         if operation == "lookup":
             if not {"idempotency_key"} <= set(body) or set(body) - {"idempotency_key", "spec"}:
                 raise AgentTaskError("local DAG lookup accepts only the bound key and optional specification")

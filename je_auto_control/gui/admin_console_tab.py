@@ -12,7 +12,7 @@ skips the hosts not reached yet and drops the answer.
 import functools
 import json
 import threading
-from typing import Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QSize, QTimer, Qt
 from PySide6.QtGui import QIcon, QImage, QPixmap
@@ -33,7 +33,7 @@ from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
 )
 from je_auto_control.gui.tab_task_controller import TaskTimeout
 from je_auto_control.utils.admin.admin_client import (
-    default_admin_console,
+    HostStatus, default_admin_console,
 )
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -127,7 +127,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("admin_add", self._on_add),
@@ -225,7 +225,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._broadcast_stop.set()
         self._broadcast_status.setText(_t("admin_broadcast_stopping"))
 
-    def _show_broadcast(self, results) -> None:
+    def _show_broadcast(self, results: List[Dict[str, Any]]) -> None:
         self._broadcast_stop = None
         self._broadcast_output.setPlainText(
             json.dumps(results, indent=2, ensure_ascii=False, default=str),
@@ -239,7 +239,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._broadcast_output.setPlainText(str(error))
         self._broadcast_status.setText("")
 
-    def _apply_poll_result(self, statuses: list) -> None:
+    def _apply_poll_result(self, statuses: List[HostStatus]) -> None:
         self._refresh_table(statuses=statuses)
 
     def _apply_poll_failure(self, error: object) -> None:
@@ -300,7 +300,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
                 out.append(item.text())
         return out
 
-    def _refresh_table(self, statuses: Optional[list] = None) -> None:
+    def _refresh_table(self, statuses: Optional[List[HostStatus]] = None) -> None:
         hosts = self._client.list_hosts()
         status_by_label = {s.label: s for s in (statuses or [])}
         self._table.setRowCount(len(hosts))

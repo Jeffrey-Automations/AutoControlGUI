@@ -144,7 +144,7 @@ class _WebhookHandler(BaseHTTPRequestHandler):
     # rename or annotation drift; the shadow of the stdlib 'format' is
     # the parent class's choice, not ours.
     # pylint: disable=redefined-builtin
-    def log_message(self, format, *args):  # noqa: A002
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
         autocontrol_logger.debug("webhook %s", log_safe(format % args))
     # pylint: enable=redefined-builtin
 
@@ -276,7 +276,7 @@ class WebhookTriggerServer:
     """Push-based trigger: external HTTP requests fire the registered script."""
 
     def __init__(self,
-                 executor: Optional[Callable[[list, Dict[str, Any]], Any]] = None,
+                 executor: Optional[Callable[[List[Any], Dict[str, Any]], Any]] = None,
                  ) -> None:
         self._lock = threading.RLock()
         # Serialise firings so concurrent webhook hits do not race on the
@@ -286,7 +286,7 @@ class WebhookTriggerServer:
         self._server: Optional[ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
         self._bound: Optional[Tuple[str, int]] = None
-        self._executor: Callable[[list, Dict[str, Any]], Any] = (
+        self._executor: Callable[[List[Any], Dict[str, Any]], Any] = (
             self._default_executor if executor is None else executor
         )
 
@@ -449,7 +449,7 @@ class WebhookTriggerServer:
             thread.join(timeout=timeout)
 
     @staticmethod
-    def _default_executor(actions: list, variables: Dict[str, Any]) -> Any:
+    def _default_executor(actions: List[Any], variables: Dict[str, Any]) -> Any:
         """Default: thread-safe global executor with ``variables`` seeded."""
         from je_auto_control.utils.executor.action_executor import (
             execute_action_with_vars,

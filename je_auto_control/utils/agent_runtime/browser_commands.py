@@ -34,7 +34,7 @@ def browser_session_scope(session: Any) -> Iterator[None]:
         _SESSION.reset(token)
 
 
-def _execute(name: str, arguments: dict, operation: str, *, timeout: float | None = None) -> Any:
+def _execute(name: str, arguments: dict[str, Any], operation: str, *, timeout: float | None = None) -> Any:
     context, session = current_operation(), _SESSION.get()
     if context is None or session is None:
         raise AgentTaskError("browser command requires its managed WebRunner session")
@@ -54,7 +54,7 @@ def _execute(name: str, arguments: dict, operation: str, *, timeout: float | Non
     return result
 
 
-def _sdk_call(session: Any, operation: str, arguments: dict) -> Any:
+def _sdk_call(session: Any, operation: str, arguments: dict[str, Any]) -> Any:
     if operation in {"link", "download", "upload"}:
         from je_auto_control.utils.agent_runtime.browser_transfers import sdk_transfer
         return sdk_transfer(session, operation, arguments)
@@ -89,7 +89,7 @@ def browser_link(selector: str, frame: str = "") -> str:
     return str(_execute("AC_browser_link", {"selector": selector, "frame": frame}, "link"))
 
 
-def browser_download(url: str, directory: str, name: str, sha256: str = "") -> dict:
+def browser_download(url: str, directory: str, name: str, sha256: str = "") -> dict[str, Any]:
     """Download through WebRunner and publish a complete file within explicit task roots."""
     _bounded(url, "URL", 4096)
     _bounded(name, "filename", 255)
@@ -97,7 +97,7 @@ def browser_download(url: str, directory: str, name: str, sha256: str = "") -> d
                                                "sha256": sha256}, "download"))
 
 
-def browser_upload(selector: str, path: str, sha256: str = "", frame: str = "") -> dict:
+def browser_upload(selector: str, path: str, sha256: str = "", frame: str = "") -> dict[str, Any]:
     """Send one rooted bounded file as immutable bytes; never submit the form automatically."""
     _bounded(selector, "selector", 4096)
     _bounded(frame, "frame", 4096, empty=True)

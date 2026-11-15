@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import subprocess  # nosec B404  # reason: argv-list, no shell interpolation
 import time
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from je_auto_control.linux_wayland._detect import (
     WAYLAND_WTYPE, WAYLAND_YDOTOOL, binary_path,
@@ -29,6 +29,9 @@ from je_auto_control.linux_wayland._ydotool_cli import reject_legacy_cli
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+
+if TYPE_CHECKING:
+    from je_auto_control.linux_wayland.ei_protocol import InputBackend
 
 
 _INSTALL_HINT_WTYPE = (
@@ -56,7 +59,7 @@ def _require_ydotool() -> str:
     return reject_legacy_cli(_require(WAYLAND_YDOTOOL, _INSTALL_HINT_YDOTOOL))
 
 
-def _run(argv: list, *, timeout: float = 5.0) -> None:
+def _run(argv: list[str], *, timeout: float = 5.0) -> None:
     # argv comes from a private allow-list (wtype / ydotool absolute
     # paths via shutil.which), never user input; no shell=True.
     try:
@@ -97,7 +100,7 @@ def release_key(keycode: int) -> None:
     _run([_require_ydotool(), "key", f"{int(keycode)}:0"])
 
 
-def _try_libei():
+def _try_libei() -> InputBackend | None:
     """Return a connected :class:`LibeiBackend`, or None when CLI should win."""
     try:
         from je_auto_control.linux_wayland._select_input import active_backend
@@ -127,7 +130,7 @@ def hotkey(keycodes: Iterable[int]) -> None:
     _run(args)
 
 
-def _libei_chord(libei, codes: list) -> bool:
+def _libei_chord(libei: InputBackend, codes: list[int]) -> bool:
     """Send a whole chord through libei; False means the CLI has to redo it.
 
     Attempt every owned release on the same backend before propagating a
@@ -151,7 +154,7 @@ def _libei_chord(libei, codes: list) -> bool:
     return taken
 
 
-def _release_chord(libei, pressed: list, failure: BaseException | None) -> bool:
+def _release_chord(libei: InputBackend, pressed: list[int], failure: BaseException | None) -> bool:
     released = True
     errors: list[BaseException] = []
     for code in reversed(pressed):

@@ -16,7 +16,7 @@ import urllib.request
 
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.http_headers import CREDENTIAL_HEADERS
-from typing import Any, Dict, Mapping, Optional
+from typing import IO, Any, Dict, Mapping, Optional
 
 # NOSONAR python:S5332 — http is allow-listed deliberately (other schemes
 # are rejected); plain http is required for internal/localhost endpoints.
@@ -114,7 +114,7 @@ def _read_response(response: Any, want_bytes: bool = False, *,
     return result
 
 
-def _collect_headers(raw_headers: Any) -> "tuple[Dict[str, str], list]":
+def _collect_headers(raw_headers: Any) -> "tuple[Dict[str, str], list[str]]":
     """Response headers with repeats joined, plus every ``Set-Cookie`` value.
 
     ``dict(headers.items())`` kept only the last of a repeated header, so a
@@ -124,7 +124,7 @@ def _collect_headers(raw_headers: Any) -> "tuple[Dict[str, str], list]":
     them in the list.
     """
     headers: Dict[str, str] = {}
-    set_cookie: list = []
+    set_cookie: list[str] = []
     for name, value in (raw_headers.items() if raw_headers else []):
         if name.lower() == "set-cookie":
             set_cookie.append(value)
@@ -157,7 +157,9 @@ class _CheckedRedirectHandler(urllib.request.HTTPRedirectHandler):
     could redirect to any other host -- or to ``ftp://``.
     """
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
+    def redirect_request(self, req: urllib.request.Request, fp: IO[bytes], code: int,  # noqa: D102
+                         msg: str, headers: http.client.HTTPMessage,
+                         newurl: str) -> Optional[urllib.request.Request]:
         from je_auto_control.utils.egress.egress_policy import get_egress_policy
         _validate_url(newurl)
         get_egress_policy().check(newurl)
@@ -175,7 +177,9 @@ class _CheckedRedirectHandler(urllib.request.HTTPRedirectHandler):
 class _RefusingRedirectHandler(urllib.request.HTTPRedirectHandler):
     """Return a 3xx as the response instead of following it."""
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
+    def redirect_request(self, req: urllib.request.Request, fp: IO[bytes], code: int,  # noqa: D102
+                         msg: str, headers: http.client.HTTPMessage,
+                         newurl: str) -> Optional[urllib.request.Request]:
         return None
 
 

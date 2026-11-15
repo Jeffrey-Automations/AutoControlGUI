@@ -45,7 +45,7 @@ def _ready(value: Any) -> str | None:
     raise AgentTaskError('physical presence source startup response is invalid')
 
 
-def _available(reply: dict) -> bool:
+def _available(reply: dict[str, Any]) -> bool:
     if reply['status'] in {'busy', 'lease_lost'}:
         return False
     if reply['status'] != 'ok' or reply['result']['state'] not in {'waiting_idle', 'locked', 'monitoring'}:
@@ -86,7 +86,7 @@ class PresenceBroker:
             self._binding.owner = None
         return self._pipe.connect()
 
-    def bootstrap(self) -> dict:
+    def bootstrap(self) -> dict[str, Any]:
         """Borrow a verified source or launch one missing source after the parent owns this helper."""
         with self._mutex:
             if self._binding.closed:
@@ -110,7 +110,7 @@ class PresenceBroker:
                 self.close()
                 raise
 
-    def request(self, operation: str, body: dict) -> dict:
+    def request(self, operation: str, body: dict[str, Any]) -> dict[str, Any]:
         """Return closed expected gate results; transport/source loss is fatal and never replayed."""
         with self._mutex:
             if self._binding.closed or self._binding.connection is None or self._binding.generation is None:
@@ -132,7 +132,7 @@ class PresenceBroker:
                 self.close()
                 raise
 
-    def dispatch(self, operation: str, body: dict) -> dict:
+    def dispatch(self, operation: str, body: dict[str, Any]) -> dict[str, Any]:
         """The host wire may select only bootstrap or the four closed presence operations."""
         if operation == 'bootstrap':
             if not isinstance(body, dict) or body:

@@ -13,9 +13,10 @@ from concurrent.futures import CancelledError
 import secrets
 from typing import Optional, Set
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QObject, Signal
 
 from je_auto_control.gui._daemon_thread import DaemonThread
+from je_auto_control.gui.remote_desktop._webrtc_types import MultiViewerHostT
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop import signaling_client
@@ -34,7 +35,7 @@ class HostSignalingWorker(DaemonThread):
 
     def __init__(self, *, server_url: str, host_id: str, secret: Optional[str],
                  offer_sdp: str, timeout_s: float = 60.0,
-                 parent=None) -> None:
+                 parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._server_url = server_url
         self._host_id = host_id
@@ -69,7 +70,7 @@ class ViewerSignalingWorker(DaemonThread):
     failed = Signal(str)
 
     def __init__(self, *, server_url: str, host_id: str, secret: Optional[str],
-                 timeout_s: float = 60.0, parent=None) -> None:
+                 timeout_s: float = 60.0, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._server_url = server_url
         self._host_id = host_id
@@ -99,7 +100,7 @@ class ViewerAnswerPushWorker(DaemonThread):
     failed = Signal(str)
 
     def __init__(self, *, server_url: str, host_id: str, secret: Optional[str],
-                 answer_sdp: str, parent=None) -> None:
+                 answer_sdp: str, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._server_url = server_url
         self._host_id = host_id
@@ -135,11 +136,11 @@ class HostPublishLoopWorker(DaemonThread):
     session_connected = Signal(str)      # session_id (after accept_answer)
     failed = Signal(str)
 
-    def __init__(self, *, multi_host, server_url: str, host_id: str,
+    def __init__(self, *, multi_host: MultiViewerHostT, server_url: str, host_id: str,
                  secret: Optional[str],
                  wait_timeout_s: float = 600.0,
                  retry_delay_s: float = 2.0,
-                 parent=None) -> None:
+                 parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._multi_host = multi_host
         self._server_url = server_url
@@ -184,7 +185,8 @@ class HostPublishLoopWorker(DaemonThread):
             self._safe_stop_session_if(session_id)
             return False
 
-    def _handle_signaling_error(self, session_id, error) -> bool:
+    def _handle_signaling_error(self, session_id: Optional[str],
+                                error: signaling_client.SignalingError) -> bool:
         # Timeout waiting for answer is expected when no one connects.
         if "no answer" in str(error):
             self._safe_stop_session_if(session_id)
@@ -193,7 +195,7 @@ class HostPublishLoopWorker(DaemonThread):
         self._safe_stop_session_if(session_id)
         return False
 
-    def _safe_stop_session_if(self, session_id) -> None:
+    def _safe_stop_session_if(self, session_id: Optional[str]) -> None:
         if session_id is not None:
             self._safe_stop_session(session_id)
 

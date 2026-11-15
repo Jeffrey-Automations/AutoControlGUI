@@ -14,6 +14,7 @@ import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import FrameType
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 from urllib.parse import urlparse
 
@@ -129,7 +130,7 @@ class _RestRequestHandler(BaseHTTPRequestHandler):
     # the auth gate, so that client has to hold a valid token.
     timeout = 30.0
 
-    def log_message(self, format, *args) -> None:  # noqa: A002  # pylint: disable=redefined-builtin  # reason: stdlib BaseHTTPRequestHandler override
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002  # pylint: disable=redefined-builtin  # reason: stdlib BaseHTTPRequestHandler override
         autocontrol_logger.info("rest-api %s - %s",
                                 self.address_string(), log_safe(format % args))
 
@@ -429,7 +430,8 @@ class _RestRequestHandler(BaseHTTPRequestHandler):
             return _BODY_ERROR_SENT
 
     def _send_json(self, payload: Dict[str, Any], status: int = 200,
-                   default=None, headers: Optional[Dict[str, str]] = None) -> int:
+                   default: Optional[Callable[[Any], Any]] = None,
+                   headers: Optional[Dict[str, str]] = None) -> int:
         """Write ``payload`` as the response; return the status actually sent.
 
         A payload that cannot be serialised (a circular reference, nesting
@@ -663,7 +665,7 @@ def start_rest_api_server(host: str = "127.0.0.1", port: int = 9939,
 __all__ = ["RestApiServer", "start_rest_api_server"]
 
 
-def _main(argv: Optional[list] = None) -> int:
+def _main(argv: Optional[List[str]] = None) -> int:
     """Foreground entrypoint used by ``python -m je_auto_control.utils.rest_api.rest_server``.
 
     Starts a :class:`RestApiServer` and blocks the main thread until
@@ -693,7 +695,7 @@ def _main(argv: Optional[list] = None) -> int:
 
     stop_event = threading.Event()
 
-    def _handle_signal(_signum, _frame):
+    def _handle_signal(_signum: int, _frame: Optional[FrameType]) -> None:
         stop_event.set()
 
     signal.signal(signal.SIGINT, _handle_signal)

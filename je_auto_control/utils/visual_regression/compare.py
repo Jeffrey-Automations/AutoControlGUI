@@ -44,7 +44,7 @@ class DiffResult:
             f"{self.differing_pixels}/{self.total_pixels} pixels"
         )
 
-    def write_diff(self, path) -> Path:
+    def write_diff(self, path: str | os.PathLike[str]) -> Path:
         """Persist the diff overlay; idempotent — returns the target path."""
         target = Path(os.path.expanduser(str(path)))
         if self.diff_image is None:
@@ -54,7 +54,7 @@ class DiffResult:
         return target
 
 
-def _expand_path(path) -> Path:
+def _expand_path(path: str | os.PathLike[str]) -> Path:
     return Path(os.path.expanduser(str(path)))
 
 
@@ -73,7 +73,7 @@ def _apply_masks(image: Image.Image,
     return result
 
 
-def take_golden(path,
+def take_golden(path: str | os.PathLike[str],
                 *, source: Optional[Image.Image] = None,
                 region: Optional[Sequence[int]] = None) -> Path:
     """Capture and save a golden image.
@@ -160,7 +160,7 @@ def _masked_pixels(size: Tuple[int, int], masks: Sequence[MaskRegion]) -> int:
     return int(sum(stencil.histogram()[1:]))
 
 
-def compare_to_golden(golden_path,
+def compare_to_golden(golden_path: str | os.PathLike[str],
                       *, actual: Optional[Image.Image] = None,
                       region: Optional[Sequence[int]] = None,
                       tolerance: float = 0.0,

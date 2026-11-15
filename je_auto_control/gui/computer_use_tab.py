@@ -8,7 +8,7 @@ the mouse. Closing the tab stops the run the same way and drops its outcome.
 import functools
 import json
 import threading
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtWidgets import (
     QFormLayout, QLabel, QLineEdit, QMessageBox,
@@ -31,7 +31,7 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _run_agent(params: dict, stop_event: threading.Event) -> dict:
+def _run_agent(params: dict[str, Any], stop_event: threading.Event) -> dict[str, Any]:
     """Worker thread: run the agent until it finishes, hits a limit or ``stop_event`` is set."""
     return result_to_dict(run_computer_use(**params, stop_event=stop_event))
 
@@ -112,7 +112,7 @@ class ComputerUseTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("computer_use_run_btn", self._on_run),
@@ -142,14 +142,14 @@ class ComputerUseTab(TranslatableMixin, QWidget):
         self._status.setText(_t("computer_use_running"))
         self._spawn_worker(params)
 
-    def _spawn_worker(self, params: dict) -> None:
+    def _spawn_worker(self, params: dict[str, Any]) -> None:
         self._run.start_until_stopped(functools.partial(_run_agent, dict(params)))
 
     def _on_stop(self) -> None:
         if self._run.stop():
             self._status.setText(_t("computer_use_stopping"))
 
-    def _on_worker_finished(self, data: dict) -> None:
+    def _on_worker_finished(self, data: dict[str, Any]) -> None:
         ok = bool(data.get("succeeded"))
         key = "computer_use_success" if ok else "computer_use_failure"
         self._status.setText(_t(key))

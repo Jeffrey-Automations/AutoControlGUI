@@ -5,7 +5,7 @@ import math
 from dataclasses import dataclass
 import threading
 import time
-from typing import Callable
+from typing import Any, Callable
 import uuid
 
 from je_auto_control.utils.agent_runtime.errors import AgentControlBusy, AgentTaskError
@@ -92,7 +92,7 @@ class PresenceState:
                 self._advance()
             self._flags.failed, self._flags.live = True, False
 
-    def _snapshot(self) -> dict:
+    def _snapshot(self) -> dict[str, Any]:
         now = self._tick()
         if (now is not None and self._flags.live and self._timing.sampled is not None
                 and now - self._timing.sampled > 0.25):
@@ -115,12 +115,12 @@ class PresenceState:
             return 'waiting_idle'
         return 'monitoring'
 
-    def inspect(self) -> dict:
+    def inspect(self) -> dict[str, Any]:
         """Return detached coarse presence metadata; native acceptance remains unrecorded."""
         with self._mutex:
             return self._snapshot()
 
-    def acquire(self) -> dict:
+    def acquire(self) -> dict[str, str]:
         """Allocate one finite presence lease after fresh unlocked, released, sixty-second idle."""
         with self._mutex:
             if self._snapshot()['state'] != 'monitoring':
@@ -137,7 +137,7 @@ class PresenceState:
         if generation != self._generation or not isinstance(lease_id, str) or lease_id not in self._leases:
             raise AgentTaskError('physical presence lease identity is unavailable')
 
-    def check(self, generation: str, lease_id: str) -> dict:
+    def check(self, generation: str, lease_id: str) -> dict[str, Any]:
         """Refuse a lost lease permanently; held input alone does not revoke its existing owner."""
         with self._mutex:
             self._validate(generation, lease_id)

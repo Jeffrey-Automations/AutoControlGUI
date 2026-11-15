@@ -4,9 +4,10 @@ The enumeration runs as a :class:`~je_auto_control.gui._tab_task.TabTask`:
 closing the tab cancels it, which ends the enumeration tool's process
 (PowerShell, ``lsusb``, ``system_profiler``) instead of leaving it to time out.
 """
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
     QCheckBox, QHeaderView, QLabel, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
@@ -20,7 +21,7 @@ from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
-from je_auto_control.utils.usb.usb_devices import list_usb_devices
+from je_auto_control.utils.usb.usb_devices import UsbEnumerationResult, list_usb_devices
 from je_auto_control.utils.usb.usb_watcher import (
     default_usb_watcher, hold_default_watcher, release_default_watcher,
 )
@@ -84,13 +85,13 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
         """
         release_resources(self, self._hold.release)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("usb_refresh", self._refresh),
         ]
 
-    def showEvent(self, event) -> None:  # noqa: N802  # reason: Qt override
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802  # reason: Qt override
         """List the devices the first time the tab is shown."""
         super().showEvent(event)
         if not self._listed:
@@ -119,7 +120,7 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
     def _show_list_error(self, error: object) -> None:
         self._error_label.setText(str(error))
 
-    def _apply_devices(self, result) -> None:
+    def _apply_devices(self, result: UsbEnumerationResult) -> None:
         self._backend_label.setText(result.backend)
         self._error_label.setText(result.error or "")
         self._update_event_summary()
@@ -166,7 +167,7 @@ class _WatcherHold:
             hold_default_watcher()
             self.held = True
 
-    def release(self, *_args) -> None:
+    def release(self, *_args: Any) -> None:
         if self.held:
             self.held = False
             release_default_watcher(background=True)

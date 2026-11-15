@@ -18,7 +18,7 @@ import functools
 import math
 import threading
 import time
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.executor.run_control import pause
@@ -179,7 +179,7 @@ class SlidingWindowLimiter:
 
 
 def throttle(interval_s: float, *,
-             clock: Callable[[], float] = time.monotonic) -> Callable:
+             clock: Callable[[], float] = time.monotonic) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator: call the wrapped function at most once per ``interval_s``.
 
     Leading-edge — the first call fires immediately; calls within the interval
@@ -189,12 +189,12 @@ def throttle(interval_s: float, *,
     if not float(interval_s) >= 0:  # NOSONAR python:S1940  # reason: "< 0" is false for NaN
         raise AutoControlException(f"interval_s must be a number >= 0, got {interval_s!r}")
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         state: Dict[str, Optional[float]] = {"last": None}
         lock = threading.Lock()
 
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             with lock:
                 now = clock()
                 last = state["last"]
@@ -208,7 +208,7 @@ def throttle(interval_s: float, *,
     return decorator
 
 
-_NAMED_BUCKETS: Dict[str, "tuple"] = {}
+_NAMED_BUCKETS: Dict[str, tuple[float, float, TokenBucket]] = {}
 _NAMED_LOCK = threading.Lock()
 
 

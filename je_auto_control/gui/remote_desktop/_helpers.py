@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QKeyEvent
-from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QLayout, QVBoxLayout, QWidget
 
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -74,7 +74,7 @@ def _scroll_amount(angle_delta: int) -> int:
     return 0
 
 
-def wire_remote_input(window: Any, send: Callable[[dict], None]) -> None:
+def wire_remote_input(window: Any, send: Callable[[dict[str, Any]], None]) -> None:
     """Forward a remote screen window's mouse and keyboard signals to ``send``.
 
     Every viewer that opens a ``RemoteScreenWindow`` wires it here, so one
@@ -88,7 +88,7 @@ def wire_remote_input(window: Any, send: Callable[[dict], None]) -> None:
     """
     sink = weakref.WeakMethod(send) if inspect.ismethod(send) else (lambda: send)
 
-    def forward(*actions: dict) -> None:
+    def forward(*actions: dict[str, Any]) -> None:
         target = sink()
         if target is None:
             return
@@ -106,7 +106,7 @@ def wire_remote_input(window: Any, send: Callable[[dict], None]) -> None:
     window.type_text.connect(lambda text: forward({"action": "type", "text": text}))
 
 
-def _read_import_entries(path: str, key: str) -> list:
+def _read_import_entries(path: str, key: str) -> list[dict[str, Any]]:
     """The object entries of an exported JSON file: ``{key: [...]}`` or a bare list.
 
     Raises ``OSError`` or ``ValueError`` for a file that cannot be read or has
@@ -201,7 +201,7 @@ class _CollapsibleSection(QGroupBox):
     def body(self) -> QWidget:
         return self._body
 
-    def set_body_layout(self, layout) -> None:
+    def set_body_layout(self, layout: QLayout) -> None:
         self._body.setLayout(layout)
 
     def adopt(self, inner: QGroupBox) -> None:

@@ -133,26 +133,26 @@ class ScriptTab(TranslatableMixin, QWidget):
     def _load_error(self, error: object) -> None:
         self.script_result_text.setText(f"Error loading: {error}")
 
-    def _execute_script(self):
+    def _execute_script(self) -> None:
         path = self.script_path_input.text()
         if path:
             capture = _requested_manual_run(getattr(self, "script_history_controls", None),
                                             source_id="gui.file", script_path=path)
             self._start_script_run(functools.partial(_run_script_file, path, capture))
 
-    def _browse_script_dir(self):
+    def _browse_script_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, _t("execute_dir_label"))
         if path:
             self.script_dir_input.setText(path)
 
-    def _execute_dir(self):
+    def _execute_dir(self) -> None:
         path = self.script_dir_input.text()
         if path:
             capture = _requested_manual_run(getattr(self, "script_history_controls", None),
                                             source_id="gui.directory", script_path=path)
             self._start_script_run(functools.partial(_run_script_dir, path, capture))
 
-    def _execute_manual_script(self):
+    def _execute_manual_script(self) -> None:
         text = self.script_editor.toPlainText().strip()
         if text:
             capture = _requested_manual_run(getattr(self, "script_history_controls", None),

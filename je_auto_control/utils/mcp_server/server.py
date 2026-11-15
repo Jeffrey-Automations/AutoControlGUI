@@ -13,7 +13,7 @@ import secrets
 import sys
 import threading
 import time
-from typing import Any, Callable, Dict, List, Optional, TextIO
+from typing import Any, Callable, Dict, Iterator, List, Optional, TextIO
 
 from je_auto_control.utils.cli_output import utf8_stream
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -148,7 +148,7 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
         return getattr(self._local, "notifier", None) or self._default_notifier
 
     @_notifier.setter
-    def _notifier(self, value) -> None:
+    def _notifier(self, value: Optional[Callable[[str, Dict[str, Any]], None]]) -> None:
         self._default_notifier = value
 
     @property
@@ -156,7 +156,7 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
         return getattr(self._local, "writer", None) or self._default_writer
 
     @_writer.setter
-    def _writer(self, value) -> None:
+    def _writer(self, value: Optional[Callable[[str], None]]) -> None:
         self._default_writer = value
 
     @property
@@ -167,7 +167,7 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
         return scoped
 
     @_concurrent_tools.setter
-    def _concurrent_tools(self, value) -> None:
+    def _concurrent_tools(self, value: bool) -> None:
         self._default_concurrent_tools = bool(value)
 
     @property
@@ -196,8 +196,11 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
             self._client_caps_by_conn[conn] = value
 
     @contextlib.contextmanager
-    def connection_scope(self, *, notifier=None, writer=None,
-                         concurrent_tools=None, connection_id=None):
+    def connection_scope(self, *,
+                         notifier: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+                         writer: Optional[Callable[[str], None]] = None,
+                         concurrent_tools: Optional[bool] = None,
+                         connection_id: Any = None) -> Iterator["MCPServer"]:
         """Bind notifier/writer/concurrency/identity to the calling thread only.
 
         Transports that serve more than one peer must wrap each request in

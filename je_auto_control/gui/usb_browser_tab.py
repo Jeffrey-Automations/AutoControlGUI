@@ -24,7 +24,7 @@ import functools
 import urllib.error
 import urllib.parse
 from email.message import Message
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtWidgets import (
     QFormLayout, QGroupBox, QHeaderView, QLabel, QLineEdit, QMessageBox,
@@ -118,7 +118,7 @@ def fetch_remote_devices(*, base_url: str,
     return devices
 
 
-def _open_local(vendor_id: str, product_id: str, serial: Optional[str]) -> tuple:
+def _open_local(vendor_id: str, product_id: str, serial: Optional[str]) -> Tuple[str, str, bytes]:
     """Open the device locally; return ``(vendor_id, product_id, descriptor)`` for the status line."""
     return vendor_id, product_id, open_local_descriptor(
         vendor_id=vendor_id, product_id=product_id, serial=serial)
@@ -164,7 +164,7 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("usb_browser_fetch", self._on_fetch),
@@ -194,7 +194,7 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
         if self._start(work, "fetch"):
             self._status_label.setText(_t("usb_browser_fetching"))
 
-    def _start(self, work, tag: str) -> bool:
+    def _start(self, work: Callable[[], Any], tag: str) -> bool:
         if self._requests.start(work, tag=tag, timeout_s=REQUEST_DEADLINE_S):
             return True
         self._status_label.setText(_t("task_busy"))
@@ -210,7 +210,7 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
         else:
             self._apply_devices(value)
 
-    def _apply_devices(self, devices: list) -> None:
+    def _apply_devices(self, devices: List[Dict[str, Any]]) -> None:
         self._status_label.setText(
             _t("usb_browser_fetched").format(count=len(devices)),
         )

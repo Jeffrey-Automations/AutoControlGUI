@@ -14,7 +14,8 @@ optional dep until the operator actually instantiates a gamepad.
 from __future__ import annotations
 
 import threading
-from typing import Dict, Optional, Tuple
+from types import ModuleType, TracebackType
+from typing import Any, Dict, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
@@ -70,10 +71,10 @@ _DPAD_ATTR_MAP: Dict[str, Tuple[str, ...]] = {
 _DPAD_ALL = (_DPAD_UP, _DPAD_DOWN, _DPAD_LEFT, _DPAD_RIGHT)
 
 
-def _import_vgamepad():
+def _import_vgamepad() -> ModuleType:
     """Resolve ``vgamepad`` lazily so the optional dep is opt-in."""
     try:
-        import vgamepad  # type: ignore
+        import vgamepad
     except ImportError as exc:  # pragma: no cover - optional dep
         raise GamepadUnavailable(
             "vgamepad is not installed. Run "
@@ -109,7 +110,7 @@ def is_available() -> bool:
     return True
 
 
-def _clamp_signed_short(value) -> int:
+def _clamp_signed_short(value: float) -> int:
     """Clamp ``value`` to the int16 range vgamepad's left/right sticks expect."""
     n = int(value)
     if n > 32767:
@@ -119,7 +120,7 @@ def _clamp_signed_short(value) -> int:
     return n
 
 
-def _clamp_byte(value) -> int:
+def _clamp_byte(value: float) -> int:
     """Clamp ``value`` to the 0..255 trigger range."""
     n = int(value)
     if n > 255:
@@ -158,7 +159,7 @@ class VirtualGamepad:
 
     # --- buttons -------------------------------------------------------------
 
-    def _resolve_button(self, name: str):
+    def _resolve_button(self, name: str) -> Any:
         try:
             attr = _BUTTON_ATTR_MAP[name.lower()]
         except KeyError as exc:
@@ -265,7 +266,8 @@ class VirtualGamepad:
     def __enter__(self) -> "VirtualGamepad":
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(self, exc_type: Optional[type[BaseException]], exc: Optional[BaseException],
+                 tb: Optional[TracebackType]) -> None:
         self.close()
 
 

@@ -78,7 +78,7 @@ class AndroidRemoteAdapter:
             self._observed = None
         return ready, reason
 
-    def observe(self) -> dict:
+    def observe(self) -> dict[str, Any]:
         """Publish proven app metadata and optionally host-reviewed semantic readback; never raw XML or values."""
         spec, check = self._context()
         if self._spec is None:
@@ -128,7 +128,7 @@ class AndroidRemoteAdapter:
         if self._capture_hierarchy(evidence, deadline, check).signature != signature:
             raise AgentObservationStale("Android semantic hierarchy changed since observation")
 
-    def prepare(self, name: str, arguments: dict) -> PreparedRemoteAction:
+    def prepare(self, name: str, arguments: dict[str, Any]) -> PreparedRemoteAction:
         """Refuse stale evidence and return one finite call bound to a fresh trusted device lease."""
         spec, check = self._context()
         if self._spec is None or self._observed is None or self._control is None:
@@ -156,7 +156,7 @@ def _same_evidence(expected: AndroidInputEvidence, actual: AndroidInputEvidence 
 
 
 def _prepared_call(session: AndroidDeviceSession, lease: AndroidCommandLease, name: str,
-                   arguments: dict, deadline: float, check: Callable[[], None],
+                   arguments: dict[str, Any], deadline: float, check: Callable[[], None],
                    verify: Callable[[], None] | None) -> PreparedRemoteAction:
     results: list[AndroidActionResult] = []
     invoked = False
@@ -166,7 +166,7 @@ def _prepared_call(session: AndroidDeviceSession, lease: AndroidCommandLease, na
         lease.checkpoint()
         _remaining(deadline)
 
-    def invoke() -> dict:
+    def invoke() -> dict[str, Any]:
         nonlocal invoked
         if invoked:
             raise AgentTaskError("Android prepared commands cannot be replayed")
@@ -184,7 +184,7 @@ def _prepared_call(session: AndroidDeviceSession, lease: AndroidCommandLease, na
         results.append(result)
         return {"android_phase": result.phase, "may_have_effect": result.may_have_effect}
 
-    def settle() -> dict:
+    def settle() -> dict[str, Any]:
         if len(results) != 1:
             raise AgentTaskError("Android settlement has no complete command result")
         return _settlement(lease.settle(results[0]), lease)
@@ -193,7 +193,7 @@ def _prepared_call(session: AndroidDeviceSession, lease: AndroidCommandLease, na
                                 lease.epoch, invoke, settle)
 
 
-def _settlement(proof: dict, lease: AndroidCommandLease) -> dict:
+def _settlement(proof: dict[str, Any], lease: AndroidCommandLease) -> dict[str, Any]:
     if (not isinstance(proof, dict)
             or set(proof) != {"device", "epoch", "inputs_released", "queue_empty", "request_id", "boot_id"}
             or proof["request_id"] != lease.request_id or proof["boot_id"] != lease.proposal.snapshot.boot_id):

@@ -46,7 +46,7 @@ messages = {
 
 
 def send_message_to_window(window_name: str, action_message: int,
-                           key_code_1: int, key_code_2: int):
+                           key_code_1: int, key_code_2: int) -> tuple[int, int]:
     """
     使用 SendMessageW 對指定視窗名稱傳送訊息
     Send message to a window by name using SendMessageW
@@ -64,8 +64,8 @@ def send_message_to_window(window_name: str, action_message: int,
     return hwnd, post_status
 
 
-def send_message_to_window_hwnd(hwnd, action_message: int,
-                                key_code_1: int, key_code_2: int):
+def send_message_to_window_hwnd(hwnd: int, action_message: int,
+                                key_code_1: int, key_code_2: int) -> tuple[int, int]:
     """
     使用 SendMessageW 對指定 HWND 傳送訊息
     Send message to a window by HWND using SendMessageW
@@ -75,7 +75,7 @@ def send_message_to_window_hwnd(hwnd, action_message: int,
 
 
 def post_message_to_window(window_name: str, action_message: int,
-                           key_code_1: int, key_code_2: int):
+                           key_code_1: int, key_code_2: int) -> tuple[int, int]:
     """
     使用 PostMessageW 對指定視窗名稱投遞訊息
     Post message to a window by name using PostMessageW
@@ -87,8 +87,8 @@ def post_message_to_window(window_name: str, action_message: int,
     return hwnd, post_status
 
 
-def post_message_to_window_hwnd(hwnd, action_message: int,
-                                key_code_1: int, key_code_2: int):
+def post_message_to_window_hwnd(hwnd: int, action_message: int,
+                                key_code_1: int, key_code_2: int) -> tuple[int, int]:
     """
     使用 PostMessageW 對指定 HWND 投遞訊息
     Post message to a window by HWND using PostMessageW

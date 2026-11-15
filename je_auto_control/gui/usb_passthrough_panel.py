@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import functools
 from pathlib import Path
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHeaderView,
     QLabel, QLineEdit, QMessageBox, QTableWidget,
@@ -47,7 +48,7 @@ from je_auto_control.utils.usb.passthrough import (
     AclRule, UsbAcl, UsbLoopback, describe_descriptor, enable_usb_passthrough,
     export_acl_to_file, import_acl_from_file,
 )
-from je_auto_control.utils.usb.usb_devices import list_usb_devices
+from je_auto_control.utils.usb.usb_devices import UsbEnumerationResult, list_usb_devices
 from je_auto_control.utils.usb.usb_watcher import (
     default_usb_watcher, hold_default_watcher, release_default_watcher,
 )
@@ -145,7 +146,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         root.setSpacing(12)
         root.addWidget(ResponsiveBox(self._build_host_section(), self._build_viewer_section()), stretch=1)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("usb_share_enable", self._enable_sharing),
@@ -280,7 +281,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
 
     # --- local devices + ACL ----------------------------------------------
 
-    def showEvent(self, event) -> None:  # noqa: N802  # reason: Qt override
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802  # reason: Qt override
         """List the local devices the first time the panel is shown."""
         super().showEvent(event)
         if not self._listed:
@@ -293,7 +294,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
     def _show_list_error(self, error: object) -> None:
         self._viewer_status.setText(str(error))
 
-    def _show_local_devices(self, result) -> None:
+    def _show_local_devices(self, result: UsbEnumerationResult) -> None:
         devices = result.devices
         self._local_table.setRowCount(len(devices))
         for row, device in enumerate(devices):
@@ -424,7 +425,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         if self._start(client.list_devices, "shared"):
             self._viewer_status.setText(_t("usb_share_listing"))
 
-    def _apply_shared(self, devices: List[dict]) -> None:
+    def _apply_shared(self, devices: List[Dict[str, Any]]) -> None:
         self._viewer_status.setText(
             _t("usb_share_listed").format(count=len(devices)),
         )
@@ -565,7 +566,7 @@ def _default_remote_client() -> Optional[Any]:
     return registry.webrtc_usb_client()
 
 
-def _probe_labelled(client: Any, vid: str, pid: str, serial: Optional[str]) -> tuple:
+def _probe_labelled(client: Any, vid: str, pid: str, serial: Optional[str]) -> Tuple[str, str, bytes]:
     """Probe the device; return ``(vid, pid, descriptor)`` for the status line."""
     return vid, pid, _probe_device(client, vid, pid, serial)
 

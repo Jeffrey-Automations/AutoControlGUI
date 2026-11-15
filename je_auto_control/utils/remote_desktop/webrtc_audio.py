@@ -65,7 +65,7 @@ class OpusMicAudioTrack(MediaStreamTrack):
         self._sample_rate = sample_rate
         self._channels = channels
         self._device = device
-        self._queue: asyncio.Queue = asyncio.Queue(maxsize=50)
+        self._queue: asyncio.Queue[Optional[bytes]] = asyncio.Queue(maxsize=50)
         self._loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         self._timestamp = 0
         self._capture: Optional[AudioCapture] = None
@@ -179,12 +179,12 @@ class OpusMicReceiver:
             device=device, sample_rate=sample_rate, channels=channels,
         )
         self._player.start()
-        self._task: Optional[asyncio.Task] = None
+        self._task: Optional[asyncio.Task[None]] = None
         self._stopped = False
         self._player_retired = False
         self._resampler: Optional[Any] = None
 
-    def consume(self, track) -> None:
+    def consume(self, track: MediaStreamTrack) -> None:
         """Spawn a background task that drains ``track.recv()`` into the player."""
         if self._stopped:
             raise AudioBackendError("audio receiver is stopped")
@@ -192,7 +192,7 @@ class OpusMicReceiver:
             return
         self._task = asyncio.ensure_future(self._loop(track))
 
-    async def _loop(self, track) -> None:
+    async def _loop(self, track: MediaStreamTrack) -> None:
         from aiortc.mediastreams import MediaStreamError
         try:
             while not self._stopped:
@@ -207,7 +207,7 @@ class OpusMicReceiver:
             raise_caused_run_interruption(error)
             autocontrol_logger.info("opus mic receiver ended: %r", error)
 
-    def _to_player_pcm(self, frame) -> list:
+    def _to_player_pcm(self, frame: Any) -> list[bytes]:
         """int16 PCM in the player's layout and rate.
 
         aiortc's Opus decoder always yields 48 kHz stereo; written as is to a

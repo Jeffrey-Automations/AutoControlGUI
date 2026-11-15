@@ -9,7 +9,7 @@ from je_auto_control.utils.agent_runtime.retained_browser_target import Retained
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
 
-def retire_target(runtime: Any, row: dict, target: Any, eligible: bool) -> None:
+def retire_target(runtime: Any, row: dict[str, Any], target: Any, eligible: bool) -> None:
     """Keep only eligible actual contexts; every other target uses its established cleanup path."""
     if not eligible:
         target.cleanup()
@@ -34,7 +34,7 @@ def retire_target(runtime: Any, row: dict, target: Any, eligible: bool) -> None:
             raise
 
 
-def require_source(runtime: Any, effect: dict) -> dict:
+def require_source(runtime: Any, effect: dict[str, Any]) -> dict[str, Any]:
     """Validate live source authority and actual SDK proof before completion preview or admission."""
     # pylint: disable-next=protected-access  # reason: private effect admission owns this exact runtime collection
     pool = runtime._retained_browsers
@@ -62,10 +62,10 @@ def require_source(runtime: Any, effect: dict) -> dict:
         pool.release(entry)
 
 
-def completion_adapter(runtime: Any, effect: dict, spec: Any,
+def completion_adapter(runtime: Any, effect: dict[str, Any], spec: Any,
                        current_operation: Callable[[], Any]) -> RetainedBrowserTarget:
     """Construct an inert closed borrower from private effect identity; readiness never launches a helper."""
-    def current_source() -> dict:
+    def current_source() -> dict[str, Any]:
         # pylint: disable-next=protected-access  # reason: private original-effect authority stays live on every read
         return runtime._retained_source(effect["id"])
     # pylint: disable-next=protected-access  # reason: share actual runtime-owned process lifetime

@@ -32,7 +32,7 @@ from je_auto_control.utils.usbip.protocol import (
 _USB_TIMEOUT_MS = 5_000  # 5 s ceiling per URB; matches kernel default.
 
 
-def _try_pyusb():
+def _try_pyusb() -> bool:
     try:
         import usb.core  # noqa: F401
         import usb.util  # noqa: F401
@@ -64,7 +64,7 @@ class LibUsbBackend(UrbBackend):
 
     def __init__(self) -> None:
         self._available = _try_pyusb()
-        self._device_cache: dict = {}
+        self._device_cache: dict[int, Any] = {}
 
     @property
     def available(self) -> bool:
@@ -141,7 +141,7 @@ class LibUsbBackend(UrbBackend):
     # --- per-endpoint-type helpers --------------------------------------
 
     @staticmethod
-    def _submit_control(device, request: UrbRequest) -> UrbResponse:
+    def _submit_control(device: Any, request: UrbRequest) -> UrbResponse:
         """Control transfer (ep 0). Setup packet lives in ``request.setup``."""
         if len(request.setup) != 8:
             return UrbResponse(status=-22, actual_length=0)  # -EINVAL
@@ -168,7 +168,7 @@ class LibUsbBackend(UrbBackend):
         return UrbResponse(status=0, actual_length=int(sent or 0))
 
     @staticmethod
-    def _submit_bulk_or_interrupt(device, request: UrbRequest) -> UrbResponse:
+    def _submit_bulk_or_interrupt(device: Any, request: UrbRequest) -> UrbResponse:
         """Bulk / interrupt transfer through ``Device.read`` or ``Device.write``."""
         endpoint = _endpoint_address(request.direction, request.ep)
         if _direction_in(request.direction):

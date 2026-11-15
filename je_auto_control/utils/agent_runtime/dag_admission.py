@@ -13,11 +13,11 @@ from je_auto_control.utils.agent_runtime.policy import owns_task
 from je_auto_control.utils.rbac.authorization import AuthorizationContext, AuthorizationError, current_authorization
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
-_ADMISSION: ContextVar[dict | None] = ContextVar("agent_local_dag_admission", default=None)
+_ADMISSION: ContextVar[dict[str, Any] | None] = ContextVar("agent_local_dag_admission", default=None)
 
 
 @contextmanager
-def admission_scope(value: dict) -> Iterator[None]:
+def admission_scope(value: dict[str, Any]) -> Iterator[None]:
     """Carry service-authored evidence only across the synchronous task acceptance transaction."""
     binding = _ADMISSION.set(detached(value))
     try:
@@ -26,13 +26,13 @@ def admission_scope(value: dict) -> Iterator[None]:
         _ADMISSION.reset(binding)
 
 
-def current_admission() -> dict | None:
+def current_admission() -> dict[str, Any] | None:
     """Return a detached trusted envelope; model-visible spec options cannot create admission evidence."""
     value = _ADMISSION.get()
     return detached(value) if value is not None else None
 
 
-def actor_identity(value: dict) -> tuple[Any, Any]:
+def actor_identity(value: dict[str, Any]) -> tuple[Any, Any]:
     """Use the real user-store namespace without freezing a user's changing role."""
     return value.get("user_id"), value.get("store_path")
 

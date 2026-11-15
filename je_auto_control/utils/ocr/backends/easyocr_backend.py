@@ -8,9 +8,12 @@ games this is the simpler install path.
 from __future__ import annotations
 
 from threading import Lock
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from je_auto_control.utils.ocr.backends.base import OCRBackendNotAvailableError
+
+if TYPE_CHECKING:  # pragma: no cover
+    from je_auto_control.utils.ocr.ocr_engine import TextMatch
 
 
 _easyocr = None
@@ -18,7 +21,7 @@ _readers: Dict[str, Any] = {}
 _reader_lock = Lock()
 
 
-def _load():
+def _load() -> Any:
     global _easyocr
     if _easyocr is not None:
         return _easyocr
@@ -59,7 +62,7 @@ def _resolve_langs(lang: str) -> List[str]:
     return [lang]
 
 
-def _get_reader(lang: str):
+def _get_reader(lang: str) -> Any:
     """Lazily build (and cache) the EasyOCR Reader for ``lang``."""
     codes = _resolve_langs(lang)
     key = ",".join(codes)
@@ -89,8 +92,8 @@ class EasyOCRBackend:
     def available(self) -> bool:
         return self._available
 
-    def image_to_matches(self, image, lang: str,
-                         min_confidence: float) -> List:
+    def image_to_matches(self, image: Any, lang: str,
+                         min_confidence: float) -> List[TextMatch]:
         # Import inside to avoid circular import at module load.
         from je_auto_control.utils.ocr.ocr_engine import TextMatch
         import numpy as np

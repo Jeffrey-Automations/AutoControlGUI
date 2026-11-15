@@ -31,7 +31,8 @@ def classify_reply(reply: Any, request_id: str) -> tuple[bool, Any]:
     return False, detached(reply.get("result"))
 
 
-def require_event_owner(event: Any, callback: Callable[[dict], None] | None) -> Callable[[dict], None]:
+def require_event_owner(event: Any,
+                        callback: Callable[[dict[str, Any]], None] | None) -> Callable[[dict[str, Any]], None]:
     """Refuse an input announcement that is malformed or that no caller agreed to handle.
 
     Returns the callback that agreed to handle it.
@@ -148,7 +149,7 @@ class OwnedChannel:
 
     def request(self, operation: str, payload: Any, *, timeout: float,
                 check: Callable[[], None] = cancellation_checkpoint,
-                on_event: Callable[[dict], None] | None = None) -> Any:
+                on_event: Callable[[dict[str, Any]], None] | None = None) -> Any:
         """Validate one proposal, wait within its deadline, and reap on every failed operation."""
         positive(timeout, "native deadline", 3600)
         with self._request_lock:
@@ -167,7 +168,7 @@ class OwnedChannel:
                 raise
 
     def _receive(self, request_id: str, deadline: float, check: Callable[[], None],
-                 on_event: Callable[[dict], None] | None, operation: str = "operation") -> Any:
+                 on_event: Callable[[dict[str, Any]], None] | None, operation: str = "operation") -> Any:
         while time.monotonic() < deadline:
             self._fenced()
             check()
@@ -192,7 +193,7 @@ class OwnedChannel:
         if self._stop.is_set():
             raise AgentTaskError("native helper was closed while a request was waiting")
 
-    def _event(self, event: Any, callback: Callable[[dict], None] | None, check: Callable[[], None]) -> None:
+    def _event(self, event: Any, callback: Callable[[dict[str, Any]], None] | None, check: Callable[[], None]) -> None:
         handler = require_event_owner(event, callback)
         check()
         handler(detached(event))

@@ -49,10 +49,10 @@ class MediaNegotiationMixin:
         _closed: threading.Event
         _host_voice_track: Optional["OpusMicAudioTrack"]
         _config: "WebRTCConfig"
-        _viewer_video_task: Optional[asyncio.Task]
+        _viewer_video_task: Optional[asyncio.Task[Any]]
         _opus_audio_receiver: Optional["OpusMicReceiver"]
         _send_ctrl: Callable[[Mapping[str, Any]], None]
-        _spawn_bg: Callable[[Any], asyncio.Task]
+        _spawn_bg: Callable[[Any], asyncio.Task[Any]]
         _consume_viewer_video: Callable[[Any], Coroutine[Any, Any, None]]
         _start_opus_audio_receive: Callable[[Any], None]
 
@@ -111,7 +111,7 @@ class MediaNegotiationMixin:
             return
 
     @staticmethod
-    def _receiver_track(transceiver):
+    def _receiver_track(transceiver: Any) -> Any:
         receiver = transceiver.receiver
         return receiver.track if receiver is not None else None
 
@@ -230,7 +230,7 @@ class MediaNegotiationMixin:
             return
         self._media_owners.schedule("opus receiver", lambda: self._retire_live_audio(peer, receiver))
 
-    async def _retire_live_audio(self, peer, receiver) -> None:
+    async def _retire_live_audio(self, peer: Optional["RTCPeerConnection"], receiver: "OpusMicReceiver") -> None:
         if self._pc is not peer or self._opus_audio_receiver is not receiver:
             return
         await self._media_owners.stop_field_async("opus receiver", receiver)
@@ -239,7 +239,8 @@ class MediaNegotiationMixin:
         if self._pc is peer and not self._closed.is_set():
             self._spawn_bg(self._async_renegotiate())
 
-    async def _retire_live_video(self, peer, task) -> None:
+    async def _retire_live_video(self, peer: Optional["RTCPeerConnection"],
+                                 task: Optional[asyncio.Task[Any]]) -> None:
         if self._pc is not peer or self._viewer_video_task is not task:
             return
         if task is not None:
