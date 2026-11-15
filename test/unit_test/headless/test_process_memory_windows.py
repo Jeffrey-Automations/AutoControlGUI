@@ -6,7 +6,7 @@ import struct
 import pytest
 
 from je_auto_control.utils.process_memory.models import (
-    FailureReason, MemoryObservationError, Observation, ObservationFailure,
+    FailureReason, MemoryObservationError, ModuleSpan, Observation, ObservationFailure,
     ProcessIdentity, ReadPlan, ReviewedProbe,
 )
 from je_auto_control.utils.process_memory.reader import ProcessMemoryReader
@@ -39,6 +39,7 @@ class Kernel:
         self.after_read = lambda: None
         self.regions = [(0x1000, 8), (0x1008, 8)]
         self.payload = struct.pack("<I12s", 17, b"ready")
+        self.module_base, self.module_size, self.info_base, self.modules_ok = 0x1000, 16, None, True
         for name, implementation in {
             "OpenProcess": lambda *args: self.open_value,
             "CloseHandle": lambda *args: self.close_ok,
@@ -49,6 +50,8 @@ class Kernel:
             "IsWow64Process2": self.architecture,
             "VirtualQueryEx": self.query,
             "ReadProcessMemory": self.read,
+            "K32EnumProcessModulesEx": self.modules,
+            "K32GetModuleInformation": self.module_info,
         }.items():
             setattr(self, name, Function(implementation))
 
@@ -73,6 +76,15 @@ class Kernel:
                 return size - 1 if self.query_short else size
         return 0
 
+    def modules(self, handle, first, size, needed, flag):
+        first._obj.value, needed._obj.value = self.module_base, 3 * size
+        return self.modules_ok
+
+    def module_info(self, handle, module, info, size):
+        info._obj.base = self.module_base if self.info_base is None else self.info_base
+        info._obj.size = self.module_size
+        return True
+
     def read(self, handle, address, buffer, size, count):
         buffer.raw = self.payload[address - 0x1000:address - 0x1000 + size]
         count._obj.value = size if self.read_count is None else self.read_count
@@ -93,7 +105,7 @@ def provider(kernel, **options):
 def probe():
     return ReviewedProbe("fixture", "1", IDENTITY.executable, ("1",), ("x64", "x86"),
                          ("document_id",), 64, 8, 1, 32,
-                         lambda identity: ReadPlan(0x1000, 16),
+                         lambda identity, view: ReadPlan(0x1000, 16),
                          lambda raw, fields: {"document_id": struct.unpack("<I12s", raw)[0]})
 
 
@@ -303,3 +315,50 @@ def test_cancel_before_open_does_not_acquire_native_handle():
     with pytest.raises(CancelledError):
         reader.observe(IDENTITY, probe(), ("document_id",), target_id="fixture", checkpoint=checkpoint)
     assert not kernel.OpenProcess.calls and not kernel.CloseHandle.calls
+
+
+def test_the_main_module_is_the_first_psapi_entry_measured_through_the_retained_handle():
+    kernel = Kernel()
+    handle = provider(kernel).open_readonly(IDENTITY)
+    assert handle.main_module() == ModuleSpan(0x1000, 16)
+    target, _first, size, _needed, flag = kernel.K32EnumProcessModulesEx.calls[0]
+    assert target == kernel.open_value and size == ctypes.sizeof(PTR) and flag == 0x00
+    assert kernel.K32EnumProcessModulesEx.argtypes[2] is U32
+    assert kernel.K32GetModuleInformation.argtypes[1] is PTR
+
+
+def test_a_wow64_target_lists_its_own_32_bit_modules():
+    kernel = Kernel()
+    kernel.machine = 0x014C
+    handle = provider(kernel).open_readonly(replace(IDENTITY, architecture="x86", pointer_bits=32))
+    handle.main_module()
+    assert kernel.K32EnumProcessModulesEx.calls[0][4] == 0x01
+
+
+@pytest.mark.parametrize("change,reason", [
+    ({"info_base": 0x2000}, FailureReason.UNREADABLE_REGION),     # MODULEINFO disagrees with the HMODULE
+    ({"module_base": 0}, FailureReason.UNREADABLE_REGION),        # no first module
+    ({"module_size": 0}, FailureReason.UNREADABLE_REGION),
+    ({"modules_ok": False, "error": 5}, FailureReason.ACCESS_DENIED),
+    ({"modules_ok": False, "error": 299}, FailureReason.UNREADABLE_REGION),
+])
+def test_an_unmeasurable_main_module_fails_closed(change, reason):
+    kernel = Kernel()
+    for name, value in change.items():
+        setattr(kernel, name, value)
+    with pytest.raises(MemoryObservationError) as caught:
+        provider(kernel).open_readonly(IDENTITY).main_module()
+    assert caught.value.reason == reason
+
+
+def test_a_resolver_finds_its_plan_from_the_measured_module_base():
+    """An image-relative probe: the plan moves with the module, nothing absolute is cached."""
+    def resolve(identity, view):
+        module = view.main_module()
+        return ReadPlan(module.base, 16)
+
+    kernel = Kernel()
+    reader = ProcessMemoryReader(provider(kernel))
+    reviewed = replace(probe(), resolve=resolve)
+    result = reader.observe(IDENTITY, reviewed, ("document_id",), target_id="fixture")
+    assert isinstance(result, Observation) and result.fields == (("document_id", 17),)

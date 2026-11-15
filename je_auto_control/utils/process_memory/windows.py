@@ -5,13 +5,16 @@ import ctypes
 import threading
 from typing import Callable, NoReturn
 
-from .models import FailureReason, MemoryObservationError, MemoryRegion, ProcessIdentity
-from .windows_native import Kernel, MemoryInfo32, MemoryInfo64, SIZE, bind, load
+from .models import FailureReason, MemoryObservationError, MemoryRegion, ModuleSpan, ProcessIdentity
+from .windows_native import PTR, U32, Kernel, MemoryInfo32, MemoryInfo64, ModuleInfo, SIZE, bind, load
 from .windows_facts import NativeProcessFacts as NativeProcessFacts, measure_process
 
 _ACCESS = 0x00100000 | 0x0400 | 0x0010
 _READABLE = frozenset({0x02, 0x04, 0x08, 0x20, 0x40, 0x80})
 _MAX_READ = 1 << 20
+# EnumProcessModulesEx filters: a 64-bit caller lists a WOW64 target's own
+# 32-bit modules; otherwise the default list is the target's native one.
+_LIST_MODULES_DEFAULT, _LIST_MODULES_32BIT = 0x00, 0x01
 
 
 Attestor = Callable[[NativeProcessFacts], ProcessIdentity]
@@ -121,6 +124,35 @@ class WindowsProcessHandle:
             if self._facts() != facts or self._region(address, facts.pointer_bits) != region:
                 _fail(FailureReason.TARGET_CHANGED)
             return raw
+
+    def main_module(self) -> ModuleSpan:
+        """The executable's image: the first module PSAPI lists, measured through the retained handle.
+
+        Microsoft documents the executable as the first entry. Its HMODULE is
+        its load address, which MODULEINFO must repeat; the reader then checks
+        the mapping at that address starts an allocation.
+        """
+        with self._lock:
+            facts = self._facts()
+            wow64 = facts.pointer_bits < self._caller_bits
+            first, needed = PTR(), U32()
+            if not self._kernel.K32EnumProcessModulesEx(
+                    self._owned(), ctypes.byref(first), ctypes.sizeof(PTR), ctypes.byref(needed),
+                    _LIST_MODULES_32BIT if wow64 else _LIST_MODULES_DEFAULT):
+                self._error(FailureReason.UNREADABLE_REGION)
+            if needed.value < ctypes.sizeof(PTR) or not first.value:
+                _fail(FailureReason.UNREADABLE_REGION)
+            info = ModuleInfo()
+            if not self._kernel.K32GetModuleInformation(self._owned(), first, ctypes.byref(info),
+                                                        ctypes.sizeof(info)):
+                self._error(FailureReason.UNREADABLE_REGION)
+            base = info.base or 0
+            if base != first.value:
+                _fail(FailureReason.UNREADABLE_REGION)
+            _range(base, info.size, facts.pointer_bits)
+            if self._facts() != facts:
+                _fail(FailureReason.TARGET_CHANGED)
+            return ModuleSpan(base, info.size)
 
     def close(self) -> None:
         """Retain ownership on failure; successful repeated closes are harmless."""

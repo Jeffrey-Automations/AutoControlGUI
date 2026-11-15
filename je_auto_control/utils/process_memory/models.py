@@ -108,6 +108,26 @@ class ReadPlan:
 
 
 @dataclass(frozen=True)
+class ModuleSpan:
+    """The target's main executable image as mapped now, measured from the retained handle."""
+
+    base: int = field(repr=False)
+    size: int = field(repr=False)
+
+
+class ResolverView(Protocol):
+    """A resolver's only reach into the target, valid for one ``resolve`` call.
+
+    Both calls go through the retained handle under the probe's byte, region
+    and deadline budget; nothing else about the process is exposed.
+    """
+
+    def main_module(self) -> ModuleSpan: ...
+
+    def read(self, address: int, size: int) -> bytes: ...
+
+
+@dataclass(frozen=True)
 class ReviewedProbe:
     """Immutable host-owned ceiling and trusted version-specific resolver/decoder."""
 
@@ -121,7 +141,7 @@ class ReviewedProbe:
     max_regions: int
     timeout: float
     max_value_bytes: int
-    resolve: Callable[[ProcessIdentity], ReadPlan] = field(repr=False, compare=False)
+    resolve: Callable[[ProcessIdentity, ResolverView], ReadPlan] = field(repr=False, compare=False)
     decode: Callable[[bytes, tuple[str, ...]], Mapping[str, Scalar]] = field(repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -145,6 +165,8 @@ class ProcessHandle(Protocol):
     def query_region(self, address: int) -> MemoryRegion: ...
 
     def read(self, address: int, size: int) -> bytes: ...
+
+    def main_module(self) -> ModuleSpan: ...
 
     def close(self) -> None: ...
 

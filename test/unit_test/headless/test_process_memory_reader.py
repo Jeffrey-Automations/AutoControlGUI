@@ -10,7 +10,7 @@ import pytest
 from je_auto_control.utils.exception.control_signals import OperationCancelledError
 from je_auto_control.utils.executor.run_control import ExecutionStopped
 from je_auto_control.utils.process_memory.models import (
-    FailureReason, MemoryObservationError, MemoryRegion, Observation, ObservationFailure,
+    FailureReason, MemoryObservationError, MemoryRegion, ModuleSpan, Observation, ObservationFailure,
     ProcessIdentity, ReadPlan, ReviewedProbe,
 )
 from je_auto_control.utils.process_memory.reader import ProcessMemoryReader
@@ -36,7 +36,7 @@ def decode(raw, fields):
 def probe(**changes):
     original = ReviewedProbe("fixture-document", "1", IDENTITY.executable, ("1",), ("x64",),
                              ("document_id", "job_status"), 64, 8, 1.0, 32,
-                             lambda identity: ReadPlan(ADDRESS, SCHEMA.size), decode)
+                             lambda identity, view: ReadPlan(ADDRESS, SCHEMA.size), decode)
     return replace(original, **changes)
 
 
@@ -51,6 +51,7 @@ class Handle:
         self.fail_close = False
         self.after_read = lambda: None
         self.transform = lambda value: value
+        self.module = ModuleSpan(ADDRESS - 8, 8 + SCHEMA.size)
 
     def identity(self):
         return self.current_identity
@@ -63,6 +64,9 @@ class Handle:
         value = bytes(self.memory[i] for i in range(address, address + size))
         self.after_read()
         return self.transform(value)
+
+    def main_module(self):
+        return self.module
 
     def close(self):
         self.closed += 1
@@ -183,13 +187,13 @@ def test_short_read_fails_and_closes():
 @pytest.mark.parametrize("address,size", [(True, 1), (1 << 64, 1), ((1 << 64) - 1, 2), (ADDRESS, 0)])
 def test_invalid_private_plan_range_cannot_reach_read(address, size):
     handle = Handle()
-    assert observe(Provider(handle), probe(resolve=lambda identity: ReadPlan(address, size))).reason == (
+    assert observe(Provider(handle), probe(resolve=lambda identity, view: ReadPlan(address, size))).reason == (
         FailureReason.UNREADABLE_REGION)
     assert not handle.reads
 
 
 def test_stable_even_sequence_is_required_and_charged():
-    reviewed = probe(resolve=lambda identity: ReadPlan(ADDRESS, SCHEMA.size, ADDRESS - 8))
+    reviewed = probe(resolve=lambda identity, view: ReadPlan(ADDRESS, SCHEMA.size, ADDRESS - 8))
     handle = Handle()
     result = observe(Provider(handle), reviewed)
     assert result.consistency == "sequence_checked" and result.bytes_read == 32
@@ -201,7 +205,7 @@ def test_stable_even_sequence_is_required_and_charged():
 def test_odd_sequence_rejects_without_reading_payload():
     handle = Handle()
     handle.memory[ADDRESS - 8] = 3
-    reviewed = probe(resolve=lambda identity: ReadPlan(ADDRESS, SCHEMA.size, ADDRESS - 8))
+    reviewed = probe(resolve=lambda identity, view: ReadPlan(ADDRESS, SCHEMA.size, ADDRESS - 8))
     assert observe(Provider(handle), reviewed).reason == FailureReason.INCONSISTENT_SNAPSHOT
     assert handle.reads == [(ADDRESS - 8, 8)]
 
@@ -361,7 +365,7 @@ def test_cancellation_during_close_cannot_deliver_success():
 
 def test_sequence_reads_share_the_payload_budget():
     handle = Handle()
-    reviewed = probe(max_bytes=31, resolve=lambda identity: ReadPlan(ADDRESS, SCHEMA.size, ADDRESS - 8))
+    reviewed = probe(max_bytes=31, resolve=lambda identity, view: ReadPlan(ADDRESS, SCHEMA.size, ADDRESS - 8))
     assert observe(Provider(handle), reviewed).reason == FailureReason.BUDGET_EXCEEDED
     assert sum(size for _, size in handle.reads) == 24
 
@@ -524,3 +528,91 @@ def test_cleanup_in_progress_still_reports_retained_ownership():
         release.set()
         thread.join(3)
     assert not thread.is_alive() and results == [True] and not reader.pending_cleanup
+
+
+HEADER = (2).to_bytes(8, "little")  # the eight bytes the fake maps at ADDRESS - 8
+
+
+def test_a_resolver_reads_through_the_view_under_the_probe_budget():
+    """The header read binds the plan to this process, and it is charged like any other read."""
+    seen = []
+
+    def resolve(identity, view):
+        seen.append(view.read(ADDRESS - 8, 8))
+        return ReadPlan(ADDRESS, SCHEMA.size)
+
+    handle = Handle()
+    result = observe(Provider(handle), probe(resolve=resolve))
+    assert seen == [HEADER]
+    assert result.bytes_read == 8 + SCHEMA.size and result.regions_read == 2
+    assert handle.reads == [(ADDRESS - 8, 8), (ADDRESS, SCHEMA.size)]
+
+
+def test_a_resolver_cannot_swallow_a_budget_failure():
+    def resolve(identity, view):
+        try:
+            view.read(ADDRESS - 8, 8 + SCHEMA.size)
+        except MemoryObservationError:
+            pass
+        return ReadPlan(ADDRESS, SCHEMA.size)
+
+    handle = Handle()
+    assert observe(Provider(handle), probe(max_bytes=16, resolve=resolve)).reason == FailureReason.BUDGET_EXCEEDED
+    assert handle.reads == [] and handle.closed == 1
+
+
+def test_a_checkpoint_failure_inside_the_view_propagates_even_when_the_resolver_catches_it():
+    failure = PermissionError("authority revoked")
+    armed = []
+
+    def checkpoint():
+        if armed:
+            raise failure
+
+    def resolve(identity, view):
+        armed.append(True)
+        try:
+            view.read(ADDRESS - 8, 8)
+        except PermissionError:
+            pass
+        return ReadPlan(ADDRESS, SCHEMA.size)
+
+    handle = Handle()
+    with pytest.raises(PermissionError) as caught:
+        observe(Provider(handle), probe(resolve=resolve), checkpoint=checkpoint)
+    assert caught.value is failure and handle.closed == 1
+
+
+def test_the_main_module_is_bound_to_the_allocation_it_claims():
+    spans = []
+
+    def resolve(identity, view):
+        spans.append(view.main_module())
+        return ReadPlan(ADDRESS, SCHEMA.size)
+
+    handle = Handle()
+    assert isinstance(observe(Provider(handle), probe(resolve=resolve)), Observation)
+    assert spans == [ModuleSpan(ADDRESS - 8, 8 + SCHEMA.size)]
+    assert str(ADDRESS) not in repr(spans[0])
+    moved = Handle()
+    moved.module = ModuleSpan(ADDRESS, SCHEMA.size)  # inside the mapping, not where its allocation starts
+    assert observe(Provider(moved), probe(resolve=resolve)).reason == FailureReason.TARGET_CHANGED
+    wrong = Handle()
+    wrong.module = (ADDRESS - 8, 8)
+    assert observe(Provider(wrong), probe(resolve=resolve)).reason == FailureReason.UNREADABLE_REGION
+
+
+def test_a_view_kept_past_resolve_reads_nothing():
+    kept = []
+
+    def resolve(identity, view):
+        kept.append(view)
+        return ReadPlan(ADDRESS, SCHEMA.size)
+
+    handle = Handle()
+    assert isinstance(observe(Provider(handle), probe(resolve=resolve)), Observation)
+    with pytest.raises(MemoryObservationError):
+        kept[0].read(ADDRESS, SCHEMA.size)
+    with pytest.raises(MemoryObservationError):
+        kept[0].main_module()
+    assert handle.reads == [(ADDRESS, SCHEMA.size)]

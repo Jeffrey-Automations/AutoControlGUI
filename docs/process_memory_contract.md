@@ -132,7 +132,23 @@ The reviewed resolver runs anew for each observation. It supplies one private
 payload range and optionally an eight-byte sequence range. A native adapter must
 resolve its current module/fixture location from the retained target relationship;
 it cannot cache an absolute address across launches or trust a path string as
-executable identity. That native resolution remains unimplemented.
+executable identity.
+
+The resolver is called as `resolve(identity, view)`. The view is its only reach
+into the target and is valid for that one call; afterwards every call on it fails.
+`view.read(address, size)` goes through the same checked path as payload reads and
+is charged to the same byte, region and deadline budget. `view.main_module()`
+returns a `ModuleSpan` (base and size, hidden from representations) measured from
+the retained handle: on Windows the first module `K32EnumProcessModulesEx` lists,
+which Microsoft documents as the executable, with `LIST_MODULES_32BIT` for a WOW64
+target seen from a 64-bit caller, and `K32GetModuleInformation` repeating the same
+base. The reader then requires that base to start the allocation of a committed,
+readable mapping. A failure raised by the reader's own checks inside the view
+(budget, deadline, changed target, the live checkpoint) is kept and raised again
+after `resolve` returns, so a resolver that catches it cannot still produce a plan.
+Only injected tests exercise this; native module resolution is unverified, and the
+fixture header challenge that would bind bootstrap locations to the retained
+process is not implemented yet.
 
 The reader visits only intersecting regions. Each region must be committed,
 readable and unguarded. Addresses, lengths and pointer-width arithmetic are

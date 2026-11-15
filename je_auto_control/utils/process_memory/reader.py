@@ -4,14 +4,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 import threading
 import time
-from typing import Callable, Mapping, TypeVar
+from typing import Callable, Mapping, NoReturn, TypeVar
 from uuid import uuid4
 
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.exception.control_signals import raise_if_run_interrupted
 from je_auto_control.utils.executor.run_control import ExecutionStopped
 from je_auto_control.utils.process_memory.models import (
-    FailureReason, MemoryObservationError, MemoryRegion, Observation, ObservationFailure,
+    FailureReason, MemoryObservationError, MemoryRegion, ModuleSpan, Observation, ObservationFailure,
     ObservationResult, ProcessHandle, ProcessIdentity, ProcessProvider, ReadPlan, ReviewedProbe, Scalar,
     _identifier,
 )
@@ -42,7 +42,7 @@ def _provider_call(call: Callable[[], _T]) -> _T:
         raise _ObservationFailed(reason) from None
 
 
-def _fail(reason: FailureReason) -> None:
+def _fail(reason: FailureReason) -> NoReturn:
     raise _ObservationFailed(reason)
 
 
@@ -120,6 +120,69 @@ class _Operation:
             self.identity(handle)
             collected.extend(chunk)
         return bytes(collected)
+
+
+    def module(self, handle: ProcessHandle) -> ModuleSpan:
+        """The main image, bound to the mapping it claims: its base must start an allocation."""
+        self.identity(handle)
+        value = _provider_call(handle.main_module)
+        self.check()
+        if not isinstance(value, ModuleSpan):
+            _fail(FailureReason.UNREADABLE_REGION)
+        _range(value.base, value.size, self.expected.pointer_bits)
+        if self.region(handle, value.base).allocation != value.base:
+            _fail(FailureReason.TARGET_CHANGED)
+        self.identity(handle)
+        return value
+
+
+class _ResolverView:
+    """Budgeted reads and the measured main module for one ``resolve`` call, then nothing.
+
+    A failure raised by the reader's own checks (budget, deadline, changed
+    target, the live checkpoint) is kept, so a resolver that catches it cannot
+    turn it into a plan: the reader raises it again once ``resolve`` returns.
+    """
+
+    def __init__(self, operation: _Operation, handle: ProcessHandle) -> None:
+        self._operation, self._handle = operation, handle
+        self.failure: BaseException | None = None
+        self.live = True
+
+    def _call(self, call: Callable[[], _T]) -> _T:
+        if not self.live:
+            _fail(FailureReason.UNSUPPORTED)
+        try:
+            return call()
+        except BaseException as error:  # reason: recorded and re-raised by the reader after resolve()
+            if self.failure is None:
+                self.failure = error
+            raise
+
+    def main_module(self) -> ModuleSpan:
+        return self._call(lambda: self._operation.module(self._handle))
+
+    def read(self, address: int, size: int) -> bytes:
+        return self._call(lambda: self._operation.read(self._handle, address, size))
+
+
+def _resolve(operation: _Operation, handle: ProcessHandle) -> ReadPlan:
+    """Run the reviewed resolver with a one-call view; a failure of the reader's own checks wins."""
+    view = _ResolverView(operation, handle)
+    try:
+        plan = operation.probe.resolve(operation.expected, view)
+    except Exception as error:  # reason: resolver failures must not disclose private addresses
+        if view.failure is None:
+            _preserve_interruption(error)
+            raise _ObservationFailed(FailureReason.UNSUPPORTED) from None
+        plan = None
+    finally:
+        view.live = False
+    if view.failure is not None:
+        raise view.failure
+    if not isinstance(plan, ReadPlan):
+        _fail(FailureReason.UNSUPPORTED)
+    return plan
 
 
 def _values(decoded: Mapping[str, Scalar], fields: tuple[str, ...], limit: int) -> tuple[tuple[str, Scalar], ...]:
@@ -223,13 +286,7 @@ class ProcessMemoryReader:
                  target_id: str, started: float) -> Observation:
         operation.identity(handle)
         probe = operation.probe
-        try:
-            plan = probe.resolve(operation.expected)
-        except Exception as error:  # reason: resolver failures must not disclose private addresses
-            _preserve_interruption(error)
-            raise _ObservationFailed(FailureReason.UNSUPPORTED) from None
-        if not isinstance(plan, ReadPlan):
-            _fail(FailureReason.UNSUPPORTED)
+        plan = _resolve(operation, handle)
         operation.check()
         before: bytes | None = None
         if plan.sequence_address is not None:

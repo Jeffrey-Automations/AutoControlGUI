@@ -36,6 +36,12 @@ class MemoryInfo64(ctypes.Structure):
                 ("protection", U32), ("kind", U32), ("alignment2", U32)]
 
 
+class ModuleInfo(ctypes.Structure):
+    """PSAPI MODULEINFO in the caller's pointer width: base, image size, entry point."""
+
+    _fields_ = [("base", PTR), ("size", U32), ("entry", PTR)]
+
+
 class NativeFunction(Protocol):
     """A ctypes function with an explicitly installed native signature."""
 
@@ -62,6 +68,8 @@ class Kernel(ProcessKernel, Protocol):
 
     VirtualQueryEx: NativeFunction
     ReadProcessMemory: NativeFunction
+    K32EnumProcessModulesEx: NativeFunction
+    K32GetModuleInformation: NativeFunction
 
 
 def bind_process(kernel: ProcessKernel) -> None:
@@ -86,6 +94,8 @@ def bind(kernel: Kernel) -> None:
     signatures: tuple[tuple[NativeFunction, list[object], object], ...] = (
         (kernel.VirtualQueryEx, [PTR, PTR, PTR, SIZE], SIZE),
         (kernel.ReadProcessMemory, [PTR, PTR, PTR, SIZE, ctypes.POINTER(SIZE)], BOOL),
+        (kernel.K32EnumProcessModulesEx, [PTR, ctypes.POINTER(PTR), U32, ctypes.POINTER(U32), U32], BOOL),
+        (kernel.K32GetModuleInformation, [PTR, PTR, ctypes.POINTER(ModuleInfo), U32], BOOL),
     )
     for function, arguments, result in signatures:
         function.argtypes, function.restype = arguments, result
