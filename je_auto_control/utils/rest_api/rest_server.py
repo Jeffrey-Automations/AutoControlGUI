@@ -161,7 +161,9 @@ class _RestRequestHandler(BaseHTTPRequestHandler):
         # Static assets — safe to cache briefly inside the same session.
         self.send_header("Cache-Control", "private, max-age=60")
         self.end_headers()
-        self.wfile.write(body)
+        # body is one of the files shipped in dashboard/, read once into _dashboard_assets();
+        # the request only picks a name from that table, so it cannot choose the content.
+        self.wfile.write(body)  # NOSONAR pythonsecurity:S5131  # reason: packaged static asset, see above
         self._metrics().record_request("GET", _PATH_DASHBOARD, status)
 
     def _serve_metrics(self) -> None:
