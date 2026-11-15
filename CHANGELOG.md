@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Approval gate: with RBAC on, the maker and the checker are the authenticated user. A
+  `requester` or `approver` naming anyone else raises `AuthorizationError` (an empty one means
+  that user), so one operator can no longer file a request and approve it under a second name.
+  Without RBAC the supplied names are used as before.
+
 - RBAC: every `AC_*` command now has a recorded decision. The 817 commands not in
   `COMMAND_CAPABILITIES` were reviewed as reaching nothing admin-only and are listed in
   `utils/rbac/command_review.py` (33 of them with the reason); a new command in neither table

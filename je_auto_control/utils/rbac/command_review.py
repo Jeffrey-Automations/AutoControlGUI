@@ -23,11 +23,11 @@ from typing import Dict, FrozenSet
 #: Reviewed candidates that stay at operator, with the reason.
 OPERATOR_NOTES: Dict[str, str] = {
     "AC_approval_approve": (
-        "maker-checker for scripts: nothing on the host consults the gate, and the approver is a caller-supplied "
-        "name, not the RBAC user"
+        "maker-checker for scripts: nothing on the host consults the gate, and under RBAC the approver is the "
+        "authenticated user (ApprovalGate refuses another name)"
     ),
     "AC_approval_reject": "as AC_approval_approve",
-    "AC_approval_request": "maker-checker for scripts: nothing on the host consults the gate",
+    "AC_approval_request": "maker-checker for scripts; under RBAC the requester is the authenticated user",
     "AC_approval_status": "reads a request's state",
     "AC_approve_artifact": "promotes a test baseline: workflow data, not host policy",
     "AC_chatops_dispatch": (

@@ -7,6 +7,11 @@ different principal — approves or rejects it; the action proceeds only once
 ``is_approved`` is true. State is an optional JSON file so the maker and checker
 can run as separate processes (CI dispatcher and a human approver).
 
+Inside an RBAC scope the maker and the checker are the authenticated user, not
+whatever name the caller supplies: one operator could otherwise file a request
+and approve it under another name. A supplied name that is not that user is
+refused; an empty one means that user.
+
 Pure standard library; imports no ``PySide6``. Tokens use :mod:`secrets`.
 """
 import functools
@@ -27,6 +32,19 @@ def _principal(user: object) -> str:
     """Compare user ids as one person: "Alice" approving "alice" is self-approval."""
     return unicodedata.normalize("NFKC", str(user or "")).strip().casefold()
 
+
+def _acting(supplied: str, role: str) -> str:
+    """``supplied`` outside RBAC; inside it, the authenticated user, which ``supplied`` must name."""
+    from je_auto_control.utils.rbac.authorization import AuthorizationError, current_authorization
+    context = current_authorization()
+    if context is None:
+        return supplied
+    if _principal(supplied) and _principal(supplied) != _principal(context.user_id):
+        raise AuthorizationError(
+            f"{role} {supplied!r} is not the authenticated user {context.user_id!r}")
+    return context.user_id
+
+
 class ApprovalGate:
     """A maker-checker approval registry backed by an optional JSON file.
 
@@ -41,6 +59,7 @@ class ApprovalGate:
 
     def request(self, action: str, requester: str = "") -> str:
         """File an approval request for ``action``; return its token."""
+        requester = _acting(requester, "requester")
         token = secrets.token_hex(8)
         record = {
             "token": token, "action": action, "requester": requester,
@@ -50,6 +69,7 @@ class ApprovalGate:
         return token
 
     def _decide(self, token: str, approver: str, status: str) -> bool:
+        approver = _acting(approver, "approver")
         checker = _principal(approver)
 
         def decide(items: Dict[str, Dict[str, object]]) -> bool:
