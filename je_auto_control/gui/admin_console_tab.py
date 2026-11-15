@@ -15,7 +15,7 @@ import threading
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QSize, QTimer, Qt
-from PySide6.QtGui import QIcon, QImage, QPixmap
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QSpinBox, QTableWidget,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import decoded_image
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
@@ -282,7 +283,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
     def _icon_for(png: Optional[bytes]) -> Optional[QIcon]:
         if not png:
             return None
-        image = QImage.fromData(png, "PNG")  # type: ignore[arg-type]  # reason: the stub says bytes; PySide6 raises ValueError for bytes
+        image = decoded_image(png, "PNG")
         if image.isNull():
             return None
         scaled = image.scaled(

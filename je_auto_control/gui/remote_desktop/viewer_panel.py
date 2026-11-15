@@ -16,6 +16,7 @@ from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import decoded_image
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui.remote_desktop._connect_task import connect_viewer
 from je_auto_control.gui.remote_desktop._helpers import (
@@ -466,7 +467,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             self._on_error_main(message)
 
     def _on_frame_main(self, payload: bytes) -> None:
-        image = QImage.fromData(payload, "JPEG")  # type: ignore[arg-type]  # reason: the stub says bytes; PySide6 raises ValueError for bytes
+        image = decoded_image(payload, "JPEG")
         if image.isNull():
             return
         if self._screen_window is None:

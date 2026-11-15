@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261115-21 | 2026-11-15 | Decode GUI frames through loadFromData; drop the five fromData type-ignores | #done #typing #gui | [2026-11-b](2026-11-b.md) |
 | U-20261115-20 | 2026-11-15 | PopenLauncher measures the owned child through Popen's own handle | #done #process-memory | [2026-11-b](2026-11-b.md) |
 | U-20261115-19 | 2026-11-15 | Owned-launch attestor: lease, pinned SHA-256, re-observed child | #done #process-memory #security | [2026-11-b](2026-11-b.md) |
 | U-20261115-18 | 2026-11-15 | The memory fixture's bootstrap is bound by a header challenge | #done #process-memory | [2026-11-b](2026-11-b.md) |

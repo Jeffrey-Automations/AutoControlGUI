@@ -5,7 +5,7 @@ import ssl
 from typing import Any, Optional
 
 from PySide6.QtCore import QTimer, Signal
-from PySide6.QtGui import QGuiApplication, QImage
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
     QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget,
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import decoded_image
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -391,6 +392,6 @@ class _HostPanel(TranslatableMixin, QWidget):
         frame = host.latest_frame()
         if frame is None:
             return
-        image = QImage.fromData(frame, "JPEG")  # type: ignore[arg-type]  # reason: the stub says bytes; PySide6 raises ValueError for bytes
+        image = decoded_image(frame, "JPEG")
         if not image.isNull():
             self._preview.set_image(image)

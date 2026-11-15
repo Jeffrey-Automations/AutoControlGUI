@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,546 |
-| 程式碼總行數 | 238,509 |
+| 程式碼總行數 | 238,525 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -1392,10 +1392,10 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | dag_runner | `dag_tab.py` | 367 | 編輯、驗證、執行跨主機 DAG。 |
 | chatops | `chatops_tab.py` | 140 | 在接上 Slack 前先本機測試 slash 指令。 |
 | trace_replay | `trace_replay_tab.py` | 194 | 拖曳捲動時光回溯錄製內容。 |
-| remote_desktop | `remote_desktop/`（40 檔） | 8,577 | 見下。 |
+| remote_desktop | `remote_desktop/`（40 檔） | 8,580 | 見下。 |
 | presence | `presence_tab.py` | 171 | 多檢視者在場名單。 |
 | rest_api | `rest_api_tab.py` | 256 | 啟停 HTTP 前端並顯示 URL、實際驗證模式與可用 token。 |
-| admin_console | `admin_console_tab.py` | 330 | 管理多個遠端 AutoControl REST 端點。 |
+| admin_console | `admin_console_tab.py` | 331 | 管理多個遠端 AutoControl REST 端點。 |
 | audit_log | `audit_log_tab.py` | 193 | 瀏覽並驗證防竄改雜湊鏈。 |
 | inspector | `inspector_tab.py` | 133 | WebRTC 檢測器：即時摘要與近期統計取樣。 |
 | usb_devices | `usb_devices_tab.py` | 176 | 唯讀列舉 + 熱插拔監看控制。 |
@@ -1410,7 +1410,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `gui/diagnostics_capabilities.py` | 60 | 只呈現既有不可變能力快照與四語狀態；不探測、不連線，不持有原生物件。 |
 
-#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／8,577 行）
+#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／8,580 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1425,10 +1425,10 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `webrtc_dialogs.py` | 533 | WebRTC GUI 用的自訂對話框與清單元件（待審檢視者、信任清單、通訊錄、遠端檔案表、稽核記錄、LAN 瀏覽）。 |
 | `advanced_group.py` | 99 | 兩個 WebRTC 面板共用的 Advanced STUN／TURN（含選用硬體編碼器）群組，含分離的 STUN／TURN 與選用主機硬體編碼器 Protocol。 |
 | `trusted_group.py` | 75 | WebRTC host 面板的信任 viewer 清單群組（移除／清空／匯入／匯出），含它寫回面板的 Protocol。 |
-| `connection_screen.py` | 723 | Quick Connect —— AnyDesk 風格單畫面入口。 |
-| `viewer_panel.py` | 617 | 「控制另一台機器」子分頁。 |
+| `connection_screen.py` | 724 | Quick Connect —— AnyDesk 風格單畫面入口。 |
+| `viewer_panel.py` | 618 | 「控制另一台機器」子分頁。 |
 | `webrtc_known_hosts.py` | 345 | TOFU 釘選庫瀏覽器：`KnownHostsDialog` 與帶外釘選用的小表單。由 `webrtc_dialogs` 再匯出。 |
-| `host_panel.py` | 396 | 「分享這台機器」子分頁。 |
+| `host_panel.py` | 397 | 「分享這台機器」子分頁。 |
 | `_host_ops.py` | 39 | Start and stop the machine's remote-desktop host on a worker thread. Host 面板與 Quick Connect 共用的 `replace_host`／`stop_host`／`release_host`。 |
 | `frame_display.py` | 229 | 繪製 JPEG 影格並發出遠端輸入事件的元件。 |
 | `webrtc_workers.py` | 253 | 訊令流程的背景 worker（`DaemonThread`，長輪詢比面板或程式活得久也不會中止行程）。 |
@@ -1550,7 +1550,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 166 | 43,934 |
+| `gui/` | 166 | 43,950 |
 | `utils/mcp_server/` | 63 | 22,322 |
 | `utils/remote_desktop/` | 77 | 16,938 |
 | `utils/executor/` | 11 | 10,765 |
@@ -1571,7 +1571,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,009 | 104,132 |
-| **總計** | **1,534** | **237,764** |
+| **總計** | **1,534** | **237,780** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

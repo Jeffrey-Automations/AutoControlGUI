@@ -21,13 +21,14 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QGuiApplication, QImage
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import decoded_image
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui._dispose import release_resources
@@ -598,7 +599,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         window = self._screen_window
         if window is None:
             return
-        image = QImage.fromData(payload, "JPEG")  # type: ignore[arg-type]  # reason: the stub says bytes; PySide6 raises ValueError for bytes
+        image = decoded_image(payload, "JPEG")
         if not image.isNull():
             window.set_image(image)
 
@@ -620,7 +621,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         # If frames arrived before this window existed (race with the
         # motion-dedup capture path), apply the most recent now.
         if self._pending_frame is not None:
-            image = QImage.fromData(self._pending_frame, "JPEG")  # type: ignore[arg-type]  # reason: the stub says bytes; PySide6 raises ValueError for bytes
+            image = decoded_image(self._pending_frame, "JPEG")
             if not image.isNull():
                 self._screen_window.set_image(image)
         self._screen_window.show()
