@@ -16,12 +16,12 @@ from je_auto_control.utils.agent_runtime.transfer_management import SOURCE_FIELD
 from je_auto_control.utils.agent_runtime.transfer_records import TransferRecords, _text
 from je_auto_control.utils.agent_runtime.transfer_selection import TextCriterion, check_source_paths, selected_files
 
-def _binding(context: dict) -> dict:
+def _binding(context: dict[str, Any]) -> dict[str, Any]:
     return {key: context[key] for key in ('source_snapshot', 'completion_snapshot', 'submission_digest',
                                          'origin_scope', 'expires', 'lineage_digest')}
 
 
-def _public(record: dict) -> dict:
+def _public(record: dict[str, Any]) -> dict[str, Any]:
     state = record['state']
     if state == 'active' and record['expires'] <= time.time():
         state = 'expired'
@@ -47,7 +47,7 @@ class TransferSource:
 
     def __init__(self, runtime: Any, records: TransferRecords, host: Any, checkpoint: Any) -> None:
         self.runtime, self.records, self.host = runtime, records, host
-        self._reviews: dict[str, dict] = {}
+        self._reviews: dict[str, dict[str, Any]] = {}
         self._cache = PrivateTransferCache(runtime.store.path)
         self._initialized = False
         self._checkpoint = checkpoint
@@ -58,7 +58,7 @@ class TransferSource:
                 self.records.initialize(connection)
             self._initialized = True
 
-    def control(self, operation: str, request: Mapping[str, Any]) -> dict:
+    def control(self, operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
         """Execute only exact local management envelopes; none accept paths or foreign principals."""
         self.host.check_open()
         self._checkpoint()
@@ -85,12 +85,12 @@ class TransferSource:
                 row = self.records.find(connection, row['id'])
         return {'export': _public(row)}
 
-    def _manage(self, record: dict, actor: dict) -> None:
+    def _manage(self, record: dict[str, Any], actor: dict[str, Any]) -> None:
         if record['kind'] != 'export':
             raise AgentTaskError('identity is not an export')
         self.host.managed(record['scope']['source_task'], actor)
 
-    def _review(self, request: dict, actor: dict) -> dict:
+    def _review(self, request: dict[str, Any], actor: dict[str, Any]) -> dict[str, Any]:
         _text(request['idempotency_key'], 256, 'idempotency key')
         if request['recipient_policy'] not in ('caller', 'source_owner'):
             raise AgentTaskError('recipient_policy must derive caller or original source owner')
@@ -120,7 +120,7 @@ class TransferSource:
         return {'review': review, 'digest': manifest.digest, 'manifest': manifest.to_dict(),
                 'review_expires': now + 300, 'approval_required': True}
 
-    def _scan(self, context: dict, selected: list, checkpoint: Any, *,
+    def _scan(self, context: dict[str, Any], selected: list[tuple[str, dict[str, Any]]], checkpoint: Any, *,
               account: str | None = None) -> tuple[SourceFile, ...]:
         result, remaining = [], MAX_TRANSFER_BYTES
         for path, clause in selected:
@@ -134,7 +134,7 @@ class TransferSource:
         return tuple(result)
 
     @staticmethod
-    def _criterion(item: SourceFile, clause: dict, text: TextCriterion | None) -> None:
+    def _criterion(item: SourceFile, clause: dict[str, Any], text: TextCriterion | None) -> None:
         if clause['kind'] == 'file_sha256' and item.file.blob.sha256 != clause['value']:
             raise AgentTaskError('source bytes no longer satisfy the selected hash criterion')
         if 'expected_size' in clause and item.file.blob.size != clause['expected_size']:
@@ -144,7 +144,7 @@ class TransferSource:
         if text is not None:
             text.finish()
 
-    def _check(self, context: dict, issuer: dict, *, connection: Any = None) -> None:
+    def _check(self, context: dict[str, Any], issuer: dict[str, Any], *, connection: Any = None) -> None:
         self._checkpoint()
         self._cache.check()
         current = self.host.context(context['row']['id'], issuer, connection=connection,
@@ -153,7 +153,7 @@ class TransferSource:
             raise AgentTaskError('source evidence or reviewed authority changed')
         self._checkpoint()
 
-    def _create(self, request: dict, actor: dict) -> dict:
+    def _create(self, request: dict[str, Any], actor: dict[str, Any]) -> dict[str, Any]:
         _hex(request['review'], 32)
         note_hash = _text(request['note'], 4000, 'approval note')
         key_hash = _text(request['idempotency_key'], 256, 'idempotency key')
@@ -197,7 +197,8 @@ class TransferSource:
             if not accepted:
                 self._cleanup(record)
 
-    def _retry(self, request: dict, actor: dict, note_hash: str, key_hash: str) -> dict | None:
+    def _retry(self, request: dict[str, Any], actor: dict[str, Any], note_hash: str,
+               key_hash: str) -> dict[str, Any] | None:
         with self.runtime.store.connection() as connection:
             previous = self.records.review(connection, request['review'])
         if previous is None:
@@ -208,7 +209,7 @@ class TransferSource:
         self._live(previous)
         return previous
 
-    def _live(self, record: dict) -> dict:
+    def _live(self, record: dict[str, Any]) -> dict[str, Any]:
         self._checkpoint()
         with self.runtime.store.connection() as connection:
             active = self.records.active(connection, record['id'])
@@ -221,7 +222,7 @@ class TransferSource:
         self._cache.check()
         return current
 
-    def peer(self, operation: str, request: Mapping[str, Any]) -> dict:
+    def peer(self, operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
         """Read only exact committed manifests or selected content hashes as their actual local recipient."""
         fields = {'export_id'} if operation == 'export' else {'export_id', 'sha256'}
         if not isinstance(operation, str) or operation not in {'export', 'chunk'}:
@@ -265,7 +266,7 @@ class TransferSource:
         for record in pending:
             self._cleanup(record)
 
-    def _cleanup(self, record: dict) -> None:
+    def _cleanup(self, record: dict[str, Any]) -> None:
         with self.runtime.store.connection(write=True) as connection:
             self.records.revoke(connection, record['id'])
         self._cache.delete_account(record['account'])

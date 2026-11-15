@@ -42,7 +42,7 @@ class NativeWorker:
         self._activity: Any = None
         self._control_event = threading.Event()
         self._sink_lock = threading.Lock()
-        self._presence_binding: dict | None = None
+        self._presence_binding: dict[str, Any] | None = None
         self._presence_endpoint: Any = None
         self._notice_stop = threading.Event()
         self._notice_thread: threading.Thread | None = None
@@ -51,7 +51,7 @@ class NativeWorker:
     def _browser_readonly(self) -> bool:
         return isinstance(self._target, BrowserTarget) and self._target.input_retired
 
-    def _reply(self, payload: dict) -> None:
+    def _reply(self, payload: dict[str, Any]) -> None:
         packet = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8") + b"\n"
         if len(packet) > _LIMIT:
             raise AgentTaskError("native response is too large")
@@ -65,7 +65,7 @@ class NativeWorker:
                 self._reply({"control": "physical_input"})
                 return
 
-    def _validate_input(self, event: dict) -> None:
+    def _validate_input(self, event: dict[str, Any]) -> None:
         """Recheck live permission; cleanup may acknowledge owned release boundaries only."""
         if self._cleanup:
             if event.get("kind") not in {"key_release", "key_released", "mouse_release", "mouse_released"}:
@@ -74,7 +74,7 @@ class NativeWorker:
         self._check_activity()
         self._target.validate_input(event)
 
-    def _input(self, event: dict) -> None:
+    def _input(self, event: dict[str, Any]) -> None:
         if self._browser_readonly:
             raise AgentTaskError("read-only browser cannot acknowledge native input")
         self._validate_input(event)
@@ -116,7 +116,7 @@ class NativeWorker:
                 self._reply(durable_payload({"id": self._request_id, "error": f"{type(error).__name__}: {error}",
                                              "error_type": type(error).__name__}))
 
-    def _dispatch(self, operation: str, payload: dict) -> Any:
+    def _dispatch(self, operation: str, payload: dict[str, Any]) -> Any:
         if self._browser_readonly:
             with input_observer(self._input):
                 return self._dispatch_browser_readonly(operation, payload)
@@ -132,7 +132,7 @@ class NativeWorker:
             self._configure_scope(payload)
         return self._scoped_operation(operation, payload)
 
-    def _bootstrap(self) -> dict:
+    def _bootstrap(self) -> dict[str, Any]:
         """Advertise optional retirement only on the built-in original configured browser worker."""
         result = {"protocol": 1}
         # pylint: disable-next=unidiomatic-typecheck  # reason: read-only/custom worker subclasses cannot claim this API
@@ -140,7 +140,7 @@ class NativeWorker:
             result["browser_readonly"] = 1
         return result
 
-    def _scoped_operation(self, operation: str, payload: dict) -> Any:
+    def _scoped_operation(self, operation: str, payload: dict[str, Any]) -> Any:
         if self._spec is None:
             raise AgentTaskError("native worker must be configured by its owner")
         definition = self._target.readonly_spec if self._browser_readonly else self._spec
@@ -155,7 +155,7 @@ class NativeWorker:
             stack.enter_context(operation_scope(TaskOperation(definition, self._check_activity, self._owner)))
             return self._operation(operation, payload)
 
-    def _retire_browser(self, payload: dict) -> dict:
+    def _retire_browser(self, payload: dict[str, Any]) -> dict[str, Any]:
         if payload != {} or self._profile_kind != "browser" or self._spec is None:
             raise AgentTaskError("browser retirement requires the configured original scope")
         with command_guard(refuse_browser_tool), input_observer(self._input):
@@ -163,7 +163,7 @@ class NativeWorker:
                 return {"supported": False}
             return self._target.freeze_readonly()
 
-    def _dispatch_browser_readonly(self, operation: str, payload: dict) -> Any:
+    def _dispatch_browser_readonly(self, operation: str, payload: dict[str, Any]) -> Any:
         if operation == "cleanup":
             return self._cleanup_browser_readonly(payload)
         _readonly_browser_payload(operation, payload)
@@ -175,21 +175,21 @@ class NativeWorker:
                 return self._target.bind_readonly(payload["spec"], validate=TaskPolicy)
         return self._scoped_operation(operation, payload)
 
-    def _cleanup_browser_readonly(self, payload: dict) -> dict:
+    def _cleanup_browser_readonly(self, payload: dict[str, Any]) -> dict[str, Any]:
         if payload != {"keys": [], "buttons": []}:
             raise AgentTaskError("read-only browser cleanup cannot inject input")
         with command_guard(refuse_browser_tool), input_observer(self._input):
             self._target.cleanup()
         return {"cleaned": True}
 
-    def _probe_browser(self, payload: dict) -> dict:
+    def _probe_browser(self, payload: dict[str, Any]) -> dict[str, Any]:
         if self._spec is not None or not isinstance(payload, dict) or set(payload) != {"transfer"}:
             raise AgentTaskError("dependency probing requires an unconfigured owned helper")
         # pylint: disable-next=import-outside-toplevel  # reason: only an explicit unconfigured probe loads this seam
         from je_auto_control.utils.agent_runtime.browser_environment import inspect_browser_dependencies
         return inspect_browser_dependencies(payload["transfer"])
 
-    def _configure_scope(self, payload: dict) -> None:
+    def _configure_scope(self, payload: dict[str, Any]) -> None:
         spec = AgentTaskSpec.from_dict(payload["spec"])
         owner = AuthorizationContext(**payload["owner"]) if payload.get("owner") else None
         self._check_presence_pin(spec, owner, payload)
@@ -203,7 +203,8 @@ class NativeWorker:
                 self._target = BrowserTarget()
         self._configure_presence(payload)
 
-    def _check_presence_pin(self, spec: AgentTaskSpec, owner: AuthorizationContext | None, payload: dict) -> None:
+    def _check_presence_pin(self, spec: AgentTaskSpec, owner: AuthorizationContext | None,
+                            payload: dict[str, Any]) -> None:
         if self._presence_binding is not None and (spec != self._spec or owner != self._owner
                                                   or payload.get('presence') != self._presence_binding
                                                   or payload.get('presence_endpoint') != (
@@ -211,7 +212,7 @@ class NativeWorker:
                                                       if self._presence_endpoint is not None else None)):
             raise AgentTaskError('configured desktop presence cannot change capability or owner scope')
 
-    def _configure_presence(self, payload: dict) -> None:
+    def _configure_presence(self, payload: dict[str, Any]) -> None:
         if self._requires_presence():
             binding = payload.get('presence')
             if not isinstance(binding, dict):
@@ -225,7 +226,7 @@ class NativeWorker:
         return (not self._custom_target and self._spec is not None and self._spec.target != 'local-files'
                 and self._profile_kind not in {'files', 'browser'})
 
-    def _configure_profile(self, payload: dict) -> None:
+    def _configure_profile(self, payload: dict[str, Any]) -> None:
         if "profile" not in payload:
             return
         from je_auto_control.utils.agent_runtime.target_config import AgentTargetProfile, check_host_platform
@@ -249,7 +250,7 @@ class NativeWorker:
         self._check_activity()
         policy.check(name, arguments)
 
-    def _operation(self, operation: str, payload: dict) -> Any:
+    def _operation(self, operation: str, payload: dict[str, Any]) -> Any:
         if operation == "configure":
             if self._spec is None:
                 raise AgentTaskError("native worker has no configured scope")
@@ -297,14 +298,14 @@ class NativeWorker:
                 raise AgentTaskError('physical presence notice has not retired; owned helper must retire')
 
     @staticmethod
-    def _release_key(key: dict) -> None:
+    def _release_key(key: dict[str, Any]) -> None:
         from je_auto_control.wrapper.auto_control_keyboard import release_keyboard_key, _release_unicode_unit
         if key.get('unicode'):
             _release_unicode_unit(key['keycode'])
         else:
             release_keyboard_key(key['keycode'], key['is_shift'], skip_record=True)
 
-    def _release_owned(self, payload: dict) -> dict:
+    def _release_owned(self, payload: dict[str, Any]) -> dict[str, Any]:
         from je_auto_control.wrapper.auto_control_mouse import release_mouse
         if set(payload) != {"keys", "buttons"}:
             raise AgentTaskError("cleanup payload is invalid")

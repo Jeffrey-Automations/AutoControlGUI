@@ -6,14 +6,14 @@ preserve the original recording.
 from typing import Any, Callable, List, Optional
 
 
-def trim_actions(actions: List[list], start: int = 0,
-                 end: Optional[int] = None) -> List[list]:
+def trim_actions(actions: List[List[Any]], start: int = 0,
+                 end: Optional[int] = None) -> List[List[Any]]:
     """Return a slice ``actions[start:end]`` (end=None means to the end)."""
     return list(actions[start:end])
 
 
-def insert_action(actions: List[list], index: int, new_action: list
-                  ) -> List[list]:
+def insert_action(actions: List[List[Any]], index: int, new_action: List[Any]
+                  ) -> List[List[Any]]:
     """Return a new list with ``new_action`` inserted at ``index``."""
     result = list(actions)
     if index < 0 or index > len(result):
@@ -22,28 +22,28 @@ def insert_action(actions: List[list], index: int, new_action: list
     return result
 
 
-def remove_action(actions: List[list], index: int) -> List[list]:
+def remove_action(actions: List[List[Any]], index: int) -> List[List[Any]]:
     """Return a new list with the entry at ``index`` removed."""
     if index < 0 or index >= len(actions):
         raise IndexError(f"remove_action: index {index} out of range")
     return actions[:index] + actions[index + 1:]
 
 
-def filter_actions(actions: List[list],
-                   predicate: Callable[[list], bool]) -> List[list]:
+def filter_actions(actions: List[List[Any]],
+                   predicate: Callable[[List[Any]], bool]) -> List[List[Any]]:
     """Return only actions for which ``predicate(action)`` is true."""
     return [action for action in actions if predicate(action)]
 
 
-def adjust_delays(actions: List[list], factor: float = 1.0,
-                  clamp_ms: int = 0) -> List[list]:
+def adjust_delays(actions: List[List[Any]], factor: float = 1.0,
+                  clamp_ms: int = 0) -> List[List[Any]]:
     """Scale every ``AC_sleep`` delay by ``factor`` (and clamp to ``clamp_ms``).
 
     :param factor: multiplier for ``seconds`` values (<1 speeds up).
     :param clamp_ms: floor for each resulting delay, in milliseconds.
     """
     floor_seconds = max(0.0, float(clamp_ms) / 1000.0)
-    adjusted: List[list] = []
+    adjusted: List[List[Any]] = []
     for action in actions:
         original = _numeric_seconds(action)
         if original is not None:
@@ -56,10 +56,10 @@ def adjust_delays(actions: List[list], factor: float = 1.0,
     return adjusted
 
 
-def scale_coordinates(actions: List[list],
-                      x_factor: float, y_factor: float) -> List[list]:
+def scale_coordinates(actions: List[List[Any]],
+                      x_factor: float, y_factor: float) -> List[List[Any]]:
     """Multiply every ``x`` / ``y`` parameter; useful when replaying on a new resolution."""
-    scaled: List[list] = []
+    scaled: List[List[Any]] = []
     for action in actions:
         if len(action) < 2 or not isinstance(action[1], dict):
             scaled.append(action)
@@ -83,8 +83,8 @@ def _action_name(action: object) -> object:
     return None
 
 
-def dedupe_moves(actions: List[list],
-                 move_commands: Optional[List[str]] = None) -> List[list]:
+def dedupe_moves(actions: List[List[Any]],
+                 move_commands: Optional[List[str]] = None) -> List[List[Any]]:
     """Collapse each run of consecutive mouse-move actions into its last one.
 
     A raw recording captures one action per cursor sample, so a single
@@ -98,7 +98,7 @@ def dedupe_moves(actions: List[list],
         ``("AC_set_mouse_position",)``.
     """
     moves = set(move_commands) if move_commands else set(_DEFAULT_MOVE_COMMANDS)
-    result: List[list] = []
+    result: List[List[Any]] = []
     for action in actions:
         name = _action_name(action)
         prev_name = _action_name(result[-1]) if result else None
@@ -109,7 +109,7 @@ def dedupe_moves(actions: List[list],
     return result
 
 
-def merge_sleeps(actions: List[list]) -> List[list]:
+def merge_sleeps(actions: List[List[Any]]) -> List[List[Any]]:
     """Collapse each run of consecutive ``AC_sleep`` actions into one sleep.
 
     A recording often emits several back-to-back idle delays; replaying
@@ -118,7 +118,7 @@ def merge_sleeps(actions: List[list]) -> List[list]:
     single sleep, leaving every other action untouched. Returns a new
     list; the input is not mutated.
     """
-    result: List[list] = []
+    result: List[List[Any]] = []
     for action in actions:
         seconds = _numeric_seconds(action)
         previous = _numeric_seconds(result[-1]) if result else None
@@ -146,7 +146,7 @@ def _numeric_seconds(action: Any) -> Optional[float]:
         return None
 
 
-def _is_sleep(action: list) -> bool:
+def _is_sleep(action: List[Any]) -> bool:
     return (
         isinstance(action, list)
         and len(action) == 2

@@ -57,20 +57,20 @@ def dispatch(runtime: Any, operation: str, body: Any = None, task_id: str | None
     return _task_operation(runtime, operation, body)
 
 
-def _transfer(runtime: Any, body: dict, *, peer: bool = False) -> dict:
+def _transfer(runtime: Any, body: dict[str, Any], *, peer: bool = False) -> dict[str, Any]:
     if set(body) != {'operation', 'request'}:
         raise AgentTaskError('transfer requires operation and request')
     handler = runtime.transfers.peer if peer else runtime.transfers.control
     return handler(body['operation'], body['request'])
 
 
-def _dag(runtime: Any, body: dict) -> dict:
+def _dag(runtime: Any, body: dict[str, Any]) -> dict[str, Any]:
     if "operation" not in body or set(body) - {"operation", "request"}:
         raise AgentTaskError("dag accepts operation and an optional request object")
     return runtime.batches.control(body["operation"], body.get("request"))
 
 
-def _lookup(runtime: Any, body: dict) -> dict:
+def _lookup(runtime: Any, body: dict[str, Any]) -> dict[str, Any]:
     if "idempotency_key" not in body or set(body) - {"idempotency_key", "spec"}:
         raise AgentTaskError("lookup requires idempotency_key and accepts an optional spec")
     if "spec" in body and not isinstance(body["spec"], dict):
@@ -78,7 +78,7 @@ def _lookup(runtime: Any, body: dict) -> dict:
     return runtime.lookup(body["idempotency_key"], body.get("spec"))
 
 
-def _submit(runtime: Any, body: dict) -> dict:
+def _submit(runtime: Any, body: dict[str, Any]) -> dict[str, Any]:
     if "spec" not in body or set(body) - {"spec", "idempotency_key"}:
         raise AgentTaskError("submit requires spec and accepts an optional idempotency_key")
     task = runtime.submit(body["spec"], idempotency_key=body.get("idempotency_key"))
@@ -87,51 +87,51 @@ def _submit(runtime: Any, body: dict) -> dict:
     return {"task_id": task.task_id, "state": task.state}
 
 
-def _recover_target(runtime: Any, body: dict) -> dict:
+def _recover_target(runtime: Any, body: dict[str, Any]) -> dict[str, Any]:
     if set(body) != {"target", "note"} or not isinstance(body["target"], str):
         raise AgentTaskError("recover_target requires target and operator note")
     from je_auto_control.utils.agent_runtime.native_recovery import recover_target
     return recover_target(runtime, body["target"], body["note"])
 
 
-def _stop_all(runtime: Any, body: dict) -> dict:
+def _stop_all(runtime: Any, body: dict[str, Any]) -> dict[str, Any]:
     if body:
         raise AgentTaskError("stop_all requires an empty body")
     return runtime.stop_all()
 
 
-def _draft(body: dict) -> dict:
+def _draft(body: dict[str, Any]) -> dict[str, Any]:
     if set(body) != {"workflow", "config"}:
         raise AgentTaskError("draft requires workflow and config")
     from je_auto_control.utils.agent_runtime.workflow_specs import draft_agent_workflow
     return {"draft": draft_agent_workflow(body["workflow"], body["config"])}
 
 
-def _prune(runtime: Any, body: dict) -> dict:
+def _prune(runtime: Any, body: dict[str, Any]) -> dict[str, Any]:
     if set(body) - {"keep_days"}:
         raise AgentTaskError("prune accepts only keep_days")
     return runtime.prune(body.get("keep_days", 30))
 
 
-def _trigger(runtime: Any, body: dict) -> dict:
+def _trigger(runtime: Any, body: dict[str, Any]) -> dict[str, Any]:
     if "operation" not in body or set(body) - {"operation", "request"}:
         raise AgentTaskError("trigger accepts operation and an optional request object")
     return runtime.triggers.control(body["operation"], body.get("request"))
 
 
-def _skill(runtime: Any, body: dict) -> dict:
+def _skill(runtime: Any, body: dict[str, Any]) -> dict[str, Any]:
     if "operation" not in body or set(body) - {"operation", "request"}:
         raise AgentTaskError("skill accepts operation and an optional request object")
     return runtime.skills.control(body["operation"], body.get("request"))
 
 
-def _target(runtime: Any, body: dict) -> dict:
+def _target(runtime: Any, body: dict[str, Any]) -> dict[str, Any]:
     if "operation" not in body or set(body) - {"operation", "request"}:
         raise AgentTaskError("target accepts operation and an optional request object")
     return runtime.target_profiles.control(body["operation"], body.get("request"))
 
 
-def _recovery(runtime: Any, body: dict) -> dict:
+def _recovery(runtime: Any, body: dict[str, Any]) -> dict[str, Any]:
     if set(body) != {"operation", "request"}:
         raise AgentTaskError("recovery requires operation and request")
     result = runtime.recovery.control(body["operation"], body["request"])
@@ -158,7 +158,7 @@ def _task_operation(runtime: Any, operation: str, body: dict[str, Any]) -> dict[
     return result
 
 
-def _check_task_fields(operation: str, body: dict) -> None:
+def _check_task_fields(operation: str, body: dict[str, Any]) -> None:
     required = {"task_id"} | {"act": {"action"}, "reconcile": {"review"}}.get(operation, set())
     optional = {"offset", "limit"} if operation == "receipts" else set()
     if not required <= set(body) or set(body) - required - optional or not isinstance(body.get("task_id"), str):

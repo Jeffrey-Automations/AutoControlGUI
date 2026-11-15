@@ -18,7 +18,7 @@ from je_auto_control.utils.exception.exceptions import AutoControlException
 class ContinuationEvidence:
     """Use captured matching host endpoints, bounded deadlines and no submit/resume/control operation."""
 
-    def __init__(self, batch: dict, timeout: float = 30, runtime: Any = None) -> None:
+    def __init__(self, batch: dict[str, Any], timeout: float = 30, runtime: Any = None) -> None:
         positive(timeout, "DAG continuation timeout_seconds", 300)
         self.batch = batch
         self.deadline = time.monotonic() + timeout
@@ -26,7 +26,7 @@ class ContinuationEvidence:
         self.calls: dict[str, Any] = {}
         self.runtime = runtime
 
-    def query(self, node: dict, operation: str, body: dict) -> dict:
+    def query(self, node: dict[str, Any], operation: str, body: dict[str, Any]) -> dict[str, Any]:
         """Refresh authority around one pinned lookup/get, hiding transport diagnostics."""
         host = node["host"]
         managed_tasks.authorize_task_host(self.owner, host)
@@ -48,7 +48,7 @@ class ContinuationEvidence:
             raise AgentTaskError("DAG continuation destination evidence is malformed")
         return reply
 
-    def _read(self, host: str, operation: str, body: dict, timeout: float) -> dict:
+    def _read(self, host: str, operation: str, body: dict[str, Any], timeout: float) -> dict[str, Any]:
         if host == "local" and self.runtime is not None:
             return self._local(operation, body)
         return self.connection(host)(operation, body, timeout)
@@ -59,7 +59,7 @@ class ContinuationEvidence:
             self.calls[host] = managed_tasks.bound_task_connection(host, self.batch['hosts'][host])
         return self.calls[host]
 
-    def _local(self, operation: str, body: dict) -> dict:
+    def _local(self, operation: str, body: dict[str, Any]) -> dict[str, Any]:
         with self.owner.scope():
             if operation == "lookup":
                 return self.runtime.lookup(body["idempotency_key"], body.get("spec"))
@@ -67,7 +67,7 @@ class ContinuationEvidence:
                 return self.runtime.get(body["task_id"]).to_dict()
         raise AgentTaskError("continuation evidence accepts read-only lookup/get only")
 
-    def original(self, node: dict) -> dict | None:
+    def original(self, node: dict[str, Any]) -> dict[str, Any] | None:
         """Identify the accepted original spec through a submission witness or live legacy matching."""
         key = {"idempotency_key": node["task"]["idempotency_key"]}
         reply = self.query(node, "lookup", key)
@@ -88,14 +88,15 @@ class ContinuationEvidence:
             task = matched["task"]
         return task
 
-    def successor(self, node: dict, original: dict, identifier: str,
-                  handoff_id: str | None = None) -> tuple[dict, list[dict]]:
+    def successor(self, node: dict[str, Any], original: dict[str, Any], identifier: str,
+                  handoff_id: str | None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """Follow only real runtime recovery provenance; every candidate must independently complete."""
         if handoff_id is not None:
             return self._handoff(node, original, identifier, handoff_id)
         return self._ordinary_successor(node, original, identifier)
 
-    def _handoff(self, node: dict, original: dict, identifier: str, handoff_id: str) -> tuple[dict, list[dict]]:
+    def _handoff(self, node: dict[str, Any], original: dict[str, Any], identifier: str,
+                 handoff_id: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         if node['host'] != 'local':
             binding = {'source_task': original['task_id'],
                 'request_key_hash': sha256(node['task']['idempotency_key'].encode('utf-8')).hexdigest(),
@@ -115,13 +116,14 @@ class ContinuationEvidence:
         completion(candidate, node)
         return candidate, chain
 
-    def _ordinary_successor(self, node: dict, original: dict, identifier: str) -> tuple[dict, list[dict]]:
+    def _ordinary_successor(self, node: dict[str, Any], original: dict[str, Any],
+                            identifier: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         candidate = self.query(node, "get", {"task_id": identifier})
         if candidate.get("task_id") != identifier:
             raise AgentTaskError("DAG continuation successor identity changed")
         completion(candidate, node)
         current, seen = candidate, set()
-        chain: list[dict] = []
+        chain: list[dict[str, Any]] = []
         for _index in range(16):
             current_id = current.get("task_id")
             if not isinstance(current_id, str) or current_id in seen:
@@ -130,7 +132,7 @@ class ContinuationEvidence:
             metadata = current.get("metadata")
             recovery = metadata.get("recovery") if isinstance(metadata, dict) else None
             source = recovery.get("source_task") if isinstance(recovery, dict) else None
-            chain.append(cast(dict, semantic_task(current)))
+            chain.append(cast(dict[str, Any], semantic_task(current)))
             if source == original.get("task_id"):
                 return candidate, chain
             if not isinstance(source, str):
@@ -141,7 +143,7 @@ class ContinuationEvidence:
         raise AgentTaskError("DAG continuation successor has no verified source recovery chain")
 
 
-def _legacy_match(reply: dict, initial: dict) -> None:
+def _legacy_match(reply: dict[str, Any], initial: dict[str, Any]) -> None:
     version = reply.get("spec_match_contract")
     # pylint: disable-next=unidiomatic-typecheck  # reason: exact legacy protocol integer excludes bool
     if type(version) is not int or version != 1 or reply.get("spec_match") != "matches":
@@ -151,12 +153,12 @@ def _legacy_match(reply: dict, initial: dict) -> None:
         raise AgentTaskError("DAG continuation original request identity changed")
 
 
-def completion(task: dict, node: dict) -> None:
+def completion(task: dict[str, Any], node: dict[str, Any]) -> None:
     """Share strict independent clauses and input retirement without interpreting historical screen state."""
     managed_tasks.validate_recorded_completion(task, node["task"]["spec"])
 
 
-def semantic_task(task: dict | None) -> dict | None:
+def semantic_task(task: dict[str, Any] | None) -> dict[str, Any] | None:
     """Bind stable evidence only, excluding elapsed time, private paths and raw diagnostics."""
     if task is None:
         return None

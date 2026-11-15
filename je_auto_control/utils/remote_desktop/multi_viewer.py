@@ -8,15 +8,16 @@ on a per-viewer basis.
 """
 from __future__ import annotations
 
+import os
 import secrets
 from dataclasses import dataclass
 from functools import partial
 import threading
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 
 try:
-    from aiortc.contrib.media import MediaRelay  # type: ignore
+    from aiortc.contrib.media import MediaRelay
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "Multi-viewer host requires the 'webrtc' extra (aiortc).",
@@ -31,6 +32,9 @@ from je_auto_control.utils.remote_desktop.webrtc_host import WebRTCDesktopHost
 from je_auto_control.utils.remote_desktop.webrtc_transport import (
     ScreenVideoTrack, WebRTCConfig,
 )
+
+if TYPE_CHECKING:
+    from aiortc import MediaStreamTrack, RTCPeerConnection
 
 
 SessionStateCallback = Callable[[str, str], None]
@@ -50,7 +54,7 @@ class _ScreenSource:
         )
         self._relay = MediaRelay()
 
-    def subscribe(self):
+    def subscribe(self) -> MediaStreamTrack:
         return self._relay.subscribe(self._track)
 
     @property
@@ -103,8 +107,8 @@ class MultiViewerHost:
                  read_only: bool = False,
                  permissions: Optional[SessionPermissions] = None,
                  input_dispatcher: Optional[Callable[[Mapping[str, Any]], Any]] = None,
-                 ip_whitelist: Optional[list] = None,
-                 on_annotation: Optional[Callable[[dict], None]] = None,
+                 ip_whitelist: Optional[List[str]] = None,
+                 on_annotation: Optional[Callable[[Dict[str, Any]], None]] = None,
                  on_session_state: Optional[SessionStateCallback] = None,
                  on_session_authenticated: Optional[SessionAuthCallback] = None,
                  on_pending_viewer: Optional[SessionPendingCallback] = None,
@@ -126,7 +130,7 @@ class MultiViewerHost:
         self._on_session_authenticated = on_session_authenticated
         self._on_pending_viewer = on_pending_viewer
         self._sessions: Dict[str, WebRTCDesktopHost] = {}
-        self._session_meta: Dict[str, dict] = {}
+        self._session_meta: Dict[str, Dict[str, str]] = {}
         self._session_tokens: Dict[str, object] = {}
         self._retiring: Dict[str, WebRTCDesktopHost] = {}
         self._creating: set[WebRTCDesktopHost] = set()
@@ -140,7 +144,7 @@ class MultiViewerHost:
         source = self._source
         return source.capture_origin if source is not None else (0, 0)
 
-    def _annotate(self, data: dict) -> None:
+    def _annotate(self, data: Dict[str, Any]) -> None:
         """Pass a session's annotation on with the shared track's origin.
 
         A session relays the shared track, so its own origin is (0, 0).
@@ -373,7 +377,7 @@ class MultiViewerHost:
             except (RuntimeError, OSError) as error:
                 autocontrol_logger.debug("disable accept audio: %r", error)
 
-    def broadcast_file(self, local_path, remote_name=None) -> int:
+    def broadcast_file(self, local_path: Union[str, os.PathLike[str]], remote_name: Optional[str] = None) -> int:
         """Push a file to every authenticated viewer; returns recipient count."""
         with self._lock:
             sessions = list(self._sessions.values())
@@ -390,7 +394,7 @@ class MultiViewerHost:
 
     # --- introspection ------------------------------------------------------
 
-    def list_sessions(self) -> List[dict]:
+    def list_sessions(self) -> List[Dict[str, Any]]:
         with self._lock:
             return [
                 {
@@ -409,12 +413,12 @@ class MultiViewerHost:
         with self._lock:
             return len(self._sessions)
 
-    def screen_track(self):
+    def screen_track(self) -> Optional[ScreenVideoTrack]:
         """Return the underlying ``ScreenVideoTrack`` (or None if no source)."""
         with self._lock:
             return None if self._source is None else self._source._track
 
-    def first_session_pc(self):
+    def first_session_pc(self) -> Optional[RTCPeerConnection]:
         """Return the first session's RTCPeerConnection, or None."""
         with self._lock:
             for host in self._sessions.values():
@@ -422,7 +426,7 @@ class MultiViewerHost:
                     return host._pc
             return None
 
-    def session_pc(self, session_id: str):
+    def session_pc(self, session_id: str) -> Optional[RTCPeerConnection]:
         """Return the named session's RTCPeerConnection, or None if gone."""
         with self._lock:
             host = self._sessions.get(session_id)
@@ -439,7 +443,7 @@ class MultiViewerHost:
 
     # --- callback wrappers --------------------------------------------------
 
-    def _wrap_state_callback(self, session_id: str, token: object = None):
+    def _wrap_state_callback(self, session_id: str, token: object = None) -> Callable[[str], None]:
         cb = self._on_session_state
         def _emit(state: str) -> None:
             if token is not None and self._session_tokens.get(session_id) is not token:
@@ -478,7 +482,7 @@ class MultiViewerHost:
                 autocontrol_logger.warning("session retirement remains pending")
         threading.Thread(target=retire, name="webrtc-prune", daemon=True).start()
 
-    def _wrap_auth_callback(self, session_id: str, token: object = None):
+    def _wrap_auth_callback(self, session_id: str, token: object = None) -> Callable[[], None]:
         cb = self._on_session_authenticated
         def _emit() -> None:
             with self._lock:
@@ -494,7 +498,7 @@ class MultiViewerHost:
                 autocontrol_logger.debug("session auth cb: %r", error)
         return _emit
 
-    def _wrap_pending_callback(self, session_id: str, token: object = None):
+    def _wrap_pending_callback(self, session_id: str, token: object = None) -> Optional[Callable[[], None]]:
         cb = self._on_pending_viewer
         if cb is None:
             return None

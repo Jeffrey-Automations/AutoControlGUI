@@ -24,7 +24,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
-Node = Tuple
+Node = Tuple[Any, ...]
 PluralRule = Callable[[Any], str]
 _Operands = Callable[[float, int, bool], str]
 

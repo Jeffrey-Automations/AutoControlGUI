@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.handoff_records import HandoffAccess
@@ -11,11 +11,18 @@ from je_auto_control.utils.agent_runtime.completion_contract import (
 )
 
 
-def _decode_binding(value: str) -> dict:
+if TYPE_CHECKING:
+    from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
+
+_Authority = Callable[..., dict[str, Any] | None]
+_Template = Callable[[Any, dict[str, Any]], 'AgentTaskSpec']
+
+
+def _decode_binding(value: str) -> dict[str, Any]:
     return decode_completion_binding(value)
 
 
-def publication_details(connection: Any, publication: Any) -> dict | None:
+def publication_details(connection: Any, publication: Any) -> dict[str, Any] | None:
     """Expose historical adoption IDs and hashes, never private principal stores or live-evidence claims."""
     if publication is None:
         return None
@@ -31,7 +38,7 @@ def publication_details(connection: Any, publication: Any) -> dict | None:
     return result
 
 
-def _binding(connection: Any, task_id: str, trial_id: str) -> dict:
+def _binding(connection: Any, task_id: str, trial_id: str) -> dict[str, Any]:
     row = connection.execute('SELECT c.details,r.source_task,r.snapshot FROM agent_readonly_completions c '
         'JOIN agent_task_recoveries r ON r.task_id=c.task_id WHERE c.task_id=?', (task_id,)).fetchone()
     if row is None:
@@ -43,7 +50,7 @@ def _binding(connection: Any, task_id: str, trial_id: str) -> dict:
     return details
 
 
-def _lineage(connection: Any, task_id: str, trial_id: str) -> dict:
+def _lineage(connection: Any, task_id: str, trial_id: str) -> dict[str, Any]:
     details = _binding(connection, task_id, trial_id)
     current, seen = details['source_task'], {task_id}
     for _index in range(16):
@@ -56,8 +63,8 @@ def _lineage(connection: Any, task_id: str, trial_id: str) -> dict:
     raise AgentTaskError('skill completion has no bounded verified recovery chain')
 
 
-def _verification_scope(runtime: Any, connection: Any, trial: dict, task_id: str,
-                        authority_check: Callable, verification_spec: Callable) -> tuple[dict, str | None]:
+def _verification_scope(runtime: Any, connection: Any, trial: dict[str, Any], task_id: str,
+                        authority_check: _Authority, verification_spec: _Template) -> tuple[dict[str, Any], str | None]:
     renewed = connection.execute('SELECT 1 FROM agent_task_authorizations WHERE task_id=?', (task_id,)).fetchone()
     scope = (authority_check(runtime, task_id, connection=connection) if renewed is not None
              else authority_check(runtime, task_id))
@@ -66,13 +73,14 @@ def _verification_scope(runtime: Any, connection: Any, trial: dict, task_id: str
     return verification_spec(runtime, trial).to_dict(), None
 
 
-def _completion_identifier(task_id: Any, trial: dict) -> None:
+def _completion_identifier(task_id: Any, trial: dict[str, Any]) -> None:
     if not isinstance(task_id, str) or not 1 <= len(task_id) <= 256 or task_id == trial['id']:
         raise AgentTaskError('completion_task_id must identify a separate reviewed completion task')
 
 
-def _selected_completion(runtime: Any, connection: Any, trial: dict, selected: Any,
-                         authority_check: Callable, verification_spec: Callable) -> tuple[dict, Any, Any, dict]:
+def _selected_completion(runtime: Any, connection: Any, trial: dict[str, Any], selected: Any,
+                         authority_check: _Authority, verification_spec: _Template
+                         ) -> tuple[dict[str, Any], Any, Any, dict[str, Any]]:
     access = selected if isinstance(selected, HandoffAccess) else None
     task_id = access.projection['task_id'] if access is not None else selected
     _completion_identifier(task_id, trial)
@@ -92,8 +100,9 @@ def _selected_completion(runtime: Any, connection: Any, trial: dict, selected: A
     return row, access, authorization_review, details
 
 
-def check_skill_completion(runtime: Any, connection: Any, trial: dict, task_id: Any,
-                           authority_check: Callable, verification_spec: Callable, snapshot_digest: Callable) -> dict:
+def check_skill_completion(runtime: Any, connection: Any, trial: dict[str, Any], task_id: Any,
+                           authority_check: _Authority, verification_spec: _Template,
+                           snapshot_digest: Callable[[Any], str]) -> dict[str, Any]:
     """Revalidate a separately succeeded reader under the skill library's SQLite write transaction."""
     row, access, authorization_review, details = _selected_completion(runtime, connection, trial, task_id,
                                                                      authority_check, verification_spec)

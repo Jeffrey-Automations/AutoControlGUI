@@ -36,10 +36,10 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Awaitable, Callable, Dict, List, Optional
 
 try:
-    from fastapi import Depends, FastAPI, Header, HTTPException, Request
+    from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse
     from fastapi.staticfiles import StaticFiles
@@ -159,7 +159,7 @@ _NOT_FOUND_RESPONSES = {
 }
 
 
-def _build_secret_dependency(shared_secret: Optional[str]):
+def _build_secret_dependency(shared_secret: Optional[str]) -> Callable[[Optional[str]], None]:
     """Return a FastAPI dependency that enforces ``X-Signaling-Secret``."""
     def _check(
         x_signaling_secret: Annotated[
@@ -206,7 +206,7 @@ def _maybe_mount_viewer(app: FastAPI, serve_web_viewer: bool) -> None:
 
 
 def _register_routes(app: FastAPI, store: "_SessionStore",
-                     secret_dep) -> None:
+                     secret_dep: Callable[..., object]) -> None:
     # Apply the auth dependency at the route layer so each handler's
     # signature stays free of plumbing parameters. The dependency
     # itself uses the recommended ``Annotated[Optional[str], Header(...)]``
@@ -215,12 +215,12 @@ def _register_routes(app: FastAPI, store: "_SessionStore",
     auth_only = [Depends(secret_dep)]
 
     @app.get("/health")
-    def _health() -> dict:
+    def _health() -> dict[str, str]:
         return {"status": "ok"}
 
     @app.post("/sessions/{host_id}/offer",
               responses=_OFFER_RESPONSES, dependencies=auth_only)
-    def _post_offer(host_id: str, body: _OfferIn) -> dict:
+    def _post_offer(host_id: str, body: _OfferIn) -> dict[str, bool]:
         _validate_host_id(host_id)
         _validate_sdp(body.sdp)
         if not store.upsert_offer(host_id, body.sdp):
@@ -229,7 +229,7 @@ def _register_routes(app: FastAPI, store: "_SessionStore",
 
     @app.get("/sessions/{host_id}/offer",
              responses=_NOT_FOUND_RESPONSES, dependencies=auth_only)
-    def _get_offer(host_id: str) -> dict:
+    def _get_offer(host_id: str) -> dict[str, str]:
         _validate_host_id(host_id)
         sdp = store.fetch_offer(host_id)
         if sdp is None:
@@ -239,7 +239,7 @@ def _register_routes(app: FastAPI, store: "_SessionStore",
     @app.post("/sessions/{host_id}/answer",
               responses={**_VALIDATION_RESPONSES, **_NOT_FOUND_RESPONSES},
               dependencies=auth_only)
-    def _post_answer(host_id: str, body: _AnswerIn) -> dict:
+    def _post_answer(host_id: str, body: _AnswerIn) -> dict[str, bool]:
         _validate_host_id(host_id)
         _validate_sdp(body.sdp)
         if not store.upsert_answer(host_id, body.sdp):
@@ -249,7 +249,7 @@ def _register_routes(app: FastAPI, store: "_SessionStore",
 
     @app.get("/sessions/{host_id}/answer",
              responses=_NOT_FOUND_RESPONSES, dependencies=auth_only)
-    def _get_answer(host_id: str) -> dict:
+    def _get_answer(host_id: str) -> dict[str, str]:
         _validate_host_id(host_id)
         sdp = store.fetch_answer(host_id)
         if sdp is None:
@@ -258,7 +258,7 @@ def _register_routes(app: FastAPI, store: "_SessionStore",
 
     @app.delete("/sessions/{host_id}",
                 responses=_AUTH_RESPONSES, dependencies=auth_only)
-    def _delete(host_id: str) -> dict:
+    def _delete(host_id: str) -> dict[str, bool]:
         _validate_host_id(host_id)
         return {"deleted": store.delete(host_id)}
 
@@ -302,14 +302,14 @@ def _guard_refusal(request: Request, shared_secret: Optional[str]) -> Optional[J
 
 def _register_body_guard(app: FastAPI, shared_secret: Optional[str]) -> None:
     @app.middleware("http")
-    async def _guard(request: Request, call_next):
+    async def _guard(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         refusal = _guard_refusal(request, shared_secret)
         return refusal if refusal is not None else await call_next(request)
 
 
 def _register_request_logging(app: FastAPI) -> None:
     @app.middleware("http")
-    async def _log_request(request: Request, call_next):
+    async def _log_request(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         response = await call_next(request)
         _LOG.info("%s %s -> %d", request.method, request.scope.get("path", ""),
                   response.status_code)
@@ -319,7 +319,7 @@ def _register_request_logging(app: FastAPI) -> None:
 def create_app(shared_secret: Optional[str] = None,
                ttl_s: float = _DEFAULT_TTL_S,
                serve_web_viewer: bool = True,
-               cors_origins: Optional[list] = None,
+               cors_origins: Optional[List[str]] = None,
                config_store_path: Optional[str | Path] = None,
                allow_legacy_config_writes: bool = False,
                asset_store_path: Optional[str | Path] = None) -> FastAPI:
@@ -364,10 +364,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[list] = None) -> None:
+def main(argv: Optional[List[str]] = None) -> None:
     """Entry point: parse args and start uvicorn."""
     try:
-        import uvicorn  # type: ignore
+        import uvicorn
     except ImportError as exc:  # pragma: no cover
         raise SystemExit(
             "uvicorn missing; install with pip install "

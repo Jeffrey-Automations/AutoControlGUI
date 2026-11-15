@@ -9,19 +9,22 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.rbac.authorization import AuthorizationContext
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
+_Link = tuple[dict[str, Any], dict[str, Any], dict[str, Any]]
+
 
 @dataclass(frozen=True)
 class SourceLineage:
     """Reuse host recovery witnesses without issuing completion grants or fabricating child admission."""
 
     runtime: Any
-    digest: Callable
-    submitted: Callable
-    manager: Callable
-    retired: Callable
-    ownership: Callable
+    digest: Callable[[Any], str]
+    submitted: Callable[[dict[str, Any]], str]
+    manager: Callable[[dict[str, Any], dict[str, Any]], None]
+    retired: Callable[[str], bool]
+    ownership: Callable[[Any, str], dict[str, Any] | None]
 
-    def context(self, connection: Any, leaf: dict, issuer: dict, origins: list[str] | None) -> dict:
+    def context(self, connection: Any, leaf: dict[str, Any], issuer: dict[str, Any],
+                origins: list[str] | None) -> dict[str, Any]:
         """Check original requests, current owners and every real historical recovery segment."""
         rows, links = self._chain(connection, leaf, issuer)
         root = rows[0]
@@ -39,7 +42,8 @@ class SourceLineage:
                 'submission_digest': accepted if accepted is not None else self.submitted(root['spec'])}
 
     @staticmethod
-    def _principals(rows: list, context: dict, ownership: list) -> tuple[dict, ...]:
+    def _principals(rows: list[dict[str, Any]], context: dict[str, Any],
+                    ownership: list[dict[str, Any] | None]) -> tuple[dict[str, Any], ...]:
         owners = tuple(row['owner'] for row in rows)
         admission = context['binding'].get('admission')
         if admission is not None:
@@ -49,8 +53,8 @@ class SourceLineage:
                 owners += (value['actor'], value['owner'])
         return owners
 
-    def _segments(self, connection: Any, context: dict, links: list, issuer: dict,
-                  origins: list[str] | None) -> tuple[tuple, list]:
+    def _segments(self, connection: Any, context: dict[str, Any], links: list[_Link], issuer: dict[str, Any],
+                  origins: list[str] | None) -> tuple[tuple[Any, ...], list[dict[str, Any]]]:
         if not links:
             return (), []
         context['issuer'] = issuer
@@ -61,9 +65,10 @@ class SourceLineage:
                     for parent, child, link in links]
         return (context['policy'],), segments
 
-    def _chain(self, connection: Any, leaf: dict, issuer: dict) -> tuple[list, list]:
+    def _chain(self, connection: Any, leaf: dict[str, Any],
+               issuer: dict[str, Any]) -> tuple[list[dict[str, Any]], list[_Link]]:
         rows, seen, row = [leaf], set(), leaf
-        links: list[tuple[dict, dict, dict]] = []
+        links: list[_Link] = []
         for _index in range(17):
             if row['id'] in seen or not self.retired(row['id']):
                 raise AgentTaskError('source recovery ancestry is cyclic or input has not retired')
@@ -84,7 +89,8 @@ class SourceLineage:
             row = parent
         raise AgentTaskError('source exceeds sixteen real recovery links')
 
-    def _root(self, connection: Any, root: dict, origins: list[str] | None) -> tuple[dict, str | None]:
+    def _root(self, connection: Any, root: dict[str, Any],
+              origins: list[str] | None) -> tuple[dict[str, Any], str | None]:
         accepted = connection.execute('SELECT spec_digest FROM agent_task_submissions WHERE task_id=?',
                                       (root['id'],)).fetchone()
         admitted = connection.execute('SELECT * FROM agent_dag_local_tasks WHERE task_id=?',
@@ -101,7 +107,7 @@ class SourceLineage:
         return context, accepted[0] if accepted is not None else None
 
     @staticmethod
-    def _tag(root: dict, accepted: Any, admitted: Any) -> dict | None:
+    def _tag(root: dict[str, Any], accepted: Any, admitted: Any) -> dict[str, Any] | None:
         tag = root['spec']['options'].get('dag_batch')
         if (accepted is not None or admitted is not None) and tag is None:
             raise AgentTaskError('source original DAG tag is missing')
@@ -109,7 +115,8 @@ class SourceLineage:
             raise AgentTaskError('tagged source original submission witness is unavailable')
         return tag
 
-    def _local_context(self, connection: Any, root: dict, binding: dict | None, origins: list[str] | None) -> dict:
+    def _local_context(self, connection: Any, root: dict[str, Any], binding: dict[str, Any] | None,
+                       origins: list[str] | None) -> dict[str, Any]:
         if binding is None:
             raise AgentTaskError('source original local DAG binding is unavailable')
         context = self.runtime.batches.handoff_context(binding['batch_id'], binding['node_id'],
@@ -119,7 +126,7 @@ class SourceLineage:
         self.manager(json.loads(context['binding']['admission']['actor']), root['owner'])
         return context
 
-    def _requests(self, connection: Any, row: dict) -> list:
+    def _requests(self, connection: Any, row: dict[str, Any]) -> list[dict[str, Any]]:
         requests = [dict(item) for item in connection.execute(
             'SELECT * FROM agent_request_keys WHERE task_id=? ORDER BY owner_key,key_hash', (row['id'],))]
         owner = json.dumps([row['owner'].get('user_id'), row['owner'].get('store_path')])
@@ -127,11 +134,12 @@ class SourceLineage:
             raise AgentTaskError('source original accepted request witness changed')
         return requests
 
-    def accepted_requests(self, connection: Any, row: dict) -> list:
+    def accepted_requests(self, connection: Any, row: dict[str, Any]) -> list[dict[str, Any]]:
         """Expose only actual validated private request witnesses to another host-owned proof builder."""
         return self._requests(connection, row)
 
-    def evidence_context(self, connection: Any, source: dict, issuer: dict, origins: list[str] | None) -> dict:
+    def evidence_context(self, connection: Any, source: dict[str, Any], issuer: dict[str, Any],
+                         origins: list[str] | None) -> dict[str, Any]:
         """Preserve actual local DAG admission; remote accepted nodes keep their real task-only context."""
         lineage = self.context(connection, source, issuer, origins)
         rows, _links = self._chain(connection, source, issuer)

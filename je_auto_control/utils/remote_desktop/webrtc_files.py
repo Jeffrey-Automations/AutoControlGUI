@@ -31,7 +31,7 @@ import threading
 from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -42,7 +42,7 @@ from je_auto_control.utils.remote_desktop.webrtc_file_commit import (
 )
 from je_auto_control.utils.remote_desktop.webrtc_transport import get_bridge
 from je_auto_control.utils.remote_desktop.webrtc_file_write import (
-    _PinnedBridge, _channel_transfer, _checkpoint, _send_confirmed,
+    _Channel, _PinnedBridge, _channel_transfer, _checkpoint, _send_confirmed,
 )
 
 
@@ -84,7 +84,7 @@ def _redirected_on_windows(base: str) -> bool:
     return base[-1] in ". " or base.split(".")[0].upper() in _WINDOWS_DEVICE_NAMES
 
 
-def _announced_size(raw) -> int:
+def _announced_size(raw: Any) -> int:
     """Validate the envelope's ``size``: an int in 0..4 GiB."""
     try:
         size = int(raw)
@@ -95,7 +95,7 @@ def _announced_size(raw) -> int:
     return size
 
 
-def _confirmed_begin(data: dict) -> bool:
+def _confirmed_begin(data: dict[str, Any]) -> bool:
     version = data.get('commit')
     if version is None:
         return False
@@ -106,7 +106,7 @@ def _confirmed_begin(data: dict) -> bool:
     return True
 
 
-def _confirmed_end(current: dict, data: dict) -> None:
+def _confirmed_end(current: dict[str, Any], data: dict[str, Any]) -> None:
     if not current['commit']:
         return
     if (data.get('transfer_id') != current['transfer_id'] or not valid_hex(data.get('sha256'), 64)
@@ -123,7 +123,7 @@ class FileTransferReceiver:
         self._inbox = (Path(inbox_dir) if inbox_dir else default_inbox_dir()).absolute()
         self._inbox.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
-        self._current: Optional[dict] = None
+        self._current: Optional[dict[str, Any]] = None
         self._closed = False
 
     def abort(self, reason: str = 'receive permission ended') -> None:
@@ -136,7 +136,7 @@ class FileTransferReceiver:
             self._closed = True
         self._abort_locked('receiver closed')
 
-    def handle_message(self, message,
+    def handle_message(self, message: object,
                        on_progress: Optional[Callable[[int, int], None]] = None,
                        on_done: Optional[Callable[[Path], None]] = None,
                        on_error: Optional[Callable[[str], None]] = None, *,
@@ -165,7 +165,9 @@ class FileTransferReceiver:
             raise
 
     def _handle_envelope(self, raw: str,
-                         on_done, on_error, on_receipt) -> None:
+                         on_done: Optional[Callable[[Path], None]],
+                         on_error: Optional[Callable[[str], None]],
+                         on_receipt: Optional[Callable[[FileReceiveReceipt], None]]) -> None:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as error:
@@ -183,7 +185,7 @@ class FileTransferReceiver:
             if on_error is not None:
                 on_error(reason)
 
-    def _handle_chunk(self, chunk: bytes, on_progress) -> None:
+    def _handle_chunk(self, chunk: bytes, on_progress: Optional[Callable[[int, int], None]]) -> None:
         with self._lock:
             current = self._current
             if self._closed or current is None:
@@ -203,7 +205,7 @@ class FileTransferReceiver:
         if on_progress is not None:
             on_progress(written, size)
 
-    def _begin(self, data: dict) -> None:
+    def _begin(self, data: dict[str, Any]) -> None:
         with self._lock:
             if self._closed:
                 return
@@ -229,7 +231,8 @@ class FileTransferReceiver:
             "file transfer: receiving %s (%d bytes)", target, size,
         )
 
-    def _finish(self, on_done, on_receipt, data) -> None:
+    def _finish(self, on_done: Optional[Callable[[Path], None]],
+                on_receipt: Optional[Callable[[FileReceiveReceipt], None]], data: dict[str, Any]) -> None:
         with self._lock:
             current = self._current
             if self._closed or current is None:
@@ -266,7 +269,7 @@ class FileTransferReceiver:
         autocontrol_logger.warning("file transfer aborted: %s", reason)
 
 
-def _discard_partial(current: dict) -> None:
+def _discard_partial(current: dict[str, Any]) -> None:
     """Attempt both cleanup operations before preserving the first original interruption."""
     failures = []
     for operation in (current['fh'].close, lambda: current['part'].unlink(missing_ok=True)):
@@ -300,7 +303,8 @@ def _send_options(channel: object, chunk_size: int, require_commit: bool) -> Non
         raise FileTransferError('require_commit must be a boolean')
 
 
-def _source_plan(local_path, remote_name, chunk_size, peer) -> _SendPlan:
+def _source_plan(local_path: str | os.PathLike[str], remote_name: Optional[str], chunk_size: int,
+                 peer: Optional[ConfirmedPeer]) -> _SendPlan:
     path = Path(local_path)
     if not path.is_file():
         raise FileTransferError(f'not a file: {local_path}')
@@ -313,12 +317,12 @@ def _source_plan(local_path, remote_name, chunk_size, peer) -> _SendPlan:
 class FileTransferSender:
     """Send a single file from the caller side via the DataChannel."""
 
-    def __init__(self, channel) -> None:
+    def __init__(self, channel: Optional[_Channel]) -> None:
         if channel is None:
             raise ValueError("file sender requires a DataChannel")
         self._channel = channel
 
-    def send(self, local_path,
+    def send(self, local_path: str | os.PathLike[str],
              remote_name: Optional[str] = None,
              chunk_size: int = _DEFAULT_CHUNK_SIZE,
              on_progress: Optional[Callable[[int, int], None]] = None, *,
@@ -339,7 +343,8 @@ class FileTransferSender:
         except BaseException as error:  # reason: preserve signals while containing ordinary channel failures
             raise _send_failure(error, require_commit=require_commit) from error
 
-    def _transfer(self, plan, on_progress, bridge, cancelled) -> None:
+    def _transfer(self, plan: _SendPlan, on_progress: Optional[Callable[[int, int], None]],
+                  bridge: _PinnedBridge, cancelled: Optional[Callable[[], bool]]) -> None:
         guard = plan.peer.guard if plan.peer is not None else cancelled
         try:
             with commit_request(plan.peer, plan.transfer_id, plan.size) as request:
@@ -367,7 +372,8 @@ class FileTransferSender:
                 raise
             raise converted from error
 
-    def _chunks(self, plan, on_progress, bridge, cancelled) -> str:
+    def _chunks(self, plan: _SendPlan, on_progress: Optional[Callable[[int, int], None]],
+                bridge: _PinnedBridge, cancelled: Optional[Callable[[], bool]]) -> str:
         sent = 0
         digest = sha256()
         try:

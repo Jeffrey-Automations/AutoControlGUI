@@ -5,26 +5,11 @@
 # (which may not grow). Each is debt, not an exemption: this list may only
 # shrink. Move a module into the strict block once mypy passes it there, and
 # delete its line.
-je_auto_control.gui.agent_tasks_tab
-je_auto_control.utils.agent_runtime.browser_workflows
 je_auto_control.utils.agent_runtime.completion_recovery
 je_auto_control.utils.agent_runtime.dag_batches
 je_auto_control.utils.agent_runtime.dag_continuation
-je_auto_control.utils.agent_runtime.dag_continuation_evidence
 je_auto_control.utils.agent_runtime.evidence_handoff
-je_auto_control.utils.agent_runtime.input_ledger
-je_auto_control.utils.agent_runtime.native_worker
-je_auto_control.utils.agent_runtime.presence_pool
-je_auto_control.utils.agent_runtime.routes
-je_auto_control.utils.agent_runtime.skill_completion
-je_auto_control.utils.agent_runtime.skill_execution
 je_auto_control.utils.agent_runtime.task_authority
 je_auto_control.utils.agent_runtime.task_recovery
 je_auto_control.utils.agent_runtime.task_skills
-je_auto_control.utils.agent_runtime.task_triggers
-je_auto_control.utils.agent_runtime.transfer_evidence
 je_auto_control.utils.agent_runtime.transfer_host
-je_auto_control.utils.agent_runtime.transfer_import
-je_auto_control.utils.agent_runtime.transfer_lineage
-je_auto_control.utils.agent_runtime.transfer_source
-je_auto_control.utils.agent_runtime.workflow_specs

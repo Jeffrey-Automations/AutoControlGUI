@@ -29,10 +29,13 @@ minimised window from the many other things an application keeps off screen,
 so that half asks the accessibility API and is empty without the grant.
 """
 import sys
-from typing import Any, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.wrapper.window_backends.base import WindowManageBackend
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.exception.exceptions import AutoControlUnsupportedOperationException
 
 #: ``ShowWindow`` codes with a macOS meaning; see the X11 backend for why the
 #: project spells show-state in Win32's numbering.
@@ -62,7 +65,7 @@ class MacOSWindowBackend(WindowManageBackend):
 
     # --- listing, via Quartz -----------------------------------------------
 
-    def _window_info(self) -> List[dict]:
+    def _window_info(self) -> List[Dict[str, Any]]:
         """Every on-screen window Quartz will admit to, front-most first."""
         import Quartz
 
@@ -71,7 +74,7 @@ class MacOSWindowBackend(WindowManageBackend):
         found = Quartz.CGWindowListCopyWindowInfo(options, Quartz.kCGNullWindowID)
         return list(found or [])
 
-    def _off_screen_info(self, on_screen: List[dict]) -> List[dict]:
+    def _off_screen_info(self, on_screen: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Application-layer windows Quartz knows of that are not on screen.
 
         Far more than the minimised ones: hidden applications, other Spaces
@@ -87,7 +90,7 @@ class MacOSWindowBackend(WindowManageBackend):
                 if _number(info) and _number(info) not in shown
                 and _is_application_layer(info)]
 
-    def _minimized_info(self, on_screen: List[dict]) -> List[dict]:
+    def _minimized_info(self, on_screen: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """The off-screen windows whose accessibility element says minimised.
 
         One ``AXWindows`` query per owning process, not per window. Without
@@ -97,7 +100,7 @@ class MacOSWindowBackend(WindowManageBackend):
         import Quartz
 
         minimized = []
-        elements: dict = {}
+        elements: Dict[int, List[Any]] = {}
         for info in self._off_screen_info(on_screen):
             pid = int(info.get(Quartz.kCGWindowOwnerPID, 0) or 0)
             if not pid:
@@ -128,7 +131,7 @@ class MacOSWindowBackend(WindowManageBackend):
             windows.append((number, str(info.get(Quartz.kCGWindowName, "") or "")))
         return windows
 
-    def _info_for(self, window_id: int) -> Optional[dict]:
+    def _info_for(self, window_id: int) -> Optional[Dict[str, Any]]:
         """Quartz's description of one window, on screen or not, or None.
 
         Asked for by id rather than searched for in the on-screen list, which
@@ -192,7 +195,7 @@ class MacOSWindowBackend(WindowManageBackend):
 
     # --- acting, via the accessibility API ---------------------------------
 
-    def _ax_windows_for(self, pid: int) -> list:
+    def _ax_windows_for(self, pid: int) -> List[Any]:
         """Every accessibility window belonging to a process."""
         import ApplicationServices as ax
 
@@ -201,7 +204,7 @@ class MacOSWindowBackend(WindowManageBackend):
             application, "AXWindows", None)
         return [] if error or not windows else list(windows)
 
-    def _ax_window(self, window_id: int):
+    def _ax_window(self, window_id: int) -> Any:
         """The ``AXUIElement`` for a ``CGWindowID``, or None.
 
         Quartz ids and accessibility elements are separate namespaces with no
@@ -218,7 +221,7 @@ class MacOSWindowBackend(WindowManageBackend):
             return None
         return _match_info(self._ax_windows_for(pid), info)
 
-    def _require_ax_window(self, window_id: int, operation: str):
+    def _require_ax_window(self, window_id: int, operation: str) -> Any:
         window = self._ax_window(window_id)
         if window is None:
             raise _refusal(operation, window_id)
@@ -319,14 +322,14 @@ class MacOSWindowBackend(WindowManageBackend):
     # Refusing says so; a "success" that focused something else would not.
 
 
-def _number(info: dict) -> int:
+def _number(info: Dict[str, Any]) -> int:
     """The ``CGWindowID`` in a Quartz window-info dictionary, or 0."""
     import Quartz
 
     return int(info.get(Quartz.kCGWindowNumber, 0) or 0)
 
 
-def _is_application_layer(info: dict) -> bool:
+def _is_application_layer(info: Dict[str, Any]) -> bool:
     """Whether a Quartz window sits on layer 0, where ordinary windows live."""
     import Quartz
 
@@ -342,7 +345,7 @@ def _ax_minimized(window: Any) -> bool:
     return bool(value)
 
 
-def _match_info(candidates: list, info: dict):
+def _match_info(candidates: List[Any], info: Dict[str, Any]) -> Any:
     """The accessibility window among ``candidates`` that ``info`` describes."""
     import Quartz
 
@@ -353,8 +356,8 @@ def _match_info(candidates: list, info: dict):
         str(info.get(Quartz.kCGWindowName, "") or ""))
 
 
-def _best_match(candidates: list, wanted_origin: Tuple[int, int],
-                wanted_title: str):
+def _best_match(candidates: List[Any], wanted_origin: Tuple[int, int],
+                wanted_title: str) -> Any:
     """Pick the accessibility window that is the Quartz window described.
 
     Frame is the stronger signal and is tried first: a title can be empty, or
@@ -389,7 +392,7 @@ def _point(value: Any) -> Tuple[int, int]:
     return (int(point.x), int(point.y))
 
 
-def _refusal(operation: str, window_id: int):
+def _refusal(operation: str, window_id: int) -> "AutoControlUnsupportedOperationException":
     from je_auto_control.utils.exception.exceptions import (
         AutoControlUnsupportedOperationException,
     )
