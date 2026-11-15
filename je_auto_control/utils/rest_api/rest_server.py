@@ -9,8 +9,8 @@ to ``0.0.0.0`` requires an explicit caller decision.
 """
 from __future__ import annotations
 
+import functools
 import json
-import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -156,6 +156,7 @@ class _RestRequestHandler(BaseHTTPRequestHandler):
         body, content_type, status = _load_dashboard_asset(asset)
         self.send_response(status)
         self.send_header("Content-Type", content_type)
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Length", str(len(body)))
         # Static assets — safe to cache briefly inside the same session.
         self.send_header("Cache-Control", "private, max-age=60")
@@ -513,30 +514,35 @@ _DASHBOARD_MIME: Dict[str, str] = {
 }
 _TEXT_PLAIN_UTF8 = "text/plain; charset=utf-8"
 _NOT_FOUND_BODY = b"not found"
-# Conservative whitelist — alphanumerics, dot, dash, underscore. No path
-# separators, no parent traversal, no leading dots. ``\w`` would also
-# match (it's [A-Za-z0-9_]), but the explicit class makes the intent
-# more legible at the cost of a tiny S6353 noise we accept.
-_DASHBOARD_ASSET_RE = re.compile(r"^\w[\w.-]*$")
+
+
+@functools.lru_cache(maxsize=1)
+def _dashboard_assets() -> Dict[str, Tuple[bytes, str]]:
+    """Every file shipped in ``dashboard/`` with a known type, read once: name -> (body, MIME type).
+
+    A request only ever looks a name up here, so the path it carries never
+    chooses a file to open: traversal, hidden files, sub-directories and
+    Python source are simply names that are not in the table.
+    """
+    assets: Dict[str, Tuple[bytes, str]] = {}
+    if not _DASHBOARD_DIR.is_dir():
+        return assets
+    for entry in sorted(_DASHBOARD_DIR.iterdir()):
+        mime = _DASHBOARD_MIME.get(entry.suffix.lower())
+        if mime is None or entry.name.startswith(".") or not entry.is_file():
+            continue
+        try:
+            assets[entry.name] = (entry.read_bytes(), mime)
+        except OSError as error:
+            autocontrol_logger.warning("dashboard asset read %s: %r", entry.name, error)
+    return assets
 
 
 def _load_dashboard_asset(asset: str) -> Tuple[bytes, str, int]:
-    if not _DASHBOARD_ASSET_RE.match(asset):
+    found = _dashboard_assets().get(asset)
+    if found is None:
         return _NOT_FOUND_BODY, _TEXT_PLAIN_UTF8, 404
-    target = (_DASHBOARD_DIR / asset).resolve()
-    try:
-        target.relative_to(_DASHBOARD_DIR)
-    except ValueError:
-        return _NOT_FOUND_BODY, _TEXT_PLAIN_UTF8, 404
-    if not target.is_file():
-        return _NOT_FOUND_BODY, _TEXT_PLAIN_UTF8, 404
-    suffix = target.suffix.lower()
-    mime = _DASHBOARD_MIME.get(suffix, "application/octet-stream")
-    try:
-        body = target.read_bytes()
-    except OSError as error:
-        autocontrol_logger.warning("dashboard asset read %s: %r", asset, error)
-        return b"read error", _TEXT_PLAIN_UTF8, 500
+    body, mime = found
     return body, mime, 200
 
 

@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,545 |
-| 程式碼總行數 | 238,044 |
+| 程式碼總行數 | 238,050 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -562,7 +562,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.11 伺服器、網路協定與外部整合
 
-> 24 個套件、約 7,585 行。
+> 24 個套件、約 7,591 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -584,7 +584,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/otp/` | 37 | TOTP 一次性密碼產生（自動化 2FA 登入） |
 | `utils/outbox/` | 107 | 交易式 outbox，保證至少一次的事件投遞 |
 | `utils/pytest_plugin/` | 283 | pytest 外掛 + BDD step library（`pytest11` entry point） |
-| `utils/rest_api/` | 2,228 | 純標準庫 REST 前端：路由、Bearer 驗證、限流、Prometheus 指標、OpenAPI 3.1 產生 |
+| `utils/rest_api/` | 2,234 | 純標準庫 REST 前端：路由、Bearer 驗證、限流、Prometheus 指標、OpenAPI 3.1 產生 |
 | `utils/socket_server/` | 164 | 執行 action JSON 的執行緒式 TCP 指令伺服器（預設綁 127.0.0.1） |
 | `utils/sse_client/` | 142 | Server-Sent Events 用戶端解析 |
 | `utils/tls_acme/` | 475 | TLS 自動化：HTTP-01 挑戰伺服器、金鑰／CSR、自動續期 |
@@ -906,11 +906,11 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `usbip/libusb_backend.py` | 224 | 以 PyUSB／libusb 執行 URB 的正式後端。 |
 | `usbip/backend.py` | 87 | 可插拔 URB 執行後端。 |
 
-#### `utils/rest_api/`（2,228 行）
+#### `utils/rest_api/`（2,234 行）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
-| `rest_server.py` | 713 | HTTP 前端主體；相容 check-only gate，RBAC 必須帶使用者身分。 |
+| `rest_server.py` | 719 | HTTP 前端主體；相容 check-only gate，RBAC 必須帶使用者身分。 |
 | `rest_handlers.py` | 539 | 端點實作。 |
 | `rest_openapi.py` | 503 | 走訪路由表產生 OpenAPI 3.1 規格。 |
 | `rest_auth.py` | 227 | Bearer token 驗證 + 逐 client 限流閘門。 |
@@ -1558,7 +1558,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `utils/accessibility/` | 16 | 3,378 |
 | `wrapper/` | 25 | 6,053 |
 | `windows/` | 24 | 2,363 |
-| `utils/rest_api/` | 8 | 2,228 |
+| `utils/rest_api/` | 8 | 2,234 |
 | `utils/agent/` | 13 | 2,254 |
 | `linux_with_x11/` | 19 | 1,382 |
 | `linux_wayland/` | 24 | 4,448 |
@@ -1570,7 +1570,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,008 | 103,714 |
-| **總計** | **1,533** | **237,299** |
+| **總計** | **1,533** | **237,305** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- REST dashboard: `/dashboard/*` and `/docs` now serve only the `.html`, `.css`, `.js`, `.svg` and
+  `.png` files shipped in `utils/rest_api/dashboard/`, read once on first request, and send
+  `X-Content-Type-Options: nosniff`. A file of another type in that directory is no longer served
+  as `application/octet-stream` (none ships), and editing an asset needs a restart to show.
+
 - Remote desktop: a WebRTC control message whose `type` is not a string (`{"type": []}`) is
   ignored by the host and the viewer; it raised `TypeError: unhashable type` from the data
   channel's message callback.

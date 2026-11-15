@@ -72,3 +72,19 @@ def test_dashboard_does_not_leak_python_source(server):
     with pytest.raises(urllib.error.HTTPError) as exc_info:
         _get(server, "/dashboard/rest_server.py")
     assert exc_info.value.code == 404
+
+
+def test_only_the_shipped_assets_are_servable():
+    """A request looks a name up in a table built from ``dashboard/``; it never opens a path it names."""
+    from je_auto_control.utils.rest_api.rest_server import _DASHBOARD_DIR, _dashboard_assets
+    shipped = {p.name for p in _DASHBOARD_DIR.iterdir()
+               if p.is_file() and p.suffix in {".html", ".css", ".js"}}
+    assert set(_dashboard_assets()) == shipped
+    assert {"index.html", "swagger.html", "app.css", "app.js"} <= shipped
+
+
+def test_assets_are_served_with_nosniff(server):
+    host, port = server.address
+    with urllib.request.urlopen(f"{_TEST_SCHEME}://{host}:{port}/dashboard/app.js",  # nosec B310  # reason: localhost test server
+                                timeout=3) as response:
+        assert response.headers.get("X-Content-Type-Options") == "nosniff"
