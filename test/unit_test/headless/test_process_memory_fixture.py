@@ -145,3 +145,114 @@ def test_clean_eof_and_fresh_launch_identity():
     assert len(first) == len(second) == 1
     assert first[0]["launch_nonce"] != second[0]["launch_nonce"]
     assert first[0]["source_sha256"] == second[0]["source_sha256"]
+
+
+CHALLENGE = bytes(range(1, 17))
+
+
+class _OwnBuffers:
+    """A provider over this process's own fixture buffers: the reader's real code, no other process."""
+
+    def __init__(self, state, identity):
+        self._identity = identity
+        self._buffers = [state.header, state.payload, state.sequence]
+        self.reads = []
+
+    def open_readonly(self, identity):
+        return self
+
+    def identity(self):
+        return self._identity
+
+    def query_region(self, address):
+        from je_auto_control.utils.process_memory.models import MemoryRegion
+        for buffer in self._buffers:
+            base = ctypes.addressof(buffer)
+            if base <= address < base + ctypes.sizeof(buffer):
+                return MemoryRegion(base, ctypes.sizeof(buffer), base, 4, True, True, False)
+        raise OSError("not a fixture buffer")
+
+    def read(self, address, size):
+        self.reads.append((address, size))
+        return ctypes.string_at(address, size)
+
+    def main_module(self):
+        raise OSError("not used")
+
+    def close(self):
+        pass
+
+
+def _observe_own(state, resolve, pid=None):
+    from je_auto_control.utils.process_memory.models import ProcessIdentity, ReviewedProbe
+    from je_auto_control.utils.process_memory.reader import ProcessMemoryReader
+    identity = ProcessIdentity("host", "session", pid or os.getpid(), 1, "fixture", "1", "x64", 64)
+
+    def decode(raw, fields):
+        document_id, status = fixture_module.PAYLOAD.unpack(raw)
+        values = {"document_id": document_id, "job_status": status.rstrip(b"\0").decode("ascii")}
+        return {name: values[name] for name in fields}
+
+    probe = ReviewedProbe("fixture", "1", "fixture", ("1",), ("x64",), ("document_id", "job_status"),
+                          256, 8, 5.0, 32, resolve, decode)
+    provider = _OwnBuffers(state, identity)
+    result = ProcessMemoryReader(provider).observe(identity, probe, ("document_id", "job_status"), target_id="fixture")
+    return result, provider
+
+
+def test_the_header_records_the_challenge_and_where_the_buffers_are():
+    state = fixture_module.FixtureState(CHALLENGE)
+    magic, challenge, payload, sequence = fixture_module.HEADER.unpack(state.header.raw)
+    assert (magic, challenge) == (b"JEPMFIX1", CHALLENGE)
+    assert (payload, sequence) == (ctypes.addressof(state.payload), ctypes.addressof(state.sequence))
+    bootstrap = state.bootstrap()
+    assert (bootstrap["header_address"], bootstrap["header_size"]) == (ctypes.addressof(state.header), 40)
+
+
+def test_a_header_that_reads_back_binds_the_bootstrap_locations():
+    from je_auto_control.utils.process_memory.models import Observation
+    state = fixture_module.FixtureState(CHALLENGE)
+    state.set_state(23, "busy")
+    resolve = fixture_module.challenge_resolver(CHALLENGE, state.bootstrap())
+    result, provider = _observe_own(state, resolve)
+    assert isinstance(result, Observation) and result.consistency == "sequence_checked"
+    assert result.fields == (("document_id", 23), ("job_status", "busy"))
+    assert provider.reads[0] == (ctypes.addressof(state.header), 40)
+
+
+@pytest.mark.parametrize("tamper", ["challenge", "magic", "payload_address", "pid"])
+def test_a_header_that_does_not_match_the_launch_yields_no_plan(tamper):
+    from je_auto_control.utils.process_memory.models import FailureReason
+    state = fixture_module.FixtureState(CHALLENGE)
+    bootstrap = state.bootstrap()
+    challenge, pid = CHALLENGE, None
+    if tamper == "challenge":
+        challenge = bytes(range(2, 18))
+    elif tamper == "magic":
+        state.header.raw = b"NOTMAGIC" + state.header.raw[8:]
+    elif tamper == "payload_address":
+        bootstrap["payload_address"] += 1
+    else:
+        pid = os.getpid() + 1
+    resolve = fixture_module.challenge_resolver(challenge, bootstrap)
+    result, provider = _observe_own(state, resolve, pid)
+    assert result.reason == FailureReason.UNSUPPORTED
+    assert all(address == ctypes.addressof(state.header) for address, _size in provider.reads)
+
+
+@pytest.mark.parametrize("challenge", [bytes(16), b"short", "0" * 16])
+def test_an_unusable_challenge_is_refused_before_any_read(challenge):
+    with pytest.raises(ValueError):
+        fixture_module.challenge_resolver(challenge, fixture_module.FixtureState().bootstrap())
+
+
+def test_the_child_writes_the_parents_challenge_into_its_own_header():
+    flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    child = subprocess.run([sys.executable, "-I", "-u", str(FIXTURE_PATH), "--challenge", CHALLENGE.hex()],
+                           input=b'{"command":"stop"}\n', capture_output=True, timeout=10, creationflags=flags)
+    bootstrap = json.loads(child.stdout.splitlines()[0])
+    assert child.returncode == 0 and bootstrap["header_size"] == 40
+    assert type(bootstrap["header_address"]) is int
+    refused = subprocess.run([sys.executable, "-I", "-u", str(FIXTURE_PATH), "--challenge", "zz"],
+                             input=b"", capture_output=True, timeout=10, creationflags=flags)
+    assert refused.returncode == 2 and refused.stdout == b""

@@ -146,9 +146,7 @@ base. The reader then requires that base to start the allocation of a committed,
 readable mapping. A failure raised by the reader's own checks inside the view
 (budget, deadline, changed target, the live checkpoint) is kept and raised again
 after `resolve` returns, so a resolver that catches it cannot still produce a plan.
-Only injected tests exercise this; native module resolution is unverified, and the
-fixture header challenge that would bind bootstrap locations to the retained
-process is not implemented yet.
+Only injected tests exercise this; native module resolution is unverified.
 
 The reader visits only intersecting regions. Each region must be committed,
 readable and unguarded. Addresses, lengths and pointer-width arithmetic are
@@ -239,6 +237,20 @@ Bootstrap reports PID, pointer width, buffer locations, fixture source digest an
 a fresh launch nonce as unverified self-reports. The nonce is not OS process birth,
 and the source digest is not measured executable identity. No reviewed probe may
 trust these records without the future provider's independent identity checks.
+
+The parent binds the reported locations with a header challenge. It chooses 16
+random bytes and launches the fixture with `--challenge <32 hex digits>`. The
+fixture writes a 40-byte header into its own memory (`<8s16sQQ`: magic `JEPMFIX1`,
+the challenge, the payload address, the sequence address) and reports the header's
+location in the bootstrap. `challenge_resolver(challenge, bootstrap)` in the fixture
+module is the reviewed resolver: it requires the identity's PID to equal the
+bootstrap PID, reads the header through the resolver view, compares the challenge
+in constant time, requires the header's locations to equal the bootstrap's, and only
+then returns the plan. Any mismatch produces no plan. This proves the locations are
+in the process the retained handle reads; it does not attest the executable, which
+remains the attestor's job. Headless tests run it through the real reader against
+the fixture's own buffers in the test process; a cross-process native run is still
+paused.
 
 Headless tests exercise exact local buffer layout and real hidden child-process
 communication, invalid requests, EOF and shutdown. These checks do not establish
