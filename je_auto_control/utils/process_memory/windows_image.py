@@ -33,6 +33,16 @@ class ObservedImageFile:
 
 
 @dataclass(frozen=True)
+class LeasedImageFile:
+    """An image file measured before any process runs it, while writes stay excluded."""
+
+    volume: int = field(repr=False)
+    file_id: bytes = field(repr=False)
+    size: int
+    sha256: str = field(repr=False)
+
+
+@dataclass(frozen=True)
 class _FileFacts:
     volume: int
     file_id: bytes
@@ -69,6 +79,10 @@ def _fail(reason: FailureReason) -> NoReturn:
 def _bounds(pid: int, max_bytes: int, timeout: float) -> None:
     if type(pid) is not int or not 0 < pid <= 0xFFFFFFFF:
         _fail(FailureReason.UNSUPPORTED)
+    _limits(max_bytes, timeout)
+
+
+def _limits(max_bytes: int, timeout: float) -> None:
     if type(max_bytes) is not int or not 0 < max_bytes <= _MAX_IMAGE_BYTES:
         _fail(FailureReason.BUDGET_EXCEEDED)
     if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0:
@@ -196,17 +210,65 @@ class WindowsImageObserver:
         file = self._file_facts(image)
         if file.size > max_bytes:
             _fail(FailureReason.BUDGET_EXCEEDED)
+        digest = self._digest(image, file, deadline, checkpoint,
+                              lambda: self._unchanged(process, image, path, facts, file))
+        return ObservedImageFile(facts, file.volume, file.file_id, file.size, digest)
+
+    def _digest(self, image: int, file: _FileFacts, deadline: float, checkpoint: Callable[[], None],
+                unchanged: Callable[[], None]) -> str:
+        """SHA-256 of the file's actual bytes, rechecking ``unchanged`` around every chunk."""
         digest, remaining = hashlib.sha256(), file.size
-        self._unchanged(process, image, path, facts, file)
+        unchanged()
         while remaining:
             self._check(deadline, checkpoint)
             size = min(remaining, _CHUNK_BYTES)
             digest.update(self._read(image, size))
             self._check(deadline, checkpoint)
-            self._unchanged(process, image, path, facts, file)
+            unchanged()
             remaining -= size
         self._check(deadline, checkpoint)
-        return ObservedImageFile(facts, file.volume, file.file_id, file.size, digest.hexdigest())
+        return digest.hexdigest()
+
+    def _lease(self, path: str, max_bytes: int, deadline: float,
+               checkpoint: Callable[[], None]) -> LeasedImageFile:
+        self._check(deadline, checkpoint)
+        image = self._file(path)
+        self._check(deadline, checkpoint)
+        file = self._file_facts(image)
+        if file.size > max_bytes:
+            _fail(FailureReason.BUDGET_EXCEEDED)
+
+        def unchanged() -> None:
+            if self._file_facts(image) != file:
+                _fail(FailureReason.TARGET_CHANGED)
+
+        digest = self._digest(image, file, deadline, checkpoint, unchanged)
+        return LeasedImageFile(file.volume, file.file_id, file.size, digest)
+
+    def lease(self, path: str, *, max_bytes: int, timeout: float,
+              checkpoint: Callable[[], None]) -> LeasedImageFile:
+        """Open ``path`` read-only, sharing only reads, and digest it; keep the lease until close.
+
+        For an owned launch: taken before the process starts, the lease keeps
+        ordinary writers and deleters out while the image is mapped. Like
+        :meth:`observe`, one acquisition per observer, and a failure retires it.
+        """
+        with self._lock:
+            if self._state is not _State.NEW:
+                _fail(FailureReason.TARGET_CHANGED)
+            if (not isinstance(path, str) or not path or "\0" in path
+                    or len(path.encode("utf-16-le", "surrogatepass")) // 2 >= _PATH_CHARACTERS):
+                _fail(FailureReason.UNSUPPORTED)
+            _limits(max_bytes, timeout)
+            self._state = _State.ACTIVE
+            try:
+                return self._lease(path, max_bytes, self._clock() + timeout, checkpoint)
+            except BaseException:
+                try:
+                    self.close()
+                except MemoryObservationError:
+                    pass
+                raise
 
     def observe(self, pid: int, *, max_bytes: int, timeout: float,
                 checkpoint: Callable[[], None]) -> ObservedImageFile:

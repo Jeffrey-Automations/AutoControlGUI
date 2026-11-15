@@ -68,6 +68,37 @@ and measures facts again after attestation. A path string, fixture nonce, self-r
 digest or a callback that merely echoes an expected identity is not an attestation.
 The production attestor and trusted fixture bootstrap matching remain unimplemented.
 
+### Owned-launch attestation
+
+`windows_launch.py` is the first attestor, chosen by the maintainer on 2026-11-15.
+It attests only a process the host launches itself. `PinnedExecutable` is host
+configuration: the host and session labels, the executable and version identifiers,
+and the SHA-256 of the image bytes (64 lowercase hex digits). `launch_attested` then:
+
+1. leases the image file with a fresh `WindowsImageObserver.lease(path, ...)`: opened
+   with `GENERIC_READ` and only `FILE_SHARE_READ`, digested from its actual bytes, with
+   the file facts rechecked around every chunk, and the lease kept open;
+2. requires that digest to equal the pin, in constant time, before anything is started;
+3. calls the caller's launcher, which must return a `LaunchRecord` holding the PID and
+   birth it measured from the new process's own handle (the launcher owns the child and
+   ends it if attestation fails);
+4. observes the child's image with a second fresh observer and requires the same
+   volume, 128-bit file ID, size and digest as the lease, and the same PID and birth as
+   the record.
+
+Only then does it return an `OwnedLaunch` whose `OwnedLaunchAttestor` mints a
+`ProcessIdentity` for those native facts and refuses any other (a different birth, PID
+or session). One deadline covers both measurements. On failure both observers are closed
+and the original error propagates; launcher exceptions become `unsupported` without their
+message, and cancellation signals propagate unchanged.
+
+What it proves: the bytes on disk, held against writers from before the launch until
+the observation, are the pinned ones, and the child the host started maps that same
+file. It does not prove the code running now (in-memory patching, loaded DLLs), and it
+cannot attest a process the host did not start. The real launcher (measuring PID and
+birth from the `Popen` handle) and a native run are not implemented yet; tests drive the
+real observer code through injected native calls.
+
 ### Observed image-file evidence
 
 `windows_image.py` adds a separate one-shot `WindowsImageObserver`. It acquires

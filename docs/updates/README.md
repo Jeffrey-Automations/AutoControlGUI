@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261115-19 | 2026-11-15 | Owned-launch attestor: lease, pinned SHA-256, re-observed child | #done #process-memory #security | [2026-11-b](2026-11-b.md) |
 | U-20261115-18 | 2026-11-15 | The memory fixture's bootstrap is bound by a header challenge | #done #process-memory | [2026-11-b](2026-11-b.md) |
 | U-20261115-17 | 2026-11-15 | Process-memory resolvers get a bounded view of the retained handle | #done #process-memory | [2026-11-b](2026-11-b.md) |
 | U-20261115-16 | 2026-11-15 | The last 14 modules join the strict tier: the whole package is strict | #done #typing | [2026-11-b](2026-11-b.md) |
