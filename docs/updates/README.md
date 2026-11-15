@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261115-13 | 2026-11-15 | Dev CI red on ac_wait_for_pixel after get_pixel was annotated | #incident #mcp #typing | [2026-11-b](2026-11-b.md) |
 | U-20261115-12 | 2026-11-15 | 25 more modules join the strict typing tier (11 to 20 fixes each) | #done #typing | [2026-11-b](2026-11-b.md) |
 | U-20261115-11 | 2026-11-15 | Box and Candidate get real types; two locator modules join the strict tier | #done #typing | [2026-11-b](2026-11-b.md) |
 | U-20261115-10 | 2026-11-15 | One shared ImageSource alias; 22 image modules join the strict tier | #done #typing | [2026-11-b](2026-11-b.md) |

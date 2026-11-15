@@ -241,7 +241,8 @@ def screen_tools() -> List[MCPTool]:
             input_schema=schema({
                 "x": {"type": "integer"},
                 "y": {"type": "integer"},
-                "target_rgb": {"type": "array",
+                # wait_for_pixel refuses fewer than three channels (it reads the first three).
+                "target_rgb": {"type": "array", "minItems": 3,
                                 "items": {"type": "integer"}},
                 "tolerance": {"type": "integer"},
                 "timeout": {"type": "number"},

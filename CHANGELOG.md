@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- MCP: `ac_wait_for_pixel`'s `target_rgb` schema declares `minItems: 3`, which the handler
+  already required (it raises on fewer channels and reads the first three of more).
+
 - Approval gate: with RBAC on, the maker and the checker are the authenticated user. A
   `requester` or `approver` naming anyone else raises `AuthorizationError` (an empty one means
   that user), so one operator can no longer file a request and approve it under a second name.
