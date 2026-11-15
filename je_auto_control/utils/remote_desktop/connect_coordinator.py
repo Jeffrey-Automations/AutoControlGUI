@@ -66,7 +66,7 @@ class ConnectTarget:
         return self.kind in ("tcp", "ws", "wss")
 
 
-def _parse_host_port(rest: str) -> tuple:
+def _parse_host_port(rest: str) -> tuple[str, int, str]:
     """Split ``host:port[/path]`` and validate each piece."""
     if "/" in rest:
         authority, _slash, path = rest.partition("/")

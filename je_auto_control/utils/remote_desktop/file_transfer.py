@@ -427,7 +427,7 @@ def _end_cancelled(channel: Any, transfer_id: str) -> None:
         autocontrol_logger.debug("file transfer %s: cancel notice not sent: %r", transfer_id, error)
 
 
-def send_file(channel, source_path: str, dest_path: str,
+def send_file(channel: Any, source_path: str, dest_path: str,
               on_progress: Optional[ProgressCallback] = None,
               chunk_size: int = DEFAULT_CHUNK_SIZE,
               transfer_id: Optional[str] = None, *,

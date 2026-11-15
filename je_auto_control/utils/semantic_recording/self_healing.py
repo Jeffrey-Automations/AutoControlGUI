@@ -205,7 +205,7 @@ def _remember_moved_press(action: Mapping[str, Any], step: StepResult,
 
 
 def self_healing_replay(actions: Sequence[Mapping[str, Any]],
-                        **kwargs) -> ReplayResult:
+                        **kwargs: Any) -> ReplayResult:
     """Convenience wrapper: ``SelfHealingReplayer(...).replay(actions)``."""
     return SelfHealingReplayer(**kwargs).replay(actions)
 

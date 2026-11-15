@@ -64,7 +64,7 @@ class Bulkhead:
         self.release()
         return False
 
-    def run(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+    def run(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Run ``func`` under a permit (raises ``BulkheadFullError`` if full)."""
         with self:
             return func(*args, **kwargs)

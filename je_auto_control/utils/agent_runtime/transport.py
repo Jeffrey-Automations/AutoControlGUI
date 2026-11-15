@@ -106,7 +106,7 @@ def _local_path(url: str, token: str | None) -> str:
         raise AgentTaskError("delegation requires an explicit authenticated local service route") from None
 
 
-def _raise_reply_error(reply: dict) -> NoReturn:
+def _raise_reply_error(reply: dict[str, Any]) -> NoReturn:
     payload = reply.get("json")
     detail = payload.get("error", "operation failed") if isinstance(payload, dict) else "invalid JSON reply"
     if isinstance(payload, dict) and payload.get("error_type") == "stale_observation":

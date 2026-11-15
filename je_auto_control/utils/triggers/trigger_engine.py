@@ -12,7 +12,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, ClassVar, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.json.json_file import read_executable_action_json
@@ -239,7 +239,7 @@ class CronTrigger(_TriggerBase):
 class TriggerEngine:
     """Polls registered triggers on a background thread."""
 
-    def __init__(self, executor: Optional[Callable[[list], object]] = None,
+    def __init__(self, executor: Optional[Callable[[List[Any]], object]] = None,
                  tick_seconds: float = 0.25) -> None:
         from je_auto_control.utils.executor.action_executor import execute_action
         self._execute = executor or execute_action

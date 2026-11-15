@@ -14,13 +14,16 @@ import base64
 import hashlib
 import os
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, Tuple, Type
 
 from je_auto_control.utils.action_signing._key_file import load_or_create_key_file
 from je_auto_control.utils.exception.exceptions import (
     AutoControlException, CryptographyUnavailableError,
 )
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet, InvalidToken
 
 
 def _default_key_path() -> Path:
@@ -38,7 +41,7 @@ _SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2 ** 15, 8, 1
 KeyType = Optional[bytes | str]
 
 
-def _fernet_types() -> tuple:
+def _fernet_types() -> Tuple[Type["Fernet"], Type["InvalidToken"]]:
     """Return ``(Fernet, InvalidToken)``, or explain why encryption is off.
 
     ``cryptography`` publishes no ``win_arm64`` wheel, so on Windows arm64 it

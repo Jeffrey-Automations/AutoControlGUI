@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -104,7 +104,7 @@ def _select_input_backend() -> Tuple[Win32KeyboardBackend, Win32MouseBackend]:
     return interception_keyboard, interception_mouse
 
 
-def _build_mouse_keys_table(mouse_module) -> dict:
+def _build_mouse_keys_table(mouse_module: Any) -> Dict[str, Tuple[int, int, int]]:
     """Map logical button names to the *selected* backend's flag tuples.
 
     The table must be built from the module ``_select_input_backend``

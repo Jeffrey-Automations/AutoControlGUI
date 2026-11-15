@@ -1,7 +1,10 @@
 """Annotate recorded actions with anchor metadata for portable replay."""
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Sequence
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.accessibility.element import AccessibilityElement
 
 
 _CLICK_ACTIONS = frozenset({
@@ -69,7 +72,8 @@ _CONTAINER_ROLES = frozenset({
 })
 
 
-def _smallest_containing(elements, x: int, y: int):
+def _smallest_containing(elements: Sequence[AccessibilityElement], x: int,
+                         y: int) -> Optional[AccessibilityElement]:
     """Pick the smallest element whose bounding box covers ``(x, y)``.
 
     "Smallest" because a click usually lands on a button nested inside

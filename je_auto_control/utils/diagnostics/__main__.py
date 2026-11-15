@@ -18,7 +18,7 @@ _SEVERITY_TAG = {
 }
 
 
-def main(_argv: Optional[list] = None) -> int:
+def main(_argv: Optional[list[str]] = None) -> int:
     report = run_diagnostics()
     for check in report.checks:
         tag = _SEVERITY_TAG.get(check.severity, "?    ")

@@ -14,7 +14,7 @@ def bootstrap_allowed(spec: AgentTaskSpec | None) -> bool:
     return bool(spec is not None and spec.apps and any(action["tool"] == "AC_focus_window" for action in spec.actions))
 
 
-def focus_approved(spec: AgentTaskSpec | None, arguments: dict) -> Any:
+def focus_approved(spec: AgentTaskSpec | None, arguments: dict[str, Any]) -> Any:
     """Wait for one approved application window without touching an unrelated foreground app."""
     from je_auto_control.utils.agent_runtime.native_scope import check_window_arguments
     from je_auto_control.utils.tool_use_schema import run_tool_call

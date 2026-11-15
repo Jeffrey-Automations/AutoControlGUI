@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Callable, Dict, Optional, Protocol
 
 from je_auto_control.utils.failure_hooks.report import (
     FailureReport, TicketResult,
@@ -121,7 +121,9 @@ def _post_json(backend_name: str, url: str, body: Dict[str, Any], *,
                 id_key: Optional[str] = None,
                 url_key: Optional[str] = None,
                 url_template: Optional[str] = None,
-                response_extractor=None) -> TicketResult:
+                response_extractor: Optional[
+                    Callable[[str, Dict[str, Any]], TicketResult]] = None,
+                ) -> TicketResult:
     """Shared HTTP POST helper used by every backend."""
     if not url.startswith(_ALLOWED_SCHEMES):
         return TicketResult(

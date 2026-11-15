@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Callable, ContextManager, Protocol
+from typing import Any, Callable, ContextManager, Protocol
 
 from je_auto_control.utils.agent_runtime.android_action_result import AndroidActionResult
 from je_auto_control.utils.agent_runtime.android_commands import AndroidActionProposal
@@ -28,7 +28,7 @@ class AndroidCommandLease:
     epoch: str
     device_fence: Callable[[], ContextManager[None]] = field(repr=False)
     checkpoint: Callable[[], None] = field(repr=False)
-    settle: Callable[[AndroidActionResult], dict] = field(repr=False)
+    settle: Callable[[AndroidActionResult], dict[str, Any]] = field(repr=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.proposal, AndroidActionProposal) or self.proposal.input_evidence is None:

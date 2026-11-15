@@ -241,7 +241,7 @@ def _reject_unknown_guards(transition: Mapping[str, Any]) -> None:
             f"unknown guard {unknown[0]!r}; use 'predicate' for other checks")
 
 
-def run_state_machine(spec: Mapping[str, Any], **kwargs) -> Dict[str, Any]:
+def run_state_machine(spec: Mapping[str, Any], **kwargs: Any) -> Dict[str, Any]:
     """Convenience wrapper: build a :class:`StateMachine` and run it."""
     return StateMachine(spec, **kwargs).run()
 

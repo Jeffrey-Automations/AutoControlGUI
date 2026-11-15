@@ -56,7 +56,7 @@ class ViewerAuthMixin:
         _on_authenticated: Optional[Callable[[], None]]
         _on_pending_viewer: Optional[Callable[[], None]]
         _send_ctrl: Callable[[Mapping[str, Any]], None]
-        _spawn_bg: Callable[[Any], asyncio.Task]
+        _spawn_bg: Callable[[Any], asyncio.Task[Any]]
         _async_stop: Callable[[], Coroutine[Any, Any, None]]
 
     def _handle_send_sas(self) -> None:

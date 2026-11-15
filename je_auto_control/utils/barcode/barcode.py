@@ -18,7 +18,7 @@ ImageSource = Any
 Decoder = Callable[[Any], List[Dict[str, Any]]]
 
 
-def _default_decoder(image) -> List[Dict[str, Any]]:
+def _default_decoder(image: Any) -> List[Dict[str, Any]]:
     """Decode 1-D barcodes with ``cv2.barcode`` (empty if the module is absent)."""
     import cv2
     if not hasattr(cv2, "barcode"):

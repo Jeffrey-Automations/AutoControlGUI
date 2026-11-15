@@ -26,7 +26,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 _MANIFEST_FILENAME = "manifest.json"
@@ -138,7 +138,7 @@ class JpegSequenceRecorder:
         return self.manifest_path
 
 
-def load_manifest(path) -> Dict:
+def load_manifest(path: str | os.PathLike[str]) -> Dict[str, Any]:
     """Read a manifest.json written by :class:`JpegSequenceRecorder`."""
     return json.loads(Path(path).read_text(encoding="utf-8"))
 

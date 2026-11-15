@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
@@ -23,7 +23,7 @@ from je_auto_control.gui.remote_desktop._helpers import _t
 class _BlankingWindow(QWidget):
     """One blanking window per screen."""
 
-    def __init__(self, geometry, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, geometry: QRect, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint

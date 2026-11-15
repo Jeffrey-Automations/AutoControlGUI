@@ -19,6 +19,7 @@ from je_auto_control.utils.exception.exceptions import AutoControlActionExceptio
 from je_auto_control.utils.executor.run_control import pause
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.wrapper.window_backends import get_backend
+from je_auto_control.wrapper.window_backends.base import WindowManageBackend
 from je_auto_control.utils.timeouts import clamp_poll_interval, deadline_after
 
 #: How long focus_window waits for the window to become the foreground one.
@@ -56,7 +57,7 @@ def find_window(title_substring: str,
     return None
 
 
-def _became_foreground(backend, hwnd: int, settle_s: float) -> bool:
+def _became_foreground(backend: WindowManageBackend, hwnd: int, settle_s: float) -> bool:
     """Poll until ``hwnd`` is the foreground window or ``settle_s`` runs out."""
     deadline = time.monotonic() + max(0.0, float(settle_s))
     while True:

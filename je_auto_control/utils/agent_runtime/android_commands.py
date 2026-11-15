@@ -142,7 +142,8 @@ def compile_android_input_probe(snapshot: AndroidSnapshot) -> str:
     return script
 
 
-def _check_evidence(evidence: AndroidInputEvidence, snapshot: AndroidSnapshot, name: str, arguments: dict) -> None:
+def _check_evidence(evidence: AndroidInputEvidence, snapshot: AndroidSnapshot, name: str,
+                    arguments: dict[str, Any]) -> None:
     if not isinstance(evidence, AndroidInputEvidence) or evidence.snapshot != snapshot:
         raise AgentTaskError("Android input evidence belongs to a different device/boot/window snapshot")
     if name == "AC_android_tap":

@@ -24,7 +24,7 @@ def no_held_input() -> None:
         raise AgentTaskError("release held keys and mouse buttons manually before input recovery")
 
 
-def recover_target(runtime: Any, target: str, note: str) -> dict:
+def recover_target(runtime: Any, target: str, note: str) -> dict[str, Any]:
     """Require host authority and a registered target's explicit recovery implementation."""
     owner = current_authorization()
     if owner is not None and not owner.allows(Capability.MANAGE_HOSTS):

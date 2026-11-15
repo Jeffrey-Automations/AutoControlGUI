@@ -171,7 +171,7 @@ def get_all_window_hwnd() -> List[Tuple[int, str]]:
     """
     window_info: List[Tuple[int, str]] = []
 
-    def _foreach_window(hwnd, _l_param) -> bool:
+    def _foreach_window(hwnd: int, _l_param: int) -> bool:
         if _is_listable(hwnd):
             length = _user32.GetWindowTextLengthW(hwnd)
             buff = create_unicode_buffer(length + 1)

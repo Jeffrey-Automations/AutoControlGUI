@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import http.server
 import threading
-from typing import Optional
+from typing import Any, Optional
 
 from je_auto_control.utils.http_headers import LocalThreadingHTTPServer
 from je_auto_control.utils.observability.metrics import (
@@ -41,7 +41,7 @@ class _MetricsHandler(http.server.BaseHTTPRequestHandler):
 
     # Silence the default access log to keep the operator's stderr clean —
     # the scrape happens every 15 s and would otherwise drown real logs.
-    def log_message(self, format: str, *args) -> None:  # noqa: A002, D401  # pylint: disable=W0622  # reason: signature dictated by BaseHTTPRequestHandler
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002, D401  # pylint: disable=W0622  # reason: signature dictated by BaseHTTPRequestHandler
         return
 
 

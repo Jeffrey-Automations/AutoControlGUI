@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from je_auto_control.utils.usbip.protocol import UsbIpDevice
 
@@ -59,7 +59,7 @@ class FakeUrbBackend(UrbBackend):
 
     def __init__(self, devices: Optional[List[UsbIpDevice]] = None) -> None:
         self._devices = list(devices or [])
-        self._urb_responses: Dict[tuple, List[UrbResponse]] = {}
+        self._urb_responses: Dict[Tuple[int, int, int], List[UrbResponse]] = {}
         self.received: List[UrbRequest] = []
 
     def add_device(self, device: UsbIpDevice) -> None:

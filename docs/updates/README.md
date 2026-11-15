@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261115-06 | 2026-11-15 | 143 more modules join the strict typing tier after one-line fixes | #done #typing | [2026-11-b](2026-11-b.md) |
 | U-20261115-05 | 2026-11-15 | 896 older modules join the strict typing tier | #done #typing | [2026-11-b](2026-11-b.md) |
 | U-20261115-04 | 2026-11-15 | The approval gate binds maker and checker to the RBAC user | #done #rbac #governance | [2026-11-b](2026-11-b.md) |
 | U-20261115-03 | 2026-11-15 | Every AC_* command has an RBAC decision | #done #rbac #security | [2026-11-b](2026-11-b.md) |

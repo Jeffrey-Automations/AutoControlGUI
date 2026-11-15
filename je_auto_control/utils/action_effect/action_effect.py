@@ -50,7 +50,7 @@ def _action_point(action: Any) -> Optional[List[int]]:
 
 
 def _changed_elements(before: Sequence[Element], after: Sequence[Element],
-                      iou_threshold: float, move_threshold: int):
+                      iou_threshold: float, move_threshold: int) -> List[Element]:
     """Return every element that was added / removed / changed between two frames."""
     from je_auto_control.utils.element_diff import match_elements
     from je_auto_control.utils.observation_delta.observation_delta import (

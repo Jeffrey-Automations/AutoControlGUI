@@ -79,7 +79,7 @@ class RestApiTab(TranslatableMixin, QWidget):
         root.addWidget(ResponsiveBox(self._build_config_group(), self._build_status_group()))
         root.addWidget(self._users_panel, stretch=1)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, object]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("rest_start", self._on_start),

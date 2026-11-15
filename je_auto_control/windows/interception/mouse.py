@@ -140,8 +140,8 @@ def mouse_event(event: int, x: int, y: int, dw_data: int = 0) -> None:
     _send_stroke(event, x=int(x), y=int(y), rolling=int(dw_data))
 
 
-def send_mouse_event_to_window(window, mouse_keycode: Tuple[int, int, int],
-                               x: int = 0, y: int = 0):
+def send_mouse_event_to_window(window: object, mouse_keycode: Tuple[int, int, int],
+                               x: int = 0, y: int = 0) -> None:
     """Targeted-window injection — degraded to focused-window for the driver.
 
     Interception talks to the kernel HID stack, not a single window

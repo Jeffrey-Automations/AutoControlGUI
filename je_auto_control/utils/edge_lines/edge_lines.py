@@ -37,7 +37,7 @@ def _orientation(angle: float) -> str:
     return "diagonal"
 
 
-def _segments(gray, min_length: int, max_gap: int):
+def _segments(gray: Any, min_length: int, max_gap: int) -> Any:
     import cv2
     import numpy as np
     # Canny takes 8-bit only: a 16-bit or float image raised cv2.error.

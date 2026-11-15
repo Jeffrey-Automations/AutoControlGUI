@@ -1,4 +1,5 @@
 import json
+import socket
 import socketserver
 import threading
 
@@ -14,7 +15,7 @@ _MAX_COMMAND_BYTES = 8 * 1024 * 1024
 _COMMAND_TERMINATOR = b"\n"
 
 
-def _read_command(request) -> str:
+def _read_command(request: socket.socket) -> str:
     """Read one newline-terminated command, spanning as many TCP reads as needed.
 
     A single ``recv`` returns whatever one TCP segment carried, not the whole

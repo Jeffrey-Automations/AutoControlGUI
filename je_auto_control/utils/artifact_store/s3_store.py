@@ -113,7 +113,7 @@ class S3ArtifactStore:
         return f"s3://{self._bucket}/{self._key(key)}"
 
 
-_STATE: dict = {"store": None}
+_STATE: dict[str, Optional[S3ArtifactStore]] = {"store": None}
 
 
 def set_default_store(store: Optional[S3ArtifactStore]) -> None:

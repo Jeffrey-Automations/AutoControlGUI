@@ -1,5 +1,5 @@
 """Plugins tab: load extra AC_ commands from a user directory."""
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtWidgets import (
     QFileDialog, QFormLayout, QLabel, QLineEdit, QListWidget, QMessageBox,
@@ -47,7 +47,7 @@ class PluginsTab(TranslatableMixin, QWidget):
         set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("browse", self._browse),

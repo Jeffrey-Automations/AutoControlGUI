@@ -90,7 +90,7 @@ def _window(line: str, index: int, snapshot: AndroidSnapshot) -> AndroidInputWin
                               _flags(match["flags"]), target, alpha)
 
 
-def _target(match: re.Match, owner: tuple[int, int], snapshot: AndroidSnapshot) -> None:
+def _target(match: re.Match[str], owner: tuple[int, int], snapshot: AndroidSnapshot) -> None:
     if match["app"] != snapshot.activity or owner[0] <= 0 or owner[1] // 100000 != snapshot.user:
         raise AgentTaskError("Android input-window application/owner does not match the reviewed focus")
     if any(re.fullmatch(r"0x[1-9a-f][0-9a-f]*", match[key]) is None for key in ("app_token", "token")):

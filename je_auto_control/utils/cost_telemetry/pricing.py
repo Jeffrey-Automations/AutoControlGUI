@@ -96,7 +96,7 @@ def estimate_usd(model: str, input_tokens: int, output_tokens: int,
     return round(cost, 6)
 
 
-def known_models() -> list:
+def known_models() -> list[str]:
     """Sorted list of every model the default pricing table covers."""
     return sorted(_DEFAULT_PRICING)
 

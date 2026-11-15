@@ -268,7 +268,7 @@ WindowTitleLister = Callable[[], List[str]]
 
 
 def _title_matches(titles: List[str], pattern: str,
-                   compiled: Optional["re.Pattern"]) -> bool:
+                   compiled: Optional["re.Pattern[str]"]) -> bool:
     if compiled is not None:
         return any(compiled.search(title) for title in titles)
     return any(pattern in title for title in titles)

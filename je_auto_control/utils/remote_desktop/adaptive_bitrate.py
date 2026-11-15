@@ -16,10 +16,13 @@ caller thread (no extra event loop needed).
 from __future__ import annotations
 
 import threading
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop.webrtc_stats import StatsSnapshot
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.remote_desktop.webrtc_transport import ScreenVideoTrack
 
 
 _LOSS_DOWN_PCT = 5.0
@@ -34,7 +37,7 @@ _FLOOR_FPS = 5
 class AdaptiveBitrateController:
     """Adjusts a ScreenVideoTrack's target FPS based on stats samples."""
 
-    def __init__(self, video_track, *, max_fps: Optional[int] = None,
+    def __init__(self, video_track: ScreenVideoTrack, *, max_fps: Optional[int] = None,
                  floor_fps: int = _FLOOR_FPS,
                  max_bitrate_kbps: int = 0) -> None:
         self._track = video_track

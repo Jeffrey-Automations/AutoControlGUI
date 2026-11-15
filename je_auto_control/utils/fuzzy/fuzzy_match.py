@@ -34,7 +34,7 @@ def _lcs_length(left: str, right: str) -> int:
     """Length of the longest common subsequence (bit-parallel, Allison-Dix)."""
     if len(left) < len(right):
         left, right = right, left
-    masks: dict = {}
+    masks: dict[str, int] = {}
     for position, char in enumerate(right):
         masks[char] = masks.get(char, 0) | (1 << position)
     full = (1 << len(right)) - 1

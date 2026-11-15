@@ -181,7 +181,7 @@ def _is_hashable(value: Any) -> bool:
     return True
 
 
-def _coerce_params(raw: Any, msg_id: Any) -> tuple:
+def _coerce_params(raw: Any, msg_id: Any) -> Tuple[Dict[str, Any], Optional[str]]:
     """Normalise JSON-RPC ``params`` to a dict.
 
     Returns ``(params, error_line)``. Every handler here expects an object;

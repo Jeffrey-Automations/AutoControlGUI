@@ -14,7 +14,7 @@ import os
 import socket
 import struct
 import threading
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.remote_desktop.protocol import ProtocolError
@@ -139,7 +139,7 @@ def _parse_status(response: str) -> int:
     return int(parts[1])
 
 
-def _parse_headers(text: str) -> dict:
+def _parse_headers(text: str) -> Dict[str, str]:
     headers = {}
     for line in text.split("\r\n"):
         if ":" in line:

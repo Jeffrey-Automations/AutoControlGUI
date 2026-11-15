@@ -17,7 +17,7 @@ def runtime_evidence_scope(runtime: Any) -> Iterator[None]:
             # Entering the scope is the check: it refuses a revoked or read-only caller.
             pass
 
-    def read(operation: str, body: dict, _timeout: float) -> dict:
+    def read(operation: str, body: dict[str, Any], _timeout: float) -> dict[str, Any]:
         check()
         if operation == "lookup":
             return runtime.lookup(body["idempotency_key"], body.get("spec"))

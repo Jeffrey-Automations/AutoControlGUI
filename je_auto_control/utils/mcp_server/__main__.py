@@ -64,7 +64,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[list] = None) -> None:
+def main(argv: Optional[list[str]] = None) -> None:
     """CLI entry point. Performs the requested action and returns ``None``."""
     parser = _build_parser()
     args = parser.parse_args(argv)

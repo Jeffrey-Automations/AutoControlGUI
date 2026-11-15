@@ -93,7 +93,7 @@ class DisclosureServerMixin(ToolCatalogMixin):
                 self._disclosure_views[connection] = self._new_tool_view(False)
             return self._disclosure_views[connection]
 
-    def _tool_worker_for_request(self, callback: Callable[[], None], params: dict) -> Callable[[], None]:
+    def _tool_worker_for_request(self, callback: Callable[[], None], params: dict[str, Any]) -> Callable[[], None]:
         meta = params.get("_meta")
         stateless = isinstance(meta, dict) and "io.modelcontextprotocol/protocolVersion" in meta
         return self._capture_tool_worker(callback, view=self._session_tool_view(stateless=stateless))

@@ -88,7 +88,7 @@ class WebRunnerTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("web_browse", self._on_browse_screenshot),

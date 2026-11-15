@@ -115,7 +115,7 @@ def _connections(block: str, snapshot: AndroidSnapshot) -> None:
     _target_connection(rows, snapshot)
 
 
-def _target_connection(rows: list[re.Match], snapshot: AndroidSnapshot) -> None:
+def _target_connection(rows: list[re.Match[str]], snapshot: AndroidSnapshot) -> None:
     if len({row["fd"] for row in rows}) != len(rows):
         raise AgentTaskError("Android native channel descriptors are duplicated")
     if any(row["channel"] != row["window"] for row in rows):

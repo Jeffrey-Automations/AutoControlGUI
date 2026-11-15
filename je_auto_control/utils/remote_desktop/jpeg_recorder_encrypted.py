@@ -192,7 +192,7 @@ class EncryptedJpegSequenceRecorder:
         return self.manifest_path
 
 
-def verify_manifest(manifest_path, hmac_key: bytes) -> bool:
+def verify_manifest(manifest_path: str | os.PathLike[str], hmac_key: bytes) -> bool:
     """Recompute the manifest signature and verify it in constant time.
 
     A manifest that is not a signed JSON object is ``False``, not an

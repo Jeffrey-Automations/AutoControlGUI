@@ -54,7 +54,7 @@ class _ScopedDriver(FileDialogDriver):
 
 
 @contextmanager
-def scoped_file_dialog(target: Any, window_id: int, process_id: int, arguments: dict) -> Iterator[None]:
+def scoped_file_dialog(target: Any, window_id: int, process_id: int, arguments: dict[str, Any]) -> Iterator[None]:
     """Keep the public executor call/journal intact while replacing only its trusted driver seam."""
     if "driver" in arguments:
         raise AgentTaskError("managed file dialogs cannot override their host driver")

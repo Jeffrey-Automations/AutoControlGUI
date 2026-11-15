@@ -7,7 +7,7 @@ display + navigation; the real timeline logic lives in
 :class:`TraceReplayController` so it can be unit-tested without Qt.
 """
 import json
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
@@ -74,7 +74,7 @@ class TraceReplayTab(TranslatableMixin, QWidget):
         root.addWidget(self._status)
         self._apply_translations()
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("trace_open_btn", self._on_open),

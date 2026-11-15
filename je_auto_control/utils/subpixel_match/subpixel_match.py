@@ -54,7 +54,7 @@ def _parabola_offset(low: float, mid: float, high: float) -> float:
     return max(-0.5, min(0.5, offset))
 
 
-def refine_peak(score_map, peak_xy: Tuple[int, int]) -> Tuple[float, float]:
+def refine_peak(score_map: Any, peak_xy: Tuple[int, int]) -> Tuple[float, float]:
     """Return the sub-pixel ``(offset_x, offset_y)`` of a peak via 3x3 quadratic fit."""
     peak_x, peak_y = int(peak_xy[0]), int(peak_xy[1])
     height, width = score_map.shape

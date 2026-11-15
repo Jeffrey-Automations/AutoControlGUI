@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import os
 import socket
 import struct
+from typing import Any
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.presence_frames import decode_frame
@@ -79,7 +80,7 @@ def _sender(ancillary: list[tuple[int, int, bytes]], abi: _AncillaryABI) -> tupl
     return descriptor, pid, uid, gid
 
 
-def _receive(connection: socket.socket, peer: LinuxPeerProcess) -> dict:
+def _receive(connection: socket.socket, peer: LinuxPeerProcess) -> dict[str, Any]:
     """Consume once under the channel's exclusive lease; EAGAIN preserves that lease."""
     abi = _ancillary_abi()
     truncation = getattr(socket, 'MSG_TRUNC') | getattr(socket, 'MSG_CTRUNC')

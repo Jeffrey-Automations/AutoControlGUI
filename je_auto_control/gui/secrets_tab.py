@@ -1,5 +1,5 @@
 """Secrets tab: unlock the vault and manage ${secrets.NAME} entries."""
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtWidgets import (
     QAbstractItemView, QFormLayout, QGroupBox, QInputDialog, QLabel,
@@ -60,7 +60,7 @@ class SecretsTab(TranslatableMixin, QWidget):
         set_role(self._status_label, "hint")
         root.addWidget(self._status_label)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("secret_unlock", self._on_unlock),

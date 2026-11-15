@@ -12,10 +12,13 @@ seam (the same seam the rest of the accessibility module uses), so the headless 
 unit-testable on any platform by injecting a fake backend; the real UIA calls live in the
 Windows backend. Imports no ``PySide6``.
 """
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.accessibility.backends.base import AccessibilityBackend
 
 
-def _backend():
+def _backend() -> "AccessibilityBackend":
     from je_auto_control.utils.accessibility.backends import get_backend
     return get_backend()
 

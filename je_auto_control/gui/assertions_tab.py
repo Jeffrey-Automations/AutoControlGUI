@@ -5,7 +5,7 @@ Assertions run with ``raise_on_fail=False`` so the GUI reports the
 outcome instead of crashing the tab.
 """
 import functools
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFormLayout, QLabel, QLineEdit,
@@ -88,7 +88,7 @@ class AssertionsTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("assert_run", self._on_run),

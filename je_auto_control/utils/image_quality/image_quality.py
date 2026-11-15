@@ -23,7 +23,7 @@ from je_auto_control.utils.visual_match.visual_match import _contain_cv2_error
 ImageSource = Any
 
 
-def _gray(source: Optional[ImageSource], region: Optional[Sequence[int]]):
+def _gray(source: Optional[ImageSource], region: Optional[Sequence[int]]) -> Any:
     """An 8-bit gray frame: a uint16 mid-gray read as brightness 32028 and ``too_bright``."""
     from je_auto_control.utils.preprocess.preprocess import _as_uint8, _eight_bit
     from je_auto_control.utils.visual_match.visual_match import _haystack_gray

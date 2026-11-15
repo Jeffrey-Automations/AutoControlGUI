@@ -19,7 +19,7 @@ ImageSource = Union[str, Path, bytes, "Image.Image"]
 QRDecoder = Callable[[Any], List[str]]
 
 
-def _load_np(source: ImageSource, region: Optional[Sequence[int]]):
+def _load_np(source: ImageSource, region: Optional[Sequence[int]]) -> Any:
     import numpy as np
     from PIL import Image
     if isinstance(source, Image.Image):

@@ -8,11 +8,14 @@ data-source loader; the rest of the module stays import-light. Imports no
 """
 import functools
 import os
-from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, TypeVar, Union
 
 from je_auto_control.utils.exception.exceptions import (
     AutoControlActionException, AutoControlAssertionException,
 )
+
+if TYPE_CHECKING:
+    from pypdf import PdfReader
 
 PageSelector = Optional[Union[int, Iterable[int]]]
 _Result = TypeVar("_Result")
@@ -41,7 +44,7 @@ def _pdf_errors_as_action_errors(function: Callable[..., _Result]) -> Callable[.
     return wrapper
 
 
-def _open_pdf(path: str):
+def _open_pdf(path: str) -> "PdfReader":
     """Return a ``pypdf.PdfReader`` for an existing PDF; raise if unavailable."""
     try:
         from pypdf import PdfReader

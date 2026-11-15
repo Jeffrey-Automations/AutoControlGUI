@@ -453,7 +453,7 @@ def _resolve_interface_detail(info_set: int,
     return text or None
 
 
-def _parse_vid_pid(path: str) -> tuple:
+def _parse_vid_pid(path: str) -> tuple[Optional[str], Optional[str]]:
     """Extract VID/PID from a Windows device interface path."""
     match = _VID_PID_RE.search(path)
     if not match:

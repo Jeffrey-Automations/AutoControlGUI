@@ -4,7 +4,7 @@ Thin wrapper over :func:`je_auto_control.load_rows` — the widget only
 builds a source spec dict from the form and renders the returned rows.
 """
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
@@ -77,7 +77,7 @@ class DataSourceTab(TranslatableMixin, QWidget):
         set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("ds_load", self._on_load),

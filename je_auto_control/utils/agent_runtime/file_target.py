@@ -30,6 +30,6 @@ class FileTarget:
     def cleanup(self) -> None:
         """File operations hold no desktop input resources."""
 
-    def validate_input(self, _event: dict) -> None:
+    def validate_input(self, _event: dict[str, Any]) -> None:
         """Refuse any unexpected native input, including inside nested commands."""
         raise AgentTaskError("file tasks cannot drive native input")

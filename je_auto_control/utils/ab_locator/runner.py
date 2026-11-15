@@ -100,7 +100,7 @@ def report_for(target_id: str,
     return target_store.report(target_id)
 
 
-def _run_one(item) -> Tuple[str, StrategyResult]:
+def _run_one(item: Tuple[str, Locator]) -> Tuple[str, StrategyResult]:
     name, locator = item
     started = time.monotonic()
     try:

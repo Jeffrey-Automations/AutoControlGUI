@@ -37,7 +37,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.json_store.json_store import atomic_write_text
@@ -175,7 +175,7 @@ class ConfigBundleImporter:
         )
         return report
 
-    def _validate(self, bundle: Any) -> tuple:
+    def _validate(self, bundle: Any) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if not isinstance(bundle, dict):
             raise ConfigBundleError("bundle must be a JSON object")
         manifest = bundle.get("manifest")

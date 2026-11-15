@@ -1,5 +1,5 @@
 """Window Manager tab: list, focus, close windows."""
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
@@ -83,7 +83,7 @@ class WindowManagerTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("win_refresh", self.refresh),

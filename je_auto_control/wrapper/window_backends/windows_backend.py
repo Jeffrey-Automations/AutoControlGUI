@@ -1,5 +1,6 @@
 """Windows window-management backend, over the existing Win32 module."""
 import sys
+from types import ModuleType
 from typing import List, Optional, Tuple
 
 from je_auto_control.wrapper.window_backends.base import WindowManageBackend
@@ -21,7 +22,7 @@ class WindowsWindowBackend(WindowManageBackend):
         self.available = sys.platform in ("win32", "cygwin", "msys")
 
     @property
-    def _wm(self):
+    def _wm(self) -> ModuleType:
         """The Win32 module, imported lazily so other platforms never load it."""
         from je_auto_control.windows.window import windows_window_manage
 

@@ -12,7 +12,7 @@ The planning is pure and headless-testable; only the default driver touches Win3
 (returning ``False`` on other platforms). Imports no ``PySide6``.
 """
 import sys
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 ZOrderDriver = Callable[[str, str], bool]
 
@@ -20,7 +20,7 @@ ZOrderDriver = Callable[[str, str], bool]
 _ACTIONS = {"top": 0, "bottom": 1, "topmost": -1, "notopmost": -2}
 
 
-def available_actions() -> list:
+def available_actions() -> List[str]:
     """Return the supported z-order action names."""
     return list(_ACTIONS)
 

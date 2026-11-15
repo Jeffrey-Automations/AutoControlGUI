@@ -93,7 +93,7 @@ def _validate_object(schema: Dict[str, Any], value: Dict[str, Any],
     return None
 
 
-def _validate_array(schema: Dict[str, Any], value: list,
+def _validate_array(schema: Dict[str, Any], value: List[Any],
                     path: str) -> Optional[str]:
     item_schema = schema.get("items")
     if not isinstance(item_schema, dict):

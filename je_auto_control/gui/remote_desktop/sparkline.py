@@ -9,7 +9,7 @@ from collections import deque
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPainter, QPen, QPolygonF
+from PySide6.QtGui import QColor, QPaintEvent, QPainter, QPen, QPolygonF
 from PySide6.QtCore import QPointF
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
@@ -40,7 +40,7 @@ class Sparkline(QWidget):
         self._values.clear()
         self.update()
 
-    def paintEvent(self, _event) -> None:  # noqa: N802 Qt override
+    def paintEvent(self, _event: QPaintEvent) -> None:  # noqa: N802 Qt override
         painter = QPainter(self)
         try:
             painter.fillRect(self.rect(), self._bg_color or self.palette().base().color())

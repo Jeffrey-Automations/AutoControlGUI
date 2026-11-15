@@ -1,5 +1,5 @@
 """Profiler tab: visualise per-action wall-clock hot spots."""
-from typing import List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
@@ -87,7 +87,7 @@ class ProfilerTab(TranslatableMixin, QWidget):
         set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("prof_enable", self._toggle_enable),

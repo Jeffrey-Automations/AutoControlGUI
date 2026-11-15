@@ -75,7 +75,7 @@ def _mouse_input(kind: str, keycode: MouseKeycode, x: int, y: int) -> None:
     raise AutoControlMouseException("managed mouse input requires a reviewed button")
 
 
-def get_mouse_table() -> dict:
+def get_mouse_table() -> Dict[str, MouseKeycode]:
     """
     取得滑鼠按鍵對應表
     Get mouse keys table

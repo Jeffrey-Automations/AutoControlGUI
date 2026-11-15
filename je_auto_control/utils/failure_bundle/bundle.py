@@ -17,7 +17,7 @@ import zipfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Iterator, Mapping
 
 from je_auto_control.utils.config_redaction import (
     redact_config,
@@ -200,7 +200,7 @@ def failure_bundle_on_error(
     context: Mapping[str, Any] | None = None,
     events: Iterable[Mapping[str, Any]] = (),
     options: FailureBundleOptions | None = None,
-):
+) -> Iterator[None]:
     """Create a bundle when the wrapped block raises, then re-raise it.
 
     The block's own exception is always the one that propagates: a bundle

@@ -19,7 +19,7 @@ injectable, so the whole flow is testable without a screen. Reuses
 :func:`actionability.act_when_ready`. Imports no ``PySide6``.
 """
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.actionability import GateConfig, act_when_ready
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
@@ -66,7 +66,7 @@ def act_in_view(target: str, action: Callable[[List[int]], Any], *,
     cx, cy = int(found["coords"][0]), int(found["coords"][1])
     locate = plan.locator or _default_locator(plan.kind, _DEFAULT_THRESHOLD, _DEFAULT_LANG)
 
-    def target_box():
+    def target_box() -> Optional[Tuple[int, int, int, int]]:
         # Located again on every poll: a constant box could never disappear
         # or move, so the visibility and stability gates checked nothing.
         coords = locate(target)

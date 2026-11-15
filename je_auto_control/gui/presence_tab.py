@@ -6,7 +6,7 @@ timestamp, and exposes one-click promote / demote / kick buttons. The
 table auto-refreshes when the registry notifies of a change.
 """
 import functools
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -90,7 +90,7 @@ class PresenceTab(TranslatableMixin, QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._apply_translations()
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("presence_refresh_btn", self.refresh),

@@ -8,6 +8,7 @@ remain identical, so `wss://` is just `ws://` over the same
 ``ssl_context`` already supported by the parent.
 """
 import socket
+from typing import Any
 
 from je_auto_control.utils.remote_desktop.host import RemoteDesktopHost
 from je_auto_control.utils.remote_desktop.transport import (
@@ -24,7 +25,7 @@ class WebSocketDesktopHost(RemoteDesktopHost):
     """Speak the same protocol as :class:`RemoteDesktopHost` over WebSockets."""
 
     def _build_channel(self, sock: socket.socket,
-                       address) -> MessageChannel:
+                       address: Any) -> MessageChannel:
         del address
         sock.settimeout(_HANDSHAKE_TIMEOUT_S)
         try:

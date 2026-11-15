@@ -142,7 +142,7 @@ class SubscriptionMixin:
                 "MCP failed to send tools/list_changed",
             )
 
-    def _tool_change_listeners(self, connection_id: Any) -> list:
+    def _tool_change_listeners(self, connection_id: Any) -> List[Tuple[Any, Listener]]:
         with self._listeners_lock:
             return [(key, listener) for key, listener in self._listeners.items()
                     if listener.tools_list_changed

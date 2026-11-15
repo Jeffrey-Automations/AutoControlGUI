@@ -11,7 +11,7 @@ Every function runs on an injectable image (ndarray / path / PIL, RGB) so it is
 headless-testable on synthetic arrays. ``cv2.calcHist`` / ``cv2.compareHist`` are base
 OpenCV; OpenCV + NumPy come in via ``je_open_cv``. Imports no ``PySide6``.
 """
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, Optional, Sequence, Tuple
 
 # Reuse the RGB loader / screen grab (single source of truth, no copy).
 from je_auto_control.utils.color_region.color_region import _grab_rgb, _to_rgb
@@ -20,7 +20,7 @@ ImageSource = Any
 _SIMILARITY_METHODS = ("correlation", "intersection")
 
 
-def _convert(rgb, space: str):
+def _convert(rgb: Any, space: str) -> Tuple[Any, List[List[int]]]:
     import cv2
     if space == "hsv":
         return (cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV),

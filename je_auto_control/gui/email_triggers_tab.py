@@ -5,7 +5,7 @@ closing the tab) cancels it: the pass ends before the next trigger's server,
 and a trigger already being polled finishes, so no message is marked seen
 without its script having fired.
 """
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
@@ -141,7 +141,7 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         pair.setMinimumWidth(min_width)
         return pair
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("eml_start", self._on_start),

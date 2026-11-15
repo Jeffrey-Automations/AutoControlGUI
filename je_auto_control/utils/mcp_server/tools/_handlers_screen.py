@@ -8,10 +8,13 @@ import base64
 import io
 import math
 import os
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from je_auto_control.utils.mcp_server.tools._base import MCPContent
 from je_auto_control.utils.timeouts import clamp_poll_interval, deadline_after
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 
 # === Screen / image / OCR ===================================================
@@ -74,7 +77,7 @@ def list_monitors() -> List[Dict[str, Any]]:
         ]
 
 
-def _grab_monitor(index: int):
+def _grab_monitor(index: int) -> "Image.Image":
     """Capture a single monitor through the platform grabber; returns a PIL Image."""
     from je_auto_control.utils.cv2_utils.screen_grabber import mss_grabber
     from PIL import Image

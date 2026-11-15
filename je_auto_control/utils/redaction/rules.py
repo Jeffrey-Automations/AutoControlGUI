@@ -48,7 +48,7 @@ _RE_PHONE = re.compile(
 )
 
 
-_REGEX_BY_DETECTOR: Dict[str, re.Pattern] = {
+_REGEX_BY_DETECTOR: Dict[str, re.Pattern[str]] = {
     DETECTOR_EMAIL: _RE_EMAIL,
     DETECTOR_CREDIT_CARD: _RE_CREDIT_CARD,
     DETECTOR_SSN: _RE_SSN,

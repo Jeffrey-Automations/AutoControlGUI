@@ -16,10 +16,10 @@ cv2 / numpy are imported lazily (the module stays importable without them) and
 the loaders reuse :mod:`visual_match`. The ranking is pure and fully testable.
 Imports no ``PySide6``.
 """
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
-def _unpack(item: Any) -> tuple:
+def _unpack(item: Any) -> Tuple[Any, Any]:
     """Return ``(box, score)`` from a ``{box, score}`` dict or a ``(box, score)``."""
     if isinstance(item, dict):
         return item["box"], item["score"]

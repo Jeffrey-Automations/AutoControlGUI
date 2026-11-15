@@ -79,7 +79,7 @@ class AutoControlGUIWidget(WorkspaceShell):
             entry.widget.dispose()
         stop_all_script_runs()
 
-    def keyPressEvent(self, event: QKeyEvent):
+    def keyPressEvent(self, event: QKeyEvent) -> None:
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_4:
             self._stop_auto_click()
         else:

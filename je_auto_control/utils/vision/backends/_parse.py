@@ -1,6 +1,6 @@
 """Shared parsing helpers for VLM backend responses."""
 import re
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 # Anchored so a pair is never cut out of a longer number: "123456, 7" read as
 # (23456, 7). Decimals are read whole and rounded, and "x=", "x:", '"x":'
@@ -42,7 +42,7 @@ LOCATE_PROMPT = (
 )
 
 
-def read_usage(response: object, input_name: str, output_name: str):
+def read_usage(response: object, input_name: str, output_name: str) -> Optional[Dict[str, Any]]:
     """``{"input_tokens", "output_tokens"}`` from an SDK response, or ``None``.
 
     The SDKs name the two counts differently (``input_tokens`` /

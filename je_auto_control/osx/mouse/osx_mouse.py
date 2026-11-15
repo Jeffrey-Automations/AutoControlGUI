@@ -1,6 +1,6 @@
 import sys
 import time
-from typing import Tuple
+from typing import Any, Tuple
 
 from je_auto_control.utils.exception.exception_tags import osx_import_error_message
 from je_auto_control.utils.exception.exceptions import (
@@ -66,7 +66,7 @@ def mouse_event(event: int, x: int, y: int, mouse_button: int,
 
 
 def _build_mouse_event(event: int, x: int, y: int, mouse_button: int,
-                       click_count: int = 1):
+                       click_count: int = 1) -> Any:
     """
     The Quartz event ``mouse_event`` posts, not yet posted
     建立（但不送出）滑鼠事件

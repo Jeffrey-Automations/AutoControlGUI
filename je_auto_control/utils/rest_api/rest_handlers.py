@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import io
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs
 
 from je_auto_control.utils.exception.exceptions import (
@@ -385,7 +385,7 @@ def _usb_vid_pid(body: Dict[str, Any]) -> Tuple[str, str, Optional[str]]:
     )
 
 
-def _usb_command(thunk) -> HandlerResult:
+def _usb_command(thunk: Callable[[], Dict[str, Any]]) -> HandlerResult:
     """Run a passthrough command thunk and map errors to status codes."""
     try:
         return 200, thunk()

@@ -198,7 +198,7 @@ class OSXInputTap:
                 Quartz.CFRunLoopRemoveSource(
                     run_loop, source, kCFRunLoopDefaultMode)
 
-    def _callback(self, proxy, event_type, event, _refcon):
+    def _callback(self, proxy: Any, event_type: int, event: Any, _refcon: Any) -> Any:
         """Called by the window server on the tap thread, for every event."""
         # Anything escaping here tears down the run loop, and the recording
         # then stops without saying so — one unexpected event shape would end

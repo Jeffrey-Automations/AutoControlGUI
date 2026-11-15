@@ -24,6 +24,7 @@ import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from types import ModuleType
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 
@@ -61,7 +62,7 @@ class ResourceReport:
         }
 
 
-def _try_psutil():
+def _try_psutil() -> Optional[ModuleType]:
     try:
         import psutil  # noqa: F401
         return psutil

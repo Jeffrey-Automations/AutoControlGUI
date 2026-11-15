@@ -67,7 +67,7 @@ class AnthropicLLMBackend(LLMBackend):
         return _join_text_blocks(response)
 
 
-def _join_text_blocks(response) -> str:
+def _join_text_blocks(response: object) -> str:
     """Concatenate every text block in an Anthropic response."""
     parts = []
     for block in getattr(response, "content", []) or []:
