@@ -635,7 +635,9 @@ Bundled checks:
 - ``optional_deps`` — inventory of optional modules (aiortc, av, pyusb,
   pyaudio, pytesseract, cv2, PySide6) with available/missing breakdown
 - ``executor`` — count of registered ``AC_*`` commands
-- ``audit_chain`` — chain integrity (uses ``verify_chain()``)
+- ``audit_chain`` — chain integrity, read-only (``verify_audit_chain_read_only()``: never creates
+  ``~/.je_auto_control/audit.db``, its schema or the one-off backfill; reports "no chained audit
+  log yet" when there is none)
 - ``screenshot`` — captures a real screen image
 - ``mouse`` — reads current mouse position
 - ``disk_space`` — free space in user home (warn <1 GB, error <100 MB)

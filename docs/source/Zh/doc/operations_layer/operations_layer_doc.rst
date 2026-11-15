@@ -566,7 +566,8 @@ GUI：*USB Devices* 分頁加上 *Auto-refresh + watch hotplug* 勾選，
 - ``optional_deps`` — 選用模組清單（aiortc、av、pyusb、pyaudio、
   pytesseract、cv2、PySide6），提供已裝/缺少的明細
 - ``executor`` — 已註冊的 ``AC_*`` 指令數
-- ``audit_chain`` — 雜湊鏈完整性（使用 ``verify_chain()``）
+- ``audit_chain`` — 雜湊鏈完整性，唯讀（``verify_audit_chain_read_only()``：不會建立
+  ``~/.je_auto_control/audit.db``、它的 schema 或一次性補鏈；沒有紀錄時回報「尚無雜湊鏈稽核紀錄」）
 - ``screenshot`` — 實際擷取一張螢幕影像
 - ``mouse`` — 讀取目前滑鼠座標
 - ``disk_space`` — 使用者家目錄剩餘空間（<1 GB warn、<100 MB error）

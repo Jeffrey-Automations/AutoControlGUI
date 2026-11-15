@@ -164,10 +164,7 @@ class AuditLog:
 
     def _read_anchor_locked(self) -> str:
         """The hash the first row must point at: genesis, or the last pruned row."""
-        row = self._conn.execute(
-            "SELECT value FROM chain_meta WHERE key = 'anchor'"
-        ).fetchone()
-        return row[0] if row and row[0] else _GENESIS_HASH
+        return _read_anchor(self._conn)
 
     def _set_anchor_locked(self, value: str) -> None:
         self._conn.execute(
@@ -256,30 +253,8 @@ class AuditLog:
     def verify_chain(self) -> ChainVerification:
         """Walk the chain top-to-bottom; return the first broken link."""
         with self._lock:
-            cur = self._conn.execute(
-                "SELECT id, ts, event_type, host_id, viewer_id, detail,"
-                " prev_hash, row_hash FROM events ORDER BY id ASC"
-            )
-            rows = cur.fetchall()
-            anchor = self._read_anchor_locked()
-        if not rows:
-            return ChainVerification(ok=True, broken_at_id=None, total_rows=0)
-        prev_hash = anchor
-        for row in rows:
-            row_id, ts, event_type, host_id, viewer_id, detail, ph, rh = row
-            if ph != prev_hash:
-                return ChainVerification(
-                    ok=False, broken_at_id=row_id, total_rows=len(rows),
-                )
-            expected = _compute_row_hash(
-                ph, ts, event_type, host_id, viewer_id, detail,
-            )
-            if expected != rh:
-                return ChainVerification(
-                    ok=False, broken_at_id=row_id, total_rows=len(rows),
-                )
-            prev_hash = rh
-        return ChainVerification(ok=True, broken_at_id=None, total_rows=len(rows))
+            rows, anchor = _read_chain(self._conn)
+        return _check_chain(rows, anchor)
 
     def clear(self) -> int:
         """Wipe the table, leaving one ``audit_log_cleared`` event. Returns the rows deleted.
@@ -312,6 +287,63 @@ def _compute_row_hash(prev_hash: Optional[str], ts: str, event_type: str,
         ensure_ascii=False, separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _read_anchor(conn: Any) -> str:
+    row = conn.execute("SELECT value FROM chain_meta WHERE key = 'anchor'").fetchone()
+    return row[0] if row and row[0] else _GENESIS_HASH
+
+
+def _read_chain(conn: Any) -> Tuple[List[Any], str]:
+    rows = conn.execute(
+        "SELECT id, ts, event_type, host_id, viewer_id, detail,"
+        " prev_hash, row_hash FROM events ORDER BY id ASC"
+    ).fetchall()
+    return rows, _read_anchor(conn)
+
+
+def _check_chain(rows: List[Any], anchor: str) -> ChainVerification:
+    prev_hash = anchor
+    for row in rows:
+        row_id, ts, event_type, host_id, viewer_id, detail, ph, rh = row
+        if ph != prev_hash or _compute_row_hash(ph, ts, event_type, host_id, viewer_id, detail) != rh:
+            return ChainVerification(ok=False, broken_at_id=row_id, total_rows=len(rows))
+        prev_hash = rh
+    return ChainVerification(ok=True, broken_at_id=None, total_rows=len(rows))
+
+
+def verify_audit_chain_read_only(path: Optional[Path] = None) -> Optional[ChainVerification]:
+    """Verify a chained audit log without creating, migrating or writing it.
+
+    ``None`` when there is nothing to verify that way: no file at ``path``
+    (default: :func:`default_audit_log_path`), or a log written before the
+    chain existed, which only opening it with :class:`AuditLog` would
+    backfill. When this process already holds the default log open, that
+    instance is asked instead. A file SQLite cannot read raises
+    :class:`AuditLogError`.
+    """
+    target = Path(path) if path is not None else default_audit_log_path()
+    with _default_lock:
+        opened = _default_audit_log
+    if opened is not None and opened._path == target:
+        return opened.verify_chain()
+    driver = require_sqlite3()
+    if not target.is_file():
+        return None
+    try:
+        conn = driver.connect(f"{target.resolve().as_uri()}?mode=ro", uri=True)
+    except SQLITE_ERRORS as error:
+        raise AuditLogError(f"cannot open audit log {target}: {error}") from error
+    try:
+        (version,) = conn.execute("PRAGMA user_version").fetchone()
+        if int(version) < _CHAIN_SCHEMA_VERSION:
+            return None
+        rows, anchor = _read_chain(conn)
+    except SQLITE_ERRORS as error:
+        raise AuditLogError(f"cannot read audit log {target}: {error}") from error
+    finally:
+        conn.close()
+    return _check_chain(rows, anchor)
 
 
 _QUERY_SQL = (
@@ -351,5 +383,5 @@ def default_audit_log() -> AuditLog:
 
 __all__ = [
     "AuditLog", "ChainVerification",
-    "default_audit_log", "default_audit_log_path",
+    "default_audit_log", "default_audit_log_path", "verify_audit_chain_read_only",
 ]

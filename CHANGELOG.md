@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Diagnostics (`run_diagnostics`, `ac_diagnose`): the `audit_chain` check verifies the audit log
+  through a read-only SQLite connection (`verify_audit_chain_read_only`) and no longer creates
+  `~/.je_auto_control/audit.db`, its schema or the one-off chain backfill. With no chained log yet
+  it reports `ok` with "no chained audit log yet; diagnostics does not create one" instead of
+  "chain verified (0 rows)".
+
 - Typing: the whole package is held to the strict mypy tier. `MouseKeycode` is now the platform's
   own button type (a tuple of three Win32 flags on Windows, a string such as `"Left"` on macOS, an
   int on X11 and Wayland) instead of `Any`. The macOS backend's `press_mouse` / `release_mouse` /
