@@ -15,7 +15,7 @@ class NullAccessibilityBackend(AccessibilityBackend):
     name = "null"
     available = False
 
-    def __init__(self, reason: str = "no accessibility backend available"):
+    def __init__(self, reason: str = "no accessibility backend available") -> None:
         self._reason = reason
 
     def list_elements(self, app_name: Optional[str] = None,

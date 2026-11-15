@@ -12,7 +12,7 @@ class NullVLMBackend(VLMBackend):
     name = "null"
     available = False
 
-    def __init__(self, reason: str = "no VLM backend available"):
+    def __init__(self, reason: str = "no VLM backend available") -> None:
         self._reason = reason
 
     def locate(self, image_bytes: bytes, description: str,
