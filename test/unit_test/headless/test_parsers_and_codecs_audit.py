@@ -158,3 +158,15 @@ def test_close_closes_the_container_when_the_flush_fails():
     provider._stream, provider._container = _Stream(), _Container()
     provider.close()
     assert closed == [True]
+
+
+@pytest.mark.parametrize("bit_rate", [None, 0])
+def test_an_unset_encoder_bit_rate_reopens_instead_of_raising(bit_rate):
+    """PyAV reports an unset bit rate as None; dividing by it raised TypeError."""
+    pytest.importorskip("av")
+    from je_auto_control.utils.remote_desktop import hw_codec
+    frame = types.SimpleNamespace(width=640, height=480)
+    codec = types.SimpleNamespace(width=640, height=480, bit_rate=bit_rate)
+    assert hw_codec._shape_changed(codec, frame, 1_000_000) is True
+    assert hw_codec._shape_changed(types.SimpleNamespace(width=640, height=480, bit_rate=1_000_000),
+                                   frame, 1_050_000) is False

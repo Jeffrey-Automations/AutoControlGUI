@@ -24,6 +24,7 @@ import logging
 import os
 import tempfile
 import warnings
+from io import TextIOWrapper
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
@@ -104,7 +105,7 @@ class AutoControlGUILoggingHandler(RotatingFileHandler):
         encoding: str = "utf-8",
         errors: str = "backslashreplace",
         delay: bool = False,
-    ):
+    ) -> None:
         self._follows_environment = filename is None
         path = filename if filename is not None else str(default_log_file())
         # encoding 必須明確指定。省略時 RotatingFileHandler 會採用系統
@@ -136,7 +137,7 @@ class AutoControlGUILoggingHandler(RotatingFileHandler):
         self.setFormatter(formatter)  # 設定格式器
         self.setLevel(logging.DEBUG)  # 設定等級
 
-    def _open(self):
+    def _open(self) -> TextIOWrapper:
         """Open the file, creating its directory and rotating it first.
 
         A file that cannot be opened (read-only home, a path through a regular
@@ -155,7 +156,7 @@ class AutoControlGUILoggingHandler(RotatingFileHandler):
             warnings.warn(
                 f"AutoControlGUI log file {path} unavailable, file logging "
                 f"off: {error!r}", RuntimeWarning, stacklevel=2)
-            return open(os.devnull, self.mode, encoding=self.encoding,  # noqa: SIM115  # reason: the handler owns and closes its stream
+            return open(os.devnull, "a", encoding=self.encoding,  # noqa: SIM115  # reason: the handler owns and closes its stream
                         errors=self.errors)
 
     def emit(self, record: logging.LogRecord) -> None:

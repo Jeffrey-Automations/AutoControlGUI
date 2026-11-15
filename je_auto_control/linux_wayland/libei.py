@@ -194,13 +194,13 @@ class LibeiBackend:
     """
 
     def __init__(self, *, symbols: Optional[BoundSymbols] = None,
-                 portal_connect: Optional[Callable[..., tuple]] = None) -> None:
+                 portal_connect: Optional[Callable[[], Tuple[int, oeffis.PortalSession]]] = None) -> None:
         self._symbols = symbols if symbols is not None else _load_symbols()
         self._portal_connect = portal_connect or oeffis.connect_eis_fd
         self._ei: Optional[int] = None
         self._backend_open = False
         self._handshake_complete = False
-        self._session = None
+        self._session: Optional[oeffis.PortalSession] = None
         self._devices: Dict[int, int] = {}
         # Every device this sender holds a reference to, whichever
         # capability currently points at it.

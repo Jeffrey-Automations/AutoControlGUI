@@ -526,7 +526,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
 D2 仍缺原生半開交握資源回收與合成器釋放證據；D3 的錄製／全域停止／Windows 原生崩潰證據仍缺，詳見計畫與下方生命週期待辦。
 計畫 E 已有裝置 context、輸入／畫面、應用生命週期與共用命令入口；
 仍缺真實 SDK 契約核對、iOS 擴充 adapter 與裝置驗收，不能以 fake backend 測試結案。
-H 已有三平台型別 gate 與真實相依型別檢查；嚴格型別層收進所有補註記就能通過的模組（U-20261115-05～14，共 1,511 個；`typing_not_yet_strict.txt` 已清空）。仍缺：`test/verify/typing_strict_baseline.txt` 剩 14 個，每個都要改程式碼而不只是補註記——`android/client.py`、`ios/client.py` 與兩個 vision backend（`except (OSError, *_sdk_errors())` 的星號展開，mypy 只接受 `tuple[Any, ...]`，改成 `(OSError, ...) + _sdk_errors()` 才能精確）、`linux_wayland/libei.py`（`oeffis.connect_eis_fd` 的回傳型別）、`utils/logging/logging_instance.py`（`FileHandler._open` 與 `open()` 的 `IO[Any]`）、`utils/accessibility/accessibility_api.py`（`tuple(el.bounds)` 不是 4-tuple）、`utils/actionability/actionability.py`（`visible` 不收窄 `bbox`）、`utils/table_grid_fill/table_grid_fill.py`（`None in (...)` 不收窄）、`utils/tool_use_schema/schema.py`（`Mapping` 傳給宣告 `dict` 的 `execute_one`）、`utils/remote_desktop/hw_codec.py`（PyAV 的 `bit_rate` 可能是 None，真的可能除以 None）、`gui/vlm_tab.py`（`_show_outcome(value: object)` 傳給要 `Optional[Tuple[int, int]]` 的 `_show_located`）、`utils/mcp_server/tools/_handlers.py` 的 `tween_drag`（`tuple(start)` 不是 `Tuple[int, int]`）、`wrapper/backend_contract.py` 的 `MouseKeycode = Any`（依平台寫成 tuple／int 會露出 `platform_wrapper` 各分支匯入的 `mouse_keys_table` 型別不同，其中一個是 `dict[str, str]`，要先重整 wrapper 層）；以及完整範例／文件與最終固定來源總驗收。
+H 已有三平台型別 gate 與真實相依型別檢查；整個套件（1,525 個模組）都在嚴格型別層，`typing_strict_baseline.txt` 與 `typing_not_yet_strict.txt` 已清空（U-20261115-05～16）。仍缺：完整範例／文件與最終固定來源總驗收。
 F 還缺：
 
 - **F2 GUI 重製（`WIP`，維護者 2026-11-14 決定：全面視覺改版；窄視窗時導覽與詳情改為浮層）**：

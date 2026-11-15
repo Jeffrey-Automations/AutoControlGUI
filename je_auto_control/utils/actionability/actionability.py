@@ -76,7 +76,7 @@ def _reason(visible: bool, stable: bool, enabled: bool, receives: bool) -> str:
 class _StabilityTracker:
     """Tracks how long the bbox (and optional pixel sample) has stayed unchanged."""
 
-    def __init__(self, sampler, stable_for_s: float):
+    def __init__(self, sampler: Optional[Callable[[Bbox], Any]], stable_for_s: float) -> None:
         self._sampler = sampler
         self._stable_for_s = stable_for_s
         self._prev: Any = object()
@@ -120,18 +120,22 @@ def _probe_says_enabled(answer: Any) -> bool:
     return answer is None or bool(answer)
 
 
-def _evaluate(bbox, tracker, now, enabled_probe, hit_tester):
+def _evaluate(bbox: Optional[Bbox], tracker: _StabilityTracker, now: float,
+              enabled_probe: Optional[Callable[[], Optional[bool]]],
+              hit_tester: Optional[Callable[[List[int]], bool]],
+              ) -> Tuple[bool, bool, bool, bool, Optional[List[int]]]:
     """Return ``(visible, stable, enabled, receives, point)`` for one poll."""
     # A zero-size box (a collapsed or hidden element) is not visible.
     visible = bbox is not None and len(bbox) >= 4 and bbox[2] > 0 and bbox[3] > 0
     stable = tracker.update(bbox, now)
     enabled = enabled_probe is None or _probe_says_enabled(enabled_probe())
-    point = _center(bbox) if visible else None
+    point = _center(bbox) if visible and bbox is not None else None
     receives = hit_tester is None or point is None or bool(hit_tester(point))
     return visible, stable, enabled, receives, point
 
 
-def _report(visible, stable, enabled, receives, point, waited):
+def _report(visible: bool, stable: bool, enabled: bool, receives: bool,
+            point: Optional[List[int]], waited: float) -> ActionabilityReport:
     actionable = visible and stable and enabled and receives
     return ActionabilityReport(
         actionable, visible, stable, enabled, receives, round(waited, 4),

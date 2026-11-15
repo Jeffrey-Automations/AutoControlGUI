@@ -3647,8 +3647,8 @@ def tween_drag_tools() -> List[MCPTool]:
                          "press, after it and before the release. Returns "
                          "{points}."),
             input_schema=schema({
-                "start": {"type": "array", "items": {"type": "integer"}},
-                "end": {"type": "array", "items": {"type": "integer"}},
+                "start": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer"}},
+                "end": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer"}},
                 "steps": {"type": "integer"},
                 "easing": {"type": "string"},
                 "button": {"type": "string"},

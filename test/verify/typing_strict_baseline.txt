@@ -13,17 +13,3 @@
 #   * A deleted or renamed module loses its line in the same change; a module
 #     written later under the same name is new and therefore strict.
 #
-je_auto_control.android.client
-je_auto_control.gui.vlm_tab
-je_auto_control.ios.client
-je_auto_control.linux_wayland.libei
-je_auto_control.utils.accessibility.accessibility_api
-je_auto_control.utils.actionability.actionability
-je_auto_control.utils.logging.logging_instance
-je_auto_control.utils.mcp_server.tools._handlers
-je_auto_control.utils.remote_desktop.hw_codec
-je_auto_control.utils.table_grid_fill.table_grid_fill
-je_auto_control.utils.tool_use_schema.schema
-je_auto_control.utils.vision.backends.anthropic_backend
-je_auto_control.utils.vision.backends.openai_backend
-je_auto_control.wrapper.backend_contract

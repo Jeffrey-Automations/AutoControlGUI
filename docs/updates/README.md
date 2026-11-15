@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261115-16 | 2026-11-15 | The last 14 modules join the strict tier: the whole package is strict | #done #typing | [2026-11-b](2026-11-b.md) |
 | U-20261115-15 | 2026-11-15 | Dashboard assets served from a table, not a request-chosen path | #done #security #rest-api | [2026-11-b](2026-11-b.md) |
 | U-20261115-14 | 2026-11-15 | The 18 largest modules typed; a non-string WebRTC control type is ignored | #done #typing #remote-desktop | [2026-11-b](2026-11-b.md) |
 | U-20261115-13 | 2026-11-15 | Dev CI red on ac_wait_for_pixel after get_pixel was annotated | #incident #mcp #typing | [2026-11-b](2026-11-b.md) |

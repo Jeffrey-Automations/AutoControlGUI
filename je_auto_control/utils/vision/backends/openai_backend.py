@@ -1,7 +1,7 @@
 """OpenAI (GPT-4-vision family) VLM backend."""
 import base64
 import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Type
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.vision.backends._parse import (
@@ -71,7 +71,7 @@ class OpenAIVLMBackend(VLMBackend):
         # The SDK's errors (rate limit, timeout, 5xx) derive from
         # openai.OpenAIError, a bare Exception, so they escaped here while
         # the LLM backend already caught them.
-        except (*_sdk_errors(), OSError, ValueError, RuntimeError) as error:
+        except _sdk_errors() + (OSError, ValueError, RuntimeError) as error:
             raise VLMRequestError(f"OpenAI VLM request failed: {error!r}") from error
         self.last_usage = read_usage(response, "prompt_tokens", "completion_tokens")
         try:
@@ -81,14 +81,14 @@ class OpenAIVLMBackend(VLMBackend):
         return parse_coords(text)
 
 
-def _sdk_errors() -> tuple:
+def _sdk_errors() -> Tuple[Type[BaseException], ...]:
     """``(openai.OpenAIError,)``, the base of every error the SDK raises.
 
     Evaluated while an exception is being matched, so it must not raise:
     with an injected client and no SDK installed there is nothing of the
     SDK's to catch.
     """
-    errors: tuple = ()
+    errors: Tuple[Type[BaseException], ...] = ()
     try:
         import openai  # nosemgrep: codacy.python.openai.import-without-guardrails  # reason: error type only
     except ImportError:

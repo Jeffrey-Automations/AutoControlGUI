@@ -57,7 +57,7 @@ def mouse_event(event: int, x: int, y: int, mouse_button: int,
     :param event: Quartz event type 事件類型 (例如 kCGEventMouseMoved)
     :param x: X coordinate X 座標
     :param y: Y coordinate Y 座標
-    :param mouse_button: Mouse button code 滑鼠按鍵代碼
+    :param mouse_button: Mouse button name (``"Left"``, ``"Middle"``, ``"Right"``) 滑鼠按鍵名稱
     :param click_count: 這是連續第幾次點擊 Which click of a run this is (>= 1)
     """
     Quartz.CGEventPost(
@@ -118,14 +118,14 @@ def set_position(x: int, y: int) -> None:
     mouse_event(Quartz.kCGEventMouseMoved, x, y, 0)
 
 
-def press_mouse(x: int, y: int, mouse_button: int, click_count: int = 1) -> None:
+def press_mouse(x: int, y: int, mouse_button: str, click_count: int = 1) -> None:
     """
     Press mouse button
     模擬按下滑鼠按鍵
 
     :param x: X coordinate X 座標
     :param y: Y coordinate Y 座標
-    :param mouse_button: Mouse button code 滑鼠按鍵代碼
+    :param mouse_button: Mouse button name (``"Left"``, ``"Middle"``, ``"Right"``) 滑鼠按鍵名稱
     :param click_count: 這是連續第幾次點擊 Which click of a run this is (>= 1)
     """
     if mouse_button == osx_mouse_left:
@@ -138,14 +138,14 @@ def press_mouse(x: int, y: int, mouse_button: int, click_count: int = 1) -> None
         raise AutoControlMouseException(f"unknown mouse button {mouse_button!r}")
 
 
-def release_mouse(x: int, y: int, mouse_button: int, click_count: int = 1) -> None:
+def release_mouse(x: int, y: int, mouse_button: str, click_count: int = 1) -> None:
     """
     Release mouse button
     模擬釋放滑鼠按鍵
 
     :param x: X coordinate X 座標
     :param y: Y coordinate Y 座標
-    :param mouse_button: Mouse button code 滑鼠按鍵代碼
+    :param mouse_button: Mouse button name (``"Left"``, ``"Middle"``, ``"Right"``) 滑鼠按鍵名稱
     :param click_count: 這是連續第幾次點擊，與對應的按下相同
         Which click of a run this is; the same number as the matching press
     """
@@ -159,14 +159,14 @@ def release_mouse(x: int, y: int, mouse_button: int, click_count: int = 1) -> No
         raise AutoControlMouseException(f"unknown mouse button {mouse_button!r}")
 
 
-def click_mouse(x: int, y: int, mouse_button: int, click_count: int = 1) -> None:
+def click_mouse(x: int, y: int, mouse_button: str, click_count: int = 1) -> None:
     """
     Perform mouse click (press + release)
     模擬滑鼠點擊（按下 + 釋放）
 
     :param x: X coordinate X 座標
     :param y: Y coordinate Y 座標
-    :param mouse_button: Mouse button code 滑鼠按鍵代碼
+    :param mouse_button: Mouse button name (``"Left"``, ``"Middle"``, ``"Right"``) 滑鼠按鍵名稱
     :param click_count: 這是連續第幾次點擊；雙擊的第二下傳 2
         Which click of a run this is; the second click of a double-click is 2
     """

@@ -22,7 +22,7 @@ from __future__ import annotations
 import ctypes
 import select
 import time
-from typing import Optional, Tuple
+from typing import Optional, Protocol, Tuple
 
 from je_auto_control.linux_wayland._ctypes_bind import BoundSymbols, bind
 from je_auto_control.linux_wayland._input_state import InputFailure
@@ -127,9 +127,16 @@ def _pump(symbols: BoundSymbols, handle: int, deadline: float) -> int:
             return event
 
 
+class PortalSession(Protocol):
+    """What :func:`connect_eis_fd` hands back with the fd: a handle the caller closes to end the grant."""
+
+    def close(self) -> None:
+        """End the portal session."""
+
+
 def connect_eis_fd(devices: int = OEFFIS_DEVICE_DEFAULT,
                    timeout: float = DEFAULT_TIMEOUT,
-                   symbols: Optional[BoundSymbols] = None) -> Tuple[int, object]:
+                   symbols: Optional[BoundSymbols] = None) -> Tuple[int, PortalSession]:
     """Run the portal session and return ``(eis_fd, session_handle)``.
 
     The session handle must be kept alive for as long as the EIS fd is used:

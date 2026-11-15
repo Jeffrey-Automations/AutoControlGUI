@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- Typing: the whole package is held to the strict mypy tier. `MouseKeycode` is now the platform's
+  own button type (a tuple of three Win32 flags on Windows, a string such as `"Left"` on macOS, an
+  int on X11 and Wayland) instead of `Any`. The macOS backend's `press_mouse` / `release_mouse` /
+  `click_mouse` and `DarwinMouseBackend` now declare `mouse_button: str`, what they always compared
+  against; `Executor.execute_one` accepts any `Mapping` again, as the dispatcher behind it does.
+- `ac_tween_drag`: `start` and `end` must be two-value arrays (schema `minItems`/`maxItems` 2); the
+  handler raises `ValueError` naming the argument instead of failing inside the path maths.
+- WebRTC hardware codec: an encoder whose PyAV `bit_rate` is unset (None or 0) is reopened at the
+  target rate instead of raising `TypeError` / `ZeroDivisionError` on the next frame.
+
 - REST dashboard: `/dashboard/*` and `/docs` now serve only the `.html`, `.css`, `.js`, `.svg` and
   `.png` files shipped in `utils/rest_api/dashboard/`, read once on first request, and send
   `X-Content-Type-Options: nosniff`. A file of another type in that directory is no longer served

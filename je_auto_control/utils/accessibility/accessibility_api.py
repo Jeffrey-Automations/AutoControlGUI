@@ -158,7 +158,7 @@ def dump_accessibility_tree(app_name: Optional[str] = None,
     elements = list_accessibility_elements(
         app_name=app_name, max_results=int(max_results),
     )
-    by_app: dict = {}
+    by_app: Dict[str, List[AccessibilityElement]] = {}
     for element in elements:
         app = element.app_name or "(unknown)"
         by_app.setdefault(app, []).append(element)
@@ -170,7 +170,7 @@ def dump_accessibility_tree(app_name: Optional[str] = None,
             app_name=app,
             children=[AXTreeNode(
                 name=el.name, role=el.role,
-                bounds=tuple(el.bounds),
+                bounds=_bounds(el),
                 app_name=el.app_name,
                 process_id=int(el.process_id),
             ) for el in items],
@@ -180,6 +180,12 @@ def dump_accessibility_tree(app_name: Optional[str] = None,
         name=root_app, role="AXRoot", bounds=(0, 0, 0, 0),
         app_name=root_app, children=children,
     )
+
+
+def _bounds(element: AccessibilityElement) -> Tuple[int, int, int, int]:
+    """The element's box as a fresh tuple (a backend may hand back a list)."""
+    left, top, width, height = element.bounds
+    return (left, top, width, height)
 
 
 def _scope_kwargs(window_title: Optional[str], contains: bool) -> Dict[str, Any]:

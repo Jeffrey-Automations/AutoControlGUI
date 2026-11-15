@@ -8,13 +8,14 @@ one factory keeps the registration sites identical across executors.
 from typing import Callable, Dict, Optional, Tuple
 
 from je_auto_control.wrapper.auto_control_mouse import click_mouse
+from je_auto_control.wrapper.backend_contract import MouseKeycode
 
-ClickFn = Callable[[Optional[int], Optional[int]], Tuple[int, int, int]]
+ClickFn = Callable[[Optional[int], Optional[int]], Tuple[MouseKeycode, int, int]]
 
 
 def _make_button_click(button: str) -> ClickFn:
     def click(x: Optional[int] = None,
-              y: Optional[int] = None) -> Tuple[int, int, int]:
+              y: Optional[int] = None) -> Tuple[MouseKeycode, int, int]:
         return click_mouse(button, x, y)
 
     click.__name__ = f"click_{button}"

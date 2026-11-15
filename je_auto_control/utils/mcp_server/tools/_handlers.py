@@ -263,10 +263,18 @@ def generate_sop(actions: List[Any], title: str = "Automation Procedure",
     return _gen(actions, title=title)
 
 
-def tween_drag(start, end, steps=30, easing="ease_in_out_quad",
-               button="mouse_left", step_delay_s=0.0, settle_s=0.0):
+def _xy(name: str, point: Sequence[int]) -> Tuple[int, int]:
+    """``point`` as an ``(x, y)`` pair; anything but two numbers is a ``ValueError`` naming the argument."""
+    if len(point) != 2:
+        raise ValueError(f"{name} must be [x, y], got {len(point)} values")
+    return int(point[0]), int(point[1])
+
+
+def tween_drag(start: Sequence[int], end: Sequence[int], steps: int = 30,
+               easing: str = "ease_in_out_quad", button: str = "mouse_left",
+               step_delay_s: float = 0.0, settle_s: float = 0.0) -> Dict[str, Any]:
     from je_auto_control.utils.tween_drag import tween_drag as _td
-    return {"points": _td(tuple(start), tuple(end), steps=int(steps),
+    return {"points": _td(_xy("start", start), _xy("end", end), steps=int(steps),
                           easing=easing, button=button,
                           step_delay_s=float(step_delay_s),
                           settle_s=float(settle_s))["points"]}

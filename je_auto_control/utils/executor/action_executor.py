@@ -1,6 +1,6 @@
 import threading
 import types
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 from je_auto_control.utils.diagnostics.capability_commands import probe_current_capabilities as _probe_capabilities
 
 from je_auto_control.utils.exception.exception_tags import (
@@ -8375,7 +8375,7 @@ class Executor:
             return event()
         raise AutoControlActionException(cant_execute_action_error_message + " " + describe_action(action))
 
-    def execute_one(self, name: str, arguments: Optional[Dict[str, Any]] = None) -> Any:
+    def execute_one(self, name: str, arguments: Optional[Mapping[str, Any]] = None) -> Any:
         """Execute one public command through validation, policy and journal boundaries."""
         from je_auto_control.utils.executor.dispatch import execute_one
         return execute_one(self, name, arguments)

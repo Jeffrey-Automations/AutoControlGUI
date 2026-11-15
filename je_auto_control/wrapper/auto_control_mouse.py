@@ -94,14 +94,18 @@ def mouse_preprocess(mouse_keycode: int | str, x: Optional[int],
     :param y: Y 座標，None 代表沿用目前游標位置
     :return: (keycode, x, y)
     """
-    keycode: MouseKeycode = mouse_keycode
-    try:
-        if isinstance(mouse_keycode, str):
-            keycode = mouse_keys_table.get(_BUTTON_ALIASES.get(mouse_keycode, mouse_keycode))
-            if keycode is None:
-                raise AutoControlCantFindKeyException(table_cant_find_key_error_message)
-    except AutoControlCantFindKeyException as error:
-        raise AutoControlCantFindKeyException(table_cant_find_key_error_message) from error
+    keycode: MouseKeycode
+    if isinstance(mouse_keycode, str):
+        found = mouse_keys_table.get(_BUTTON_ALIASES.get(mouse_keycode, mouse_keycode))
+        if found is None:
+            raise AutoControlCantFindKeyException(table_cant_find_key_error_message)
+        keycode = found
+    else:
+        # A number is taken as this platform's own button code and handed to
+        # the backend unchecked, as it always was: on Windows that is not
+        # even the right shape, which is what typing it Any says.
+        raw: Any = mouse_keycode
+        keycode = raw
 
     # 只有在座標缺漏時才查詢游標位置。
     # Only query the cursor when a coordinate is actually missing: backends

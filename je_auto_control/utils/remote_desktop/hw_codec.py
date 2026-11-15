@@ -99,19 +99,22 @@ def active_hardware_codec() -> Optional[str]:
     return _active_codec
 
 
-def _shape_changed(self_codec, frame, target_bitrate) -> bool:
+def _shape_changed(self_codec: Optional[av.VideoCodecContext], frame: av.VideoFrame,
+                   target_bitrate: int) -> bool:
     if self_codec is None:
         return False
+    # PyAV reports an unset bit rate as None (or 0): any target then differs
+    # by more than a tenth, where dividing by it raised.
+    bit_rate = self_codec.bit_rate or 0
     return (
         frame.width != self_codec.width
         or frame.height != self_codec.height
-        or abs(target_bitrate - self_codec.bit_rate)
-        / self_codec.bit_rate > 0.1
+        or abs(target_bitrate - bit_rate) > 0.1 * bit_rate
     )
 
 
-def _open_codec_context(target: str, frame, target_bitrate: int,
-                        max_frame_rate: int):
+def _open_codec_context(target: str, frame: av.VideoFrame, target_bitrate: int,
+                        max_frame_rate: int) -> av.VideoCodecContext:
     """Open an encoder for ``target``, or libx264 when it cannot open.
 
     Opened here, not at the first ``encode``: an encoder that fails to
