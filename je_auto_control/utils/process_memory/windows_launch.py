@@ -12,18 +12,21 @@ is running now. A process the host did not launch cannot be attested here.
 """
 from __future__ import annotations
 
+import ctypes
 from dataclasses import dataclass, field
 import hmac
 import re
+import subprocess  # nosec B404  # reason: the owned launch starts the pinned, leased image itself
 import time
-from typing import Callable, NoReturn, Protocol
+from typing import Any, Callable, NoReturn, Protocol, Sequence
 
 from je_auto_control.utils.exception.control_signals import raise_if_run_interrupted
 from je_auto_control.utils.executor.run_control import ExecutionStopped
 
 from .models import FailureReason, MemoryObservationError, ProcessIdentity, _identifier
-from .windows_facts import NativeProcessFacts
+from .windows_facts import NativeProcessFacts, measure_process
 from .windows_image import LeasedImageFile, ObservedImageFile
+from .windows_native import ProcessKernel, bind_process, load
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
@@ -79,6 +82,45 @@ class ImageObserver(Protocol):
 #: handle. The caller's launcher owns the child: when attestation fails it is
 #: the caller that ends it.
 Launcher = Callable[[str], LaunchRecord]
+
+
+class PopenLauncher:
+    """Start the image with ``subprocess`` and measure PID and birth from the handle Popen holds.
+
+    The handle is the one ``CreateProcess`` returned, so the measurement cannot
+    land on another process that reused the PID; opening the PID afresh could.
+    The started child is kept as :attr:`child` (``None`` before a launch) for
+    the caller to wait on or end, including when attestation fails.
+    """
+
+    def __init__(self, arguments: Sequence[str] = (), *, kernel: ProcessKernel | None = None,
+                 last_error: Callable[[], int] | None = None, caller_bits: int | None = None,
+                 popen: Callable[..., Any] = subprocess.Popen, **options: Any) -> None:
+        if any(not isinstance(argument, str) for argument in arguments) or "shell" in options:
+            _fail(FailureReason.UNSUPPORTED)
+        bits = ctypes.sizeof(ctypes.c_void_p) * 8 if caller_bits is None else caller_bits
+        if kernel is None:
+            loaded, last_error = load()
+            kernel = loaded
+        elif last_error is None:
+            _fail(FailureReason.UNSUPPORTED)
+        else:
+            bind_process(kernel)
+        self._arguments, self._options, self._popen = tuple(arguments), options, popen
+        self._kernel, self._last_error, self._bits = kernel, last_error, bits
+        self.child: Any = None
+
+    def __call__(self, path: str) -> LaunchRecord:
+        if self.child is not None:
+            _fail(FailureReason.UNSUPPORTED)  # one launch per launcher, so ``child`` is unambiguous
+        # An argv list, never a shell; ``path`` is the file the caller leased and pinned.
+        self.child = self._popen([path, *self._arguments], shell=False, **self._options)
+        # Popen keeps the CreateProcess handle as ``_handle`` on Windows.
+        handle = int(getattr(self.child, "_handle"))
+        facts = measure_process(self._kernel, handle, self._last_error, self._bits)
+        if facts.pid != self.child.pid:
+            _fail(FailureReason.TARGET_CHANGED)
+        return LaunchRecord(facts.pid, facts.birth)
 
 
 class OwnedLaunchAttestor:
@@ -180,4 +222,4 @@ def launch_attested(pin: PinnedExecutable, path: str, launch: Launcher, *,
 
 
 __all__ = ["ImageLease", "ImageObserver", "LaunchRecord", "Launcher", "OwnedLaunch",
-           "OwnedLaunchAttestor", "PinnedExecutable", "launch_attested"]
+           "OwnedLaunchAttestor", "PinnedExecutable", "PopenLauncher", "launch_attested"]

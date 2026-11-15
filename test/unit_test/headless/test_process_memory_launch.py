@@ -151,3 +151,57 @@ def test_launcher_failures_are_closed_and_interruptions_propagate():
 def test_a_pin_must_be_a_lowercase_sha256_and_identifiers(changes):
     with pytest.raises(MemoryObservationError, match="unsupported"):
         pin(LaunchKernel(), **changes)
+
+
+class _Child:
+    def __init__(self, pid, handle):
+        self.pid, self._handle = pid, handle
+
+
+def _popen_launcher(kernel, child_pid=42, **options):
+    from je_auto_control.utils.process_memory.windows_launch import PopenLauncher
+    started = []
+
+    def popen(argv, **kwargs):
+        started.append((argv, kwargs))
+        return _Child(child_pid, 77)
+
+    launcher = PopenLauncher(("--challenge", "00" * 16), kernel=kernel, last_error=lambda: kernel.error,
+                             caller_bits=64, popen=popen, **options)
+    return launcher, started
+
+
+def test_the_popen_launcher_measures_the_handle_popen_holds():
+    kernel = LaunchKernel()
+    launcher, started = _popen_launcher(kernel, creationflags=0x08000000)
+    record = launcher(kernel.image_path)
+    assert record == LaunchRecord(42, kernel.birth)
+    assert started == [([kernel.image_path, "--challenge", "00" * 16], {"shell": False, "creationflags": 0x08000000})]
+    assert {call[0] for call in kernel.GetProcessTimes.calls} == {77}  # never a handle reopened by PID
+    assert not kernel.OpenProcess.calls
+    assert launcher.child.pid == 42
+
+
+def test_the_popen_launcher_refuses_a_handle_for_another_pid_and_a_second_launch():
+    kernel = LaunchKernel()
+    launcher, _ = _popen_launcher(kernel, child_pid=43)
+    with pytest.raises(MemoryObservationError, match="target_changed"):
+        launcher(kernel.image_path)
+    assert launcher.child.pid == 43  # still the caller's to end
+    with pytest.raises(MemoryObservationError, match="unsupported"):
+        launcher(kernel.image_path)
+
+
+@pytest.mark.parametrize("arguments,options", [((1,), {}), ((), {"shell": True})])
+def test_the_popen_launcher_takes_only_an_argv_list(arguments, options):
+    from je_auto_control.utils.process_memory.windows_launch import PopenLauncher
+    kernel = LaunchKernel()
+    with pytest.raises(MemoryObservationError, match="unsupported"):
+        PopenLauncher(arguments, kernel=kernel, last_error=lambda: 0, **options)
+
+
+def test_an_owned_launch_through_the_popen_launcher_is_attested():
+    kernel = LaunchKernel()
+    launcher, _ = _popen_launcher(kernel)
+    launch, *_ = attest(kernel, launcher=launcher)
+    assert launch.identity.pid == 42 and launch.record == LaunchRecord(42, kernel.birth)

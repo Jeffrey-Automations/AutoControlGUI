@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,546 |
-| 程式碼總行數 | 238,467 |
+| 程式碼總行數 | 238,509 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -324,7 +324,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.2 框架基礎設施
 
-> 15 個套件、約 5,233 行。
+> 15 個套件、約 5,275 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -340,7 +340,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/package_manager/` | 198 | 動態載入套件並把 executor 注入其中；載入前先過套件閘門（允許清單加上只能從 Python 呼叫的開關，工作區 X-12） |
 | `utils/path_guard/` | 267 | 命令列及伺服器的路徑邊界、客戶端根目錄隔離與受管任務來源政策紀錄 |
 | `utils/platform_id/` | 62 | 作業系統家族的單一判定點。`sys.platform` 原本在一百多處跟字面清單比對，而那些清單都沒有 BSD；`is_x11_unix()` 問的是「這是不是 X11 unix」，這才是守衛一直想問的問題 |
-| `utils/process_memory/` | 1,429 | 內部受審 probe 的有界語意觀察、typed Windows provider、獨立映像檔觀測、自有啟動加釘選雜湊的 attestor 與失敗 handle 回收；檔案證據不等於載入程式碼身分，原生驗收及 runtime 整合待完成 |
+| `utils/process_memory/` | 1,471 | 內部受審 probe 的有界語意觀察、typed Windows provider、獨立映像檔觀測、自有啟動加釘選雜湊的 attestor 與失敗 handle 回收；檔案證據不等於載入程式碼身分，原生驗收及 runtime 整合待完成 |
 | `utils/shell_process/` | 280 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
 | `utils/start_exe/` | 36 | 啟動另一個執行檔行程 |
 
@@ -731,7 +731,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 上表以子套件為單位；以下把行數最大的幾個子系統展開到檔案層。
 
-#### `utils/process_memory/`（1,429 行／9 檔）
+#### `utils/process_memory/`（1,471 行／9 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -742,7 +742,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_facts.py` | 55 | Measure native birth, session and architecture through a retained process handle. |
 | `windows_image.py` | 308 | Observe an image file while retaining its process and deny-write/delete file leases. |
 | `windows_image_native.py` | 62 | Typed process-image filename and read-only file acquisition calls. |
-| `windows_launch.py` | 183 | Attest a process this host launched itself, from an image file pinned by SHA-256. |
+| `windows_launch.py` | 225 | Attest a process this host launched itself, from an image file pinned by SHA-256. |
 | `windows_native.py` | 113 | Typed Win32 query/read bindings and caller-sized memory information layouts. |
 
 #### `utils/executor/`（10,765 行）— 執行核心
@@ -1570,8 +1570,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,009 | 104,090 |
-| **總計** | **1,534** | **237,722** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,009 | 104,132 |
+| **總計** | **1,534** | **237,764** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

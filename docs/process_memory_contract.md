@@ -95,9 +95,15 @@ message, and cancellation signals propagate unchanged.
 What it proves: the bytes on disk, held against writers from before the launch until
 the observation, are the pinned ones, and the child the host started maps that same
 file. It does not prove the code running now (in-memory patching, loaded DLLs), and it
-cannot attest a process the host did not start. The real launcher (measuring PID and
-birth from the `Popen` handle) and a native run are not implemented yet; tests drive the
-real observer code through injected native calls.
+cannot attest a process the host did not start.
+
+`PopenLauncher(arguments, **popen_options)` is the launcher. It starts the image from an
+argv list (`shell` is refused) and measures PID and birth from the handle `Popen` holds,
+the one `CreateProcess` returned, so the measurement cannot land on a process that
+reused the PID. It refuses a measured PID that differs from `Popen.pid` and a second
+launch, and keeps the child as `child` for the caller to wait on or end. Tests drive
+the real observer and launcher code through injected native calls and a fake `Popen`;
+nothing has been launched natively.
 
 ### Observed image-file evidence
 
