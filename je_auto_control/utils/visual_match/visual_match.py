@@ -20,10 +20,10 @@ from typing import Any, Dict, List, Optional, Protocol, Sequence, TypeVar
 from je_auto_control.utils.exception.exceptions import (
     AutoControlFlatTemplateException, AutoControlScreenException,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 # cv2 method name -> the OpenCV constant is resolved lazily in _method().
 _METHOD_NAMES = ("ccoeff_normed", "ccorr_normed", "sqdiff_normed")
-ImageSource = Any
 
 
 def _contain_cv2_error(fn):

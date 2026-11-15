@@ -14,8 +14,7 @@ PIL image, or the live screen) and ``cv2_utils.blobs.connected_boxes`` for the
 region extraction. cv2 / numpy are lazily imported. Imports no ``PySide6``.
 """
 from typing import Any, Dict, List, Optional, Sequence, Tuple
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 def _gray(source: Optional[ImageSource], region: Optional[Sequence[int]]) -> Any:

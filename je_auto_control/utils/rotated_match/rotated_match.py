@@ -23,8 +23,7 @@ from je_auto_control.utils.visual_match.visual_match import (
     _haystack_gray_with_origin, _method, _nms, _reject_flat_template, _resize,
     _to_gray, _to_screen,
 )
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 @dataclass(frozen=True)

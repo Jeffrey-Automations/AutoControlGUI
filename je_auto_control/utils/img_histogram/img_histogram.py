@@ -15,8 +15,8 @@ from typing import Any, List, Optional, Sequence, Tuple
 
 # Reuse the RGB loader / screen grab (single source of truth, no copy).
 from je_auto_control.utils.color_region.color_region import _grab_rgb, _to_rgb
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 _SIMILARITY_METHODS = ("correlation", "intersection")
 
 

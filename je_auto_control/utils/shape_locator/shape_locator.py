@@ -17,8 +17,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from je_auto_control.utils.visual_match.visual_match import (
     _haystack_gray_with_origin, _to_screen,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 AspectRange = Optional[Tuple[float, float]]
 _CANNY_LOW = 50
 _CANNY_HIGH = 150

@@ -13,8 +13,8 @@ arrays without a real screen. OpenCV + NumPy come in via ``je_open_cv`` and are
 imported lazily. Imports no ``PySide6``.
 """
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 IgnoreBoxes = Optional[Sequence[Sequence[int]]]
 _WINDOW = (11, 11)
 _SIGMA = 1.5

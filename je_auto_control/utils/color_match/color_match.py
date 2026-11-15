@@ -21,8 +21,8 @@ from je_auto_control.utils.color_region.color_region import _grab_rgb, _origin, 
 from je_auto_control.utils.visual_match.visual_match import (
     Match, _contain_cv2_error, _nms, _resize, _select_candidates,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 _CHANNEL_INDEX = {"h": 0, "s": 1, "v": 2}
 # Saturation from which a template pixel carries colour; below it, hue is noise.
 _MIN_SATURATION = 40

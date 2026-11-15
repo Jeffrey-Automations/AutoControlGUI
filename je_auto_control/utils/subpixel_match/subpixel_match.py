@@ -15,8 +15,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from je_auto_control.utils.visual_match.visual_match import _contain_cv2_error, _score_map_with_origin
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 @dataclass(frozen=True)

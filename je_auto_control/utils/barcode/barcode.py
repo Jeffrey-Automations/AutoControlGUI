@@ -13,8 +13,8 @@ NumPy come in via ``je_open_cv``. Imports no ``PySide6``.
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from je_auto_control.utils.visual_match.visual_match import _haystack_gray_with_origin
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 Decoder = Callable[[Any], List[Dict[str, Any]]]
 
 

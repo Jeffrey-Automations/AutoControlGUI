@@ -18,8 +18,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from je_auto_control.utils.visual_match.visual_match import (
     Match, _score_map, _score_map_with_origin,
 )
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 def _separability(scaled: Any, threshold: float) -> float:

@@ -18,8 +18,8 @@ import math
 from typing import Any, Callable, Dict, Optional, Sequence
 
 from je_auto_control.utils.visual_match.visual_match import _contain_cv2_error
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 _INTERP = ("nearest", "linear", "cubic", "lanczos")
 
 

@@ -13,8 +13,7 @@ clustering, so it is unit-testable with no image; only ``match_ensemble`` itself
 no ``PySide6``.
 """
 from typing import Any, Dict, List, Optional, Sequence
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 def vote_centers(centers: Sequence[Sequence[int]], *, agree_px: float = 10,

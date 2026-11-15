@@ -21,11 +21,10 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 from je_auto_control.utils.visual_match.visual_match import (
     _contain_cv2_error, _haystack_gray_with_origin, _to_gray,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 if TYPE_CHECKING:
     import cv2
-
-ImageSource = Any
 
 
 @dataclass(frozen=True)

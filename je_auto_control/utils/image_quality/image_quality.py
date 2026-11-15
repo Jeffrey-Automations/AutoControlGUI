@@ -19,8 +19,7 @@ to a live-screen grab. cv2 / numpy are lazily imported. Imports no ``PySide6``.
 from typing import Any, Dict, Optional, Sequence, Tuple
 
 from je_auto_control.utils.visual_match.visual_match import _contain_cv2_error
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 def _gray(source: Optional[ImageSource], region: Optional[Sequence[int]]) -> Any:

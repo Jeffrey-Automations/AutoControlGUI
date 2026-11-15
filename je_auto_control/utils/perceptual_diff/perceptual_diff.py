@@ -20,8 +20,8 @@ from typing import Any, Dict, List, Tuple
 # Reuse the RGB loader (single source of truth, no copy).
 from je_auto_control.utils.color_region.color_region import _to_rgb
 from je_auto_control.utils.visual_match.visual_match import _contain_cv2_error
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 _MAX_YIQ_DELTA = 35215.0          # pixelmatch: max possible YIQ delta for 255 diff
 _LUMA = (0.29889531, 0.58662247, 0.11448223)
 #: The eight neighbours as (dx, dy), in pixelmatch's scan order (x outer, y

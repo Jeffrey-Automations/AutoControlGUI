@@ -20,8 +20,8 @@ from je_auto_control.utils.visual_match.visual_match import (
     Match, _contain_cv2_error, _haystack_gray, _haystack_gray_with_origin, _nms,
     _resize, _to_gray, _to_screen,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 _DEFAULT_CANNY = (50, 150)
 
 

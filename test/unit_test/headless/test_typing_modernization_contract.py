@@ -54,6 +54,9 @@ SDK_ANY_ADAPTERS = {
     # av.VideoFrame and the aiortc-backed host / viewer / recorder classes,
     # which are ``None`` at run time without the ``webrtc`` extra.
     "je_auto_control.gui.remote_desktop._webrtc_types",
+    # The image argument of the matching and analysis modules: a path, a PIL
+    # image or anything ``numpy.asarray`` accepts, with numpy itself read as Any.
+    "je_auto_control.utils.visual_match.image_source",
 }
 
 _BARE_IGNORE = re.compile(r"#\s*type:\s*ignore(?!\[)")

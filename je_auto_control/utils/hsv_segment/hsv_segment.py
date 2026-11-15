@@ -15,8 +15,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 # Reuse the RGB loader / screen grab from color_region (single source of truth).
 from je_auto_control.utils.color_region.color_region import _grab_rgb, _origin, _to_rgb
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 def _hsv(haystack: Optional[ImageSource], region: Optional[Sequence[int]]) -> Any:

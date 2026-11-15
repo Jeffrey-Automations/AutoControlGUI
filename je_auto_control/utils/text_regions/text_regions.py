@@ -17,8 +17,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from je_auto_control.utils.visual_match.visual_match import (
     _contain_cv2_error, _haystack_gray_with_origin, _to_screen,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 Rect = Tuple[int, int, int, int]
 
 
