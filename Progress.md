@@ -139,7 +139,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   仍管不到執行動作清單的工具、`ac_launch_process`／`ac_shell` 的 `argv`／`command`、
   自由格式物件裡的路徑（`ac_run_suite` 的 `spec`、`ac_run_dag` 的 `definition`、`ac_assert_all` 的 `specs`）與沒標註的外掛工具。
   檔案 symlink 的跳脫在這台機器上建不出來（只跑了目錄 junction）；POSIX 的 `:` 分隔與 `~` 沒在 Linux／macOS 跑。
-  `roots/list` 來的根目錄要另外開 `JE_AUTOCONTROL_MCP_PATH_ROOTS_FROM_CLIENT` 才算數——這是實作時定的，請維護者確認。
 - **USB passthrough 實機驗收**：仍須對真的舊版 host、WebRTC 通道與 USB 裝置驗證長時間 transfer、
   裝置逾時、通道 ERROR、晚到回覆與重新連線。現有 fake channel／backend 測試不能代替這項驗收。
 - **變數範圍**：free-threaded 原生執行緒繼承與同時存取範圍的行為尚未實測。
