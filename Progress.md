@@ -227,7 +227,7 @@ Windows 上 3.11（`test_gui_offthread_sites.py`，3.11 因此留在 6.11.2）�
 U-20261116-06 改成在每個 import Qt 或 GUI 套件的模組（379 個）裡暫停自動回收、模組結束時在主執行緒回收一次，worker 不會再觸發回收。
 未解：觸發的確切前提還沒用最小範例重現（單純跨執行緒回收、留下的 `TabTask` owner、兩種雙重刪除順序都正常），
 所以產品 GUI 在 worker 執行緒跑 Python 時（`_worker_thread`、`DaemonThread`、`tab_task_controller`）仍可能走到同一條路徑。
-待辦：向 PySide 回報（附 minidump 的堆疊與物件狀態）；之後的 6.12.x 出來時重跑完整矩陣，乾淨就拿掉 conftest 的 `no_worker_collects_qt_garbage`。
+待辦：向 PySide 回報——草稿（堆疊、物件狀態、未重現的情境與 workaround）在 `docs/upstream/pyside6-6.12-deferred-deletion-abort.md`，由維護者送到 bugreports.qt.io；之後的 6.12.x 出來時重跑完整矩陣，乾淨就拿掉 conftest 的 `no_worker_collects_qt_garbage`。
 
 ---
 
