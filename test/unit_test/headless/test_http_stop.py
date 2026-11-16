@@ -222,3 +222,26 @@ def test_a_stop_ends_a_request_still_connecting_and_sends_nothing(silent, monkey
         pytest.skip("this loopback connect completed at once, so there was no handshake to wait on")
     assert time.monotonic() - started < 3
     assert not silent.requested.is_set(), "the request was sent after the stop"
+
+
+def test_a_stop_does_not_wait_for_a_name_lookup_and_nothing_is_sent_after_it(silent, monkeypatch):
+    """A lookup cannot be interrupted, but the call does not wait for it and sends nothing once it ends."""
+    looked_up, release = threading.Event(), threading.Event()
+    real = socket.getaddrinfo
+
+    def slow_lookup(*args, **kwargs):
+        looked_up.set()
+        release.wait(10)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(http_client.socket, "getaddrinfo", slow_lookup)
+    token = StopToken("http-lookup")
+    _later(lambda: token.stop("test"))
+    started = time.monotonic()
+    with stoppable_run(token=token), pytest.raises(ExecutionStopped):
+        _call(silent.url)
+    assert time.monotonic() - started < 3, "the stop waited for the lookup"
+    assert looked_up.is_set()
+    release.set()                     # the lookup finishes after the stop ...
+    time.sleep(0.5)
+    assert not silent.requested.is_set(), "... and nothing is sent once it has"

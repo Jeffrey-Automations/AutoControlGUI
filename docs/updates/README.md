@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261116-15 | 2026-11-16 | Two stop gaps in Progress.md, measured and closed | #done #http #chatops | [2026-11-b](2026-11-b.md) |
 | U-20261116-14 | 2026-11-16 | Every template match in the package is stoppable | #done #executor #image | [2026-11-b](2026-11-b.md) |
 | U-20261116-13 | 2026-11-16 | A DAG revocation test no longer races the lease watch | #incident #ci #test #agent | [2026-11-b](2026-11-b.md) |
 | U-20261116-12 | 2026-11-16 | M0 routing profile: background channels only, never desktop input | #done #process-memory #policy | [2026-11-b](2026-11-b.md) |
