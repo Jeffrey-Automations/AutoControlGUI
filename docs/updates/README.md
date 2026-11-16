@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261116-05 | 2026-11-16 | Collect after every Qt test, not only per module, on the GUI thread | #incident #ci #test #gui | [2026-11-b](2026-11-b.md) |
 | U-20261116-04 | 2026-11-16 | Leaked widgets are collected on the GUI thread so a deferred delete cannot abort the suite | #incident #ci #test #gui | [2026-11-b](2026-11-b.md) |
 | U-20261116-03 | 2026-11-16 | A transfer-payload test no longer passes Windows MAX_PATH on a local basetemp | #test #windows | [2026-11-b](2026-11-b.md) |
 | U-20261116-02 | 2026-11-16 | Keep Qt's fatal message when a CI test aborts the interpreter | #ci #test #diagnostics | [2026-11-b](2026-11-b.md) |

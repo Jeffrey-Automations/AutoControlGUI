@@ -218,15 +218,16 @@ Windows 3.11 在 `test_gui_offthread_sites.py::test_a_failed_upload_is_reported_
 
 ## PySide6 6.12 跨執行緒回收的延後刪除會在 `QObject::~QObject` abort（GUI 本身的風險）
 
-`DECIDE` — 原因已由本機 minidump 確認（U-20261116-04）：Python 擁有的 Qt 物件若被 worker 執行緒的循環回收收走，
+`TODO` — 原因已由本機 minidump 確認（U-20261116-04）：Python 擁有的 Qt 物件若被 worker 執行緒的循環回收收走，
 PySide6 6.12 不在那裡刪，而是排進 `Shiboken::BindingManager::runDeletionInMainThread` 之後在主執行緒刪；
 其中一個被留下的頂層 `QWidget`（`wasWidget`、`wasDeleted` 已設、無 parent、無 Qt 訊息）在 `QObject::~QObject` 裡呼叫 `abort()`。
-測試端已處理：headless conftest 在每個模組開始時於主執行緒 `gc.collect()`，`test_gui_script_runs.py` 每個測試先回收、結束時刪掉自己建的 widget；
-照 CI 順序的完整本機重跑由 3/3 abort 變成 8,856 通過。
+Windows 上 3.11（`test_gui_offthread_sites.py`，3.11 因此留在 6.11.2）、3.12（同一個測試，run 43761784549）與 3.14
+（`test_gui_script_runs.py`）都出現過，abort 前都有 `QThreadStorage: entry 0 destroyed before end of thread`。
+維護者 2026-11-16 決定保留 6.12、擴大測試端的處理（U-20261116-05）：headless conftest 在每個模組開始時、
+以及每個用到 Qt 的模組（原始碼提到 `PySide6` 或 `je_auto_control.gui`）的每個測試結束後，都在主執行緒 `gc.collect()`。
 未解：觸發的確切前提還沒用最小範例重現（單純跨執行緒回收、留下的 `TabTask` owner、兩種雙重刪除順序都正常），
-所以產品 GUI 在 worker 執行緒跑 Python 時（`_worker_thread`、`DaemonThread`、`tab_task_controller`）仍可能遇到同一條路徑。
-待決定：(1) 是否向 PySide 回報（附 minidump 的堆疊與物件狀態）；(2) 是否比照 3.11 把 3.14 固定回 PySide6 6.11.2
-（6.11.1 起就有延後刪除，但升到 6.12 前 3.14 沒有出現過這個 abort）；(3) 或在 GUI 端讓主執行緒定期回收、減少留給 worker 的垃圾。
+所以產品 GUI 在 worker 執行緒跑 Python 時（`_worker_thread`、`DaemonThread`、`tab_task_controller`）仍可能走到同一條路徑。
+待辦：向 PySide 回報（附 minidump 的堆疊與物件狀態）；之後的 6.12.x 出來時重跑完整矩陣，乾淨就拿掉每個測試的回收。
 
 ---
 

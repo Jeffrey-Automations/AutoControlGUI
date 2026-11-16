@@ -75,8 +75,26 @@ def collect_qt_garbage_on_the_gui_thread():
     yield
 
 
+_qt_modules: dict = {}
+
+
+def _module_uses_qt(module) -> bool:
+    """Whether a test module's source imports Qt or the GUI package; read once per file."""
+    path = getattr(module, "__file__", None)
+    if path is None:
+        return False
+    if path not in _qt_modules:
+        try:
+            with open(path, encoding="utf-8") as source:
+                text = source.read()
+        except OSError:
+            text = ""
+        _qt_modules[path] = "PySide6" in text or "je_auto_control.gui" in text
+    return _qt_modules[path]
+
+
 @pytest.fixture(autouse=True)
-def flush_qt_deferred_deletes():
+def flush_qt_deferred_deletes(request):
     """Run Qt's queued ``deleteLater()`` work at the end of every test.
 
     ``deleteLater()`` does nothing until an event loop runs, and almost no GUI
@@ -94,6 +112,14 @@ def flush_qt_deferred_deletes():
     to remember. Being autouse, this is set up before any test-local fixture
     and therefore torn down *after* it — the module's own ``deleteLater()``
     calls have already been made by the time this runs.
+
+    In a module that uses Qt, the test's garbage is then collected here, on the
+    main thread, for the reason ``collect_qt_garbage_on_the_gui_thread`` gives:
+    collecting once per module was not enough, because a module's own earlier
+    tests leave widgets that its later workers collect. Windows / Python 3.12
+    aborted that way inside ``test_gui_offthread_sites.py`` (run 43761784549,
+    the same ``QThreadStorage`` warning first). About 40 ms a test, for the
+    ~1,150 tests in those modules.
     """
     _record_qt_messages()
     yield
@@ -103,6 +129,9 @@ def flush_qt_deferred_deletes():
     from PySide6.QtCore import QCoreApplication, QEvent
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     app.processEvents()
+    if _module_uses_qt(request.module):
+        gc.collect()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
 
 # Backend calls that move the pointer or type on the real desktop.
