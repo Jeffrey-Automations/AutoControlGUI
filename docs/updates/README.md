@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261116-08 | 2026-11-16 | A stop or cancel ends an HTTP request that is already out | #done #executor #mcp #http | [2026-11-b](2026-11-b.md) |
 | U-20261116-07 | 2026-11-16 | The GUI collects cyclic garbage on its own thread only | #gui #pyside6 #done | [2026-11-b](2026-11-b.md) |
 | U-20261116-06 | 2026-11-16 | Pause automatic GC per Qt module instead of collecting after every test | #incident #ci #test #gui | [2026-11-b](2026-11-b.md) |
 | U-20261116-05 | 2026-11-16 | Collect after every Qt test, not only per module, on the GUI thread | #incident #ci #test #gui | [2026-11-b](2026-11-b.md) |

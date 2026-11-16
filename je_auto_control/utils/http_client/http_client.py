@@ -8,8 +8,11 @@ non-2xx responses are inspectable rather than raised. Imports no
 ``PySide6`` and only allows http/https schemes (Bandit B310).
 """
 import base64
+import contextvars
 import http.client
 import json
+import socket
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -188,8 +191,92 @@ def _origin(url: str) -> "tuple[str, str]":
     return parts.scheme.lower(), (parts.netloc or "").lower()
 
 
-_OPENER = urllib.request.build_opener(_CheckedRedirectHandler)
-_NO_REDIRECT_OPENER = urllib.request.build_opener(_RefusingRedirectHandler)
+# How often a stoppable request looks at its stop and cancellation, and how long
+# a stop waits for the request's thread to notice its sockets were shut.
+_STOP_POLL_SECONDS = 0.1
+_ABORT_WAIT_SECONDS = 1.0
+_recording = threading.local()
+
+
+class _Connections:
+    """The connections one stoppable request opened, so a stop can shut their sockets.
+
+    Shutting the socket ends a ``recv`` that is waiting for the reply at once;
+    a connection that finishes connecting after the stop is shut before it
+    sends anything. A connect (or name lookup) already in progress cannot be
+    interrupted: it ends at the call's timeout and its result is discarded.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._opened: list[Any] = []
+        self._aborted = False
+
+    def wrap(self, http_class: Any) -> Any:
+        """A stand-in for ``http_class`` that records every connection it makes."""
+        def make(*args: Any, **kwargs: Any) -> Any:
+            connection = http_class(*args, **kwargs)
+            connect = connection.connect
+
+            def checked_connect() -> None:
+                connect()
+                if self._is_aborted():
+                    _shut(connection)
+                    raise urllib.error.URLError("request stopped")
+
+            connection.connect = checked_connect
+            with self._lock:
+                if self._aborted:
+                    raise urllib.error.URLError("request stopped")
+                self._opened.append(connection)
+            return connection
+        return make
+
+    def _is_aborted(self) -> bool:
+        with self._lock:
+            return self._aborted
+
+    def abort(self) -> None:
+        """Shut every socket this request opened; later connections are refused."""
+        with self._lock:
+            self._aborted = True
+            opened = list(self._opened)
+        for connection in opened:
+            _shut(connection)
+
+
+def _shut(connection: Any) -> None:
+    sock = getattr(connection, "sock", None)
+    if sock is None:
+        return
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        return  # already closed or never connected: nothing left to wake
+
+
+def _recorded(http_class: Any) -> Any:
+    connections = getattr(_recording, "active", None)
+    return http_class if connections is None else connections.wrap(http_class)
+
+
+class _RecordingHTTPHandler(urllib.request.HTTPHandler):
+    """``HTTPHandler`` whose connections a stoppable request on this thread can shut."""
+
+    def do_open(self, http_class: Any, req: Any, **kwargs: Any) -> Any:  # noqa: D102
+        return super().do_open(_recorded(http_class), req, **kwargs)
+
+
+class _RecordingHTTPSHandler(urllib.request.HTTPSHandler):
+    """``HTTPSHandler`` whose connections a stoppable request on this thread can shut."""
+
+    def do_open(self, http_class: Any, req: Any, **kwargs: Any) -> Any:  # noqa: D102
+        return super().do_open(_recorded(http_class), req, **kwargs)
+
+
+_OPENER = urllib.request.build_opener(_CheckedRedirectHandler, _RecordingHTTPHandler, _RecordingHTTPSHandler)
+_NO_REDIRECT_OPENER = urllib.request.build_opener(
+    _RefusingRedirectHandler, _RecordingHTTPHandler, _RecordingHTTPSHandler)
 
 
 def urllib_transport(call: Mapping[str, Any]) -> Dict[str, Any]:
@@ -260,11 +347,53 @@ def perform_call(call: Mapping[str, Any]) -> Dict[str, Any]:
     instead of following it.
     """
     from je_auto_control.utils.egress.egress_policy import get_egress_policy
+    from je_auto_control.utils.exception.cancellation import current_cancellation_token
+    from je_auto_control.utils.executor.run_control import current_stop_token
     get_egress_policy().check(call["url"])  # allow-all unless an operator locked it down
-    # Inside a cancelled scope (a GUI task stopped or past its deadline) the
-    # request is not sent, and a reply that arrives after the cancellation is
-    # not handed on; the request itself cannot be interrupted once it is out.
-    cancellation_checkpoint()
-    response = urllib_transport(call)
-    cancellation_checkpoint()
+    # Inside a stoppable run or a cancellation scope (a script, an MCP call, a
+    # GUI task) nothing is sent once it is stopped, a stop while the request is
+    # out shuts its sockets and ends the call, and a reply that arrives after
+    # the stop is not handed on. Outside both the call is one plain request.
+    _checkpoints()
+    if current_stop_token() is None and current_cancellation_token() is None:
+        response = urllib_transport(call)
+    else:
+        response = _stoppable_transport(call)
+    _checkpoints()
     return response
+
+
+def _checkpoints() -> None:
+    from je_auto_control.utils.executor.run_control import checkpoint
+    cancellation_checkpoint()
+    checkpoint()
+
+
+def _stoppable_transport(call: Mapping[str, Any]) -> Dict[str, Any]:
+    """``urllib_transport`` on a helper thread, waited on in slices that look at the stop."""
+    connections = _Connections()
+    outcome: Dict[str, Any] = {}
+    done = threading.Event()
+    context = contextvars.copy_context()
+
+    def run() -> None:
+        _recording.active = connections
+        try:
+            outcome["response"] = context.run(urllib_transport, call)
+        except BaseException as error:  # reason: handed to the waiting caller, which raises it
+            outcome["error"] = error
+        finally:
+            _recording.active = None
+            done.set()
+
+    threading.Thread(target=run, name="http-request", daemon=True).start()
+    while not done.wait(_STOP_POLL_SECONDS):
+        try:
+            _checkpoints()
+        except BaseException:
+            connections.abort()
+            done.wait(_ABORT_WAIT_SECONDS)
+            raise
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome["response"]
