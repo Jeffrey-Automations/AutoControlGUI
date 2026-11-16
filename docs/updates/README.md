@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261116-12 | 2026-11-16 | M0 routing profile: background channels only, never desktop input | #done #process-memory #policy | [2026-11-b](2026-11-b.md) |
 | U-20261116-11 | 2026-11-16 | A stop no longer waits for an image search or OCR pass | #done #executor #ocr #image | [2026-11-b](2026-11-b.md) |
 | U-20261116-10 | 2026-11-16 | A stop also ends an HTTP request that is still connecting | #done #http #executor | [2026-11-b](2026-11-b.md) |
 | U-20261116-09 | 2026-11-16 | MCP roots from roots/list stay opt-in | #done #mcp #security #decision | [2026-11-b](2026-11-b.md) |
