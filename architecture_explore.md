@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,547 |
-| 程式碼總行數 | 238,886 |
+| 程式碼總行數 | 238,929 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -292,7 +292,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 19,571 行。
+> 25 個套件、約 19,612 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -304,7 +304,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/decision_table/` | 112 | DMN 風格決策表：規則 + 命中策略，把分支外部化 |
 | `utils/deterministic/` | 116 | 決定性執行控制：固定亂數種子 + 凍結時鐘 |
 | `utils/action_journal/` | 856 | 結構化動作日誌：schema v1、寫入前遮罩、跨行程排序／尾端復原、executor 明確 scope 擷取與本機 parallel／DAG parent 傳遞；門面、AC／MCP、Script Builder 與 CLI 擷取／有界查閱；observer／路徑政策隨巢狀根與 workers 保留，Run History 查閱與手動 history 關聯共用相同來源。 |
-| `utils/executor/` | 10,765 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
+| `utils/executor/` | 10,806 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
 | `utils/flow_debugger/` | 166 | action list 的單步除錯器與追蹤器 |
 | `utils/input_macro/` | 481 | 定時輸入事件：錄製結果的整形（`timeline`／`InputRecorder`，Windows 與 macOS 共用）、重播與宣告式輸入序列 DSL |
 | `utils/json/` | 99 | action JSON 檔讀寫與正規化格式化（`fmt --check` 的後端） |
@@ -393,7 +393,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.5 影像辨識與畫面分析
 
-> 37 個套件、約 6,579 行。
+> 37 個套件、約 6,581 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -403,7 +403,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/color_region/` | 106 | 以顏色定位畫面區域（遮罩 + 連通元件） |
 | `utils/color_stats/` | 103 | 區域顏色統計：平均色與主色 |
 | `utils/coordinate_space/` | 93 | 模型網格座標與實體像素之間的座標空間對映 |
-| `utils/cv2_utils/` | 1,091 | OpenCV 基礎層：擷取後端選擇（`screen_grabber`，Pillow／mss 或平台後端）、截圖、`[left, top, right, bottom]` 區域擷取（`region_capture`，Windows 經 `grab_logical` 涵蓋所有螢幕）、樣板比對（走 `grab_logical`，涵蓋所有螢幕）、螢幕錄影、影片錄製（兩者都經 `frame_clock` 依 fps 配速）、連通元件、影像堆疊的取用口（`optional`，Windows arm64 沒有 wheel 時語意報錯）、非 ASCII 路徑也讀寫得到的影像檔存取（`image_file`） |
+| `utils/cv2_utils/` | 1,093 | OpenCV 基礎層：擷取後端選擇（`screen_grabber`，Pillow／mss 或平台後端）、截圖、`[left, top, right, bottom]` 區域擷取（`region_capture`，Windows 經 `grab_logical` 涵蓋所有螢幕）、樣板比對（走 `grab_logical`，涵蓋所有螢幕）、螢幕錄影、影片錄製（兩者都經 `frame_clock` 依 fps 配速）、連通元件、影像堆疊的取用口（`optional`，Windows arm64 沒有 wheel 時語意報錯）、非 ASCII 路徑也讀寫得到的影像檔存取（`image_file`） |
 | `utils/edge_lines/` | 131 | 以 Hough 轉換偵測線條／格線／分隔線 |
 | `utils/edge_match/` | 116 | 邊緣形狀（Chamfer／距離轉換）樣板比對 |
 | `utils/feature_match/` | 146 | ORB 特徵比對：在旋轉／縮放／主題變更下定位樣板 |
@@ -745,7 +745,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_launch.py` | 225 | Attest a process this host launched itself, from an image file pinned by SHA-256. |
 | `windows_native.py` | 113 | Typed Win32 query/read bindings and caller-sized memory information layouts. |
 
-#### `utils/executor/`（10,765 行）— 執行核心
+#### `utils/executor/`（10,806 行）— 執行核心
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -919,7 +919,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `rest_registry.py` | 91 | 保存執行中 REST 伺服器的行程級單例，狀態包含 RBAC 模式並隱去停用的共用 token。 |
 | `__main__.py` | 66 | `python -m je_auto_control.utils.rest_api` 進入點。 |
 
-#### `utils/cv2_utils/`（1,091 行）— 擷取、影像與共用定位 frame
+#### `utils/cv2_utils/`（1,093 行）— 擷取、影像與共用定位 frame
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -933,7 +933,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cv2_utils/screen_grabber.py` | 229 | One place that decides how this platform's pixels are read. |
 | `utils/cv2_utils/screen_record.py` | 125 | Internal image/capture utilities. |
 | `utils/cv2_utils/screenshot.py` | 95 | Internal image/capture utilities. |
-| `utils/cv2_utils/template_detection.py` | 182 | Locate a template image on screen, in the coordinates the mouse takes. |
+| `utils/cv2_utils/template_detection.py` | 184 | Locate a template image on screen, in the coordinates the mouse takes. |
 | `utils/cv2_utils/video_recording.py` | 76 | Internal image/capture utilities. |
 
 #### `utils/config_sync/`（8,577 行）— 持久化、因果模型與本機重送
@@ -1554,7 +1554,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `gui/` | 167 | 44,024 |
 | `utils/mcp_server/` | 63 | 22,322 |
 | `utils/remote_desktop/` | 77 | 16,970 |
-| `utils/executor/` | 11 | 10,765 |
+| `utils/executor/` | 11 | 10,806 |
 | `utils/usb/` | 20 | 5,069 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,168 |
 | `utils/accessibility/` | 16 | 3,384 |
@@ -1571,8 +1571,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,009 | 104,387 |
-| **總計** | **1,535** | **238,141** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,009 | 104,389 |
+| **總計** | **1,535** | **238,184** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

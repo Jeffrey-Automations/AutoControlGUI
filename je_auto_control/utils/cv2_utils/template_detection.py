@@ -13,6 +13,7 @@ from je_auto_control.utils.cv2_utils.image_file import read_image
 from je_auto_control.utils.cv2_utils.optional import require_cv2, require_je_open_cv
 from je_auto_control.utils.cv2_utils.locator_frame import current_locator_frame
 from je_auto_control.utils.exception.exceptions import ImageNotFoundException
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.monitor_layout.logical_frame import grab_logical
 
 
@@ -56,7 +57,8 @@ def _prepare(image: Any, detect_threshold: float,
         frame = _to_gray(cv2, grab_image)
         if template.shape[0] > frame.shape[0] or template.shape[1] > frame.shape[1]:
             raise ImageNotFoundException("template is larger than the searched area")
-        scores = cv2.matchTemplate(frame, template, cv2.TM_CCOEFF_NORMED)
+        # One native pass; a stop does not wait for it (see ``stoppable_call``).
+        scores = stoppable_call(cv2.matchTemplate, frame, template, cv2.TM_CCOEFF_NORMED)
     except cv2.error as error:
         # An input OpenCV cannot match (an empty frame, a pixel type it does
         # not take) is a search that found nothing, in the type callers catch.
