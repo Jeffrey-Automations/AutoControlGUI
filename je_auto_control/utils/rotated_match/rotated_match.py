@@ -18,6 +18,7 @@ Imports no ``PySide6``.
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.visual_match.visual_match import (
     _NMS_CANDIDATE_FACTOR, _NMS_CANDIDATE_MIN, _contain_cv2_error,
     _haystack_gray_with_origin, _method, _nms, _reject_flat_template, _resize,
@@ -94,7 +95,7 @@ def _scores_at(hay: Any, tmpl: Any, scale: float, angle: float,
     warped, mask = _rotate_with_mask(_resize(tmpl, float(scale)), float(angle))
     if warped.shape[0] > hay.shape[0] or warped.shape[1] > hay.shape[1]:
         return None
-    scores = cv2.matchTemplate(hay, warped, metric, mask=mask)
+    scores = stoppable_call(cv2.matchTemplate, hay, warped, metric, mask=mask)
     if metric == cv2.TM_SQDIFF_NORMED:
         scores = 1.0 - scores  # lower is better for sqdiff; the maximum was the worst spot
     # Masked correlation over a flat window divides by zero.

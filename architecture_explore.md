@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,548 |
-| 程式碼總行數 | 239,048 |
+| 程式碼總行數 | 239,054 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -393,19 +393,19 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.5 影像辨識與畫面分析
 
-> 37 個套件、約 6,581 行。
+> 37 個套件、約 6,585 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/annotate/` | 123 | 截圖標註：畫框、highlight、箭頭、標籤 |
 | `utils/barcode/` | 59 | 一維條碼（EAN／UPC）解碼，解碼器可注入 |
-| `utils/color_match/` | 151 | 在 HSV 通道上做顏色感知的樣板比對 |
+| `utils/color_match/` | 152 | 在 HSV 通道上做顏色感知的樣板比對 |
 | `utils/color_region/` | 106 | 以顏色定位畫面區域（遮罩 + 連通元件） |
 | `utils/color_stats/` | 103 | 區域顏色統計：平均色與主色 |
 | `utils/coordinate_space/` | 93 | 模型網格座標與實體像素之間的座標空間對映 |
 | `utils/cv2_utils/` | 1,093 | OpenCV 基礎層：擷取後端選擇（`screen_grabber`，Pillow／mss 或平台後端）、截圖、`[left, top, right, bottom]` 區域擷取（`region_capture`，Windows 經 `grab_logical` 涵蓋所有螢幕）、樣板比對（走 `grab_logical`，涵蓋所有螢幕）、螢幕錄影、影片錄製（兩者都經 `frame_clock` 依 fps 配速）、連通元件、影像堆疊的取用口（`optional`，Windows arm64 沒有 wheel 時語意報錯）、非 ASCII 路徑也讀寫得到的影像檔存取（`image_file`） |
 | `utils/edge_lines/` | 131 | 以 Hough 轉換偵測線條／格線／分隔線 |
-| `utils/edge_match/` | 116 | 邊緣形狀（Chamfer／距離轉換）樣板比對 |
+| `utils/edge_match/` | 117 | 邊緣形狀（Chamfer／距離轉換）樣板比對 |
 | `utils/feature_match/` | 146 | ORB 特徵比對：在旋轉／縮放／主題變更下定位樣板 |
 | `utils/hsv_segment/` | 103 | HSV 色彩空間分割（抗光照的顏色遮罩 + blob 框） |
 | `utils/icon_classify/` | 151 | 從像素形狀判斷一個框是哪一類元件 |
@@ -422,7 +422,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/perceptual_diff/` | 203 | 感知式（YIQ）影像差異，抑制反鋸齒邊緣誤報 |
 | `utils/preprocess/` | 276 | OCR／比對前的影像前處理（灰階、二值化、去傾斜…） |
 | `utils/qr/` | 59 | 從影像或螢幕區域解碼 QR code（OpenCV） |
-| `utils/rotated_match/` | 202 | 容忍旋轉與縮放的樣板比對（尺度空間 × 角度掃描） |
+| `utils/rotated_match/` | 203 | 容忍旋轉與縮放的樣板比對（尺度空間 × 角度掃描） |
 | `utils/saliency/` | 113 | 頻譜殘差視覺顯著性：顯著圖與排序後的顯著區域 |
 | `utils/scale_detect/` | 105 | 偵測樣板實際渲染的顯示縮放／視覺 DPI |
 | `utils/screen_grid/` | 146 | 供 VLM 接地用的粗粒度標號網格（點 ↔ 格對映） |
@@ -432,7 +432,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/subpixel_match/` | 108 | 以二次曲面擬合做次像素級比對精修 |
 | `utils/theme_normalize/` | 94 | 主題無關的影像正規化，讓亮色樣板能配對深色模式 |
 | `utils/video_report/` | 171 | 影片步驟疊圖報告：把截圖加字幕串成操作導覽影片 |
-| `utils/visual_match/` | 534 | 會回傳信心值的樣板比對（分數、多尺度、find-all + NMS）；擷取走 `grab_logical`，命中座標已加回虛擬桌面原點，單色樣板直接拒收；`image_source.py` 是比對與影像分析模組共用的 `ImageSource` 別名（型別契約允許的 numpy 陣列 `Any` 邊界，列在 `SDK_ANY_ADAPTERS`） |
+| `utils/visual_match/` | 535 | 會回傳信心值的樣板比對（分數、多尺度、find-all + NMS）；擷取走 `grab_logical`，命中座標已加回虛擬桌面原點，單色樣板直接拒收；`image_source.py` 是比對與影像分析模組共用的 `ImageSource` 別名（型別契約允許的 numpy 陣列 `Any` 邊界，列在 `SDK_ANY_ADAPTERS`） |
 | `utils/visual_regression/` | 251 | 桌面 GUI 的視覺回歸測試（黃金圖比對） |
 
 ### 5.4.6 OCR 與文字理解
@@ -486,7 +486,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.8 元素定位、自我修復與智慧等待
 
-> 23 個套件、約 6,344 行。
+> 23 個套件、約 6,345 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -509,7 +509,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/observation_delta/` | 122 | token 預算內的觀察差異：兩個 UI 影格之間變了什麼 |
 | `utils/screen_state/` | 191 | 語義畫面狀態：快照／差異與結構化畫面描述 |
 | `utils/scroll_find/` | 103 | 捲動直到目標影像／文字可見 |
-| `utils/self_healing/` | 2,236 | 執行時自癒定位與固定 PNG 版本比較、明確母體／延遲／來源報告 |
+| `utils/self_healing/` | 2,237 | 執行時自癒定位與固定 PNG 版本比較、明確母體／延遲／來源報告 |
 | `utils/semantic_recording/` | 502 | 為錄製內容加上語義錨點，支援換機重播與自癒重播 |
 | `utils/settle_detector/` | 79 | 以純函式介面判定 UI 是否已靜止 |
 | `utils/smart_waits/` | 663 | 智慧等待：以影格差異取代 `time.sleep` |
@@ -1025,7 +1025,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/codegen/journal_commands.py` | 13 | 日誌候選的 JSON executor 轉接與明確匯出。 |
 | `utils/codegen/journal_cli.py` | 26 | CLI --from-log 模式、JSON 審閱輸出與可選 ZIP。 |
 
-#### `utils/self_healing/`（2,236 行）— 執行時定位與固定影像比較
+#### `utils/self_healing/`（2,237 行）— 執行時定位與固定影像比較
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1044,7 +1044,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/heal_log.py` | 141 | 相容既有格式的 JSONL 記錄與執行中秘密遮蔽。 |
 | `utils/self_healing/evaluation_models.py` | 236 | 不可變影像樣本、候選、母體與來源模型。 |
 | `utils/self_healing/evaluation.py` | 175 | 固定 frame 比較；標註、驗證、誤判、成本及延遲分開統計。 |
-| `utils/self_healing/frame_locators.py` | 141 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
+| `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
 #### `utils/agent_runtime/`（26,101 行／182 檔）
@@ -1559,7 +1559,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `utils/usb/` | 20 | 5,069 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,168 |
 | `utils/accessibility/` | 16 | 3,384 |
-| `wrapper/` | 25 | 6,065 |
+| `wrapper/` | 25 | 6,066 |
 | `windows/` | 24 | 2,363 |
 | `utils/rest_api/` | 8 | 2,236 |
 | `utils/agent/` | 13 | 2,254 |
@@ -1572,8 +1572,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,010 | 104,508 |
-| **總計** | **1,536** | **238,303** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,010 | 104,513 |
+| **總計** | **1,536** | **238,309** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

@@ -131,3 +131,36 @@ def test_a_stop_ends_an_ocr_pass(monkeypatch):
     assert time.monotonic() - started < 2
     assert engine.slow.threads, "OCR never started"
     engine.slow.release.set()
+
+
+def test_a_stop_ends_a_visual_match_stuck_in_its_match(monkeypatch):
+    np = pytest.importorskip("numpy")
+    cv2 = pytest.importorskip("cv2")
+    from je_auto_control.utils.visual_match import visual_match
+    noise = np.random.default_rng(7)
+    haystack = noise.integers(0, 255, (60, 80), dtype=np.uint8)
+    template = haystack[10:30, 20:45].copy()
+    slow = _Slow(value=np.zeros((41, 56), dtype=np.float32))
+    monkeypatch.setattr(cv2, "matchTemplate", slow)
+    token = StopToken("visual-stop")
+    _later(lambda: token.stop("test"))
+    started = time.monotonic()
+    with stoppable_run(token=token), pytest.raises(ExecutionStopped):
+        visual_match.match_template(template, haystack=haystack)
+    assert time.monotonic() - started < 2
+    assert slow.threads, "the match never started"
+    slow.release.set()
+
+
+def test_every_template_match_in_the_package_goes_through_stoppable_call():
+    """A new match path that calls ``cv2.matchTemplate`` directly would bring the waiting stop back."""
+    import re
+    from pathlib import Path
+    package = Path(__file__).resolve().parents[3] / "je_auto_control"
+    bare = []
+    for path in package.rglob("*.py"):
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            code = line.split("#", 1)[0]
+            if re.search(r"(?<!stoppable_call\()\bcv2\.matchTemplate\(", code):
+                bare.append(f"{path.relative_to(package)}:{number}")
+    assert bare == []

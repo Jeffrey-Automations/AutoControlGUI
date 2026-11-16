@@ -2,8 +2,9 @@
 
 ## [Unreleased]
 
-- Image search and OCR (`find_image` and everything on `cv2_utils.template_detection`, `find_text_matches`,
-  `read_text_in_region` and the OCR commands built on them): inside a stoppable run or a cancellation scope
+- Image search and OCR (`find_image` and everything on `cv2_utils.template_detection`, `visual_match`,
+  `color_match`, `edge_match`, `rotated_match`, self-healing frame locators, device-frame matching,
+  `find_text_matches`, `read_text_in_region` and the commands built on them): inside a stoppable run or a cancellation scope
   the single native pass runs on a helper thread (`run_control.stoppable_call`), and a stop or cancel ends
   the call within about 0.1 s instead of waiting for the pass. The pass itself cannot be interrupted: it
   finishes in the background and its result is discarded. Outside a run nothing changes.
