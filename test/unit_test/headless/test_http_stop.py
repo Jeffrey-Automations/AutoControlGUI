@@ -3,9 +3,12 @@
 Real sockets on 127.0.0.1: one server reads the request and never answers (and
 notes when the client hangs up), one answers at once.
 """
+import errno
 import socket
+import sys
 import threading
 import time
+import urllib.error
 from concurrent.futures import CancelledError
 
 import pytest
@@ -155,3 +158,67 @@ def test_a_stopped_ac_http_request_ends_the_script_promptly(silent):
                                  ["AC_set_var", {"name": "after", "value": 1}]])
     assert time.monotonic() - started < 10
     assert executor.variables.get("after") is None
+
+
+class _PendingSocket:
+    """A socket whose non-blocking connect never completes."""
+
+    closed = False
+
+    def __init__(self, *args) -> None:
+        self.timeout = "unset"
+
+    def setblocking(self, flag) -> None:
+        return None
+
+    def connect_ex(self, target) -> int:
+        return 10035 if sys.platform == "win32" else errno.EINPROGRESS
+
+    def settimeout(self, value) -> None:
+        self.timeout = value
+
+    def close(self) -> None:
+        _PendingSocket.closed = True
+
+
+def _never_ready(read, write, error, timeout):
+    time.sleep(timeout)
+    return [], [], []
+
+
+def test_a_stop_ends_a_connect_that_has_not_finished(monkeypatch):
+    monkeypatch.setattr(http_client, "_wait_writable", _never_ready)
+    stop = threading.Event()
+    _later(stop.set)
+    started = time.monotonic()
+    with pytest.raises(urllib.error.URLError, match="request stopped"):
+        http_client._connect_in_slices(("127.0.0.1", 9), 30, aborted=stop.is_set, make_socket=_PendingSocket)
+    assert time.monotonic() - started < 2
+    assert _PendingSocket.closed
+
+
+def test_a_connect_that_never_finishes_still_times_out(monkeypatch):
+    monkeypatch.setattr(http_client, "_wait_writable", _never_ready)
+    started = time.monotonic()
+    with pytest.raises(TimeoutError):
+        http_client._connect_in_slices(("127.0.0.1", 9), 0.4, aborted=lambda: False, make_socket=_PendingSocket)
+    assert 0.3 < time.monotonic() - started < 2
+
+
+def test_a_stop_ends_a_request_still_connecting_and_sends_nothing(silent, monkeypatch):
+    waits = []
+
+    def held(read, write, error, timeout):
+        waits.append(timeout)
+        return _never_ready(read, write, error, timeout)
+
+    monkeypatch.setattr(http_client, "_wait_writable", held)
+    token = StopToken("http-connecting")
+    _later(lambda: token.stop("test"))
+    started = time.monotonic()
+    with stoppable_run(token=token), pytest.raises(ExecutionStopped):
+        _call(silent.url)
+    if not waits:
+        pytest.skip("this loopback connect completed at once, so there was no handshake to wait on")
+    assert time.monotonic() - started < 3
+    assert not silent.requested.is_set(), "the request was sent after the stop"

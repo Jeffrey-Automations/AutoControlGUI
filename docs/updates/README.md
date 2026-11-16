@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261116-10 | 2026-11-16 | A stop also ends an HTTP request that is still connecting | #done #http #executor | [2026-11-b](2026-11-b.md) |
 | U-20261116-09 | 2026-11-16 | MCP roots from roots/list stay opt-in | #done #mcp #security #decision | [2026-11-b](2026-11-b.md) |
 | U-20261116-08 | 2026-11-16 | A stop or cancel ends an HTTP request that is already out | #done #executor #mcp #http | [2026-11-b](2026-11-b.md) |
 | U-20261116-07 | 2026-11-16 | The GUI collects cyclic garbage on its own thread only | #gui #pyside6 #done | [2026-11-b](2026-11-b.md) |

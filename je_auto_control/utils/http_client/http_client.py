@@ -9,10 +9,15 @@ non-2xx responses are inspectable rather than raised. Imports no
 """
 import base64
 import contextvars
+import errno
+import functools
 import http.client
 import json
+import os
+import select
 import socket
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -201,10 +206,12 @@ _recording = threading.local()
 class _Connections:
     """The connections one stoppable request opened, so a stop can shut their sockets.
 
-    Shutting the socket ends a ``recv`` that is waiting for the reply at once;
-    a connection that finishes connecting after the stop is shut before it
-    sends anything. A connect (or name lookup) already in progress cannot be
-    interrupted: it ends at the call's timeout and its result is discarded.
+    Shutting the socket ends a ``recv`` that is waiting for the reply at once,
+    and the TCP handshake is waited for in slices that look at the stop
+    (:func:`_connect_in_slices`); a connection that finishes connecting after
+    the stop is shut before it sends anything. A name lookup already in
+    progress cannot be interrupted: it ends on its own and its result is
+    discarded.
     """
 
     def __init__(self) -> None:
@@ -225,6 +232,8 @@ class _Connections:
                     raise urllib.error.URLError("request stopped")
 
             connection.connect = checked_connect
+            # http.client opens its socket through this attribute (proxies included).
+            connection._create_connection = functools.partial(_connect_in_slices, aborted=self._is_aborted)
             with self._lock:
                 if self._aborted:
                     raise urllib.error.URLError("request stopped")
@@ -243,6 +252,61 @@ class _Connections:
             opened = list(self._opened)
         for connection in opened:
             _shut(connection)
+
+
+# A non-blocking connect that has not finished yet reports one of these.
+_CONNECTING = frozenset({0, errno.EINPROGRESS, errno.EWOULDBLOCK, errno.EALREADY, 10035})  # 10035: WSAEWOULDBLOCK
+# The readiness wait; a seam so a test can hold a connect open without a black-holed address.
+_wait_writable = select.select
+
+
+def _connect_in_slices(address: Any, timeout: Any = None, source_address: Any = None, *,
+                       aborted: Any, make_socket: Any = socket.socket) -> socket.socket:
+    """``socket.create_connection`` whose wait for the handshake looks at ``aborted`` every slice.
+
+    The name lookup (``getaddrinfo``) still blocks. Each address is tried in
+    turn, as ``create_connection`` does; the connected socket is handed back
+    blocking, with ``timeout`` as its per-operation timeout again.
+    """
+    host, port = address[0], address[1]
+    limit = timeout if isinstance(timeout, (int, float)) else socket.getdefaulttimeout()
+    deadline = None if limit is None else time.monotonic() + limit
+    failure: Optional[OSError] = None
+    for family, kind, proto, _name, target in socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM):
+        sock = make_socket(family, kind, proto)
+        try:
+            if source_address:
+                sock.bind(source_address)
+            sock.setblocking(False)
+            code = sock.connect_ex(target)
+            if code not in _CONNECTING:
+                raise OSError(code, os.strerror(code))
+            if code != 0:
+                _await_connect(sock, deadline, aborted)
+            sock.settimeout(limit)
+            return sock
+        except urllib.error.URLError:
+            sock.close()
+            raise
+        except OSError as error:
+            sock.close()
+            failure = error
+    raise failure if failure is not None else OSError(f"no address for {host!r}")
+
+
+def _await_connect(sock: Any, deadline: Optional[float], aborted: Any) -> None:
+    while True:
+        if aborted():
+            raise urllib.error.URLError("request stopped")
+        remaining = _STOP_POLL_SECONDS if deadline is None else min(_STOP_POLL_SECONDS, deadline - time.monotonic())
+        if remaining <= 0:
+            raise TimeoutError("timed out")
+        _readable, writable, failed = _wait_writable([], [sock], [sock], remaining)
+        if writable or failed:
+            code = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+            if code:
+                raise OSError(code, os.strerror(code))
+            return
 
 
 def _shut(connection: Any) -> None:

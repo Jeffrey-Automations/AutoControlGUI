@@ -6,9 +6,9 @@
   webhooks, config sync, signaling): inside a stoppable run or a cancellation scope, nothing is sent once
   the run is stopped, and a stop, `ac_stop_execution` or `notifications/cancelled` while the request is out
   shuts its sockets within about 0.1 s and ends the call (`ExecutionStopped`, `CancelledError`, or
-  `-32800` for an MCP client cancel), instead of waiting for the reply or the timeout. A TCP connect or
-  name lookup already in progress still runs to its timeout, and its result is discarded. Outside a run
-  the request is unchanged.
+  `-32800` for an MCP client cancel), instead of waiting for the reply or the timeout. The TCP handshake
+  is waited for in the same 0.1 s slices; only a name lookup already in progress still runs on, and its
+  result is discarded. Outside a run the request is unchanged.
 
 - GUI (`start_autocontrol_gui()`): while the window is open, automatic cyclic garbage collection is
   switched off and a GUI-thread timer collects instead (`gui/_gui_thread_gc.py`), at the interpreter's
