@@ -3,7 +3,6 @@
 Offscreen Qt. Every command a script runs here is a fake registered on the
 executor for the test: nothing touches the mouse, the keyboard or the screen.
 """
-import gc
 import json
 import os
 import threading
@@ -74,18 +73,15 @@ class _Owner(QWidget):
 
 @pytest.fixture(autouse=True)
 def widgets_die_on_the_gui_thread():
-    """Collect, then delete what each test built, on the GUI thread and never on a script's worker.
+    """Delete what each test built, on the GUI thread, instead of leaving it for a collector.
 
-    The scripts here run long Python work on worker threads, and cyclic garbage
-    is collected by whichever thread allocates when the collector runs. A
-    leaked widget collected there is queued by PySide and deleted later on the
-    main thread; on Windows / Python 3.14 one such deferred delete aborted the
-    interpreter inside ``QObject::~QObject`` (see ``conftest.py``,
-    ``collect_qt_garbage_on_the_gui_thread``). So each test starts with nothing
-    left to collect and ends with its widgets scheduled for deletion here.
+    The scripts here run long Python work on worker threads. A leaked widget
+    that a worker's collection reaches is queued by PySide and deleted later on
+    the main thread, and on Windows / Python 3.14 one such deferred delete
+    aborted the interpreter inside ``QObject::~QObject`` (``conftest.py``,
+    ``no_worker_collects_qt_garbage``, which also pauses automatic collection here).
     """
     from je_auto_control.gui._auto_click_tab import AutoClickTab
-    gc.collect()
     with deleting(_Owner, ScriptHost, RecordHost, AutoClickTab):
         yield
 

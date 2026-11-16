@@ -223,11 +223,11 @@ PySide6 6.12 不在那裡刪，而是排進 `Shiboken::BindingManager::runDeleti
 其中一個被留下的頂層 `QWidget`（`wasWidget`、`wasDeleted` 已設、無 parent、無 Qt 訊息）在 `QObject::~QObject` 裡呼叫 `abort()`。
 Windows 上 3.11（`test_gui_offthread_sites.py`，3.11 因此留在 6.11.2）、3.12（同一個測試，run 43761784549）與 3.14
 （`test_gui_script_runs.py`）都出現過，abort 前都有 `QThreadStorage: entry 0 destroyed before end of thread`。
-維護者 2026-11-16 決定保留 6.12、擴大測試端的處理（U-20261116-05）：headless conftest 在每個模組開始時、
-以及每個用到 Qt 的模組（原始碼提到 `PySide6` 或 `je_auto_control.gui`）的每個測試結束後，都在主執行緒 `gc.collect()`。
+維護者 2026-11-16 決定保留 6.12、擴大測試端的處理：U-20261116-05 每個測試後回收太慢（CI 時間約翻倍、Windows 撞 120 分鐘上限），
+U-20261116-06 改成在每個 import Qt 或 GUI 套件的模組（379 個）裡暫停自動回收、模組結束時在主執行緒回收一次，worker 不會再觸發回收。
 未解：觸發的確切前提還沒用最小範例重現（單純跨執行緒回收、留下的 `TabTask` owner、兩種雙重刪除順序都正常），
 所以產品 GUI 在 worker 執行緒跑 Python 時（`_worker_thread`、`DaemonThread`、`tab_task_controller`）仍可能走到同一條路徑。
-待辦：向 PySide 回報（附 minidump 的堆疊與物件狀態）；之後的 6.12.x 出來時重跑完整矩陣，乾淨就拿掉每個測試的回收。
+待辦：向 PySide 回報（附 minidump 的堆疊與物件狀態）；之後的 6.12.x 出來時重跑完整矩陣，乾淨就拿掉 conftest 的 `no_worker_collects_qt_garbage`。
 
 ---
 

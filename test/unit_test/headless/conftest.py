@@ -1,6 +1,7 @@
 """Shared teardown for the headless suite."""
 import gc
 import os
+import re
 import sys
 
 import pytest
@@ -55,46 +56,68 @@ def _record_qt_messages():
     core.qInstallMessageHandler(handler)
 
 
-@pytest.fixture(autouse=True, scope="module")
-def collect_qt_garbage_on_the_gui_thread():
-    """Collect what earlier modules left, on the main thread, before this module starts any worker.
-
-    Cyclic garbage is collected by whichever thread happens to allocate when
-    the collector runs. A Python-owned Qt object collected on a worker thread
-    is not deleted there: PySide 6.12 queues it and deletes it later on the
-    main thread (``Shiboken::BindingManager::runDeletionInMainThread``). On
-    Windows / Python 3.14 one such deferred delete of a leaked top-level
-    ``QWidget`` aborted the interpreter inside ``QObject::~QObject`` -- a
-    minidump showed that frame, the object's ``wasWidget`` / ``wasDeleted``
-    bits and no Qt message -- in ``test_gui_script_runs.py``, whose scripts run
-    long Python work on worker threads. Collecting here keeps leaked widgets on
-    the thread that owns them. About 40 ms a module, and only once Qt is loaded.
-    """
-    if "PySide6.QtCore" in sys.modules:
-        gc.collect()
-    yield
-
-
+_QT_IMPORT = re.compile(r"^\s*(?:from|import)\s+(?:PySide6|je_auto_control\.gui)\b"
+                        r"|importorskip\(\s*['\"]PySide6", re.MULTILINE)
 _qt_modules: dict = {}
 
 
 def _module_uses_qt(module) -> bool:
-    """Whether a test module's source imports Qt or the GUI package; read once per file."""
+    """Whether a test module imports Qt or the GUI package anywhere (lazily, too); read once per file."""
     path = getattr(module, "__file__", None)
     if path is None:
         return False
     if path not in _qt_modules:
         try:
             with open(path, encoding="utf-8") as source:
-                text = source.read()
+                _qt_modules[path] = bool(_QT_IMPORT.search(source.read()))
         except OSError:
-            text = ""
-        _qt_modules[path] = "PySide6" in text or "je_auto_control.gui" in text
+            _qt_modules[path] = False
     return _qt_modules[path]
 
 
+@pytest.fixture(autouse=True, scope="module")
+def no_worker_collects_qt_garbage(request):
+    """In a module that uses Qt, pause automatic collection; collect once, on the main thread, at its end.
+
+    Cyclic garbage is collected by whichever thread happens to allocate when
+    the collector runs. A Python-owned Qt object collected on a worker thread
+    is not deleted there: PySide 6.12 queues it and deletes it later on the
+    main thread (``Shiboken::BindingManager::runDeletionInMainThread``), and on
+    Windows one such deferred delete of a leaked top-level ``QWidget`` aborted
+    the interpreter inside ``QObject::~QObject`` -- a minidump showed that frame,
+    the object's ``wasWidget`` / ``wasDeleted`` bits and no Qt message. It hit
+    3.14 in ``test_gui_script_runs.py`` and 3.12 (and, earlier, 3.11) in
+    ``test_gui_offthread_sites.py``, each time after a ``QThreadStorage: entry 0
+    destroyed before end of thread`` warning.
+
+    With automatic collection paused no worker can start a collection at all;
+    an explicit ``gc.collect()`` still works, and tests that pause it
+    themselves restore what they found. The module's garbage is collected here
+    instead, on the main thread, and any deletes that queues are flushed.
+    Collecting after every test instead cost about 0.4 s a test on CI and
+    pushed the Windows jobs past their 120-minute limit; this is one
+    collection per module.
+    """
+    if not _module_uses_qt(request.module):
+        yield
+        return
+    paused = gc.isenabled()
+    gc.disable()
+    try:
+        yield
+    finally:
+        if paused:
+            gc.enable()
+        gc.collect()
+        app = _live_qt_application()
+        if app is not None:
+            from PySide6.QtCore import QCoreApplication, QEvent
+            QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            app.processEvents()
+
+
 @pytest.fixture(autouse=True)
-def flush_qt_deferred_deletes(request):
+def flush_qt_deferred_deletes():
     """Run Qt's queued ``deleteLater()`` work at the end of every test.
 
     ``deleteLater()`` does nothing until an event loop runs, and almost no GUI
@@ -113,13 +136,6 @@ def flush_qt_deferred_deletes(request):
     and therefore torn down *after* it — the module's own ``deleteLater()``
     calls have already been made by the time this runs.
 
-    In a module that uses Qt, the test's garbage is then collected here, on the
-    main thread, for the reason ``collect_qt_garbage_on_the_gui_thread`` gives:
-    collecting once per module was not enough, because a module's own earlier
-    tests leave widgets that its later workers collect. Windows / Python 3.12
-    aborted that way inside ``test_gui_offthread_sites.py`` (run 43761784549,
-    the same ``QThreadStorage`` warning first). About 40 ms a test, for the
-    ~1,150 tests in those modules.
     """
     _record_qt_messages()
     yield
@@ -129,9 +145,6 @@ def flush_qt_deferred_deletes(request):
     from PySide6.QtCore import QCoreApplication, QEvent
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     app.processEvents()
-    if _module_uses_qt(request.module):
-        gc.collect()
-        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
 
 # Backend calls that move the pointer or type on the real desktop.
