@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- GUI (`start_autocontrol_gui()`): while the window is open, automatic cyclic garbage collection is
+  switched off and a GUI-thread timer collects instead (`gui/_gui_thread_gc.py`), at the interpreter's
+  thresholds; it is switched back on when the app quits. Worker threads no longer collect Qt objects,
+  which PySide6 6.12 deletes late and which has aborted the process on Windows. An explicit
+  `gc.collect()` still works; importing `je_auto_control` without the GUI is unchanged.
+
 - `AC_shell_to_var` and MCP `ac_shell`: inside a stoppable run or a cancellation scope, a stop,
   `ac_stop_execution` or `notifications/cancelled` kills the command's process tree within about
   0.1 s and ends the call (`ExecutionStopped`, or `-32800` for a client cancel), instead of waiting

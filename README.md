@@ -27,6 +27,8 @@ python -m pip install "je_auto_control[gui]"
 python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 ```
 
+While the window is open, the app collects Python's cyclic garbage on the GUI thread, from a timer, with automatic collection switched off; it is switched back on when the app quits. This keeps a worker thread from reaching a Qt object that PySide6 6.12 would then delete late, which has aborted the process on Windows. Scripts that only `import je_auto_control` are unaffected.
+
 ## What you can do
 
 - Automate mouse, keyboard and window operations.

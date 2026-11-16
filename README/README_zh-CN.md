@@ -27,6 +27,8 @@ python -m pip install "je_auto_control[gui]"
 python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 ```
 
+窗口打开时，程序会关闭自动回收，改由 GUI 线程上的定时器回收 Python 的循环垃圾，退出时再打开。这是为了不让 worker 线程碰到 PySide6 6.12 会延后删除的 Qt 对象；那条路径在 Windows 上曾让进程 abort。只 `import je_auto_control` 的脚本不受影响。
+
 ## 可以做什么
 
 - 操作鼠标、键盘与窗口。

@@ -216,18 +216,16 @@ Windows 3.11 在 `test_gui_offthread_sites.py::test_a_failed_upload_is_reported_
 
 ---
 
-## PySide6 6.12 跨執行緒回收的延後刪除會在 `QObject::~QObject` abort（GUI 本身的風險）
+## PySide6 6.12 跨執行緒回收的延後刪除會在 `QObject::~QObject` abort：等上游修正
 
-`TODO` — 原因已由本機 minidump 確認（U-20261116-04）：Python 擁有的 Qt 物件若被 worker 執行緒的循環回收收走，
-PySide6 6.12 不在那裡刪，而是排進 `Shiboken::BindingManager::runDeletionInMainThread` 之後在主執行緒刪；
-其中一個被留下的頂層 `QWidget`（`wasWidget`、`wasDeleted` 已設、無 parent、無 Qt 訊息）在 `QObject::~QObject` 裡呼叫 `abort()`。
-Windows 上 3.11（`test_gui_offthread_sites.py`，3.11 因此留在 6.11.2）、3.12（同一個測試，run 43761784549）與 3.14
-（`test_gui_script_runs.py`）都出現過，abort 前都有 `QThreadStorage: entry 0 destroyed before end of thread`。
-維護者 2026-11-16 決定保留 6.12、擴大測試端的處理：U-20261116-05 每個測試後回收太慢（CI 時間約翻倍、Windows 撞 120 分鐘上限），
-U-20261116-06 改成在每個 import Qt 或 GUI 套件的模組（379 個）裡暫停自動回收、模組結束時在主執行緒回收一次，worker 不會再觸發回收。
-未解：觸發的確切前提還沒用最小範例重現（單純跨執行緒回收、留下的 `TabTask` owner、兩種雙重刪除順序都正常），
-所以產品 GUI 在 worker 執行緒跑 Python 時（`_worker_thread`、`DaemonThread`、`tab_task_controller`）仍可能走到同一條路徑。
-待辦：向 PySide 回報——草稿（堆疊、物件狀態、未重現的情境與 workaround）在 `docs/upstream/pyside6-6.12-deferred-deletion-abort.md`，由維護者送到 bugreports.qt.io；之後的 6.12.x 出來時重跑完整矩陣，乾淨就拿掉 conftest 的 `no_worker_collects_qt_garbage`。
+`BLOCKED`（上游）— 原因由本機 minidump 確認（U-20261116-04）：Python 擁有的 Qt 物件若被 worker 執行緒的循環回收收走，
+PySide6 6.12 會排進 `Shiboken::BindingManager::runDeletionInMainThread` 之後在主執行緒刪，
+其中一個被留下的頂層 `QWidget` 在 `QObject::~QObject` 裡呼叫 `abort()`；Windows 3.11／3.12／3.14 都出現過。
+現況：測試端由 conftest 的 `no_worker_collects_qt_garbage` 在用到 Qt 的模組裡暫停自動回收（U-20261116-06），
+GUI 由 `gui/_gui_thread_gc.py` 的 `GuiThreadCollector` 只在 GUI 執行緒回收（U-20261116-07），兩邊都不會讓 worker 觸發回收。
+待辦：(1) 維護者把 `docs/upstream/pyside6-6.12-deferred-deletion-abort.md` 送到 bugreports.qt.io（PYSIDE）；
+(2) 修正版 6.12.x 出來後重跑完整矩陣，乾淨就拿掉 conftest 的 `no_worker_collects_qt_garbage` 並評估是否保留 `GuiThreadCollector`，
+同時處理上一節 3.11 的固定版本。
 
 ---
 
