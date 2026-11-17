@@ -57,6 +57,8 @@ Wayland NORMAL 輸入透過受管理的子程序執行 libei 與 portal 呼叫�
 
 受管理的 Agent 任務與跨主機傳輸包含實驗性功能；採用前請查看實作紀錄與專案進度中的驗收狀態。
 
+主機選定的語意 target 支援 `semantic` 完成條件，以新讀回核對已記錄的目標身分及期望欄位。此條件不授予記憶體存取權，也不啟用原生 target。詳見[語意完成驗證](../docs/process_memory_contract.md#semantic-completion)。
+
 ## 文件
 
 - [安裝、平台支援與設定](../docs/guides/zh-TW/setup.md)

@@ -1,5 +1,6 @@
 """Run a repository-owned semantic IPC target without any desktop or memory access."""
 from dataclasses import replace
+import hashlib
 from pathlib import Path
 import sys
 import threading
@@ -19,7 +20,7 @@ class FixtureTarget(SemanticTarget):
     def __init__(self):
         self.worker = None
         self.started_marker = None
-        self.state = SemanticSnapshot(target_id="fixture", identity_digest="a" * 64,
+        self.state = SemanticSnapshot(target_id="fixture", identity_digest=hashlib.sha256(uuid4().bytes).hexdigest(),
             adapter_id="fixture-ipc", schema_version="1", source="fixture_protocol",
             fields=(("value", 0),), revision=0, consistency="sequence_checked",
             observation_id="initial", started=0, finished=0)
@@ -40,7 +41,8 @@ class FixtureTarget(SemanticTarget):
             if self.started_marker is not None:
                 self.started_marker.write_text("entered", encoding="utf-8")
             threading.Event().wait(30)
-        self.state = replace(self.state, fields=(("value", 1),), revision=self.state.revision + 2)
+        if not arguments.get("no_effect"):
+            self.state = replace(self.state, fields=(("value", 1),), revision=self.state.revision + 2)
         if arguments.get("lose_reply"):
             raise AgentEffectUnknown("fixture reply lost; readback required")
         return SemanticReceipt(operation_id, "atomic", {"value": 1})

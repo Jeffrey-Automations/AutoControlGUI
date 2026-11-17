@@ -285,6 +285,42 @@ cross-process memory or desktop input. The profile registry, application
 attestation, reader-owning production adapter and independent completion
 verification remain required before public memory commands can be enabled.
 
+## Semantic completion
+
+A `semantic` success criterion compares fresh completion-time observations with
+the recorded target witness for a named command. For the test-owned counter:
+
+```json
+{"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}
+```
+
+The command must already be in the task's allowed tools. The criterion grants no
+additional fields, reader, native target or command. The Agent Tasks scope JSON
+editor and its Submit action preserve this condition through the shared task API.
+The built-in profile registry still does not enable native memory targets.
+
+Before semantic dispatch, the journal stores the validated original snapshot.
+Only a host-selected `SemanticTarget` supplies this witness. Completion uses the
+last effective attempt for that command; an uncertain attempt stays unknown,
+while attempts proven to have no effect do not discard earlier completed work.
+Every semantic observation must use the host's `time.monotonic()` clock domain
+and have its entire capture interval inside the current runtime read request.
+The runtime rejects cached pre-dispatch reads and future timestamps before
+publication or verification. A helper on another clock domain cannot use this
+contract without a separately reviewed clock/proof protocol.
+
+The current snapshot must match target identity, adapter, schema and source, have
+a checked revision at least as new as the witness, and use a different observation
+ID with a capture interval starting after the witness ended. Best-effort snapshots,
+changed identities, missing fields and absent witnesses yield `unknown`.
+
+Expected fields are bounded scalars compared without coercion. A valid readback
+with different values yields `failed`, even when the command returned success.
+An exact match yields `passed`; other criteria and unresolved receipts still
+prevent task success. `result_equals` continues to inspect the prior result only.
+IPC fixture tests cover lying success replies and helper restart; these checks do
+not establish native memory acceptance or desktop noninterference.
+
 ## Cleanup ownership
 
 Each observation opens and closes its own handle. A failed close remains owned

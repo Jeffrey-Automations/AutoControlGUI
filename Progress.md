@@ -666,7 +666,11 @@ uncertain 紀錄。現有 target 保留完整觀察比對；task／觀察 JSON �
 已有 owned helper 語意協定，主機與 worker 雙端拒絕桌面輸入，cleanup／EOF 也保留輸入及命令守衛；
 實際背景 IPC fixture 已驗證有界操作、回覆遺失、命令進入後取消及 helper 回收。
 此 fixture 只操作自有 counter，不是跨行程記憶體或桌面原生驗收。
-受管 profile、持有 reader 的原生 adapter、獨立完成驗證與公開入口尚未接上。
+已有 `semantic` 完成條件，以新讀回核對 journal 中實際 target 的身分、版本、來源及 revision，
+再按型別比較期望欄位。每次擷取區間須在當次主機單調時鐘讀取請求內；操作前快取不能證明完成。
+IPC fixture 已驗證成功回條但未生效及 helper 重啟；程序內 target 測試驗證快取回放拒絕。
+未知效果仍須審閱，未自動確認。
+受管 profile、持有 reader 的原生 adapter 與公開記憶體入口尚未接上。
 
 1. **M0：能力盤點與範圍契約。**（已完成：profile／路由規則 U-20261116-12；維護者 2026-11-17 決定第一個目標只用自有 fixture，真實應用待 M1 原生驗收跑通後再選，U-20261117-01）先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
    讀取來源、執行介面、權限、是否全背景、支援版本、驗證方式與不支援原因。

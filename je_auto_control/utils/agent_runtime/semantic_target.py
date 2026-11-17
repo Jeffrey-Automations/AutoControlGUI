@@ -7,9 +7,10 @@ import hashlib
 import json
 import re
 import sys
+import time
 from typing import Any, Literal, Mapping
 
-from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+from je_auto_control.utils.agent_runtime.errors import AgentTaskError, AgentObservationStale
 from je_auto_control.utils.agent_runtime.models import detached, freeze
 from je_auto_control.utils.process_memory.models import Observation, Scalar
 
@@ -170,10 +171,24 @@ def fingerprint(target: Any, observation: Mapping[str, Any]) -> str:
 
 
 def observe(target: Any) -> dict[str, Any]:
-    """Validate semantic helper responses before exposing or retaining their contents."""
+    """Require a same-host monotonic capture inside this read request before publication."""
+    started = time.monotonic()
     value = target.observe()
-    return (SemanticSnapshot.from_dict(value).to_dict()
-            if isinstance(target, SemanticTarget) else detached(value))
+    finished = time.monotonic()
+    if not isinstance(target, SemanticTarget):
+        return detached(value)
+    snapshot = SemanticSnapshot.from_dict(value)
+    if not started <= snapshot.started <= snapshot.finished <= finished:
+        raise AgentObservationStale("semantic capture is outside the current read request")
+    return snapshot.to_dict()
+
+
+def grounding_details(target: Any, observation: Mapping[str, Any], observation_id: str) -> dict[str, Any]:
+    """Bind semantic completion evidence to the actual host-selected target at dispatch."""
+    result: dict[str, Any] = {"observation_id": observation_id, "fingerprint": fingerprint(target, observation)}
+    if isinstance(target, SemanticTarget):
+        result["semantic"] = SemanticSnapshot.from_dict(observation).to_dict()
+    return result
 
 
 def perform(target: Any, name: str, arguments: Mapping[str, Any], *,

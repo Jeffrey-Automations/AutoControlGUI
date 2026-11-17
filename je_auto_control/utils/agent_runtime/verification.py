@@ -12,7 +12,7 @@ from je_auto_control.utils.agent_runtime.policy import TaskPolicy
 from je_auto_control.utils.postcondition import check_postcondition
 
 KINDS = frozenset({"result_equals", "file_exists", "file_sha256", "file_text", "file_manifest", "screen",
-                   "actions_complete", "browser"})
+                   "actions_complete", "browser", "semantic"})
 
 
 def validate_criteria(criteria: Sequence[Mapping[str, Any]]) -> None:
@@ -25,18 +25,27 @@ def validate_criteria(criteria: Sequence[Mapping[str, Any]]) -> None:
 
 
 def _validate_clause(kind: str, clause: Mapping[str, Any]) -> None:
-    if kind == "browser":
-        from je_auto_control.utils.agent_runtime.browser_verification import validate_browser_clause
-        validate_browser_clause(clause)
-    if kind == "file_manifest":
-        from je_auto_control.utils.agent_runtime.manifest_evidence import validate_manifest_clause
-        validate_manifest_clause(clause)
+    if kind in {"browser", "file_manifest", "semantic"}:
+        _validate_structured_clause(kind, clause)
+        return
     if kind == "result_equals" and (not isinstance(clause.get("key"), str) or "value" not in clause):
         raise AgentTaskError("result_equals requires key and value")
     if kind == "screen" and not clause.get("spec"):
         raise AgentTaskError("screen completion requires nonempty postconditions")
     if kind in {"file_sha256", "file_text"} and not isinstance(clause.get("value"), str):
         raise AgentTaskError("file completion requires a value")
+
+
+def _validate_structured_clause(kind: str, clause: Mapping[str, Any]) -> None:
+    if kind == "browser":
+        from je_auto_control.utils.agent_runtime.browser_verification import validate_browser_clause
+        validate_browser_clause(clause)
+    elif kind == "file_manifest":
+        from je_auto_control.utils.agent_runtime.manifest_evidence import validate_manifest_clause
+        validate_manifest_clause(clause)
+    else:
+        from je_auto_control.utils.agent_runtime.semantic_verification import validate_semantic_clause
+        validate_semantic_clause(clause)
 
 
 def verify(policy: TaskPolicy, receipts: Sequence[Mapping[str, Any]],
@@ -69,6 +78,9 @@ def verify_clauses(clauses: Sequence[Mapping[str, Any]], policy: TaskPolicy, rec
 def _evaluate(clause: Mapping[str, Any], policy: TaskPolicy, receipts: Sequence[Mapping[str, Any]],
               observation: Mapping[str, Any], browser_read: Callable[[Mapping[str, Any]], Any] | None) -> bool | None:
     kind = clause["kind"]
+    if kind == "semantic":
+        from je_auto_control.utils.agent_runtime.semantic_verification import semantic_matches
+        return semantic_matches(clause, receipts, observation)
     if kind == "browser":
         value = browser_read(clause) if browser_read is not None else None
         return value if isinstance(value, bool) else None

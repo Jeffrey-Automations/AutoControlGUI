@@ -11,7 +11,7 @@ CI 以 `python scripts/generate_facade_exports.py --check` 檢查一致性。六
 > 擷取每個模組的 docstring 與頂層公開名稱；統計數字取自實際檔案，非估算。
 > 指令數與公開 API 數以 `executor.known_commands()` 與 `je_auto_control.__all__` 在工作樹上實測取得。
 >
-> **掃描時間**：2026-11-17　**版本**：`pyproject.toml` version `1.2.0`　**分支**：`dev`
+> **掃描時間**：2026-11-18　**版本**：`pyproject.toml` version `1.2.0`　**分支**：`dev`
 
 ---
 
@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,552 |
-| 程式碼總行數 | 239,518 |
+| Python 模組總數（含周邊子專案） | 1,553 |
+| 程式碼總行數 | 239,609 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -516,13 +516,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 53,504 行。
+> 14 個套件、約 53,595 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,254 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 26,419 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 26,510 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 166 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1048,7 +1048,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（26,419 行／185 檔）
+#### `utils/agent_runtime/`（26,510 行／186 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1133,7 +1133,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `parent_watch.py` | 25 | POSIX helpers retire their own live process group when the owning parent disappears. |
 | `readiness.py` | 83 | Passive readiness of the desktop, presence source, devices, browser and models; never a grant or evidence. |
 | `resume_gate.py` | 84 | A task's first action waits until a fresh observation passes every declared resume condition. |
-| `policy.py` | 120 | Explicit task scopes, rooted data paths and secret-safe durable payloads. |
+| `policy.py` | 124 | Explicit task scopes, rooted data paths and secret-safe durable payloads. |
 | `presence_channel_linux.py` | 434 | Own authenticated Linux packet channels, bounded leases and protected listeners. |
 | `presence_endpoint_linux.py` | 226 | Own protected Linux socket paths without stale-path reuse or recursive cleanup. |
 | `presence_frames.py` | 137 | Closed finite JSON byte frames and exact presence request/result validation. |
@@ -1174,7 +1174,8 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `retained_browser_runtime.py` | 91 | Connect actual browser retirement to existing runtime leases and private completion bindings. |
 | `retained_browser_target.py` | 98 | Closed transient read borrowers; the runtime collection owns the original helper lifetime. |
 | `runtime.py` | 750 | Shared managed-task lifecycle with fenced dispatch and evidence-based completion. |
-| `semantic_target.py` | 189 | Trusted semantic target dispatch with versioned snapshots and stable grounding. |
+| `semantic_target.py` | 204 | Trusted semantic target dispatch with versioned snapshots and stable grounding. |
+| `semantic_verification.py` | 60 | Compare fresh semantic readback with a confirmed operation's original target witness. |
 | `semantic_native_target.py` | 61 | Owned semantic helper proxy that refuses every desktop input event. |
 | `semantic_worker.py` | 39 | Validate grounded helper requests against the worker's immutable task scope. |
 | `runtime_lock.py` | 75 | Cross-process ownership for one runtime database; imports never acquire locks. |
@@ -1222,7 +1223,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `trigger_history.py` | 89 | Renewed trigger lineages share accepted event tombstones and outstanding-task limits. |
 | `trigger_reauthorization.py` | 150 | Explicitly replace a trigger's unavailable origins while retaining its event history and template. |
 | `trigger_registration.py` | 21 | Insert normal and explicitly renewed trigger templates through one bounded transaction contract. |
-| `verification.py` | 153 | Deterministic completion evidence with explicit passed, failed and unknown states. |
+| `verification.py` | 165 | Deterministic completion evidence with explicit passed, failed and unknown states. |
 | `window_pixels.py` | 118 | Capture only an identified Windows window, with no desktop-pixel fallback. |
 | `workflow_desktop.py` | 70 | Reviewed semantic control and document operations within the current task's application scope. |
 | `wire_data.py` | 46 | Resource-free bounded JSON and budget primitives shared by host models and owned transports. |
@@ -1576,8 +1577,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,014 | 104,948 |
-| **總計** | **1,540** | **238,773** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,015 | 105,039 |
+| **總計** | **1,541** | **238,864** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

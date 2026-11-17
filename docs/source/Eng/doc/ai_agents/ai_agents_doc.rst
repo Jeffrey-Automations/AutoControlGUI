@@ -1,6 +1,18 @@
 AI agents and computer use
 ===========================
 
+Host-selected semantic targets accept a success criterion such as
+``{"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}``
+for the test-owned counter. The command must already be allowed by the task.
+Completion reads fresh state and matches the original recorded target identity,
+adapter, schema and source before comparing fields without type coercion.
+The complete capture interval must fall inside the current read request using
+the same host monotonic clock. Cached observations are rejected; changed identity,
+missing fields and uncertain effects cannot prove success.
+The Agent Tasks scope JSON editor preserves this criterion through Submit.
+This adds no memory permission or native target registration. Native memory
+adapter integration and acceptance remain tracked in Progress.md.
+
 Transfer management now shares ``manage_agent_transfer(operation, request)``, ``AC_agent_transfer``,
 ``ac_agent_transfer``, authenticated ``POST /agent/transfer``, and Script Builder metadata. The CLI uses
 ``agent-task transfer --operation review_export --request request.json``. Review returns an approval

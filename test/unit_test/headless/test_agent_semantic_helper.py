@@ -55,6 +55,46 @@ def test_owned_helper_round_trip_and_retirement_without_presence(managed):
     assert channel.retired and target._channel is None and target._resource is None
 
 
+@pytest.mark.parametrize("no_effect,expected", [(False, "passed"), (True, "failed")])
+def test_helper_completion_reads_state_independently_of_successful_reply(managed, no_effect, expected):
+    runtime, target = managed
+    criterion = {"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}
+    task = runtime.submit(spec() | {"success_criteria": [criterion]})
+    frame = runtime.observe(task.task_id)
+    channel = target._channel
+    reply = runtime.act(task.task_id, {"tool": "AC_increment", "arguments": {"no_effect": no_effect},
+                                      "observation_id": frame.observation_id})
+    assert reply.result["result"]["value"] == 1
+    result = runtime.finish(task.task_id)
+    assert result.verification == ({"kind": "semantic", "status": expected},)
+    assert result.state == ("succeeded" if expected == "passed" else "waiting_user")
+    assert channel.retired
+
+
+def test_restarted_helper_cannot_complete_against_previous_process_evidence(tmp_path):
+    def adapter():
+        return NativeSemanticTarget(argv=[sys.executable, "-u", str(FIXTURE)],
+                                    resource_path=tmp_path / "fixture.lock")
+    database = tmp_path / "runtime.sqlite"
+    runtime = AgentRuntime(database, targets={"fixture": adapter()})
+    criterion = {"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}
+    try:
+        task = runtime.submit(spec() | {"success_criteria": [criterion]})
+        frame = runtime.observe(task.task_id)
+        runtime.act(task.task_id, {"tool": "AC_increment", "observation_id": frame.observation_id})
+    finally:
+        runtime.close()
+    restored = AgentRuntime(database, targets={"fixture": adapter()})
+    try:
+        restored.resume(task.task_id)
+        result = restored.finish(task.task_id)
+        assert result.state == "waiting_user"
+        assert result.verification == ({"kind": "semantic", "status": "unknown"},)
+        assert len(restored.store.actions(task.task_id)) == 1
+    finally:
+        restored.close()
+
+
 @pytest.mark.parametrize("fault", ["hang", "lose_reply", "input"])
 def test_failed_helper_operation_stays_uncertain_and_does_not_replay(managed, fault):
     runtime, target = managed

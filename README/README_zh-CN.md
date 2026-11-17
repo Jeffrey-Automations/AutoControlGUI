@@ -57,6 +57,8 @@ Wayland NORMAL 输入通过受管理的子进程执行 libei 与 portal 调用�
 
 受管理的 Agent 任务与跨主机传输包含实验性功能；采用前请查看实现记录与项目进度中的验收状态。
 
+主机选定的语义 target 支持 `semantic` 完成条件，用新读回核对已记录的目标身份及期望字段。此条件不授予内存访问权，也不启用原生 target。详见[语义完成验证](../docs/process_memory_contract.md#semantic-completion)。
+
 ## 文件
 
 - [安装、平台支持与配置](../docs/guides/zh-CN/setup.md)

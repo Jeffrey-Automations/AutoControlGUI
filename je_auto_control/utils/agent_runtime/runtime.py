@@ -19,7 +19,7 @@ from je_auto_control.utils.agent_runtime.models import (
     AgentTaskSpec, TERMINAL, freeze, thaw,
 )
 from je_auto_control.utils.agent_runtime.semantic_target import (
-    fingerprint, observe as observe_target, perform as perform_target,
+    fingerprint, grounding_details, observe as observe_target, perform as perform_target,
 )
 from je_auto_control.utils.agent_runtime.ownership import ControlBroker, ControlLease
 from je_auto_control.utils.agent_runtime.policy import (
@@ -405,7 +405,7 @@ class AgentRuntime:
         if not 0 <= age <= 30 or time.time() - observation.captured_at > 30:
             raise AgentObservationStale("observation has expired")
         target = self._target(row)
-        if fingerprint(target, target.observe()) != fingerprint(target, observation.data):
+        if fingerprint(target, observe_target(target)) != fingerprint(target, observation.data):
             self._observations.pop(row["id"], None)
             raise AgentObservationStale("observation changed; observe again before acting")
 
@@ -432,7 +432,7 @@ class AgentRuntime:
         arguments, grounding = resolve_action(request.tool, request.arguments, request.reference, observation.data)
         TaskPolicy(AgentTaskSpec.from_dict(row["spec"])).check(request.tool, arguments)
         target = self._target(row)
-        grounding.update(observation_id=observation.observation_id, fingerprint=fingerprint(target, observation.data))
+        grounding.update(grounding_details(target, observation.data, observation.observation_id))
         self._observations.pop(task_id, None)
         self._observation_times.pop(task_id, None)
         action_id = self.store.prepare(task_id, request.tool, durable_payload(arguments),

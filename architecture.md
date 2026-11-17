@@ -16,6 +16,11 @@ helper channel and resource lock. It requires a semantic handshake before target
 configuration. The worker rechecks tool scope; both peers refuse input events.
 Semantic cleanup keeps input and executor guards active through EOF retirement.
 
+Semantic completion stores the original validated snapshot in action grounding.
+Fresh readback must match its target provenance and checked revision before
+comparing expected fields. Every semantic capture interval must lie inside the
+current host-monotonic read request, including pre-dispatch grounding reads.
+
 WebRTC statistics owns one submitted polling future. Start does not wait for
 the event loop; stop closes admission, cancels pending submission and drops
 the callback owner without acquiring a bridge. Late awaited samples are discarded.

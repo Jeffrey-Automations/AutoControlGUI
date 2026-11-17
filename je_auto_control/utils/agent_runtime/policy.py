@@ -31,6 +31,10 @@ class TaskPolicy:
         if set(spec.allowed_tools) & {"AC_browser_upload", "AC_browser_download"} and not spec.roots:
             raise AgentTaskError("browser file transfers require explicit task roots")
         for criterion in spec.success_criteria:
+            if criterion.get("kind") == "semantic":
+                from je_auto_control.utils.agent_runtime.semantic_verification import validate_semantic_clause
+                validate_semantic_clause(criterion)
+                self.check(criterion["tool"], {})
             if criterion.get("kind") == "browser":
                 from je_auto_control.utils.agent_runtime.browser_verification import validate_browser_scope
                 validate_browser_scope(spec, criterion)

@@ -1,5 +1,14 @@
 # Capability matrix
 
+Semantic completion compares fresh sequence-checked fields with the recorded
+identity, adapter, schema and source of the last effective confirmed command.
+Missing witnesses, fields or revisions and changed identities remain unknown.
+Typed mismatches fail even if the command returned success; uncertain effects
+remain unresolved. Capture intervals outside the current host-monotonic read
+request are rejected. Counter-fixture IPC tests cover success without effect,
+cached pre-dispatch observations and helper restart. Native memory targets,
+cross-clock helpers and desktop noninterference are not established by these tests.
+
 X11 package import defers display connections, server keycode resolution, RECORD listener startup
 and uinput device selection until use. Explicit key-table retrieval returns a real mutable dict
 and requires an X connection. Screen and input operations do not start recording. This startup

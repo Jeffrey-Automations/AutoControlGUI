@@ -1,6 +1,15 @@
 AI Agent 與 Computer Use
 ===========================
 
+主機選定的語意 target 可使用完成條件，例如自有 counter 測試的
+``{"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}``。
+命令必須已在任務允許清單中。完成驗證重新讀取狀態，核對記錄中的目標身分、
+adapter、schema 與來源，再比較欄位，不進行型別轉換。
+完整擷取區間必須落在當次讀取請求內，並使用同一主機的單調時鐘。
+快取觀察會遭拒絕；身分改變、欄位缺失及效果未知均不能證明成功。
+Agent Tasks 的 scope JSON 編輯器透過 Submit 保留此條件。
+這不授予記憶體權限，也不登記原生 target；原生 adapter 整合與驗收仍列於 Progress.md。
+
 成果移交管理已共用 ``manage_agent_transfer(operation, request)``、``AC_agent_transfer``、
 ``ac_agent_transfer``、具授權的 ``POST /agent/transfer`` 與 Script Builder metadata。CLI 使用
 ``agent-task transfer --operation review_export --request request.json``。審閱回傳批准 token；

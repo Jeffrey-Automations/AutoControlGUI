@@ -1,5 +1,6 @@
 """Exercise semantic freshness, revision fencing and uncertain receipts through the runtime."""
 from dataclasses import replace
+import time
 
 import pytest
 
@@ -31,8 +32,9 @@ class Target(SemanticTarget):
 
     def observe(self):
         self.reads += 1
+        now = time.monotonic()
         return replace(self.state, observation_id=f"read-{self.reads}",
-                       started=float(self.reads), finished=float(self.reads) + 0.5).to_dict()
+                       started=now, finished=now).to_dict()
 
     def perform_grounded(self, name, arguments, *, expected, operation_id):
         if expected.grounding() != self.state.grounding():
@@ -205,3 +207,119 @@ def test_reader_result_round_trip_preserves_revision_and_hides_semantic_values_f
     assert set(result.to_dict()) == {"target_id", "identity_digest", "adapter_id", "schema_version", "source",
                                      "fields", "revision", "consistency", "complete", "observation_id",
                                      "started", "finished"}
+
+
+def semantic_task(runtime, fields=None):
+    return runtime.submit(AgentTaskSpec(
+        goal="verify fixture independently", target="fixture", allowed_tools=("AC_increment",),
+        success_criteria=({"kind": "semantic", "tool": "AC_increment",
+                           "fields": {"value": 1} if fields is None else fields},))).task_id
+
+
+def test_completion_uses_fresh_fields_and_durable_target_witness(managed):
+    runtime, target, _task = managed
+    task = semantic_task(runtime)
+    frame = runtime.observe(task)
+    act(runtime, task, frame)
+    receipt = runtime.store.actions(task)[0]
+    assert receipt["grounding"]["semantic"] == dict(frame.data)
+    result = runtime.finish(task)
+    assert result.state == "succeeded"
+    assert result.verification == ({"kind": "semantic", "status": "passed"},)
+    assert target.reads == 3
+
+
+def test_successful_reply_without_the_effect_fails_independent_completion(managed):
+    runtime, target, _task = managed
+    task = semantic_task(runtime)
+    target.perform_grounded = lambda *args, **kwargs: SemanticReceipt(kwargs["operation_id"], "atomic", {"value": 1})
+    frame = runtime.observe(task)
+    act(runtime, task, frame)
+    result = runtime.finish(task)
+    assert result.state == "waiting_user"
+    assert result.verification == ({"kind": "semantic", "status": "failed"},)
+
+
+@pytest.mark.parametrize("changes", [
+    {"identity_digest": "b" * 64}, {"target_id": "another"}, {"adapter_id": "different"},
+    {"schema_version": "2"}, {"source": "different"}, {"fields": (("missing", 1),)},
+    {"revision": None, "consistency": "best_effort"},
+])
+def test_completion_cannot_reuse_evidence_from_another_target_or_partial_state(managed, changes):
+    runtime, target, _task = managed
+    task = semantic_task(runtime)
+    frame = runtime.observe(task)
+    act(runtime, task, frame)
+    target.state = replace(target.state, **changes)
+    result = runtime.finish(task)
+    assert result.state == "waiting_user"
+    assert result.verification == ({"kind": "semantic", "status": "unknown"},)
+
+
+def test_replayed_snapshot_is_not_independent_completion(managed):
+    runtime, target, _task = managed
+    task = semantic_task(runtime, {"value": 0})
+    frame = runtime.observe(task)
+    act(runtime, task, frame)
+    target.observe = lambda: dict(frame.data)
+    with pytest.raises(AgentObservationStale, match="current read"):
+        runtime.finish(task)
+    assert runtime.get(task).state != "succeeded"
+
+
+def test_cached_grounding_read_cannot_falsely_prove_pre_command_values(managed):
+    runtime, target, _task = managed
+    task = semantic_task(runtime, {"value": 0})
+    captures = []
+    original = target.observe
+    def record():
+        value = original()
+        captures.append(value)
+        return value
+    target.observe = record
+    frame = runtime.observe(task)
+    act(runtime, task, frame)
+    assert target.state.fields == (("value", 1),) and len(captures) == 2
+    assert captures[1]["fields"] == {"value": 0}
+    target.observe = lambda: captures[1]
+    with pytest.raises(AgentObservationStale, match="current read"):
+        runtime.finish(task)
+    assert runtime.get(task).state != "succeeded"
+
+
+def test_semantic_completion_does_not_coerce_booleans_to_integers(managed):
+    runtime, _target, _task = managed
+    task = semantic_task(runtime, {"value": True})
+    frame = runtime.observe(task)
+    act(runtime, task, frame)
+    result = runtime.finish(task)
+    assert result.state == "waiting_user" and result.verification[0]["status"] == "failed"
+
+
+def test_unknown_effect_cannot_be_confirmed_by_matching_fields_alone(managed):
+    from je_auto_control.utils.agent_runtime.semantic_verification import semantic_matches
+    runtime, target, _task = managed
+    task = semantic_task(runtime)
+    frame = runtime.observe(task)
+    target.lose_reply = True
+    with pytest.raises(AgentEffectUnknown):
+        act(runtime, task, frame)
+    with pytest.raises(AgentTaskError, match="waiting_user"):
+        runtime.finish(task)
+    assert semantic_matches({"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}},
+                            runtime.store.actions(task), target.observe()) is None
+    assert runtime.store.actions(task)[0]["status"] == "uncertain"
+
+
+@pytest.mark.parametrize("clause", [
+    {"kind": "semantic", "tool": "AC_unoffered", "fields": {"value": 1}},
+    {"kind": "semantic", "tool": "AC_increment", "fields": {}},
+    {"kind": "semantic", "tool": "AC_increment", "fields": {"value": []}},
+    {"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}, "address": 4096},
+])
+def test_semantic_completion_cannot_add_grants_or_unbounded_queries(managed, clause):
+    runtime, target, _task = managed
+    with pytest.raises(AgentTaskError):
+        runtime.submit(AgentTaskSpec(goal="invalid", target="fixture", allowed_tools=("AC_increment",),
+                                     success_criteria=(clause,)))
+    assert target.calls == [] and target.reads == 0

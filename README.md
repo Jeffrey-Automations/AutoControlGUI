@@ -57,6 +57,8 @@ Wayland NORMAL input runs libei and portal calls in an owned helper process. Tim
 
 Managed agent tasks and cross-host transfers include experimental features. See the implementation notes and project progress before relying on them in production.
 
+Host-selected semantic targets support a `semantic` completion condition that compares fresh state with the recorded target identity and expected fields. It does not grant memory access or enable a native target. See [semantic completion](docs/process_memory_contract.md#semantic-completion).
+
 ## Documentation
 
 - [Installation, platform support and configuration](docs/guides/en/setup.md)
