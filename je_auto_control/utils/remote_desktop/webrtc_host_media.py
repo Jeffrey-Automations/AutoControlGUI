@@ -19,6 +19,9 @@ from je_auto_control.utils.remote_desktop.webrtc_transport import (
     get_bridge, wait_for_ice_gathering,
 )
 
+_VIEWER_VIDEO_TASK = "viewer video task"
+_OPUS_RECEIVER = "opus receiver"
+
 if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
     from je_auto_control.utils.remote_desktop.webrtc_audio import OpusMicReceiver, OpusMicAudioTrack
     from je_auto_control.utils.remote_desktop.webrtc_transport import (
@@ -148,7 +151,7 @@ class MediaNegotiationMixin:
         """
         if self._pc is None:
             return
-        self._media_owners.require_available("viewer video task")
+        self._media_owners.require_available(_VIEWER_VIDEO_TASK)
         self._config.accept_viewer_video = True
         self._queue_for_media_peer(self._add_recvonly_video_and_renegotiate)
 
@@ -156,7 +159,7 @@ class MediaNegotiationMixin:
         """Live-add a recvonly audio transceiver and renegotiate."""
         if self._pc is None:
             return
-        self._media_owners.require_available("opus receiver")
+        self._media_owners.require_available(_OPUS_RECEIVER)
         self._config.accept_viewer_audio_opus = True
         self._queue_for_media_peer(self._add_recvonly_audio_and_renegotiate)
 
@@ -210,7 +213,7 @@ class MediaNegotiationMixin:
             except (RuntimeError, OSError) as error:
                 autocontrol_logger.debug("inactivate video: %r", error)
         peer, task = self._pc, self._viewer_video_task
-        self._media_owners.schedule("viewer video task", lambda: self._retire_live_video(peer, task))
+        self._media_owners.schedule(_VIEWER_VIDEO_TASK, lambda: self._retire_live_video(peer, task))
 
     def _deactivate_recvonly_audio(self) -> None:
         if self._pc is None:
@@ -228,15 +231,15 @@ class MediaNegotiationMixin:
         if receiver is None:
             self._spawn_bg(self._async_renegotiate())
             return
-        self._media_owners.schedule("opus receiver", lambda: self._retire_live_audio(peer, receiver))
+        self._media_owners.schedule(_OPUS_RECEIVER, lambda: self._retire_live_audio(peer, receiver))
 
     async def _retire_live_audio(self, peer: Optional["RTCPeerConnection"], receiver: "OpusMicReceiver") -> None:
         if self._pc is not peer or self._opus_audio_receiver is not receiver:
             return
-        await self._media_owners.stop_field_async("opus receiver", receiver)
-        if self._opus_audio_receiver is receiver:
+        await self._media_owners.stop_field_async(_OPUS_RECEIVER, receiver)
+        if self._opus_audio_receiver is receiver:  # NOSONAR  # the await above may have replaced it
             self._opus_audio_receiver = None
-        if self._pc is peer and not self._closed.is_set():
+        if self._pc is peer and not self._closed.is_set():  # NOSONAR  # the peer can change during the await
             self._spawn_bg(self._async_renegotiate())
 
     async def _retire_live_video(self, peer: Optional["RTCPeerConnection"],
@@ -253,6 +256,6 @@ class MediaNegotiationMixin:
             finally:
                 if task.done() and self._viewer_video_task is task:
                     self._viewer_video_task = None
-        self._media_owners.settled("viewer video task")
+        self._media_owners.settled(_VIEWER_VIDEO_TASK)
         if self._pc is peer and not self._closed.is_set():
             self._spawn_bg(self._async_renegotiate())

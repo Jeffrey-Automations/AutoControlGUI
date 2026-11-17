@@ -101,7 +101,7 @@ def _sender_outcome(work: Callable[[], None], stop: Event) -> Optional[BaseExcep
     try:
         if not stop.is_set():
             work()
-    except BaseException as error:  # reason: transfer the original worker outcome to its owning request
+    except BaseException as error:  # NOSONAR  # reason: outcome handed to the owning request
         return error
     return None
 

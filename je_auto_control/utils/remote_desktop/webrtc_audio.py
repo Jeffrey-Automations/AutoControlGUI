@@ -146,19 +146,19 @@ class OpusMicAudioTrack(MediaStreamTrack):
         failures: list[BaseException] = []
         try:
             super().stop()
-        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+        except BaseException as error:  # NOSONAR  # reason: independent child cleanup; failures re-raised
             failures.append(error)
         try:
             if not self._loop.is_closed():
                 self._loop.call_soon_threadsafe(self._end_queue)
-        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+        except BaseException as error:  # NOSONAR  # reason: independent child cleanup; failures re-raised
             failures.append(error)
         try:
             with self._lock:
                 if self._capture is not None:
                     self._capture.stop()
                     self._capture = None
-        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+        except BaseException as error:  # NOSONAR  # reason: independent child cleanup; failures re-raised
             failures.append(error)
         raise_cleanup_failures(failures)
 
@@ -240,14 +240,14 @@ class OpusMicReceiver:
         except MediaRetirementError as error:
             if error.owner is not self or not error.status.retryable:
                 failures.append(error)
-        except BaseException as error:  # reason: observe the task despite an independent player or scheduling failure
+        except BaseException as error:  # NOSONAR  # reason: observe the task despite other failures
             failures.append(error)
         task = self._task
         try:
             if task is not None and not task.done() and not task.get_loop().is_closed():
                 await asyncio.wait({task})
             self.stop()
-        except BaseException as error:  # reason: preserve earlier controls after observing actual task completion
+        except BaseException as error:  # NOSONAR  # reason: keep earlier controls once the task is done
             failures.append(error)
         raise_cleanup_failures(failures)
 
@@ -269,13 +269,13 @@ class OpusMicReceiver:
         failures: list[BaseException] = []
         try:
             self._cancel_task()
-        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+        except BaseException as error:  # NOSONAR  # reason: independent child cleanup; failures re-raised
             failures.append(error)
         try:
             if not self._player_retired:
                 self._player.stop()
                 self._player_retired = True
-        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+        except BaseException as error:  # NOSONAR  # reason: independent child cleanup; failures re-raised
             failures.append(error)
         raise_cleanup_failures(failures)
         require_retired(self)

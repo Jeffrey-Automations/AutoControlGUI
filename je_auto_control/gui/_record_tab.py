@@ -87,14 +87,20 @@ class RecordTab(TranslatableMixin, QWidget):
         return _t(key)
 
     def sync_with_engine(self) -> None:
-        state = getattr(auto_control_record.recorder, "is_recording", None)
-        self._record_status_key = (
-            "task_running" if self._work.running else
-            "record_playing" if self._playback_runs.running else
-            "record_recording" if state is True else
-            "record_idle" if state is False else "record_unknown"
-        )
+        self._record_status_key = self._status_key(getattr(auto_control_record.recorder, "is_recording", None))
         self._apply_record_status_label()
+
+    def _status_key(self, recording: object) -> str:
+        """The status label for the tab's own work, then playback, then the recorder's state."""
+        if self._work.running:
+            return "task_running"
+        if self._playback_runs.running:
+            return "record_playing"
+        if recording is True:
+            return "record_recording"
+        if recording is False:
+            return "record_idle"
+        return "record_unknown"
 
     def showEvent(self, event: QShowEvent) -> None:
         self.sync_with_engine()

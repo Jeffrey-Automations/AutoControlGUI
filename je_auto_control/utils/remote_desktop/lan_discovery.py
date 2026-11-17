@@ -131,14 +131,14 @@ class HostAdvertiser:
                 try:
                     if self._info is not None:
                         self._zc.unregister_service(self._info)
-                except BaseException as error:  # reason: finish close and then preserve any control signal
+                except BaseException as error:  # NOSONAR  # reason: finish close; control signals preserved
                     failures.append(error)
                 else:
                     self._unregister = Completion.CONFIRMED
             if self._release is not Completion.CONFIRMED:
                 try:
                     self._zc.close()
-                except BaseException as error:  # reason: finish close and then preserve any control signal
+                except BaseException as error:  # NOSONAR  # reason: finish close; control signals preserved
                     failures.append(error)
                     self._release = Completion.UNCERTAIN
                 else:
@@ -263,7 +263,7 @@ class HostBrowser:
             self._failures.add("browser.acquire")
             try:
                 self.stop()
-            except BaseException as cleanup_error:  # reason: retain ownership and preserve the original control signal
+            except BaseException as cleanup_error:  # NOSONAR  # reason: keep ownership; original signal preserved
                 preserve_interrupted_owner(self, error, cleanup_error)
                 raise MediaRetirementError(self) from error
             raise
@@ -318,7 +318,7 @@ class HostBrowser:
             self._cancel_attempted = True
         try:
             self._browser.cancel()
-        except BaseException as error:  # reason: close Zeroconf independently before preserving interruption
+        except BaseException as error:  # NOSONAR  # reason: close Zeroconf; interruption preserved
             failures.append(error)
             with self._state_lock:
                 self._failures.add("browser.cancel")
@@ -332,7 +332,7 @@ class HostBrowser:
                 return
         try:
             zc.close()
-        except BaseException as error:  # reason: retain the documented retryable close before preserving interruption
+        except BaseException as error:  # NOSONAR  # reason: keep retryable close; interruption kept
             failures.append(error)
             with self._state_lock:
                 self._release = Completion.UNCERTAIN
@@ -347,7 +347,7 @@ class HostBrowser:
             return
         try:
             finished = not self._browser.is_alive()
-        except BaseException as error:  # reason: failed observation cannot acknowledge thread completion
+        except BaseException as error:  # NOSONAR  # reason: a failed observation is not completion
             failures.append(error)
             with self._state_lock:
                 self._failures.add("browser.observe")

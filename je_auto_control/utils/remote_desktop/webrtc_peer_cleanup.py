@@ -9,6 +9,8 @@ from je_auto_control.utils.remote_desktop.webrtc_file_tasks import cancel_file_r
 from je_auto_control.utils.remote_desktop.webrtc_retirement import CleanupAttempt, Resource
 from je_auto_control.utils.remote_desktop.webrtc_media_owners import AsyncMediaStop, PeerMediaOwners
 
+_VIEWER_VIDEO_TASK = "viewer video task"
+
 if TYPE_CHECKING:
     from je_auto_control.utils.remote_desktop.webrtc_host import WebRTCDesktopHost
     from je_auto_control.utils.remote_desktop.webrtc_viewer import WebRTCDesktopViewer
@@ -47,19 +49,19 @@ async def _close_peer(owner: WebRTCDesktopHost | WebRTCDesktopViewer,
     if attempt.run(lambda: close_file_receiver(owner._files_receiver, owner._files_channel), "files"):
         owner._files_receiver = owner._files_channel = None
     if peer is not None and await attempt.wait(peer.close, "peer"):
-        if owner._pc is peer:
+        if owner._pc is peer:  # NOSONAR  # the await above may have installed a new peer
             owner._pc = None
     if owner._pc is None:
         owner._control_channel = owner._mic_channel = None
 
 
 async def _host_tasks(owner: WebRTCDesktopHost, attempt: CleanupAttempt) -> None:
-    await owner._media_owners.retire_slot("viewer video task", attempt)
+    await owner._media_owners.retire_slot(_VIEWER_VIDEO_TASK, attempt)
     if owner._viewer_video_task is not None:
         task = owner._viewer_video_task
-        if await attempt.wait(lambda: _cancel_task(task), "viewer video task") or task.done():
+        if await attempt.wait(lambda: _cancel_task(task), _VIEWER_VIDEO_TASK) or task.done():
             owner._viewer_video_task = None
-            owner._media_owners.settled("viewer video task")
+            owner._media_owners.settled(_VIEWER_VIDEO_TASK)
 
 
 async def _viewer_tasks(owner: WebRTCDesktopViewer, attempt: CleanupAttempt) -> None:

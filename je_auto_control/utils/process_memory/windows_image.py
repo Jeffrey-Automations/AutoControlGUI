@@ -4,6 +4,7 @@ from __future__ import annotations
 import ctypes
 from dataclasses import dataclass, field
 from enum import Enum
+import functools
 import hashlib
 import math
 import threading
@@ -299,7 +300,7 @@ class WindowsImageObserver:
             self._state = _State.RETIRED
             for handle in tuple(reversed(self._handles)):
                 try:
-                    closed = _native(lambda: self._kernel.CloseHandle(handle), FailureReason.CLEANUP_FAILED)
+                    closed = _native(functools.partial(self._kernel.CloseHandle, handle), FailureReason.CLEANUP_FAILED)
                 except MemoryObservationError:
                     closed = 0
                 if closed:

@@ -537,8 +537,10 @@ def post_key(hwnd: int, keycode: int, character: str = "") -> bool:
     if character:
         # WM_CHAR carries UTF-16 code units: a character beyond the BMP is two.
         units = character[0].encode("utf-16-le")
-        return all([bool(_user32.PostMessageW(target, WM_CHAR, int.from_bytes(units[i:i + 2], "little"), 1))
-                    for i in range(0, len(units), 2)])
+        # Every unit is posted even after a failure (a list, not a short-circuiting generator).
+        sent = [bool(_user32.PostMessageW(target, WM_CHAR, int.from_bytes(units[i:i + 2], "little"), 1))
+                for i in range(0, len(units), 2)]
+        return all(sent)
     down, up = _key_lparams(keycode)
     posted = bool(_user32.PostMessageW(target, WM_KEYDOWN, int(keycode), down))
     return bool(_user32.PostMessageW(target, WM_KEYUP, int(keycode), up)) and posted

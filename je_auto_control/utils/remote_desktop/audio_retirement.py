@@ -110,7 +110,7 @@ class AudioLease:
     def _stop_stream(self, stream: AudioStream) -> BaseException | None:
         try:
             stream.stop(ignore_errors=False)
-        except BaseException as error:  # reason: close independently before preserving control signals
+        except BaseException as error:  # NOSONAR  # reason: close first; control signals preserved
             self._finalization = Completion.UNCERTAIN
             self._failures += ("audio.stop",)
             return error
@@ -123,7 +123,7 @@ class AudioLease:
         self._close_attempted = True
         try:
             stream.close(ignore_errors=False)
-        except BaseException as error:  # reason: record uncertain ownership before preserving control signals
+        except BaseException as error:  # NOSONAR  # reason: mark ownership uncertain; signals preserved
             self._resources = Completion.UNCERTAIN
             self._failures += ("audio.close",)
             return error

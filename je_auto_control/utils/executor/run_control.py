@@ -182,7 +182,7 @@ def stoppable_call(function: Callable[..., Any], *args: Any, **kwargs: Any) -> A
     def run() -> None:
         try:
             outcome["value"] = context.run(function, *args, **kwargs)
-        except BaseException as error:  # reason: handed to the waiting caller, which raises it
+        except BaseException as error:  # NOSONAR python:S5754  # reason: handed to the waiting caller, which raises it
             outcome["error"] = error
         finally:
             done.set()

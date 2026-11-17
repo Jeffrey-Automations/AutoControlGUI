@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import functools
 import threading
 import time
 from typing import Callable, Mapping, NoReturn, TypeVar
@@ -111,7 +112,7 @@ class _Operation:
             count = min(size - len(collected), region.base + region.size - current)
             self.bytes_read += count
             self.regions_read += 1
-            chunk = _provider_call(lambda: handle.read(current, count))
+            chunk = _provider_call(functools.partial(handle.read, current, count))
             self.check()
             if type(chunk) is not bytes or len(chunk) != count:
                 _fail(FailureReason.PARTIAL_READ)

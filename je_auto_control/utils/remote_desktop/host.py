@@ -290,7 +290,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         audio_error = None
         try:
             self._stop_audio_capture()
-        except BaseException as error:  # reason: finish independent host cleanup before preserving the audio failure
+        except BaseException as error:  # NOSONAR  # reason: finish host cleanup; audio failure kept
             audio_error = error
         try:
             self._listen_sock.close()

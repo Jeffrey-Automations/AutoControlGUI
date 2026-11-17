@@ -1,6 +1,6 @@
 """Recording Editor tab: trim, filter and rescale recorded action lists."""
 import json
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional
 
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
@@ -244,7 +244,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
             return
         self._mutate(scale_coordinates(self._actions, fx, fy))
 
-    def _filter_prefix(self, prefix: Union[str, tuple[str, ...]]) -> None:
+    def _filter_prefix(self, prefix: str | tuple[str, ...]) -> None:
         def keep(action: list[Any]) -> bool:
             if not (isinstance(action, list) and action):
                 return False
