@@ -709,7 +709,7 @@ Python／helper 來源及 DLL 的可信交付、服務獨立身分／空環境�
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。
 內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
 並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。
-fixture 的受管 profile／helper 已接合；靜態診斷 probe、可信交付及真實原生閉環仍待完成。
+fixture 的受管 profile／helper 及有時限的靜態診斷已接合；可信交付及真實原生閉環仍待完成。
 不提供任意 PID／位址記憶體入口；
 記憶體失敗原因已透過封閉錯誤封包跨 helper 保留型別；未知原因與混合封包拒絕且不回顯內容。
 

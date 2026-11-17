@@ -91,7 +91,7 @@ REST 主機資料讀取與對應 MCP 權限一致：排程、遠端 session、US
 
 內部 Windows 行程記憶體準備工作新增映像檔量測，透過保留的唯讀 handle 執行有界雜湊並保留失敗清理供重試。這只是觀測到的檔案證據，不是已載入程式碼或 fixture 的身分證明；原生驗收尚未完成，且不提供任意位址記憶體工具。詳見[契約](../docs/process_memory_contract.md)。
 
-主機管理的 fixture profile 已透過既有目標管理 API 與 GUI JSON 編輯器，將固定 worker 綁定到已審閱的設定路徑與摘要。註冊不會取得資源；bootstrap 與 configure 都核對部署綁定。靜態 probe 與原生驗收仍待完成。內部套件現有 fixture worker，可接收主機固定雜湊的部署檔，並僅在受管 readiness 中取得 fixture。設定與映像檢查不證明 Python 原始碼或 DLL 可信。原生執行仍暫停；私有交付格式與限制記載於同一契約。
+主機管理的 fixture profile 透過既有目標管理 API 與 GUI JSON 編輯器，將固定 worker 綁定到已審閱的設定路徑與摘要。註冊不會取得資源；bootstrap 與 configure 都核對部署綁定。明確呼叫 probe 時，會由有時限的背景 helper 檢查靜態產物，回報 `static_artifacts_ready`、`fixture_execution=not_run` 與 `native_evidence=not_recorded`。runtime 關閉時，會保留所有權直到診斷 helper 完成回收。fixture 僅在受管 readiness 中取得。設定與映像檢查不證明 Python 原始碼或 DLL 可信。原生執行仍暫停；私有交付格式與限制記載於同一契約。
 
 WebRTC peer 也會保留媒體建構與清理失敗的原始資源，觀測即時停用完成，並將延後協商綁定原 peer。媒體 producer 關閉會回報待完成或不確定的清理結果，並保留原始資源。音訊與錄影不會透過不安全的 close／flush 重播宣稱成功；LAN close 可明確重試。應用程式 caretaker 與 GUI 整合仍待完成。詳見[清理契約](../docs/media_retirement_contract.md)。
 

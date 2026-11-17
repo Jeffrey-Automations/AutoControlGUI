@@ -13,13 +13,23 @@ from je_auto_control.utils.agent_runtime.models import AgentTaskSpec, detached, 
 from je_auto_control.utils.agent_runtime.target_config import AgentTargetProfile, reviewed_tools, validate_root_snapshot
 from je_auto_control.utils.agent_runtime.target_factory import build_target
 from je_auto_control.utils.agent_runtime.native_target import NativeDesktopTarget
+from je_auto_control.utils.agent_runtime.fixture_probe import FixtureProbes, check_management
 from je_auto_control.utils.rbac.authorization import current_authorization
+from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
 OPERATIONS = ("register", "get", "disable", "enable", "probe")
 _PROBE_FIELDS = frozenset({"status", "reason", "python", "sdk", "readback_contract", "transfer_contract",
-                            "playwright", "browser_launch", "native_evidence"})
+                            "playwright", "browser_launch", "native_evidence", "checked_bytes", "fixture_execution"})
 _PROBE_STATUSES = frozenset({"python_dependencies_ready", "dependency_missing", "incompatible", "unknown",
-                              "not_supported"})
+                              "not_supported", "static_artifacts_ready"})
+
+
+def _probe_report(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, dict) or not isinstance(raw.get("status"), str) or raw["status"] not in _PROBE_STATUSES:
+        raise AgentTaskError("invalid target dependency probe response")
+    if raw.get("native_evidence") != "not_recorded":
+        raise AgentTaskError("dependency probes cannot establish native evidence")
+    return {key: item for key, item in raw.items() if key in _PROBE_FIELDS}
 
 
 def _transfer_profile(profile: AgentTargetProfile, row: Any) -> dict[str, Any]:
@@ -39,6 +49,7 @@ class AgentTargetProfiles:
         self._profiles: dict[str, AgentTargetProfile] = {}
         self._enabled: dict[str, bool] = {}
         self._last_probes: dict[str, dict[str, Any]] = {}
+        self._fixture_probes = FixtureProbes()
         with runtime.store.connection() as connection:
             rows = connection.execute("SELECT * FROM agent_target_profiles ORDER BY created,name LIMIT 101").fetchall()
             controls = connection.execute("SELECT * FROM agent_target_controls").fetchall()
@@ -66,6 +77,8 @@ class AgentTargetProfiles:
         if operation == "probe":
             return self._probe(value)
         with self._runtime._mutex:
+            if self._runtime._closed:
+                raise AgentTaskError("runtime is closed")
             if operation == "register":
                 return self._register(value)
             name = self._request_name(value)
@@ -74,22 +87,35 @@ class AgentTargetProfiles:
             return self._details(name)
 
     def _probe(self, value: dict[str, Any]) -> dict[str, Any]:
+        authority = DeferredAuthorization.capture()
         with self._runtime._mutex:
+            if self._runtime._closed:
+                raise AgentTaskError("runtime is closed")
             name = self._request_name(value)
             adapter = self._runtime._targets[name]
+            profile = self._profiles.get(name)
+        fixture = profile is not None and profile.kind == "fixture"
         probe = getattr(adapter, "probe", None)
-        raw = detached(probe() if callable(probe) else {"status": "not_supported",
-                                                        "native_evidence": "not_recorded"})
-        if not isinstance(raw, dict) or not isinstance(raw.get("status"), str) or raw["status"] not in _PROBE_STATUSES:
-            raise AgentTaskError("invalid target dependency probe response")
-        if raw.get("native_evidence") != "not_recorded":
-            raise AgentTaskError("dependency probes cannot establish native evidence")
-        report = {key: item for key, item in raw.items() if key in _PROBE_FIELDS}
+        if profile is not None and fixture:
+            raw = self._fixture_probes.probe(profile, authority)
+        else:
+            raw = detached(probe() if callable(probe) else {"status": "not_supported",
+                                                            "native_evidence": "not_recorded"})
+        report = _probe_report(raw)
         with self._runtime._mutex:
+            if self._runtime._closed:
+                raise AgentTaskError("runtime is closed")
+            if fixture:
+                self._fixture_probes.check()
+                check_management(authority)
             self._last_probes[name] = {**report, "checked_at": time.time()}
             details = self._details(name)
             details["probe"] = detached(self._last_probes[name])
             return details
+
+    def close(self) -> None:
+        """Retire diagnostic helpers even when no task has acquired a target lease."""
+        self._fixture_probes.close()
 
     def _request_name(self, value: dict[str, Any]) -> str:
         if set(value) != {"name"} or not isinstance(value["name"], str):

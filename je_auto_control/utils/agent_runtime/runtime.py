@@ -663,7 +663,7 @@ class AgentRuntime:
             return
         retire_runtime_inputs(self._transfers, list(self._leases), self._token, self._retire, self._retained_browsers)
         with close_runtime_ownership(self._mutex, self._owner_lock, self.evidence.history,
-                                     lambda: (self._closed, self._transfers), self._presence) as retiring:
+                            lambda: (self._closed, self._transfers), self._presence, self.target_profiles) as retiring:
             if retiring:
                 self._closed = True
 

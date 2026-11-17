@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261118-20 | 2026-11-18 | Bound static fixture diagnostics to retained helper ownership | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-08 | 2026-11-18 | Prepare a native fixture artifact without executing it | #done #process-memory | [2026-11-c](2026-11-c.md) |
 | U-20261118-07 | 2026-11-18 | Bind fixture IPC to its measured launch handle | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-06 | 2026-11-18 | Carry fixture control over owned cancellable RPC | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |

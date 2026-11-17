@@ -12,7 +12,9 @@ from .fixture_target import FixtureImage, OwnedFixtureTarget
 from .native_worker import NativeWorker
 from .models import AgentTaskSpec
 from .target_config import AgentTargetProfile
+from .parent_watch import start_parent_watch
 from ..exception.exceptions import AutoControlException
+from ..process_memory.pe_image import plan_pinned_image
 from ..process_memory.windows import WindowsProcessProvider
 from ..process_memory.windows_image import WindowsImageObserver
 
@@ -41,6 +43,27 @@ class FixtureWorker(NativeWorker):
         super()._configure_scope(payload)
 
 
+class FixtureInspectionWorker(NativeWorker):
+    """Accept only static inspection; never construct a native target or configure actions."""
+
+    def __init__(self, source: Any, sink: Any, *, path: str, expected_sha256: str) -> None:
+        super().__init__(source, sink, target=object())
+        self._reference = fixture_settings({"config_path": path, "config_sha256": expected_sha256})
+
+    def _dispatch(self, operation: str, payload: dict[str, Any]) -> Any:
+        if not isinstance(payload, dict) or payload:
+            raise AgentTaskError("fixture inspection requires an empty payload")
+        if operation == "bootstrap":
+            return {"protocol": 1, "fixture_inspection": 1}
+        if operation != "inspect_fixture":
+            raise AgentTaskError("fixture inspection operation is not supported")
+        image = load_fixture_image(self._reference["config_path"], self._reference["config_sha256"])
+        plan = plan_pinned_image(image.baseline, image.pin)
+        return {"status": "static_artifacts_ready", "config_sha256": self._reference["config_sha256"],
+                "target": image.target_id, "checked_bytes": plan.checked_bytes,
+                "native_evidence": "not_recorded", "fixture_execution": "not_run"}
+
+
 def create_target(image: FixtureImage) -> OwnedFixtureTarget:
     """Bind native owners without launching; managed readiness acquires the pinned process."""
     if sys.platform != "win32" or sys.maxsize <= 2**32:
@@ -65,9 +88,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Private pinned fixture worker", allow_abbrev=False)
     parser.add_argument("--config", required=True)
     parser.add_argument("--config-sha256", required=True)
+    parser.add_argument("--inspect", action="store_true")
     options = parser.parse_args(argv)
     try:
-        serve(options.config, options.config_sha256, sys.stdin.buffer, sys.stdout.buffer)
+        if options.inspect:
+            start_parent_watch()
+            FixtureInspectionWorker(sys.stdin.buffer, sys.stdout.buffer, path=options.config,
+                                    expected_sha256=options.config_sha256).run()
+        else:
+            serve(options.config, options.config_sha256, sys.stdin.buffer, sys.stdout.buffer)
     except (AutoControlException, OSError):
         sys.stderr.write("fixture worker failed\n")
         return 2

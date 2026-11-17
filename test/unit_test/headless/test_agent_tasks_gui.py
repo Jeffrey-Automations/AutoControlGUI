@@ -24,6 +24,10 @@ def test_fixture_profile_uses_existing_target_editor_and_actions(monkeypatch, tm
         tab._target_request.setPlainText(json.dumps(value))
         dict(tab.menu_actions())["agent_target_apply"]()
         assert submitted == [("target", {"operation": "register", "request": value})]
+        tab._target_operation.setCurrentIndex(tab._target_operation.findData("probe"))
+        tab._target_request.setPlainText(json.dumps({"name": "fixture"}))
+        dict(tab.menu_actions())["agent_target_apply"]()
+        assert submitted[-1] == ("target", {"operation": "probe", "request": {"name": "fixture"}})
     finally:
         tab.close()
         shiboken6.delete(tab)

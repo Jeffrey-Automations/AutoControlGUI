@@ -490,9 +490,25 @@ acquisition. The GUI Apply target action passes the same profile through the sha
 service; no separate GUI authority exists.
 
 Passive listings retain `readiness=not_probed` and `native_evidence=not_recorded`.
-The diagnostic `probe` operation currently reports `not_supported`; a bounded static
-artifact probe remains to be integrated. Neither registration nor the injected
-roundtrip/disable tests prove native availability. Native execution remains paused.
+The explicit diagnostic `probe` uses a separate non-display helper with a 15-second
+bootstrap deadline and a 10-second artifact inspection deadline. It validates the
+pinned configuration and PE bytes without constructing a native target or executing
+the fixture. Successful reports contain `status=static_artifacts_ready`, bounded
+`checked_bytes`, `fixture_execution=not_run` and `native_evidence=not_recorded`.
+The private worker's `--inspect` mode accepts only empty bootstrap/inspection requests;
+it refuses task configuration, desktop events and execution. Static inspection is
+portable; it does not bypass the Windows x64 gate for actual fixture acquisition.
+
+At most two inspections may own capacity in one host process, with one per profile
+per runtime. Host-management authority is refreshed during request polling and before
+publication. Timeouts and cancellation retire the helper. Failed retirement retains
+its owner and capacity for runtime-close retries. Shutdown seals new admissions and
+retains the runtime database lock while construction or retirement is unfinished,
+including when no task lease exists. Passive listing never starts this helper.
+The GUI target-operation selector with Apply target and the headless target-control
+API use this same path.
+Neither this diagnostic nor the injected roundtrip/disable tests prove native
+availability or loaded-code trust. Native execution remains paused.
 
 ### Completion evidence
 
