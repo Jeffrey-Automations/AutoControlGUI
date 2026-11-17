@@ -1631,7 +1631,7 @@ receipts without replaying effects. Accepted commands await an independent read
 of their desired state before another command is admitted; unknown outcomes
 cannot be cleared by a matching read. Status comparison is non-atomic and a
 receipt proves only acceptance. Timeouts bound admission and reject late output,
-but cannot interrupt native calls or cleanup. Managed profile/helper integration,
+but cannot interrupt native calls or cleanup. Trusted native deployment,
 dependency effect review and native service acceptance remain pending.
 
 `service_observation.py` defines closed service provenance, capture and acceptance
@@ -1649,5 +1649,10 @@ bootstrap and evidence contracts. `service_native_target.py` pins helper evidenc
 to the original bootstrap binding and uses the existing non-display owned channel.
 `service_scope.py` derives a same-user resource lock from printable ASCII service
 keys, independent of target/configuration/database names. Typed service errors
-cross IPC before event interpretation. Native deployment, host profiles, Unicode
-key canonicalization and cross-account coordination remain pending.
+cross IPC before event interpretation. The service profile carries its ASCII key
+so registration/reload can remain independent of deployment-file availability.
+`service_deployment.py` validates bounded pinned config and the operation ceiling;
+`service_entrypoint.py` validates profile/task/deployment identity before the shared
+worker accepts scope. The config digest and task profile digest remain distinct.
+Native deployment, Unicode key canonicalization and cross-account coordination
+remain pending.

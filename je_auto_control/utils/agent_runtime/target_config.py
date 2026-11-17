@@ -23,8 +23,9 @@ def reviewed_tools(kind: str) -> frozenset[str]:
     from je_auto_control.utils.agent_runtime.targets import DESKTOP_TOOLS
     from je_auto_control.utils.agent_runtime.browser_commands import BROWSER_ADAPTER_TOOLS
     from je_auto_control.utils.agent_runtime.fixture_commands import FIXTURE_COMMAND
+    from je_auto_control.utils.agent_runtime.service_observation import SERVICE_TOOLS
     kinds = {"files": FILE_TOOLS, "desktop": DESKTOP_TOOLS, "browser": BROWSER_ADAPTER_TOOLS,
-             "fixture": frozenset({FIXTURE_COMMAND}), "uia_fixture": frozenset()}
+             "fixture": frozenset({FIXTURE_COMMAND}), "uia_fixture": frozenset(), "service": frozenset(SERVICE_TOOLS)}
     if kind not in kinds:
         raise AgentTaskError("target kind does not have an implemented managed adapter")
     return kinds[kind]
@@ -89,8 +90,9 @@ class AgentTargetProfile:
         validate_root_snapshot(self.roots)
         if "helper_python" in spec.options:
             raise AgentTaskError("helper Python is host configuration, not a task option")
-        if self.kind in {"fixture", "uia_fixture"} and {"config_path", "config_sha256"} & set(spec.options):
-            raise AgentTaskError("fixture deployment is host configuration, not a task option")
+        if self.kind in {"fixture", "uia_fixture", "service"} and {
+                "config_path", "config_sha256", "service_key"} & set(spec.options):
+            raise AgentTaskError("pinned deployment is host configuration, not a task option")
         if not set(spec.allowed_tools) <= set(self.allowed_tools):
             raise AgentTaskError("task tools exceed the host target profile")
         if not {name.casefold() for name in spec.apps} <= {name.casefold() for name in self.apps}:
@@ -117,8 +119,10 @@ def _settings(kind: str, value: Mapping[str, Any]) -> dict[str, Any]:
     data = detached(value)
     if not isinstance(data, dict):
         raise AgentTaskError("target profile settings must be an object")
-    if kind in {"fixture", "uia_fixture"}:
-        return deployment_settings(data)
+    if kind in {"fixture", "uia_fixture", "service"}:
+        from .service_deployment import service_settings
+        parsers = {"fixture": deployment_settings, "uia_fixture": deployment_settings, "service": service_settings}
+        return parsers[kind](data)
     allowed = {"allowed_origins"} | ({"platform"} if kind == "desktop" else set())
     if kind == "browser":
         allowed.add("helper_python")
@@ -146,8 +150,8 @@ def _normalize_origins(data: dict[str, Any]) -> None:
 
 
 def _check_resource_scope(kind: str, spec: AgentTaskSpec) -> None:
-    if kind in {"fixture", "uia_fixture"} and (spec.roots or spec.apps):
-        raise AgentTaskError("fixture profiles cannot grant filesystem roots or desktop applications")
+    if kind in {"fixture", "uia_fixture", "service"} and (spec.roots or spec.apps):
+        raise AgentTaskError("pinned profiles cannot grant filesystem roots or desktop applications")
     if kind == "files" and (not spec.roots or spec.apps):
         raise AgentTaskError("file target profiles require explicit roots and no desktop applications")
     if kind == "desktop" and not spec.apps:
@@ -193,8 +197,8 @@ def check_host_platform(profile: AgentTargetProfile) -> None:
     """Reject a resource configured for another OS/session before acquiring native input."""
     if profile.kind == "desktop" and profile.settings["platform"] != desktop_platform():
         raise AgentTaskError("target profile platform does not match this host session")
-    if profile.kind in {"fixture", "uia_fixture"} and (sys.platform != "win32" or sys.maxsize <= 2**32):
-        raise AgentTaskError("fixture target requires 64-bit Windows")
+    if profile.kind in {"fixture", "uia_fixture", "service"} and (sys.platform != "win32" or sys.maxsize <= 2**32):
+        raise AgentTaskError("pinned target requires 64-bit Windows")
 
 
 def desktop_platform() -> str:

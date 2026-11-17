@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 from typing import Any, ClassVar, Mapping, Sequence
 
 from .errors import AgentTaskError
@@ -12,19 +13,40 @@ from .service_observation import SERVICE_TOOLS, ServiceBinding, ServiceObservati
 from .service_scope import service_resource, service_scope
 from .service_target import ServiceTarget
 from .service_worker import parse_service_bootstrap
+from .target_config import AgentTargetProfile
 
 
 class NativeServiceTarget(NativeDesktopTarget, ServiceTarget):
-    """Trusted host argv and ASCII service key select this private non-profile helper."""
+    """Trusted host configuration selects one background helper and ASCII service ownership key."""
 
     _display_helper: ClassVar[bool] = False
 
     def __init__(self, *, argv: Sequence[str], service_key: str, target_id: str,
-                 config_digest: str, lock_root: Path | None = None) -> None:
+                 config_digest: str, lock_root: Path | None = None,
+                 profile: AgentTargetProfile | None = None) -> None:
         self._expected = ServiceBinding(target_id, config_digest, service_scope(service_key), "unbound")
+        if profile is not None and (profile.kind != "service" or profile.name != target_id
+                or profile.settings["config_sha256"] != config_digest
+                or service_scope(profile.settings["service_key"]) != self._expected.scope_id):
+            raise AgentTaskError("service profile does not match its fixed helper identity")
         self._binding: ServiceBinding | None = None
         super().__init__(argv=argv, resource_path=service_resource(service_key, lock_root),
-                         recovery_probe=lambda: None)
+                         recovery_probe=lambda: None, profile=profile.to_dict() if profile is not None else None)
+
+    @classmethod
+    def from_profile(cls, profile: AgentTargetProfile) -> NativeServiceTarget:
+        """Build the fixed service worker without reading configuration or acquiring resources."""
+        if profile.kind != "service":
+            raise AgentTaskError("service adapter requires a service profile")
+        settings = profile.settings
+        argv = (sys.executable, "-I", "-u", "-m", "je_auto_control.utils.agent_runtime.service_entrypoint",
+                "--config", settings["config_path"], "--config-sha256", settings["config_sha256"])
+        return cls(argv=argv, service_key=settings["service_key"], target_id=profile.name,
+                   config_digest=settings["config_sha256"], profile=profile)
+
+    def probe(self) -> dict[str, str]:
+        """Report missing native evidence without opening configuration or starting a helper."""
+        return {"status": "not_supported", "native_evidence": "not_recorded"}
 
     @property
     def service_binding(self) -> ServiceBinding:
@@ -43,6 +65,8 @@ class NativeServiceTarget(NativeDesktopTarget, ServiceTarget):
 
     def check_spec(self, spec: AgentTaskSpec) -> None:
         """Reject task-selected identity and input scope before starting a helper."""
+        if self._profile is not None:
+            self._profile.check(spec)
         if (spec.target != self._expected.target_id or spec.mode != "external" or spec.roots or spec.apps
                 or not set(spec.allowed_tools) <= set(SERVICE_TOOLS)):
             raise AgentTaskError("service helper requires its fixed external scope")

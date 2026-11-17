@@ -2,10 +2,14 @@
 
 ## [Unreleased]
 
+- Host-reviewed service profiles now bind a fixed worker to pinned configuration,
+  an ASCII service key and bounded START/STOP permissions. Registration, reload
+  and probe remain passive; native service acceptance is still pending.
+
 - Internal service helpers now pin bootstrap and evidence to the same retained
   owner, preserve typed query failures and refuse desktop input during requests
   and retirement. ASCII service-name aliases share ownership across configurations
-  under the same lock root. No production service profile is registered.
+  under the same lock root. No production host configuration is changed.
 
 - Managed task criteria accept `service_state` for a host-selected in-process
   service adapter. START/running and STOP/stopped require confirmed acceptance

@@ -986,8 +986,8 @@ desktop noninterference. Existing semantic revision and multi-source report
 gates remain unchanged.
 
 Tests use the real managed runtime and injected service calls. Owned helper IPC
-and service locking are described below. Host profile registration, dependency
-review and native acceptance remain pending.
+and service locking are described below. Dependency review, trusted production
+deployment and native acceptance remain pending.
 
 ### Owned service helper IPC
 
@@ -1000,7 +1000,7 @@ helper cannot reuse the earlier owner's evidence. Service commands use a separat
 cannot dispatch them.
 
 The worker shares background request and retirement guards with semantic targets,
-while retaining separate service schemas. Service configuration accepts only the
+while retaining separate service schemas. Private service configuration accepts only the
 fixed task spec and owner. It rejects profile, presence and extra fields before
 changing worker state, and pins the original spec and authorization-store source.
 Request checkpoints refresh that authority. Request, cleanup and EOF retirement
@@ -1024,4 +1024,39 @@ canonicalization, coordination across Windows users and external SCM clients
 are not provided. The lower-level SCM reader's Unicode name support is unchanged.
 Hidden Python helper tests inject service calls and check actual child retirement;
 they do not establish native SCM compatibility or desktop noninterference.
-No production service profile or native service entry point is registered here.
+### Pinned service profiles
+
+A host-reviewed `service` profile accepts exactly `config_path`, `config_sha256`
+and `service_key` settings. The ASCII key determines the same-service lock before
+helper launch. Registration, reload and probe do not open the deployment file,
+start a helper or access SCM. A missing deployment therefore does not prevent
+reopening the runtime to manage unrelated targets, including when the service
+profile is disabled. Probe reports `not_supported` and `native_evidence=not_recorded`.
+
+The fixed worker loads at most 16 KiB of raw configuration and checks its pinned
+SHA-256 before parsing the duplicate-free, closed object:
+
+```json
+{"schema":1,"kind":"service","target":"reviewed-service","service_key":"ExampleService","operations":["start","stop"]}
+```
+
+Operations must be a nonempty unique list drawn from `start` and `stop`. The
+profile may narrow that ceiling through `allowed_tools`; tasks may narrow it
+again. Neither grants filesystem roots, desktop apps, arbitrary helper commands,
+remote SCM connections or credentials. The service key in the profile must match
+the loaded key's canonical scope. Case aliases match; whitespace is preserved.
+The deployment digest binds configuration bytes; the profile digest binds the
+host's task policy. They are separate identities.
+
+Pinned-worker configuration requires exactly `spec`, `owner` and `profile`.
+It validates deployment identity, operation ceilings, platform and the task's
+profile digest before delegating the unchanged spec and owner to the private
+worker contract. The full original task pin prevents later profile substitution.
+Private helpers still reject profile injection. Bootstrap and readback continue
+to require the same retained-owner binding; restarting cannot confirm an old
+command using a new owner.
+
+The profile does not attest a service executable, its dependencies or its desktop
+behavior. START can activate configured dependencies. No profile is registered on
+a real host by this change, and trusted interpreter/package delivery, dependency
+review and native background acceptance remain outstanding.

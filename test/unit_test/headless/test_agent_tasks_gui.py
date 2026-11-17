@@ -10,13 +10,15 @@ from PySide6.QtWidgets import QApplication, QPushButton  # noqa: E402  # reason:
 from je_auto_control.gui.agent_tasks_tab import AgentTasksTab  # noqa: E402  # reason: optional Qt import
 
 
-@pytest.mark.parametrize("kind", ["fixture", "uia_fixture"])
+@pytest.mark.parametrize("kind", ["fixture", "uia_fixture", "service"])
 def test_fixture_profile_uses_existing_target_editor_and_actions(monkeypatch, tmp_path, kind):
     import json
     import shiboken6
     from headless.test_agent_fixture_profiles import config
     if kind == "uia_fixture":
         from headless.test_agent_uia_profiles import config
+    elif kind == "service":
+        from headless.test_agent_service_profiles import config
     app = QApplication.instance() or QApplication([])
     tab = AgentTasksTab()
     submitted = []
@@ -28,9 +30,9 @@ def test_fixture_profile_uses_existing_target_editor_and_actions(monkeypatch, tm
         dict(tab.menu_actions())["agent_target_apply"]()
         assert submitted == [("target", {"operation": "register", "request": value})]
         tab._target_operation.setCurrentIndex(tab._target_operation.findData("probe"))
-        tab._target_request.setPlainText(json.dumps({"name": "fixture"}))
+        tab._target_request.setPlainText(json.dumps({"name": value["name"]}))
         dict(tab.menu_actions())["agent_target_apply"]()
-        assert submitted[-1] == ("target", {"operation": "probe", "request": {"name": "fixture"}})
+        assert submitted[-1] == ("target", {"operation": "probe", "request": {"name": value["name"]}})
     finally:
         tab.close()
         shiboken6.delete(tab)

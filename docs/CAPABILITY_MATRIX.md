@@ -1243,5 +1243,7 @@ It requires the matching confirmed acceptance and a new SCM report from the same
 retained owner after acceptance. A passing result reports SCM state, not atomic
 completion, health or desktop noninterference. These tool names are adapter-scoped,
 not global executor commands. Existing task APIs and the GUI JSON editor carry the
-criterion. Owned service-helper IPC has injected-call tests; service profile
-registration and native acceptance remain pending.
+criterion. The host-reviewed `service` profile pins `config_path`, `config_sha256`
+and an ASCII `service_key`. Its fixed worker checks the deployment's service and
+operation ceiling before accepting task scope. Registration, reload and probe do
+not read the deployment or access SCM; native acceptance remains pending.
