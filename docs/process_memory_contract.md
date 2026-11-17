@@ -286,6 +286,21 @@ echoing their contents. Legacy unstructured memory errors are rejected rather th
 parsed from text. This preserves read failure distinctions; an error after command
 dispatch still follows the uncertain-effect journal path, not automatic replay.
 
+`FixtureCommands` implements the internal `AC_fixture_set_state` adapter operation
+with exactly `document_id` and `job_status` arguments. It requires the host's
+schema-one binding, both fixture fields, a checked memory revision and a private
+launch nonce. The owned control transport receives only `compare_set`, under a
+one-second exchange ceiling and the live task checkpoint. This ceiling bounds the
+fixture exchange; it is not a measured service-level performance claim.
+Receipts must match the operation, nonce, requested values, exact scalar types and
+expected revision plus two. Unknown replies stop further commands; cleanup retains
+transport ownership until closure succeeds. The transport must retire failed
+streams to prevent late replies from serving later requests. The runtime never
+automatically resends an unknown effect. The internal command is not registered as
+a public executor command, and production control transport/launcher integration
+remains pending. Injected tests combine the actual reader, fixture buffers and
+runtime completion; they do not establish native acceptance.
+
 `NativeSemanticTarget` carries the same contract over the existing owned helper
 channel. Trusted host code supplies the reviewed helper argv and an explicit
 resource lock. The helper must advertise semantic protocol version one before

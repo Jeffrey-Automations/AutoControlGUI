@@ -671,7 +671,9 @@ uncertain 紀錄。現有 target 保留完整觀察比對；task／觀察 JSON �
 IPC fixture 已驗證成功回條但未生效及 helper 重啟；程序內 target 測試驗證快取回放拒絕。
 未知效果仍須審閱，未自動確認。
 自有 memory fixture 已有 launch-bound compare_set 與有界、不淘汰的重送回條紀錄；
-只有序列管線命令內的比較／提交原子性，尚未接入 runtime adapter。
+只有序列管線命令內的比較／提交原子性。FixtureCommands 已將內部命令接到 compare_set，
+嚴格比對回條身分、版本與欄位；以自有緩衝區及真實 reader 邏輯驗證 runtime 閉環，
+正式 control transport／launcher 尚未接入。
 內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
 並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。
 受管 profile、持有 reader 的原生 adapter／launcher 與公開記憶體入口尚未接上；

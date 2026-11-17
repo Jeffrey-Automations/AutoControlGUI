@@ -67,6 +67,9 @@ The internal MemorySemanticTarget composes a fixed host reader binding and a
 reviewed background command owner. Managed scope checks gate reads and commands;
 cleanup makes the target terminal and retains failed handle retirement for retry.
 Injected-provider tests exercise this path through AgentRuntime completion.
+FixtureCommands translates the one internal fixture operation into compare_set,
+binds strict receipts to the original revision and operation ID, and retires its
+command owner after an unknown reply. The reader remains read-only.
 The helper error codec preserves fixed memory failure reasons across IPC without
 serializing exception text; malformed or mixed memory error packets are refused.
 The internal Windows provider owns read/query handles and measures native process
