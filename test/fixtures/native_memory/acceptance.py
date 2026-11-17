@@ -17,6 +17,7 @@ from je_auto_control.utils.agent_runtime.fixture_commands import FIXTURE_COMMAND
 from je_auto_control.utils.agent_runtime.fixture_control import OwnedFixtureControl
 from je_auto_control.utils.agent_runtime.fixture_launch import OwnedChannelLauncher
 from je_auto_control.utils.agent_runtime.fixture_target import FixtureImage, OwnedFixtureTarget
+from je_auto_control.utils.agent_runtime.fixture_worker import create_target
 from je_auto_control.utils.agent_runtime.models import AgentTaskBudget
 from je_auto_control.utils.agent_runtime.semantic_target import SemanticSnapshot
 from je_auto_control.utils.exception.control_signals import is_run_interruption
@@ -260,12 +261,13 @@ def native_target(image: FixtureImage, *, trace: PageTrace | None = None) -> Own
     """Construct native owners only on the explicit Windows execution path."""
     if sys.platform != "win32" or sys.maxsize <= 2**32:
         raise ValueError("native smoke requires 64-bit Windows")
-    launcher = (OwnedChannelLauncher(("--rpc", "--challenge", image.challenge.hex()))
-                if trace is None else _PageLauncher(image, trace))
+    if trace is None:
+        return create_target(image)
+    launcher = _PageLauncher(image, trace)
 
     def provider(attestor):
         actual = WindowsProcessProvider(attestor)
-        return actual if trace is None else _PageProvider(actual, trace)
+        return _PageProvider(actual, trace)
 
     return OwnedFixtureTarget(image, launcher=launcher, lease=WindowsImageObserver(),
                               observer=WindowsImageObserver(),

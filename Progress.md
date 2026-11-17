@@ -698,7 +698,10 @@ OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLa
 取消與即時 profile 停用仍由主機 RPC 輪詢及 helper 退場處理，不能把 checkpoint 當成原子撤權或 syscall 中斷。
 語意 helper 已使用既有非顯示路由，Linux 有主機 binding 時只走精確 argv 的 owner service，
 政策缺失或服務失敗不得退回本機。此項僅有注入路由測試，尚未證明 Linux 原生隔離。
-正式 helper 來源交付、服務獨立身分／空環境下的套件與帳號檔存取，以及子 fixture 的 nested grant 仍待接合。
+套件已有私有 `fixture_worker` 入口，使用主機提供的固定設定及獨立 config SHA；
+先核對封閉 schema、映像 pin 與 PE 範圍，再交由受管 readiness 啟動。此路徑僅以靜態／注入測試驗證。
+Python／helper 來源及 DLL 的可信交付、服務獨立身分／空環境下的套件與帳號檔存取，
+以及子 fixture 的 nested grant 仍待接合；Windows fixture 入口不支援 Linux 原生讀取。
 原生 smoke 工具已有初始讀值、操作回條、新讀回、runtime 完成及回收的分項報告；
 目前只跑過靜態產物預檢與注入測試，不代表原生驗收或完整故障矩陣通過。
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。

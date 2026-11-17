@@ -91,6 +91,8 @@ Host read-only mode applies the same restrictions to explicitly supplied registr
 
 Internal Windows process-memory preparation can now measure a selected process image file through retained read-only handles, with bounded hashing and retryable cleanup. This is observed file evidence, not loaded-code or fixture attestation; native acceptance and public memory tools remain unavailable. See [the contract](docs/process_memory_contract.md).
 
+An internal packaged fixture worker now accepts a host-pinned deployment file and acquires the fixture only during managed readiness. Its config/image checks do not attest Python source or DLLs. Native execution remains paused; the private delivery format and limits are documented in the same contract.
+
 WebRTC peers also retain failed media constructors and children, observe live disable completion, and bind deferred renegotiation to its original peer. Media producer shutdown now reports pending or uncertain cleanup and retains original resources. Audio and recorder failures are never turned into success by unsafe close or flush replay. LAN close supports explicit retry; application caretaker and GUI integration remain pending. See [the retirement contract](docs/media_retirement_contract.md).
 
 HostBrowser also rejects late publications and retains unfinished thread/close ownership; dialog integration remains pending.

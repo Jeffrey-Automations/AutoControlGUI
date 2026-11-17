@@ -365,6 +365,40 @@ imports and authority-store access under the service's separate identity and emp
 environment still need provisioning. A child fixture also needs nested-grant
 integration. These remain production prerequisites, with native execution paused.
 
+The private packaged entry is `je_auto_control.utils.agent_runtime.fixture_worker`.
+Only reviewed host code supplies its `--config` absolute path and independent
+`--config-sha256` digest. It accepts no launch configuration through ordinary RPC.
+The schema-one JSON file has exactly these fields:
+
+```json
+{
+  "schema": 1,
+  "host": "reviewed-host",
+  "target": "fixture",
+  "image": "C:\\reviewed\\memory_fixture.exe",
+  "image_sha256": "<independently reviewed lowercase SHA-256>",
+  "read_timeout": 1
+}
+```
+
+The config digest covers its exact bytes, including whitespace. The loader checks
+it before following the image path, rejects duplicate or unknown fields, limits
+config bytes to 16 KiB and image bytes to 64 MiB, and validates the pinned PE plan
+against the existing 1 MiB observation ceiling. The read timeout must be positive
+and at most 60 seconds. Executable/schema labels remain fixture/1; PID, addresses,
+argv, session and challenge are not config fields. Each worker creates fresh
+session and challenge values. The leased launch rechecks the image pin, so static
+preparation does not replace launch-time attestation.
+
+`load_fixture_image()` performs static preparation only. The native factory accepts
+64-bit Windows, and `OwnedFixtureTarget.ready()` remains the process-acquisition
+boundary. EOF or a rejected owner/task before readiness starts no fixture. The
+entry uses the existing worker protocol and guarded cleanup. Reads are bounded in
+bytes, not wall time; opening a replaced special file can block before the regular
+file check. The host-owned helper deadline and retirement remain the interruption
+boundary. No public profile is registered. Config and image pins do not establish
+interpreter, imported-source or DLL trust, and native execution remains paused.
+
 The assembly selects a read budget of the complete image plan plus the fixture's
 72 bytes, capped at 1 MiB, with at most 1,024 region checks. The host chooses a
 finite read timeout of at most 60 seconds (default 1 second). Startup image

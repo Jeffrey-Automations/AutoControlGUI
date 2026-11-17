@@ -907,3 +907,4 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 | U-20261118-15 | 2026-11-18 | Refresh pinned semantic worker authority at access boundaries | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-16 | 2026-11-18 | Route semantic helpers through non-display ownership | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-17 | 2026-11-18 | Require cleanup in the semantic target contract | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-18 | 2026-11-18 | Package a pinned host-configured fixture worker | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
