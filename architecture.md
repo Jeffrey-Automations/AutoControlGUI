@@ -11,6 +11,11 @@ excluding only capture metadata. Grounded dispatch passes the original snapshot
 and journal action ID; only an operation-bound `SemanticReceipt` confirms a reply.
 Ordinary targets keep their existing full-payload comparison and dispatch path.
 
+`NativeSemanticTarget` transports the same contract through the existing owned
+helper channel and resource lock. It requires a semantic handshake before target
+configuration. The worker rechecks tool scope; both peers refuse input events.
+Semantic cleanup keeps input and executor guards active through EOF retirement.
+
 WebRTC statistics owns one submitted polling future. Start does not wait for
 the event loop; stop closes admission, cancels pending submission and drops
 the callback owner without acquiring a bridge. Late awaited samples are discarded.

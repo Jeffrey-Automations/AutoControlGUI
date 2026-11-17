@@ -266,9 +266,24 @@ independent task completion or desktop noninterference. A wrong-operation receip
 untyped reply or `AgentEffectUnknown` follows the existing uncertain journal path;
 the consumed observation cannot be replayed. Unknown effects require readback.
 
-This runtime seam is tested with an isolated semantic target. The profile registry,
-owned-helper implementation, application attestation and native adapter remain
-required before public memory commands can be enabled.
+`NativeSemanticTarget` carries the same contract over the existing owned helper
+channel. Trusted host code supplies the reviewed helper argv and an explicit
+resource lock. The helper must advertise semantic protocol version one before
+configuration. Both sides refuse desktop input, including cleanup. Worker cleanup
+also denies executor commands, whether requested over IPC or triggered by EOF.
+The host accepts only an exact boolean cleanup acknowledgement before retiring a
+live helper; an unconfirmed cleanup retains ownership for retry.
+
+The worker rechecks task tool scope and the closed request schema before calling
+the adapter. Existing host checkpoints enforce cancellation and deadlines while
+waiting for replies. `AgentEffectUnknown` and `AgentObservationStale` preserve
+their types across the shared channel. A blocked fixture command has been
+cancelled after entry and its actual helper process retired in a headless test.
+
+`test/fixtures/semantic_helper.py` tests this IPC path with an owned counter, not
+cross-process memory or desktop input. The profile registry, application
+attestation, reader-owning production adapter and independent completion
+verification remain required before public memory commands can be enabled.
 
 ## Cleanup ownership
 

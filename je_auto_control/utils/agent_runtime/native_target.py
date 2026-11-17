@@ -138,10 +138,13 @@ class NativeDesktopTarget:
         # It drives the user's desktop or browser session, which a protected helper cannot reach.
         self._channel = owned_channel(self._argv, on_control=control, display=True)
         reply = self._channel.request("bootstrap", {}, timeout=15, check=check)
-        if not isinstance(reply, dict) or type(reply.get("protocol")) is not int or reply["protocol"] != 1:
+        if not self._supports_bootstrap(reply):
             self._channel.close()
             raise AgentTaskError("native helper bootstrap protocol is incompatible")
         return self._channel
+
+    def _supports_bootstrap(self, reply: Any) -> bool:
+        return isinstance(reply, dict) and type(reply.get("protocol")) is int and reply["protocol"] == 1
 
     @property
     def can_reobserve(self) -> bool:

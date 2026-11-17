@@ -23,6 +23,10 @@ from je_auto_control.utils.agent_runtime.context import TaskOperation, operation
 from je_auto_control.utils.agent_runtime.presence_frames import presence_body
 from je_auto_control.utils.agent_runtime.presence_reader import PresenceReader
 from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
+from je_auto_control.utils.agent_runtime.semantic_target import SemanticTarget, observe as observe_target
+from je_auto_control.utils.agent_runtime.semantic_worker import (
+    perform_grounded, require_empty_cleanup, refuse_cleanup_command,
+)
 
 _LIMIT = 1_100_000
 
@@ -67,6 +71,8 @@ class NativeWorker:
 
     def _validate_input(self, event: dict[str, Any]) -> None:
         """Recheck live permission; cleanup may acknowledge owned release boundaries only."""
+        if isinstance(self._target, SemanticTarget):
+            raise AgentTaskError("semantic helpers cannot emit desktop input")
         if self._cleanup:
             if event.get("kind") not in {"key_release", "key_released", "mouse_release", "mouse_released"}:
                 raise AgentTaskError("native cleanup permits owned release events only")
@@ -135,6 +141,8 @@ class NativeWorker:
     def _bootstrap(self) -> dict[str, Any]:
         """Advertise optional retirement only on the built-in original configured browser worker."""
         result = {"protocol": 1}
+        if isinstance(self._target, SemanticTarget):
+            result["semantic"] = 1
         # pylint: disable-next=unidiomatic-typecheck  # reason: read-only/custom worker subclasses cannot claim this API
         if type(self) is NativeWorker and self._profile_kind == "browser" and isinstance(self._target, BrowserTarget):
             result["browser_readonly"] = 1
@@ -258,8 +266,12 @@ class NativeWorker:
             ready, reason = self._target.ready(self._spec)
             return {"ready": ready, "reason": reason}
         if operation == "observe":
-            return self._target.observe()
+            return observe_target(self._target)
+        if operation == "perform_grounded":
+            return perform_grounded(self._target, payload)
         if operation == "perform":
+            if isinstance(self._target, SemanticTarget):
+                raise AgentTaskError("semantic commands require grounded dispatch")
             return self._target.perform(payload["tool"], payload["arguments"])
         if operation == "verify_browser":
             if self._profile_kind != "browser" and not self._custom_target:
@@ -286,7 +298,10 @@ class NativeWorker:
         self._activity.ready()
 
     def close(self) -> None:
-        """Retire only this worker's reader/notice; input release remains a separate owner ACK path."""
+        """Guard semantic resource retirement, then release presence readers and notices."""
+        if isinstance(self._target, SemanticTarget):
+            with input_observer(self._input), command_guard(refuse_cleanup_command):
+                self._target.cleanup()
         if self._presence_binding is None:
             return
         self._notice_stop.set()
@@ -306,6 +321,10 @@ class NativeWorker:
             release_keyboard_key(key['keycode'], key['is_shift'], skip_record=True)
 
     def _release_owned(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if isinstance(self._target, SemanticTarget):
+            require_empty_cleanup(payload)
+            self.close()
+            return {"cleaned": True}
         from je_auto_control.wrapper.auto_control_mouse import release_mouse
         if set(payload) != {"keys", "buttons"}:
             raise AgentTaskError("cleanup payload is invalid")

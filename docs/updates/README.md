@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261117-11 | 2026-11-17 | Guard owned semantic helpers through dispatch and cleanup | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261117-10 | 2026-11-17 | Ground semantic commands with operation-bound receipts | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261117-09 | 2026-11-17 | Preserve checked memory revisions for subsequent grounding | #done #process-memory | [2026-11-c](2026-11-c.md) |
 | U-20261117-08 | 2026-11-17 | Validate fixture schema and bind launch locations | #done #process-memory | [2026-11-c](2026-11-c.md) |

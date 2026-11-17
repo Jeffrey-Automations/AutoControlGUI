@@ -12,12 +12,15 @@ import time
 import uuid
 from typing import Any, Callable, Sequence
 
-from je_auto_control.utils.agent_runtime.errors import AgentControlBusy, AgentTaskError, AgentHumanReview
+from je_auto_control.utils.agent_runtime.errors import (
+    AgentControlBusy, AgentTaskError, AgentHumanReview, AgentEffectUnknown, AgentObservationStale,
+)
 from je_auto_control.utils.agent_runtime.wire_data import detached, positive
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 
 _PACKET_LIMIT = 1_100_000
-_ERROR_TYPES = {"AgentControlBusy": AgentControlBusy, "AgentHumanReview": AgentHumanReview}
+_ERROR_TYPES = {"AgentControlBusy": AgentControlBusy, "AgentHumanReview": AgentHumanReview,
+                "AgentEffectUnknown": AgentEffectUnknown, "AgentObservationStale": AgentObservationStale}
 
 
 def classify_reply(reply: Any, request_id: str) -> tuple[bool, Any]:
