@@ -866,6 +866,7 @@ The isolated packaged worker help command was checked without native acquisition
 No UI profile was registered against a real native deployment. Trusted helper
 source/interpreter/DLL delivery, actual UIA behavior and desktop noninterference
 remain pending in Progress.md.
+
 ## Internal service-status prerequisite
 
 `WindowsServiceStatusReader` in `agent_runtime/windows_service.py` accepts one
@@ -901,3 +902,45 @@ Official contracts are documented in
 [OpenSCManagerW](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-openscmanagerw),
 [OpenServiceW](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-openservicew)
 and [SERVICE_STATUS_PROCESS](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_status_process).
+
+### Internal control and independent readback
+
+`WindowsServiceController` composes the same private session owner as the reader.
+Its host-supplied immutable allowed-operation set selects START and/or STOP rights
+in addition to QUERY_STATUS. The reader still grants only query rights and does
+not bind control functions. Both façades keep service handles private.
+
+`perform(operation, expected=before, operation_id=journal_id, timeout=1,
+checkpoint=checkpoint)` rereads through the retained handle and rejects changed
+status before dispatch. START requires STOPPED. STOP requires RUNNING or PAUSED
+and a reported STOP control bit. This comparison is non-atomic. Start has no
+arguments; stop sends only SERVICE_CONTROL_STOP. The returned control status is
+discarded because it is not independent readback.
+
+Before entering the native call, the session records an uncertain attempt in a
+bounded, non-evicting ledger. A successful return and final checkpoint produce
+an acceptance receipt, never proof of completion. A repeat of the same ID and
+request returns that original receipt without dispatch. A conflicting ID reuse
+is refused. Native failures, including start error 1053, cannot establish absence
+of effects. Uncertain attempts prevent further control in that owner; fresh
+reads remain diagnostic and cannot clear uncertainty.
+The ledger belongs to this retained session, not durable storage. A helper restart
+cannot reconstruct accepted requests; the runtime must retain its journal and
+refuse automatic replay across that boundary.
+
+An accepted start blocks new controls until a separate public read reports
+RUNNING. An accepted stop similarly waits for STOPPED. The preflight read inside
+another perform cannot clear this fence. Thus stale SCM status cannot by itself
+cause automatic repeated controls. Reaching the ledger limit refuses another
+operation before any effect. The session does not poll, retry, stop dependencies,
+change service configuration or elevate privileges.
+
+This implementation remains internal. A future managed profile must review
+configured dependencies because SCM can start them with the selected service.
+It must also establish operation authority, helper retirement, truthful service
+readback criteria and desktop noninterference. Existing best-effort observation
+and semantic completion gates are unchanged. Native services have not been run.
+
+See [StartServiceW](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-startservicew),
+[ControlService](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-controlservice)
+and the [service database](https://learn.microsoft.com/en-us/windows/win32/services/database-of-installed-services).

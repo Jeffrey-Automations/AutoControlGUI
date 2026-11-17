@@ -122,7 +122,7 @@ class OwnedFixtureTarget(SemanticTarget):
             try:
                 self.cleanup()
             # pylint: disable-next=broad-exception-caught  # reason: preserve startup or cleanup interruption identity
-            except BaseException as cleanup:
+            except BaseException as cleanup:  # reason: _raise_failure preserves the primary interruption
                 _raise_failure([error, cleanup])
             raise
         return self
@@ -212,7 +212,7 @@ class OwnedFixtureTarget(SemanticTarget):
             try:
                 self.cleanup()
             # pylint: disable-next=broad-exception-caught  # reason: preserve readiness or cleanup interruption identity
-            except BaseException as cleanup:
+            except BaseException as cleanup:  # reason: _raise_failure preserves the primary interruption
                 _raise_failure([error, cleanup])
             raise
 
@@ -277,7 +277,7 @@ class OwnedFixtureTarget(SemanticTarget):
             try:
                 action()
             # pylint: disable-next=broad-exception-caught  # reason: retire all owners before preserving interruption
-            except BaseException as error:
+            except BaseException as error:  # reason: collect every owner failure before raising
                 failures.append(error)
         if failures:
             _raise_failure(failures)

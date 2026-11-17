@@ -72,7 +72,7 @@ class _UiaOwners:
             try:
                 close()
             # pylint: disable-next=broad-exception-caught  # reason: attempt all owners before propagating interruption
-            except BaseException as error:
+            except BaseException as error:  # reason: collect every owner failure before raising
                 failures.append(error)
         if failures:
             for failure in failures:

@@ -324,7 +324,7 @@ def test_concurrent_close_rejects_late_query():
         closer.start()
         assert retiring.wait(2)
         # Observe retirement before releasing the injected syscall, without timing guesses.
-        assert reader._retired.wait(2)
+        assert reader._session._retired.wait(2)
     finally:
         release.set()
         worker.join(3)

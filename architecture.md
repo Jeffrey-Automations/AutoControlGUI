@@ -1620,11 +1620,16 @@ external mode and no planned actions. They do not make an empty plan complete.
 Native execution and trusted Python/COM/DLL delivery remain unverified.
 
 `service_status.py` models the latest SCM report as diagnostic best-effort data.
-`windows_service.py` lazily acquires local SCM connect and service query handles
-for one host-selected key name. Reads retain those handles; failure or close
-permanently retires the owner. Failed closes remain owned for retry. An RLock
-serializes native calls, a retirement event rejects late results, and a separate
-read guard rejects checkpoint reentry without preventing reentrant close.
-Timeouts bound lock admission and reject late reports, but cannot interrupt a
-native call or cleanup. No service operations, profile or managed helper are
-exposed by this prerequisite. Native service acceptance remains paused.
+`windows_service.py` exposes separate query-only and explicitly scoped control
+façades. `windows_service_session.py` owns their retained handles, serialized
+admission, retirement and pending operation state; `windows_service_native.py`
+binds only the native functions their host scope needs. Failed closes remain
+owned for retry. Query failures retire the session. Unknown control outcomes
+block further controls while allowing diagnostic reads.
+`service_operations.py` validates exact requests and retains bounded acceptance
+receipts without replaying effects. Accepted commands await an independent read
+of their desired state before another command is admitted; unknown outcomes
+cannot be cleared by a matching read. Status comparison is non-atomic and a
+receipt proves only acceptance. Timeouts bound admission and reject late output,
+but cannot interrupt native calls or cleanup. Managed profile/helper integration,
+dependency effect review and native service acceptance remain pending.
