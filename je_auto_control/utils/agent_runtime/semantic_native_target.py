@@ -8,7 +8,7 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
 from je_auto_control.utils.agent_runtime.native_target import NativeDesktopTarget
 from je_auto_control.utils.agent_runtime.semantic_target import (
-    SemanticReceipt, SemanticSnapshot, SemanticTarget,
+    SemanticReceipt, SemanticSnapshot, SemanticTarget, _report,
 )
 
 
@@ -36,7 +36,12 @@ class NativeSemanticTarget(NativeDesktopTarget, SemanticTarget):
         if not super()._supports_bootstrap(reply):
             return False
         version = reply.get("semantic")
-        return isinstance(version, int) and not isinstance(version, bool) and version == 1
+        if type(version) is not int or version != 1:
+            return False
+        if self.observation_sources:
+            return (type(reply.get("semantic_report")) is int and reply["semantic_report"] == 1
+                    and reply.get("semantic_sources") == list(self.observation_sources))
+        return "semantic_report" not in reply and "semantic_sources" not in reply
 
     def perform(self, name: str, arguments: dict[str, Any]) -> Any:
         """Refuse legacy dispatch without an expected semantic snapshot."""
@@ -45,8 +50,21 @@ class NativeSemanticTarget(NativeDesktopTarget, SemanticTarget):
     def perform_grounded(self, name: str, arguments: Mapping[str, Any], *,
                          expected: SemanticSnapshot, operation_id: str) -> SemanticReceipt:
         """Send expected state and journal identity under the existing live helper deadline."""
+        return self._send_grounded(name, arguments, expected.to_dict(), operation_id)
+
+    def perform_observed(self, name: str, arguments: Mapping[str, Any], *,
+                         observation: Mapping[str, Any], operation_id: str) -> SemanticReceipt:
+        """Preserve every source across IPC; the worker repeats the complete-report gate."""
+        if self.observation_sources:
+            report = _report(self, observation)
+            report.require_grounding()
+            return self._send_grounded(name, arguments, report.to_dict(), operation_id)
+        return super().perform_observed(name, arguments, observation=observation, operation_id=operation_id)
+
+    def _send_grounded(self, name: str, arguments: Mapping[str, Any],
+                       expected: Mapping[str, Any], operation_id: str) -> SemanticReceipt:
         reply = self._request("perform_grounded", {"tool": name, "arguments": dict(arguments),
-                              "expected": expected.to_dict(), "operation_id": operation_id})
+                              "expected": dict(expected), "operation_id": operation_id})
         receipt = SemanticReceipt.from_dict(reply)
         if receipt.operation_id != operation_id:
             raise AgentTaskError("semantic helper replied for another operation")

@@ -991,3 +991,5 @@ Linux 內部 presence_peer_linux 以不可繼承的 pidfd 保留原始 Unix stre
 
 wheel 與原始碼發行套件包含 REST Dashboard 和 Swagger 的 HTML、CSS、JavaScript 資源。
 安裝後的套件沿用相同的本機 REST 路由與授權規則；提供靜態頁面不授予任務或桌面輸入權限。
+
+主機選定的語意 adapter 可宣告固定的多來源觀察契約。既有 observe 呼叫保留部分缺失與衝突報告；操作及完成判定要求每個來源的新鮮完整一致證據。helper bootstrap 固定來源契約，完整報告跨 IPC 傳遞後才轉換為命令快照。此契約已有合成／隱藏 helper 測試；fixture memory／IPC 擷取與 UIA／DOM 整合仍待完成。

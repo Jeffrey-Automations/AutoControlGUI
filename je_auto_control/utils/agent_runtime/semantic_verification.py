@@ -8,6 +8,7 @@ from je_auto_control.utils.agent_runtime.receipts import effective_actions
 from je_auto_control.utils.agent_runtime.semantic_target import (
     SemanticSnapshot, _fields, _identifier,
 )
+from je_auto_control.utils.agent_runtime.observation_report import ObservationReport
 
 _PROVENANCE = ("target_id", "identity_digest", "adapter_id", "schema_version", "source")
 
@@ -24,10 +25,16 @@ def semantic_matches(clause: Mapping[str, Any], receipts: Sequence[Mapping[str, 
                      observation: Mapping[str, Any]) -> bool | None:
     """Compare current fields; missing or changed provenance is unknown."""
     validate_semantic_clause(clause)
-    before = _confirmed_witness(receipts, clause["tool"])
-    if before is None:
+    witness = _confirmed_witness(receipts, clause["tool"])
+    if witness is None:
         return None
-    current = SemanticSnapshot.from_dict(observation)
+    before = SemanticSnapshot.from_dict(witness["semantic"])
+    if "semantic_report" in witness:
+        current = _report_readback(witness, observation)
+        if current is None:
+            return None
+    else:
+        current = SemanticSnapshot.from_dict(observation)
     if not _same_target_readback(before, current):
         return None
     fields = dict(current.fields)
@@ -37,7 +44,7 @@ def semantic_matches(clause: Mapping[str, Any], receipts: Sequence[Mapping[str, 
                for name, value in clause["fields"].items())
 
 
-def _confirmed_witness(receipts: Sequence[Mapping[str, Any]], tool: str) -> SemanticSnapshot | None:
+def _confirmed_witness(receipts: Sequence[Mapping[str, Any]], tool: str) -> Mapping[str, Any] | None:
     actions = effective_actions(receipts)
     receipt = next((item for item in reversed(actions) if item.get("command") == tool), None)
     if receipt is None or receipt.get("status") != "confirmed":
@@ -48,7 +55,25 @@ def _confirmed_witness(receipts: Sequence[Mapping[str, Any]], tool: str) -> Sema
     witness = grounding.get("semantic")
     if not isinstance(witness, Mapping):
         return None
-    return SemanticSnapshot.from_dict(witness)
+    return grounding
+
+
+def _report_readback(witness: Mapping[str, Any], observation: Mapping[str, Any]) -> SemanticSnapshot | None:
+    required = witness.get("semantic_sources")
+    if not isinstance(required, (list, tuple)) or not all(isinstance(name, str) for name in required):
+        return None
+    before = ObservationReport.from_dict(witness["semantic_report"], required=tuple(required))
+    current = ObservationReport.from_dict(observation, required=tuple(required))
+    if before.status != "complete" or current.status != "complete":
+        return None
+    old_sources, new_sources = dict(before.sources), dict(current.sources)
+    for name in required:
+        old, new = old_sources[name], new_sources[name]
+        if not isinstance(old, SemanticSnapshot) or not isinstance(new, SemanticSnapshot):
+            return None
+        if not _same_target_readback(old, new):
+            return None
+    return current.require_grounding()
 
 
 def _same_target_readback(before: SemanticSnapshot, current: SemanticSnapshot) -> bool:

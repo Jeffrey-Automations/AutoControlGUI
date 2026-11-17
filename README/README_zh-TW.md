@@ -98,3 +98,5 @@ WebRTC peer 也會保留媒體建構與清理失敗的原始資源，觀測即�
 HostBrowser 亦會拒絕晚到發布，並保留未完成的執行緒與關閉所有權；對話框整合仍待完成。
 
 MultiViewerHost 可回傳含原始 session 清理物件的 offer，延後清理不會停止替換後的連線或畫面來源；GUI 接入仍待完成。
+
+主機選定的語意 adapter 可透過既有觀察 API 回傳多來源報告。缺失來源與衝突會保留顯示，但不能授權操作或確認完成。目前以合成來源與隱藏 helper 測試契約；fixture memory／IPC 擷取及 UIA／DOM 來源整合仍待完成。

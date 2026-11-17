@@ -512,6 +512,36 @@ availability or loaded-code trust. Native execution remains paused.
 
 ### Completion evidence
 
+Host-selected semantic adapters can declare an ordered `observation_sources`
+contract. Its first source is the command's primary snapshot. Such adapters return
+an `ObservationReport` through the existing observation API; task JSON cannot enable
+this capability. The native proxy requires the exact source contract and report
+version in the worker bootstrap. A generic semantic proxy refuses that extension.
+
+Reports retain up to four source snapshots or closed failure reasons, capture
+intervals, missing field names and typed value conflicts. All successful sources
+must refer to the same target lifetime. The host adapter must normalize its reviewed
+fields into the same schema and revision domain before declaring this contract.
+Equal values with different revisions conflict; boolean and integer values do not
+compare equal. Agreement without checked revisions remains `unverified`. Partial,
+conflicting and unverified reports remain visible but cannot ground commands.
+Authority, cancellation, target-change and cleanup errors are not reportable as
+ordinary missing-source reasons and must propagate from acquisition.
+
+Action fingerprints retain every source's state and provenance. The complete report
+crosses the helper boundary unchanged before the worker converts it to the primary
+command snapshot. The journal retains the full source report. Completion requires
+fresh compatible evidence from every original source; disagreement or missing
+sources produces an unknown result. The complete-only `SemanticSnapshot` wire schema
+is unchanged and lives in `semantic_snapshot.py`, re-exported by `semantic_target.py`.
+
+The report/runtime contract is verified using synthetic two-source targets and real
+hidden Python helper IPC. The managed fixture still uses its existing single-source
+observation pending migration to memory plus owned IPC snapshot acquisition. Scoped
+UIA/DOM source identity, field-missing semantics and revision normalization remain
+pending; existing foreground desktop or legacy DOM dictionaries are not converted
+automatically. This work is not native observation or background-application acceptance.
+
 A `semantic` success criterion compares fresh completion-time observations with
 the recorded target witness for a named command. For the test-owned counter:
 

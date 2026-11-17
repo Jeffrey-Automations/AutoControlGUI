@@ -142,9 +142,12 @@ class NativeWorker:
 
     def _bootstrap(self) -> dict[str, Any]:
         """Advertise optional retirement only on the built-in original configured browser worker."""
-        result = {"protocol": 1}
+        result: dict[str, Any] = {"protocol": 1}
         if isinstance(self._target, SemanticTarget):
             result["semantic"] = 1
+            if self._target.observation_sources:
+                result["semantic_report"] = 1
+                result["semantic_sources"] = list(self._target.observation_sources)
         # pylint: disable-next=unidiomatic-typecheck  # reason: read-only/custom worker subclasses cannot claim this API
         if type(self) is NativeWorker and self._profile_kind == "browser" and isinstance(self._target, BrowserTarget):
             result["browser_readonly"] = 1

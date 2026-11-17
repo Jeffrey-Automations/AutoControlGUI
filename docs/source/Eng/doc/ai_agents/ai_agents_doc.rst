@@ -1211,3 +1211,5 @@ Installed dashboard resources
 Installed wheel and source distributions include the REST Dashboard and Swagger HTML, CSS and
 JavaScript resources. The same localhost REST routes and authentication rules apply to an
 installed package; serving static pages grants no task or desktop input authority.
+
+Host-selected semantic adapters may declare a fixed multi-source observation contract. Existing observe calls preserve partial/conflicting reports; actions and completion require fresh complete agreement from every source. Helper bootstrap pins the source contract and the full report crosses IPC before conversion to a command snapshot. Synthetic/hidden-helper tests cover this contract; fixture memory/IPC acquisition and UIA/DOM integration remain pending.
