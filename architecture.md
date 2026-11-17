@@ -63,6 +63,10 @@ The process-memory test fixture owns fixed payload and sequence buffers in a hid
 child process. Bounded inherited pipes expose expected state and validated fixture
 updates. Bootstrap facts remain unverified until a native provider independently
 matches the retained process identity. This tooling adds no public memory API.
+The internal MemorySemanticTarget composes a fixed host reader binding and a
+reviewed background command owner. Managed scope checks gate reads and commands;
+cleanup makes the target terminal and retains failed handle retirement for retry.
+Injected-provider tests exercise this path through AgentRuntime completion.
 The internal Windows provider owns read/query handles and measures native process
 facts before asking an explicit reviewed attestor for application identity. Its
 bindings are tested through injected calls; trusted attestation and native acceptance

@@ -266,6 +266,21 @@ independent task completion or desktop noninterference. A wrong-operation receip
 untyped reply or `AgentEffectUnknown` follows the existing uncertain journal path;
 the consumed observation cannot be replayed. Unknown effects require readback.
 
+`MemorySemanticTarget` binds a reader to a host-selected `MemoryBinding`: target
+ID, measured process identity, reviewed probe and allowed fields. It pins the ready
+task specification and authorization owner (user, role and source store), and
+requires the matching live managed scope for every read and
+command. Read failures retain their sanitized reason; they never become empty
+snapshots. Pending handle cleanup prevents further reads. Grounded dispatch checks
+policy, reads again and compares provenance/state before forwarding the original
+snapshot and operation ID to the separate command owner. Only that owner can
+claim atomic comparison at commit. Cleanup permanently retires the target and
+raises until pending reader handles are closed; repeated cleanup retries ownership.
+The host must create a dedicated target/reader/command owner per resource lifecycle.
+This internal seam has injected-provider runtime tests, not a production launcher
+or public profile registration. Memory failure reasons are typed locally; the
+helper channel currently retains their sanitized text as a generic task error.
+
 `NativeSemanticTarget` carries the same contract over the existing owned helper
 channel. Trusted host code supplies the reviewed helper argv and an explicit
 resource lock. The helper must advertise semantic protocol version one before
@@ -282,7 +297,7 @@ cancelled after entry and its actual helper process retired in a headless test.
 
 `test/fixtures/semantic_helper.py` tests this IPC path with an owned counter, not
 cross-process memory or desktop input. The profile registry, application
-attestation, reader-owning production adapter and independent completion
+attestation and reader-owning production adapter
 verification remain required before public memory commands can be enabled.
 
 ## Semantic completion
