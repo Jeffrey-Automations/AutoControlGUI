@@ -344,7 +344,7 @@ Agent 任務介面將任務範圍、工作流程設定、觸發器、技能及�
 
 AgentHumanReview 表示未儲存內容或未知對話框需人工審閱；包含外部觀察請求都會記錄 waiting_user 並釋放輸入控制權，明確恢復後仍會重新檢查。Windows 依原生對話框／停用擁有者及英中日已知未儲存文字判定。Workspace 也會拒絕標題首尾帶星號的文件，並可在視窗設定加入 unsaved_selector 與 unsaved_value，於改變排列前檢查應用特有指示；不宣稱能推斷所有程式的未儲存狀態。標準檔案對話框沿用 AC_handle_file_dialog 執行器，受管 driver 只接受唯一精確標題、相同 PID、已確認前景，以及授權根目錄內的絕對路徑。UIA 控制項須屬於實際指定的根視窗，同 PID 的其他視窗也會拒絕。模擬原生與本機 HTTP 測試已有覆蓋，實際平台驗收仍未驗證。
 
-主機目標以 AgentTargetProfile 與 manage_agent_target（AC_agent_target，register/get/disable/enable/probe）設定。名稱及設定固定不可替換，目前可設定 desktop／files／browser／fixture adapter，未實作類型會被拒絕；瀏覽器可使用主機審閱的 helper_python。任務固定主機設定摘要，不能擴大工具、應用、根目錄或網路來源。啟停狀態會跨重啟保存並於分派時檢查；停用會要求暫停及清理，重新啟用仍須明確恢復任務。list_agent_targets／AC_agent_target_list／CLI agent-task targets 只提供被動資訊，readiness=not_probed、native_evidence=not_recorded；完整設定需要 manage_hosts。CLI agent-task target 及 GUI「主機目標」頁使用同一服務。匿名有效 MCP 工具 session 的直接及舊式包裝呼叫都以 operator 權限執行；MCP 主機管理需要已驗證的管理員，可信任的直接 Python 呼叫維持原行為。fixture profile 只接受 config_path／config_sha256 與 AC_fixture_set_state，不能授予根目錄或桌面應用。固定隔離 worker 的 bootstrap／configure 均須符合部署綁定；註冊不取得資源。明確呼叫 fixture probe 時，會由獨立背景 helper 檢查固定的靜態產物，並具備 bootstrap／檢查時限、即時管理權限核對及可重試的關閉所有權。成功回報 static_artifacts_ready、fixture_execution=not_run 與 native_evidence=not_recorded，不證明已載入程式碼可信。原生 fixture 執行仍暫停。瀏覽器自動化統一由 WebRunner（je_web_runner）提供，本機開發來源為 D:/Codes/WebRunner；browser profile 使用受管 je_web_runner SDK 契約，依賴診斷不代表原生可用。
+主機目標以 AgentTargetProfile 與 manage_agent_target（AC_agent_target，register/get/disable/enable/probe）設定。名稱及設定固定不可替換，目前可設定 desktop／files／browser／fixture／uia_fixture adapter，未實作類型會被拒絕；瀏覽器可使用主機審閱的 helper_python。任務固定主機設定摘要，不能擴大工具、應用、根目錄或網路來源。啟停狀態會跨重啟保存並於分派時檢查；停用會要求暫停及清理，重新啟用仍須明確恢復任務。list_agent_targets／AC_agent_target_list／CLI agent-task targets 只提供被動資訊，readiness=not_probed、native_evidence=not_recorded；完整設定需要 manage_hosts。CLI agent-task target 及 GUI「主機目標」頁使用同一服務。匿名有效 MCP 工具 session 的直接及舊式包裝呼叫都以 operator 權限執行；MCP 主機管理需要已驗證的管理員，可信任的直接 Python 呼叫維持原行為。fixture profile 只接受 config_path／config_sha256 與 AC_fixture_set_state，不能授予根目錄或桌面應用。固定隔離 worker 的 bootstrap／configure 均須符合部署綁定；註冊不取得資源。明確呼叫 fixture probe 時，會由獨立背景 helper 檢查固定的靜態產物，並具備 bootstrap／檢查時限、即時管理權限核對及可重試的關閉所有權。成功回報 static_artifacts_ready、fixture_execution=not_run 與 native_evidence=not_recorded，不證明已載入程式碼可信。原生 fixture 執行仍暫停。瀏覽器自動化統一由 WebRunner（je_web_runner）提供，本機開發來源為 D:/Codes/WebRunner；browser profile 使用受管 je_web_runner SDK 契約，依賴診斷不代表原生可用。
 
 既有瀏覽器自動化（包含 open_path(URL) 與 AC_open_path）統一交由 WebRunner，Python 套件名稱為 je_web_runner。URL 計畫的 backend 現為 je_web_runner，原本比較 webbrowser 描述值的呼叫端需改用新值；函式介面與本機檔案開啟維持相容。實際 URL 執行需要設定的 WebRunner 專案，缺少時傳出 WebRunnerBridgeError，不改用 OS 瀏覽器。本機開發來源為 D:/Codes/WebRunner；純計畫及注入 opener 測試不需要該套件。協定支援由 WebRunner 與其選用的瀏覽器決定。既有瀏覽器 GUI／MCP／AC 及錄製的 WR_* 動作都使用同一橋接。
 
@@ -992,7 +992,7 @@ Linux 內部 presence_peer_linux 以不可繼承的 pidfd 保留原始 Unix stre
 wheel 與原始碼發行套件包含 REST Dashboard 和 Swagger 的 HTML、CSS、JavaScript 資源。
 安裝後的套件沿用相同的本機 REST 路由與授權規則；提供靜態頁面不授予任務或桌面輸入權限。
 
-主機選定的語意 adapter 可宣告固定的多來源觀察契約。既有 observe 呼叫保留部分缺失與衝突報告；操作及完成判定要求每個來源的新鮮完整一致證據。helper bootstrap 固定來源契約，完整報告跨 IPC 傳遞後才轉換為命令快照。fixture 已在同一把擷取／提交鎖下結合受審閱的記憶體讀取與保留的唯讀 IPC snapshot，cleanup 仍可中斷 IPC。注入 reader 與隱藏 helper 測試涵蓋來源衝突、部分記憶體失敗及提交前一致性。原生 UI worker 部署／profile 註冊、DOM 整合與桌面驗收仍待完成。
+主機選定的語意 adapter 可宣告固定的多來源觀察契約。既有 observe 呼叫保留部分缺失與衝突報告；操作及完成判定要求每個來源的新鮮完整一致證據。helper bootstrap 固定來源契約，完整報告跨 IPC 傳遞後才轉換為命令快照。fixture 已在同一把擷取／提交鎖下結合受審閱的記憶體讀取與保留的唯讀 IPC snapshot，cleanup 仍可中斷 IPC。注入 reader 與隱藏 helper 測試涵蓋來源衝突、部分記憶體失敗及提交前一致性。原生 UI 部署信任、DOM 整合與桌面驗收仍待完成。
 
 語意觀察欄位契約
 ----------------
@@ -1010,9 +1010,16 @@ wheel 與原始碼發行套件包含 REST Dashboard 和 Swagger 的 HTML、CSS�
 
 ``UiaObservationTarget`` 在受管 readiness 中延遲建立 COM，透過既有觀察 API 發布唯讀 UIA 結果。
 它不提供 Invoke、SetValue、焦點或輸入操作。注入 COM 與隱藏 Python helper 測試涵蓋部分欄位、
-受管報告及逾時回收。原生 worker 部署／profile 註冊與所有桌面驗收仍待完成。
+受管報告及逾時回收。原生部署信任與所有桌面驗收仍待完成。
 尚未執行原生 UI fixture，也未證明不干擾桌面。
 
 內部自有 UI target 在 attestation 前保留啟動器及兩個獨立映像租約擁有者；
 清理會嘗試全部資源並保留失敗項目供重試。發布鎖防止關閉後存入晚到的來源。
-原生 factory 僅建立擁有者；固定 worker 部署、profile 註冊及原生驗收仍待完成。
+原生 factory 僅建立擁有者；原生部署信任及原生驗收仍待完成。
+
+主機管理可註冊 ``uia_fixture`` profile，``allowed_tools``、``roots``、``apps`` 都為空，
+設定只接受 ``config_path``／``config_sha256``。固定隔離 worker 在取得資源前核對部署、profile
+與目標 pin，兩端都拒絕命令。外部任務只有在沒有預排動作時可使用空工具集合；
+仍須提供完成條件，空計畫不能證明完成，UI partial／best-effort 報告仍只供診斷。
+註冊與 probe 不取得資源；probe 回傳 ``not_supported`` 與 ``native_evidence=not_recorded``。
+既有目標 API、CLI 與 GUI JSON 編輯器可傳遞此 profile。注入及隱藏 helper 測試不代表原生信任成立。

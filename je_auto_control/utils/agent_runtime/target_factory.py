@@ -15,6 +15,10 @@ def build_target(profile: AgentTargetProfile) -> Any:
     if profile.kind == "fixture":
         from je_auto_control.utils.agent_runtime.fixture_native_target import NativeFixtureTarget
         return NativeFixtureTarget(profile)
+    if profile.kind == "uia_fixture":
+        # pylint: disable-next=import-outside-toplevel  # reason: construct only the selected inert adapter
+        from je_auto_control.utils.agent_runtime.uia_native_target import NativeUiaFixtureTarget
+        return NativeUiaFixtureTarget(profile)
     if profile.kind == "files":
         resource = hashlib.sha256("\n".join(sorted(profile.roots)).encode("utf-8")).hexdigest()
         path = Path.home() / ".je_auto_control" / "input_ownership" / ("files-" + resource + ".lock")

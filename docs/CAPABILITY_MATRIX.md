@@ -1207,7 +1207,7 @@ JavaScript resources. The same localhost REST routes and authentication rules ap
 installed package; serving static pages grants no task or desktop input authority.
 
 The build-only UI fixture uses `build_fixture.py --kind uia` and a distinct
-schema-2 manifest. It is not a registered runtime target or a memory fixture.
+schema-2 manifest. Building it does not register a runtime target; it is not a memory fixture.
 Native UIA exposure and desktop noninterference remain unverified.
 
 The internal UI fixture startup channel is receive-only and one-shot. Its binding
@@ -1217,11 +1217,21 @@ ancestry and a root runtime ID pinned across captures. It preserves per-field fa
 and protects password text. COM calls stay on the source owner thread. The internal
 read-only managed adapter creates COM lazily during readiness and reports best-effort
 UIA captures through the shared task API. Injected COM and hidden-helper tests cover
-reporting and timeout retirement. Native worker deployment/profile registration and all desktop
+reporting and timeout retirement. Native deployment trust and all desktop
 acceptance remain pending; no native UI fixture execution is claimed.
 
 The internal owned UI target retains its launcher and both image leases before
 attestation, attempts every owner during cleanup, and retains failed cleanup for
 retry. A publication lock prevents late source installation after shutdown. The
-native factory only constructs owners; fixed worker deployment/profile registration
+native factory only constructs owners; native deployment trust
 and native acceptance remain pending.
+
+Host management can register a `uia_fixture` profile with empty `allowed_tools`,
+`roots` and `apps`, and only `config_path`/`config_sha256` settings. It uses a fixed
+isolated worker and validates deployment, profile and target pins before acquisition.
+Both endpoints refuse commands. External tasks may use an empty tool scope only
+without planned actions; completion criteria remain required and an empty plan
+cannot prove completion. UI partial/best-effort reports remain diagnostic.
+Registration and probe acquire nothing; probe reports `not_supported` and
+`native_evidence=not_recorded`. The existing target API, CLI and GUI JSON editor
+carry this profile. Injected and hidden-helper tests do not establish native trust.

@@ -1212,7 +1212,7 @@ Installed wheel and source distributions include the REST Dashboard and Swagger 
 JavaScript resources. The same localhost REST routes and authentication rules apply to an
 installed package; serving static pages grants no task or desktop input authority.
 
-Host-selected semantic adapters may declare a fixed multi-source observation contract. Existing observe calls preserve partial/conflicting reports; actions and completion require fresh complete agreement from every source. Helper bootstrap pins the source contract and the full report crosses IPC before conversion to a command snapshot. The fixture now combines reviewed memory reads and its retained read-only IPC snapshot under one capture/commit lock, while cleanup can interrupt IPC. Injected-reader and hidden-helper tests cover source disagreement, partial memory failures and precommit agreement. Native UI worker deployment/profile registration, DOM integration and desktop acceptance remain pending.
+Host-selected semantic adapters may declare a fixed multi-source observation contract. Existing observe calls preserve partial/conflicting reports; actions and completion require fresh complete agreement from every source. Helper bootstrap pins the source contract and the full report crosses IPC before conversion to a command snapshot. The fixture now combines reviewed memory reads and its retained read-only IPC snapshot under one capture/commit lock, while cleanup can interrupt IPC. Injected-reader and hidden-helper tests cover source disagreement, partial memory failures and precommit agreement. Native UI deployment trust, DOM integration and desktop acceptance remain pending.
 
 Semantic observation field scopes
 ---------------------------------
@@ -1236,12 +1236,22 @@ protects password text and keeps COM calls on the source owner thread.
 ``UiaObservationTarget`` creates COM lazily during managed readiness and publishes
 read-only UIA results through the existing observation API. It has no Invoke,
 SetValue, focus or input operations. Injected COM and hidden Python helper tests
-cover partial fields, managed reporting and timeout retirement. Native worker deployment/profile
-registration and all desktop acceptance remain pending. No native UI fixture execution
+cover partial fields, managed reporting and timeout retirement. Native deployment
+trust and all desktop acceptance remain pending. No native UI fixture execution
 or desktop noninterference is claimed.
 
 The internal owned UI target retains its launcher and both image leases before
 attestation, attempts every owner during cleanup, and retains failed cleanup for
 retry. A publication lock prevents late source installation after shutdown. The
-native factory only constructs owners; fixed worker deployment/profile registration
+native factory only constructs owners; native deployment trust
 and native acceptance remain pending.
+
+Host management can register a ``uia_fixture`` profile with empty ``allowed_tools``,
+``roots`` and ``apps``, and only ``config_path``/``config_sha256`` settings. It uses a fixed
+isolated worker and validates deployment, profile and target pins before acquisition.
+Both endpoints refuse commands. External tasks may use an empty tool scope only
+without planned actions; completion criteria remain required and an empty plan
+cannot prove completion. UI partial/best-effort reports remain diagnostic.
+Registration and probe acquire nothing; probe reports ``not_supported`` and
+``native_evidence=not_recorded``. The existing target API, CLI and GUI JSON editor
+carry this profile. Injected and hidden-helper tests do not establish native trust.

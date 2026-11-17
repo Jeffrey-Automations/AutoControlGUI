@@ -21,8 +21,8 @@
 ### 自有 UI 觀察 fixture 的限定範圍讀取
 
 `TODO` — `test/fixtures/native_memory/uia_fixture.c` 的原生執行仍暫緩。
-尚須完成原生 UIA worker 的固定部署與 profile 組裝；啟動器、映像租約與受管唯讀 adapter
-的組合目前只有注入測試，不能據此宣告原生載入／COM 信任成立。
+尚須核實固定 UIA worker 的可信交付、Python／COM／DLL 相依與原生啟動環境。
+部署 pin、零動作 profile 與受管 worker 已有注入／隱藏 Python helper 證據，不能據此宣告原生信任成立。
 指定 HWND 的 root／祖先核實、逐欄報告與受管唯讀 adapter 目前只有注入呼叫驗證；
 隱藏 Python helper 的阻塞退休測試不能證明原生 COM、HWND 與 provider 行為。
 解除暫緩後才驗證 hidden controls 的 UIA 暴露與 AutomationId、空值／停用／密碼／重複 selector、
@@ -677,7 +677,7 @@ best-effort 觀察沒有 revision，也不承諾後續操作具原子性。原�
 多來源報告與 runtime／helper 契約已有合成來源驗證，可保留部分缺失及型別化衝突，
 且拒絕以不完整資料執行或確認完成。自有 fixture 已接合 memory＋IPC 擷取及提交前雙來源核對，
 目前以注入原生呼叫、真實 reader 邏輯與隱藏 Python helper 驗證，仍非原生驗收；
-UIA 的原生部署與 profile 尚未接合；限定 root／祖先、逐欄失敗、受保護欄位及唯一 selector
+UIA 的實際部署信任與原生驗收仍待完成；限定 root／祖先、逐欄失敗、受保護欄位及唯一 selector
 目前只有注入測試，helper 阻塞退休只有隱藏 Python 程序證據，仍須核實原生 COM 行為。
 DOM 的來源身分與逐欄報告正規化仍待接合。UIA best-effort 不提供原子 revision。
 

@@ -31,7 +31,7 @@ process. Existing desktop foreground and input-presence gates are unchanged.
 | Operation | Source and scope | Background requirement | Evidence and present state |
 |---|---|---|---|
 | Process/session identity | Retained OS handle, creation time, session and architecture; reviewed application attestor | Read/query/synchronize rights only; no privilege escalation | Typed calls and injected tests implemented; executable attestation and native acceptance pending |
-| UI state | UIA read-only element properties for an explicitly selected application | No Invoke, SetValue or focus change | Scoped reader and internal read-only managed adapter have injected/helper coverage; native worker deployment/profile registration and acceptance pending |
+| UI state | UIA read-only element properties for an explicitly selected application | No Invoke, SetValue or focus change | Scoped reader and internal read-only managed adapter have injected/helper coverage; native deployment trust and acceptance pending |
 | Browser state | Existing WebRunner managed DOM session and reviewed origins | Dedicated managed browser; no desktop input fallback | Existing browser path; this reader adds no browser access |
 | Fixture semantic state | Reviewed schema resolved for the retained fixture process identity | Bounded `VirtualQueryEx` / `ReadProcessMemory` provider; no writes | Typed provider and injected-call tests implemented; trusted resolver and native acceptance pending |
 | Application command | Each application's official API, CLI or IPC with scoped resources | Must independently prove no foreground/focus/mouse/input interference | Application selection and command adapter pending |
@@ -566,7 +566,7 @@ revalidate the captured operation and owner before and after each source boundar
 
 Tests use injected native calls/buffers, the actual reader and real hidden Python
 helper IPC. The scoped UIA reader described below preserves explicit field failures
-and best-effort capture metadata. Native UI worker deployment/profile registration, DOM source
+and best-effort capture metadata. Native UI deployment trust, DOM source
 identity and revision normalization remain pending. Existing foreground desktop or
 legacy DOM dictionaries are not converted automatically. This work is not native
 observation or background-application acceptance.
@@ -808,8 +808,8 @@ owners and does not launch a child or create COM until managed readiness.
 
 The helper owner must bound blocking COM work and retain cleanup ownership.
 Injected COM tests cover scoped reads, field failures and root replacement; hidden
-Python helpers cover managed reporting and timeout retirement. Native worker deployment/profile
-registration remains pending. No native UI executable was run, and native UIA property
+Python helpers cover managed reporting and timeout retirement. Native deployment
+trust remains pending. No native UI executable was run, and native UIA property
 exposure and desktop noninterference remain unverified. The UI artifact manifest
 stays schema 2; it is independent of observation report version 3. See the fixture
 README for the field table and startup protocol.
@@ -817,3 +817,52 @@ README for the field table and startup protocol.
 The typed owner query follows Microsoft's
 [GetWindowThreadProcessId](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid)
 contract: both the returned thread ID and output PID must be nonzero.
+
+
+### Fixed read-only UI worker deployment
+
+The host-managed `uia_fixture` profile has empty `allowed_tools`, `roots` and
+`apps`. Its settings contain only an absolute `config_path` and the independently
+verified `config_sha256` of that file. Profile registration, reload and probe do
+not read an image or launch a helper. Probe currently reports `not_supported`
+with `native_evidence=not_recorded`; it is not the memory fixture static inspector.
+
+The UI configuration is a closed JSON object with exactly these fields:
+
+| Field | Required value |
+|---|---|
+| `schema` | Integer `1`, excluding booleans |
+| `kind` | `uia_fixture` |
+| `host`, `target` | Bounded identifiers; target must match the profile name |
+| `image` | Absolute Windows path to the host-reviewed UI fixture |
+| `image_sha256` | Independently reviewed lowercase SHA-256 digest |
+| `max_image_bytes` | Integer from 1 through 67,108,864 |
+| `attestation_timeout` | Number greater than zero and at most 60 seconds |
+
+The shared pinned loader bounds configuration to 16 KiB and rejects duplicate
+keys. It hashes the exact configuration bytes before following the image path.
+The UI loader bounds and hashes image bytes before constructing owners. The
+original launch still leases and rechecks the image; startup self-reports never
+select a new PID. Memory deployment and UI deployment schemas remain distinct.
+
+The proxy uses the fixed isolated module `je_auto_control.utils.agent_runtime.uia_worker`.
+Its bootstrap must match report version 3, source `uia`, the fixed UI fields and
+an exact `uia_fixture` object containing integer `version=1`, configuration SHA
+and target. The worker validates platform, deployment reference and original
+profile/target pin before mutating scope or acquiring resources. Both worker
+and proxy reject effect requests, including direct grounded calls. Existing
+host management, CLI and GUI JSON routes carry the profile without new commands.
+
+An empty task tool scope is accepted only in external mode with no planned
+actions. Existing completion criteria remain mandatory and `actions_complete`
+refuses empty plans. Partial and best-effort UI reports cannot prove semantic
+completion. These tasks expose observations for review; they do not imply a
+successful effect or grant later input authority. Task options cannot replace
+host deployment settings. Disabling the profile revokes work and retires the
+original helper under the existing runtime ownership rules.
+
+Tests use injected image/window/COM functions and real hidden Python helper IPC.
+The isolated packaged worker help command was checked without native acquisition.
+No UI profile was registered against a real native deployment. Trusted helper
+source/interpreter/DLL delivery, actual UIA behavior and desktop noninterference
+remain pending in Progress.md.

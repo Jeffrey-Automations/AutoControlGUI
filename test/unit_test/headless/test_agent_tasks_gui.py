@@ -10,10 +10,13 @@ from PySide6.QtWidgets import QApplication, QPushButton  # noqa: E402  # reason:
 from je_auto_control.gui.agent_tasks_tab import AgentTasksTab  # noqa: E402  # reason: optional Qt import
 
 
-def test_fixture_profile_uses_existing_target_editor_and_actions(monkeypatch, tmp_path):
+@pytest.mark.parametrize("kind", ["fixture", "uia_fixture"])
+def test_fixture_profile_uses_existing_target_editor_and_actions(monkeypatch, tmp_path, kind):
     import json
     import shiboken6
     from headless.test_agent_fixture_profiles import config
+    if kind == "uia_fixture":
+        from headless.test_agent_uia_profiles import config
     app = QApplication.instance() or QApplication([])
     tab = AgentTasksTab()
     submitted = []
@@ -34,7 +37,8 @@ def test_fixture_profile_uses_existing_target_editor_and_actions(monkeypatch, tm
         app.processEvents()
 
 
-def test_task_scope_editor_preserves_semantic_completion_for_shared_submit(monkeypatch):
+@pytest.mark.parametrize("tools", [["AC_increment"], []])
+def test_task_scope_editor_preserves_semantic_completion_for_shared_submit(monkeypatch, tools):
     import json
     import shiboken6
     app = QApplication.instance() or QApplication([])
@@ -45,11 +49,12 @@ def test_task_scope_editor_preserves_semantic_completion_for_shared_submit(monke
         monkeypatch.setattr(tab, "_dispatch", lambda *args: submitted.append(args))
         tab._goal.setText("verify reviewed fixture")
         tab._target.setText("fixture")
-        tab._scope.setPlainText(json.dumps({"allowed_tools": ["AC_increment"], "success_criteria": [criterion]}))
+        tab._scope.setPlainText(json.dumps({"allowed_tools": tools, "success_criteria": [criterion]}))
         dict(tab.menu_actions())["agent_submit"]()
         operation, payload = submitted[0]
         assert operation == "submit" and payload["spec"]["success_criteria"] == [criterion]
         assert payload["spec"]["target"] == "fixture"
+        assert payload["spec"]["allowed_tools"] == tools
     finally:
         tab.close()
         shiboken6.delete(tab)

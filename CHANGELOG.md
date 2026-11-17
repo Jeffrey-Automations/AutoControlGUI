@@ -2,13 +2,19 @@
 
 ## [Unreleased]
 
+- External tasks may now declare an empty tool scope when they have no planned
+  actions. Completion criteria remain required; empty plans do not prove completion.
+  The new host-managed `uia_fixture` profile uses this zero-action contract, a
+  fixed isolated worker and pinned configuration/image bytes. Both IPC endpoints
+  reject commands. Registration/probe remain inert; native UI acceptance is pending.
+
 - The build-only UI fixture now wraps its startup result in an exact `id`/`result`
   envelope, correlated by launch challenge. Rebuild earlier UI artifacts for the
   new receive-only internal launcher; the memory fixture protocol is unchanged.
 
 - The native fixture builder adds `--kind uia` for a separate owned hidden-window
   artifact and schema-2 static manifest. The default memory artifact is unchanged.
-  This builds only; native launcher/profile assembly and acceptance remain pending.
+  This builds only; native deployment trust and acceptance remain pending.
 
 - Managed fixture observations now return a version-three multi-source report instead of a flat
   memory snapshot. Read `sources.process_memory.snapshot` only after requiring a complete report;
@@ -23,7 +29,7 @@
   fields stay beneath the original HWND/PID and pinned root runtime ID, with bounded traversal,
   ancestry checks and password protection. Partial fields and complete best-effort captures
   grant no action or completion authority. Injected COM and hidden-helper tests cover this path;
-  native launcher/profile assembly and all desktop acceptance remain pending.
+  native deployment trust and all desktop acceptance remain pending.
 
 - Image search and OCR (`find_image` and everything on `cv2_utils.template_detection`, `visual_match`,
   `color_match`, `edge_match`, `rotated_match`, self-healing frame locators, device-frame matching,

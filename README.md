@@ -103,10 +103,20 @@ Host-selected semantic adapters can return multi-source reports through the exis
 
 A separate owned UI observation fixture can be built with `test/fixtures/native_memory/build_fixture.py --kind uia`; its static manifest remains schema 2. The internal launcher binds startup to the retained process and window owner. The scoped UIA reader checks that window, process and root identity, limits tree traversal, and protects password fields. Its read-only managed adapter creates COM lazily and preserves partial fields through the shared observation API.
 
-Injected calls and hidden Python helpers cover scoped reads, reporting and timeout retirement. Native worker deployment/profile registration, DOM integration and desktop acceptance remain pending. No native UI fixture execution or desktop noninterference is claimed.
+Injected calls and hidden Python helpers cover scoped reads, reporting and timeout retirement. Native deployment trust, DOM integration and desktop acceptance remain pending. No native UI fixture execution or desktop noninterference is claimed.
 
 The internal owned UI target retains its launcher and both image leases before
 attestation, attempts every owner during cleanup, and retains failed cleanup for
 retry. A publication lock prevents late source installation after shutdown. The
-native factory only constructs owners; fixed worker deployment/profile registration
+native factory only constructs owners; native deployment trust
 and native acceptance remain pending.
+
+Host management can register a `uia_fixture` profile with empty `allowed_tools`,
+`roots` and `apps`, and only `config_path`/`config_sha256` settings. It uses a fixed
+isolated worker and validates deployment, profile and target pins before acquisition.
+Both endpoints refuse commands. External tasks may use an empty tool scope only
+without planned actions; completion criteria remain required and an empty plan
+cannot prove completion. UI partial/best-effort reports remain diagnostic.
+Registration and probe acquire nothing; probe reports `not_supported` and
+`native_evidence=not_recorded`. The existing target API, CLI and GUI JSON editor
+carry this profile. Injected and hidden-helper tests do not establish native trust.

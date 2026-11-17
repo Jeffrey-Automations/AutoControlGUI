@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from je_auto_control.utils.agent_runtime import fixture_deployment, fixture_worker, target_config
+from je_auto_control.utils.agent_runtime import fixture_deployment, fixture_worker, target_config, pinned_deployment
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.target_config import AgentTargetProfile
 from je_auto_control.utils.process_memory.models import ProcessIdentity
@@ -67,14 +67,14 @@ def test_unknown_scope_or_invalid_deployment_never_constructs_target(tmp_path, c
 
 def test_config_pin_is_checked_before_following_image_path(tmp_path, monkeypatch):
     path, _ = deployment(tmp_path)
-    original = fixture_deployment._read
+    original = pinned_deployment.read_artifact
     reads = []
 
     def read(artifact, limit):
         reads.append(artifact)
         return original(artifact, limit)
 
-    monkeypatch.setattr(fixture_deployment, "_read", read)
+    monkeypatch.setattr(pinned_deployment, "read_artifact", read)
     with pytest.raises(AgentTaskError):
         fixture_deployment.load_fixture_image(str(path), "0" * 64)
     assert reads == [path]

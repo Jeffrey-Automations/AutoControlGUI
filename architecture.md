@@ -1599,11 +1599,22 @@ ancestry around field reads and retains the first verified root runtime identity
 `partial_observation.py`; report version 3 preserves successful fields beside
 closed per-field failures. Best-effort UIA observations cannot ground actions.
 `uia_target.py` binds the reader to managed scope with lazy COM acquisition and
-retryable cleanup. Native deployment/profile assembly remains in `Progress.md`;
+retryable cleanup. Native deployment trust and acceptance remain in `Progress.md`;
 hidden Python helper tests establish IPC retirement, not native COM acceptance.
 
 `uia_owner.py` retains the launcher and two independent image owners before
 attestation starts. A private owner bundle supplies the managed adapter callbacks;
 the adapter remains the sole lifecycle owner. Its publication lock excludes source
 installation after cleanup. The native factory constructs inert owners only;
-fixed worker deployment and profile registration remain pending.
+fixed worker deployment and zero-action profile registration are described below.
+
+`pinned_deployment.py` checks bounded configuration bytes before any artifact path
+is followed; memory and UI loaders retain their distinct closed schemas.
+`uia_deployment.py` checks the UI image hash and bounds before owner construction.
+`uia_worker.py` validates the original deployment/profile/target before scope
+mutation and refuses effects. `uia_native_target.py` fixes the worker argv and
+binds its bootstrap to the configuration digest, target and UI report contract.
+The `uia_fixture` profile grants no tools, roots or desktop applications and uses
+the existing host management and task editor surfaces. Empty tool scopes require
+external mode and no planned actions. They do not make an empty plan complete.
+Native execution and trusted Python/COM/DLL delivery remain unverified.

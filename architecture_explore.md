@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,577 |
-| 程式碼總行數 | 242,432 |
+| Python 模組總數（含周邊子專案） | 1,581 |
+| 程式碼總行數 | 242,629 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -516,13 +516,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 56,106 行。
+> 14 個套件、約 56,303 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,254 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 29,021 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 29,218 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 166 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1051,7 +1051,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（29,021 行／207 檔）
+#### `utils/agent_runtime/`（29,218 行／211 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1117,7 +1117,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `local_evidence.py` | 29 | Bind server-side batch evidence to its owning runtime without global client discovery. |
 | `manifest_evidence.py` | 51 | Independently re-read archive manifests and their scoped files at task completion. |
 | `model_tools.py` | 65 | Local-model schemas expose observation references without changing legacy executor signatures. |
-| `models.py` | 214 | Detached JSON contracts for managed computer tasks and their evidence. |
+| `models.py` | 216 | Detached JSON contracts for managed computer tasks and their evidence. |
 | `native_errors.py` | 42 | Encode helper failures without disclosing memory details and preserve closed reason codes. |
 | `native_channel.py` | 281 | Bounded JSON IPC to an owned helper, with cancellable writes, replies and retirement. |
 | `native_control.py` | 59 | Generation-bound negative-only takeover notices with retained coarse cleanup failure diagnostics. |
@@ -1182,12 +1182,16 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `uia_channel.py` | 79 | Receive one correlated UI-fixture startup without writing commands or input acknowledgments. |
 | `scoped_uia.py` | 255 | Read explicit fields beneath one retained-process window inside its owned helper. |
 | `uia_launch.py` | 84 | Bind a private UI-fixture HWND to the independently attested retained launch. |
+| `uia_deployment.py` | 41 | Load the fixed UI fixture deployment without granting task-selected launch settings. |
 | `uia_owner.py` | 99 | Retain pinned UI fixture resources before acquisition and through failed retirement. |
 | `uia_target.py` | 132 | Expose scoped UI fixture observations under managed authority without granting actions. |
 | `fixture_launch.py` | 52 | Measure an owned fixture channel's launch handle before binding its private bootstrap. |
 | `fixture_target.py` | 287 | Own pinned fixture startup, guarded semantic reads and retryable resource retirement. |
-| `fixture_deployment.py` | 95 | Load a bounded, independently pinned host deployment for the fixed schema-one fixture. |
+| `pinned_deployment.py` | 77 | Validate bounded host-pinned deployment bytes before following artifact references. |
+| `fixture_deployment.py` | 51 | Load a bounded, independently pinned host deployment for the fixed schema-one fixture. |
+| `uia_worker.py` | 74 | Serve one pinned UI fixture deployment through a permanently read-only semantic worker. |
 | `fixture_worker.py` | 107 | Private host-launched worker for a pinned Windows fixture, with no task-selected launch settings. |
+| `uia_native_target.py` | 43 | Bind a zero-action UI profile to its fixed worker and exact deployment bootstrap. |
 | `fixture_native_target.py` | 36 | Bind a managed fixture profile to one fixed worker and its pinned deployment bootstrap. |
 | `fixture_probe.py` | 151 | Own bounded static fixture inspections through shutdown and failed helper retirement. |
 | `fixture_control.py` | 141 | Owned fixture RPC transport with bounded requests and retained process retirement. |
@@ -1213,7 +1217,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `submission.py` | 40 | Admission witnesses bind tagged DAG requests before live scope normalization, without granting authority. |
 | `target_config.py` | 209 | Immutable host-reviewed target configuration, distinct from untrusted task options. |
 | `target_continuity.py` | 16 | Require a live UI target context before trusting a finite skill's verified prefix. |
-| `target_factory.py` | 30 | Create inert managed adapters from host profiles; SDKs and native resources stay lazy. |
+| `target_factory.py` | 34 | Create inert managed adapters from host profiles; SDKs and native resources stay lazy. |
 | `target_profiles.py` | 231 | Durable target profiles, live controls and explicit dependency diagnostics separate from native evidence. |
 | `targets.py` | 193 | Explicit target adapters; native imports occur only during requested operations. |
 | `task_authority.py` | 322 | Trusted source-owner recovery admission and live owner/reviewer authority checks. |
@@ -1601,8 +1605,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,039 | 107,862 |
-| **總計** | **1,565** | **241,687** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,043 | 108,059 |
+| **總計** | **1,569** | **241,884** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

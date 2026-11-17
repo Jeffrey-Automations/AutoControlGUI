@@ -103,8 +103,15 @@ MultiViewerHost 可回傳含原始 session 清理物件的 offer，延後清理�
 
 獨立自有 UI 觀察 fixture 可透過 `test/fixtures/native_memory/build_fixture.py --kind uia` 建置，靜態 manifest 維持 schema 2。內部 launcher 將啟動訊息綁定保留程序與視窗擁有者。限定範圍的 UIA reader 核對該視窗、程序與根節點身分，限制樹狀走訪並保護密碼欄位。唯讀受管 adapter 延遲建立 COM，透過共用觀察 API 保留部分欄位結果。
 
-注入呼叫與隱藏 Python helper 已涵蓋限定範圍讀取、報告與逾時回收。原生 worker 部署／profile 註冊、DOM 整合與桌面驗收仍待完成，尚未執行原生 UI fixture，也未證明不干擾桌面。
+注入呼叫與隱藏 Python helper 已涵蓋限定範圍讀取、報告與逾時回收。原生部署信任、DOM 整合與桌面驗收仍待完成，尚未執行原生 UI fixture，也未證明不干擾桌面。
 
 內部自有 UI target 在 attestation 前保留啟動器及兩個獨立映像租約擁有者；
 清理會嘗試全部資源並保留失敗項目供重試。發布鎖防止關閉後存入晚到的來源。
-原生 factory 僅建立擁有者；固定 worker 部署、profile 註冊及原生驗收仍待完成。
+原生 factory 僅建立擁有者；原生部署信任及原生驗收仍待完成。
+
+主機管理可註冊 `uia_fixture` profile，`allowed_tools`、`roots`、`apps` 都為空，
+設定只接受 `config_path`／`config_sha256`。固定隔離 worker 在取得資源前核對部署、profile
+與目標 pin，兩端都拒絕命令。外部任務只有在沒有預排動作時可使用空工具集合；
+仍須提供完成條件，空計畫不能證明完成，UI partial／best-effort 報告仍只供診斷。
+註冊與 probe 不取得資源；probe 回傳 `not_supported` 與 `native_evidence=not_recorded`。
+既有目標 API、CLI 與 GUI JSON 編輯器可傳遞此 profile。注入及隱藏 helper 測試不代表原生信任成立。
