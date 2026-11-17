@@ -26,6 +26,8 @@
 目前 injected-provider 測試不算原生通過；設計見 [記憶體觀察契約](docs/process_memory_contract.md)。
 已有 `test/fixtures/native_memory/acceptance.py` 的靜態預檢與明確選用的 smoke 執行路徑，
 但原生執行尚未啟用；頁面故障、權限、PID 重用、背景不干擾及長時間資源驗收仍待完成。
+原生 fixture 已有固定 split／guard／noaccess／decommitted 頁面配置的建置前置能力；
+尚未執行，也未接上能核對指定 payload 頁面來源的驗收 runner，不能只憑失敗代碼判為通過。
 
 ### 桌面行為驗收
 

@@ -543,6 +543,11 @@ The native fixture README documents a static-by-default smoke CLI with an explic
 execution option. Its external image pin and source inventory checks do not establish
 dependency trust. Injected smoke tests cover initial state, receipts, fresh readback,
 managed completion and retryable cleanup, without running the native artifact.
+The C fixture can also prepare fixed split/guard/no-access/decommitted payload
+layouts, with bootstrap as their only operation. Source review and compilation do
+not validate native page behavior. The smoke runner does not select these layouts;
+a page runner still needs private evidence that its region query reached the
+intended payload page, rather than merely matching a generic failure reason.
 Native execution stays paused under `Progress.md`; native verification of the typed calls,
 trusted bootstrap matching, page-protection fault injection, host probe configuration, runtime
 lifecycle/policy integration and application coverage remain required for M1/M3.

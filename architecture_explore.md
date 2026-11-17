@@ -1606,3 +1606,6 @@ build-only compiler/import-inventory tool. Its acceptance CLI defaults to static
 inventory checks; an explicit execution path assembles the managed smoke roundtrip
 and reports independent readback and cleanup separately. The artifact is not
 executed by ordinary tests; native behavior and loaded-image trust remain in `Progress.md`.
+The C fixture has fixed split, guard, no-access and decommitted diagnostic layouts.
+They copy the payload into a separate two-page allocation and expose bootstrap only;
+the ordinary static payload and command ledger remain separate.

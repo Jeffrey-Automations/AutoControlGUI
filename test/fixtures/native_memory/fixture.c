@@ -44,12 +44,17 @@ typedef struct {
     const char *error;
 } Receipt;
 
+typedef enum {
+    LAYOUT_INVALID, LAYOUT_SPLIT, LAYOUT_GUARD, LAYOUT_NOACCESS, LAYOUT_DECOMMITTED
+} PageLayout;
+
 static Payload payload = {17, "ready"};
 static __declspec(align(8)) volatile LONG64 generation = 0;
 static Header header;
 static char launch_nonce[33];
 static Receipt receipts[OPERATIONS];
 static size_t receipt_count;
+static unsigned char *page_allocation;
 
 typedef char payload_size_check[sizeof(Payload) == 16 ? 1 : -1];
 typedef char header_size_check[sizeof(Header) == 40 ? 1 : -1];
@@ -253,7 +258,49 @@ static void bootstrap(void) {
            "\"header_address\":%llu,\"header_size\":40,\"payload_address\":%llu,"
            "\"payload_size\":16,\"sequence_address\":%llu,\"sequence_size\":8,\"launch_nonce\":\"%s\"}",
            GetCurrentProcessId(), (unsigned long long)(uintptr_t)&header,
-           (unsigned long long)(uintptr_t)&payload, (unsigned long long)(uintptr_t)&generation, launch_nonce);
+           (unsigned long long)header.payload, (unsigned long long)(uintptr_t)&generation, launch_nonce);
+}
+
+static PageLayout page_layout(const char *name) {
+    static const struct { const char *name; PageLayout layout; } layouts[] = {
+        {"split", LAYOUT_SPLIT}, {"guard", LAYOUT_GUARD},
+        {"noaccess", LAYOUT_NOACCESS}, {"decommitted", LAYOUT_DECOMMITTED}
+    };
+    size_t i;
+    for (i = 0; i < sizeof(layouts) / sizeof(layouts[0]); ++i) {
+        if (!strcmp(name, layouts[i].name)) return layouts[i].layout;
+    }
+    return LAYOUT_INVALID;
+}
+
+static int prepare_pages(PageLayout layout) {
+    static const DWORD protection[] = {PAGE_READWRITE, PAGE_READWRITE | PAGE_GUARD, PAGE_NOACCESS};
+    SYSTEM_INFO info;
+    SIZE_T page_size;
+    DWORD previous;
+    unsigned char *selected;
+    GetSystemInfo(&info);
+    page_size = info.dwPageSize;
+    if (page_size < sizeof(payload) || page_size > 65536) return 0;
+    page_allocation = VirtualAlloc(NULL, page_size * 2, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    if (!page_allocation) return 0;
+    selected = page_allocation + page_size - sizeof(payload) / 2;
+    memcpy(selected, &payload, sizeof(payload));
+    if (!VirtualProtect(page_allocation, page_size, PAGE_READONLY, &previous)) return 0;
+    if (layout == LAYOUT_DECOMMITTED) {
+        if (!VirtualFree(page_allocation + page_size, page_size, MEM_DECOMMIT)) return 0;
+    } else if (!VirtualProtect(page_allocation + page_size, page_size,
+                               protection[layout - 1], &previous)) return 0;
+    header.payload = (uint64_t)(uintptr_t)selected;
+    return 1;
+}
+
+static int configure_pages(int argc, char **argv) {
+    PageLayout layout;
+    if (argc == 4) return 1;
+    if (argc != 6 || strcmp(argv[4], "--page-layout")) return 0;
+    layout = page_layout(argv[5]);
+    return layout && prepare_pages(layout);
 }
 
 static int initialize(int argc, char **argv) {
@@ -261,7 +308,8 @@ static int initialize(int argc, char **argv) {
     static const char hex[] = "0123456789abcdef";
     size_t i;
     unsigned nonzero = 0;
-    if (argc != 4 || strcmp(argv[1], "--rpc") || strcmp(argv[2], "--challenge") || !hex32(argv[3])) return 0;
+    if ((argc != 4 && argc != 6) || strcmp(argv[1], "--rpc") ||
+        strcmp(argv[2], "--challenge") || !hex32(argv[3])) return 0;
     memcpy(header.magic, "JEPMFIX1", 8);
     for (i = 0; i < 16; ++i) {
         header.challenge[i] = (unsigned char)(hex_digit(argv[3][i * 2]) * 16 + hex_digit(argv[3][i * 2 + 1]));
@@ -274,11 +322,12 @@ static int initialize(int argc, char **argv) {
     }
     header.payload = (uint64_t)(uintptr_t)&payload;
     header.sequence = (uint64_t)(uintptr_t)&generation;
-    return 1;
+    return configure_pages(argc, argv);
 }
 
 static void dispatch(const Request *request) {
     if (!strcmp(request->operation, "bootstrap") && request->fields == 0) { bootstrap(); return; }
+    if (page_allocation) { error("invalid_request"); return; }
     if (strcmp(request->operation, "control")) { error("invalid_request"); return; }
     if (!strcmp(request->command, "snapshot") && request->fields == COMMAND) snapshot();
     else if (!strcmp(request->command, "compare_set")) compare_set(request);
@@ -300,8 +349,13 @@ static int serve(void) {
 }
 
 int main(int argc, char **argv) {
-    if (sizeof(void *) != 8 || !initialize(argc, argv)) return 2;
-    if (_setmode(_fileno(stdin), _O_BINARY) == -1 || _setmode(_fileno(stdout), _O_BINARY) == -1) return 2;
-    setvbuf(stdout, NULL, _IONBF, 0);
-    return serve();
+    int result = 2;
+    if (sizeof(void *) == 8 && initialize(argc, argv)) {
+        if (_setmode(_fileno(stdin), _O_BINARY) != -1 && _setmode(_fileno(stdout), _O_BINARY) != -1) {
+            setvbuf(stdout, NULL, _IONBF, 0);
+            result = serve();
+        }
+    }
+    if (page_allocation && !VirtualFree(page_allocation, 0, MEM_RELEASE)) result = 3;
+    return result;
 }
