@@ -248,6 +248,10 @@ are normalized, not the surrounding runtime authority checks.
 ## Managed semantic grounding
 
 The runtime has an internal `SemanticTarget` contract for host-selected adapters.
+Every concrete semantic target must implement `cleanup()`. Retirement failures
+must raise while retaining resource ownership for retry; adapters without cleanup
+cannot be instantiated. The worker uses this same contract when closing after EOF
+or revocation.
 Task JSON and observation fields cannot opt an ordinary target into it. Existing
 targets retain full-payload fingerprinting and their existing `perform` calls.
 

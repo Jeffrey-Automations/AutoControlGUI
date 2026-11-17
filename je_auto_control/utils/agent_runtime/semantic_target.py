@@ -148,7 +148,6 @@ class SemanticReceipt:
                 "result": detached(self.result)}
 
 
-# pylint: disable-next=too-few-public-methods  # reason: nominal opt-in adds grounded dispatch to existing targets
 class SemanticTarget(ABC):
     """Host-selected adapter contract, never enabled by a task or observation payload."""
 
@@ -161,6 +160,10 @@ class SemanticTarget(ABC):
         non_atomic receipt. An unknown effect raises AgentEffectUnknown instead of
         a receipt. The runtime owns all retries.
         """
+
+    @abstractmethod
+    def cleanup(self) -> None:
+        """Retire owned resources; raise and retain ownership when cleanup needs a retry."""
 
 
 def fingerprint(target: Any, observation: Mapping[str, Any]) -> str:
