@@ -278,8 +278,13 @@ claim atomic comparison at commit. Cleanup permanently retires the target and
 raises until pending reader handles are closed; repeated cleanup retries ownership.
 The host must create a dedicated target/reader/command owner per resource lifecycle.
 This internal seam has injected-provider runtime tests, not a production launcher
-or public profile registration. Memory failure reasons are typed locally; the
-helper channel currently retains their sanitized text as a generic task error.
+or public profile registration. Memory failure reasons retain their type across
+the owned helper channel. The worker emits only a closed reason code and fixed
+message, never the memory exception text. The host requires the exact error schema
+and rejects unknown reasons, extra fields and mixed event/result packets without
+echoing their contents. Legacy unstructured memory errors are rejected rather than
+parsed from text. This preserves read failure distinctions; an error after command
+dispatch still follows the uncertain-effect journal path, not automatic replay.
 
 `NativeSemanticTarget` carries the same contract over the existing owned helper
 channel. Trusted host code supplies the reviewed helper argv and an explicit

@@ -12,25 +12,24 @@ import time
 import uuid
 from typing import Any, Callable, Sequence
 
-from je_auto_control.utils.agent_runtime.errors import (
-    AgentControlBusy, AgentTaskError, AgentHumanReview, AgentEffectUnknown, AgentObservationStale,
-)
+from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.wire_data import detached, positive
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+from je_auto_control.utils.agent_runtime.native_errors import raise_reply_error
 
 _PACKET_LIMIT = 1_100_000
-_ERROR_TYPES = {"AgentControlBusy": AgentControlBusy, "AgentHumanReview": AgentHumanReview,
-                "AgentEffectUnknown": AgentEffectUnknown, "AgentObservationStale": AgentObservationStale}
 
 
 def classify_reply(reply: Any, request_id: str) -> tuple[bool, Any]:
     """Return ``(True, event)`` for an input announcement or ``(False, result)``; a helper error raises its type."""
     if not isinstance(reply, dict) or reply.get("id") != request_id:
         raise AgentTaskError("native helper returned an unexpected reply")
+    if reply.get("error_type") == "MemoryObservationError" or "memory_reason" in reply:
+        raise_reply_error(reply)
     if "event" in reply:
         return True, reply["event"]
     if "error" in reply:
-        raise _ERROR_TYPES.get(str(reply.get("error_type")), AgentTaskError)(str(reply["error"]))
+        raise_reply_error(reply)
     return False, detached(reply.get("result"))
 
 

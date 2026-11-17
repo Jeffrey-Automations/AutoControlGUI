@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261118-04 | 2026-11-18 | Preserve closed memory failure reasons across helpers | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-03 | 2026-11-18 | Bind semantic tasks to reviewed memory readers | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-02 | 2026-11-18 | Fence fixture changes and retain operation receipts | #done #process-memory | [2026-11-c](2026-11-c.md) |
 | U-20261118-01 | 2026-11-18 | Verify semantic completion from fresh target state | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |

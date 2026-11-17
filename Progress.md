@@ -675,7 +675,7 @@ IPC fixture 已驗證成功回條但未生效及 helper 重啟；程序內 targe
 內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
 並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。
 受管 profile、持有 reader 的原生 adapter／launcher 與公開記憶體入口尚未接上；
-記憶體失敗原因目前只在本機保留型別，helper 通道仍以安全文字傳回一般 task error。
+記憶體失敗原因已透過封閉錯誤封包跨 helper 保留型別；未知原因與混合封包拒絕且不回顯內容。
 
 1. **M0：能力盤點與範圍契約。**（已完成：profile／路由規則 U-20261116-12；維護者 2026-11-17 決定第一個目標只用自有 fixture，真實應用待 M1 原生驗收跑通後再選，U-20261117-01）先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
    讀取來源、執行介面、權限、是否全背景、支援版本、驗證方式與不支援原因。

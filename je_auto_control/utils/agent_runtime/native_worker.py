@@ -8,6 +8,7 @@ from contextlib import ExitStack
 from typing import Any
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+from je_auto_control.utils.agent_runtime.native_errors import error_reply
 from je_auto_control.utils.agent_runtime.browser_target import BrowserTarget
 from je_auto_control.utils.agent_runtime.browser_retirement import refuse_browser_tool
 from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
@@ -119,8 +120,7 @@ class NativeWorker:
                 result = self._dispatch(request["operation"], request["payload"])
                 self._reply({"id": self._request_id, "result": durable_payload(result)})
             except (AutoControlException, OSError, RuntimeError, TypeError, ValueError, LookupError) as error:
-                self._reply(durable_payload({"id": self._request_id, "error": f"{type(error).__name__}: {error}",
-                                             "error_type": type(error).__name__}))
+                self._reply(durable_payload(error_reply(self._request_id, error)))
 
     def _dispatch(self, operation: str, payload: dict[str, Any]) -> Any:
         if self._browser_readonly:

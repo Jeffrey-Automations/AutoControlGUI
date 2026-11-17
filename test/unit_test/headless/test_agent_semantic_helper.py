@@ -279,3 +279,16 @@ def test_failed_cleanup_keeps_helper_owned_until_confirmation(tmp_path, unconfir
     channel.response = {"cleaned": True}
     adapter.cleanup()
     assert adapter._channel is None and channel.retired
+
+
+def test_memory_failure_reason_survives_owned_helper_ipc(managed):
+    from je_auto_control.utils.process_memory.models import FailureReason, MemoryObservationError
+    runtime, _target = managed
+    task = runtime.submit(spec()).task_id
+    frame = runtime.observe(task)
+    with pytest.raises(MemoryObservationError) as failure:
+        runtime.act(task, {"tool": "AC_increment", "observation_id": frame.observation_id,
+                           "arguments": {"memory_failure": "partial_read"}})
+    assert failure.value.reason is FailureReason.PARTIAL_READ
+    assert str(failure.value) == "partial_read"
+    assert runtime.store.actions(task)[0]["status"] == "uncertain"

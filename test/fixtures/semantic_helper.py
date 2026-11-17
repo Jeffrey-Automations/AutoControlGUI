@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from je_auto_control.utils.agent_runtime.errors import AgentEffectUnknown, AgentObservationStale
 from je_auto_control.utils.agent_runtime.native_worker import NativeWorker
 from je_auto_control.utils.agent_runtime.semantic_target import SemanticReceipt, SemanticSnapshot, SemanticTarget
+from je_auto_control.utils.process_memory.models import FailureReason, MemoryObservationError
 
 
 class FixtureTarget(SemanticTarget):
@@ -33,6 +34,8 @@ class FixtureTarget(SemanticTarget):
         return replace(self.state, observation_id=uuid4().hex, started=now, finished=now).to_dict()
 
     def perform_grounded(self, name, arguments, *, expected, operation_id):
+        if arguments.get("memory_failure"):
+            raise MemoryObservationError(FailureReason(arguments["memory_failure"]))
         if expected.grounding() != self.state.grounding():
             raise AgentObservationStale("fixture changed before commit")
         if arguments.get("input"):
