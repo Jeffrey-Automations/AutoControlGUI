@@ -16,7 +16,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 
 STATUS_SATISFIED = "satisfied"
 STATUS_GAP = "gap"
@@ -71,7 +71,7 @@ def _framework_key(name: str) -> str:
     return "".join(ch for ch in str(name).upper() if ch.isalnum())
 
 
-def _wanted_frameworks(frameworks: Optional[Sequence[str]]) -> Optional[set]:
+def _wanted_frameworks(frameworks: Optional[Sequence[str]]) -> Optional[Set[str]]:
     """The requested framework keys, or ``None`` for all; unknown names are a ``ValueError``."""
     if isinstance(frameworks, str):
         # "SOC2" was walked letter by letter: unknown frameworks 2, C, O, S.

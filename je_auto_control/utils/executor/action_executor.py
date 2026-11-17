@@ -1,6 +1,6 @@
 import threading
 import types
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 from je_auto_control.utils.diagnostics.capability_commands import probe_current_capabilities as _probe_capabilities
 
 from je_auto_control.utils.exception.exception_tags import (
@@ -134,10 +134,18 @@ from je_auto_control.wrapper.auto_control_window import (
     windows_for_process_id,
 )
 
+if TYPE_CHECKING:
+    from je_auto_control.utils.agent_memory import AgentMemory
+    from je_auto_control.utils.element_repository import ElementRepository
+    from je_auto_control.utils.layered_config import LayeredConfig
+    from je_auto_control.utils.locator_chain.locator_chain import Candidates
+    from je_auto_control.utils.skill_library import SkillLibrary
+    from je_auto_control.utils.work_queue import WorkQueue
+
 
 def _a11y_list_as_dicts(app_name: Optional[str] = None,
                         max_results: int = 200,
-                        window_title: Optional[str] = None) -> List[dict]:
+                        window_title: Optional[str] = None) -> List[Dict[str, Any]]:
     """Executor adapter: list accessibility elements as plain dicts."""
     from je_auto_control.utils.accessibility.accessibility_api import (
         list_accessibility_elements,
@@ -155,7 +163,7 @@ def _a11y_find_as_dict(name: Optional[str] = None,
                        role: Optional[str] = None,
                        app_name: Optional[str] = None,
                        window_title: Optional[str] = None,
-                       contains: Any = False) -> Optional[dict]:
+                       contains: Any = False) -> Optional[Dict[str, Any]]:
     """Executor adapter: find an accessibility element, return its dict."""
     element = find_accessibility_element(
         name=name, role=role, app_name=app_name, window_title=window_title,
@@ -164,7 +172,7 @@ def _a11y_find_as_dict(name: Optional[str] = None,
     return None if element is None else element.to_dict()
 
 
-def _a11y_focused_as_dict(app_name: Optional[str] = None) -> Optional[dict]:
+def _a11y_focused_as_dict(app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Executor adapter: the element holding keyboard focus, as a dict."""
     from je_auto_control.utils.accessibility.accessibility_api import (
         focused_accessibility_element,
@@ -179,7 +187,7 @@ def _a11y_find_all_as_dicts(name: Optional[str] = None,
                             window_title: Optional[str] = None,
                             contains: Any = False,
                             max_results: int = 50,
-                            scan_limit: int = 1500) -> List[dict]:
+                            scan_limit: int = 1500) -> List[Dict[str, Any]]:
     """Executor adapter: every matching accessibility element, best match first."""
     from je_auto_control.utils.accessibility.accessibility_api import (
         find_accessibility_elements,
@@ -1678,7 +1686,7 @@ def _ac_web_run(action: Optional[Dict[str, Any]] = None,
     return run_webrunner_action(payload)
 
 
-def _ac_web_run_actions(actions: List[Dict[str, Any]]) -> list:
+def _ac_web_run_actions(actions: List[Dict[str, Any]]) -> List[Any]:
     """Bridge a list of WR_* actions through the WebRunner executor."""
     from je_auto_control.utils.webrunner_bridge import run_webrunner_actions
     return run_webrunner_actions(actions)
@@ -1690,7 +1698,7 @@ def _ac_web_available() -> bool:
     return is_webrunner_available()
 
 
-def _ac_web_list_commands() -> list:
+def _ac_web_list_commands() -> List[str]:
     """Return every WR_* command the local WebRunner install exposes."""
     from je_auto_control.utils.webrunner_bridge import list_webrunner_commands
     return list_webrunner_commands()
@@ -1798,7 +1806,7 @@ def _ac_android_screenshot(file_path: str,
     return str(path)
 
 
-def _ac_android_list_devices(adb_path: Optional[str] = None) -> list:
+def _ac_android_list_devices(adb_path: Optional[str] = None) -> List[Dict[str, Any]]:
     """Return ``{serial, state, model, …}`` for every adb-attached device."""
     devices = _android_client(None, adb_path).list_devices()
     return [
@@ -1938,9 +1946,9 @@ def _ac_ios_dump_source(url: Optional[str] = None) -> str:
 
 
 def _llm_plan_for_executor(description: str,
-                           examples: Optional[list] = None,
+                           examples: Optional[List[Dict[str, Any]]] = None,
                            model: Optional[str] = None,
-                           max_tokens: int = 2048) -> list:
+                           max_tokens: int = 2048) -> List[List[Any]]:
     """Executor adapter: plan without executing, using current command set."""
     return llm_plan_actions(
         description,
@@ -1952,7 +1960,7 @@ def _llm_plan_for_executor(description: str,
 
 
 def _llm_run_for_executor(description: str,
-                          examples: Optional[list] = None,
+                          examples: Optional[List[Dict[str, Any]]] = None,
                           model: Optional[str] = None,
                           max_tokens: int = 2048) -> Dict[str, Any]:
     """Executor adapter: plan and execute, as the caller this thread already serves (so no ``owner``)."""
@@ -1967,7 +1975,7 @@ def _llm_run_for_executor(description: str,
 
 def _ocr_read_region_as_dicts(region: Optional[List[int]] = None,
                               lang: str = "eng",
-                              min_confidence: float = 60.0) -> List[dict]:
+                              min_confidence: float = 60.0) -> List[Dict[str, Any]]:
     """Executor adapter: dump OCR hits in a region as JSON-friendly dicts."""
     return [
         {
@@ -1985,7 +1993,7 @@ def _ocr_find_regex_as_dicts(pattern: str,
                              lang: str = "eng",
                              region: Optional[List[int]] = None,
                              min_confidence: float = 60.0,
-                             flags: int = 0) -> List[dict]:
+                             flags: int = 0) -> List[Dict[str, Any]]:
     """Executor adapter: regex OCR search returning JSON-friendly dicts."""
     return [
         {
@@ -2198,7 +2206,7 @@ def _secret_status() -> Dict[str, Any]:
     }
 
 
-def _profiler_stats_as_dicts(limit: Optional[int] = None) -> List[dict]:
+def _profiler_stats_as_dicts(limit: Optional[int] = None) -> List[Dict[str, object]]:
     """Executor adapter: dump profiler stats as JSON-friendly dicts."""
     rows = default_profiler.stats()
     if limit is not None:
@@ -2206,7 +2214,7 @@ def _profiler_stats_as_dicts(limit: Optional[int] = None) -> List[dict]:
     return [row.to_dict() for row in rows]
 
 
-def _profiler_hot_spots_as_dicts(limit: int = 10) -> List[dict]:
+def _profiler_hot_spots_as_dicts(limit: int = 10) -> List[Dict[str, object]]:
     """Executor adapter: top N actions by total time, as dicts."""
     return [row.to_dict() for row in default_profiler.hot_spots(int(limit))]
 
@@ -2227,7 +2235,7 @@ def _profiler_reset() -> Dict[str, Any]:
 
 
 def _history_list_as_dicts(limit: int = 100,
-                           source_type: Optional[str] = None) -> List[dict]:
+                           source_type: Optional[str] = None) -> List[Dict[str, Any]]:
     """Executor adapter: list run history as plain dicts (JSON-friendly)."""
     rows = default_history_store.list_runs(
         limit=int(limit), source_type=source_type,
@@ -2247,7 +2255,7 @@ def _history_list_as_dicts(limit: int = 100,
 _EXECUTOR_METRIC_CACHE: Dict[str, Any] = {}
 
 
-def _executor_metrics():
+def _executor_metrics() -> Dict[str, Any]:
     """Lazily register the action-executor Counter + Histogram (Phase 10.1)."""
     if "calls" in _EXECUTOR_METRIC_CACHE:
         return _EXECUTOR_METRIC_CACHE
@@ -2462,11 +2470,14 @@ def _save_window_layout(path: Optional[str] = None) -> Dict[str, Any]:
     return {"count": len(layout), "path": path, "layout": layout}
 
 
-def _restore_window_layout(layout: List[Dict[str, Any]] | str
+def _restore_window_layout(layout: List[Dict[str, Any]] | str, maximize: bool = False
                            ) -> Dict[str, Any]:
-    """Executor adapter: move windows back to a saved layout (list or path)."""
+    """Executor adapter: move windows back to a saved layout (list or path).
+
+    ``maximize`` re-maximizes windows saved maximized, which activates each one.
+    """
     from je_auto_control.utils.window_capture import restore_window_layout
-    return {"restored": restore_window_layout(layout)}
+    return {"restored": restore_window_layout(layout, maximize=_as_bool(maximize))}
 
 
 def _region_color_stats(region: Optional[List[int] | str] = None,
@@ -2579,7 +2590,7 @@ def _control_get_value(name: Optional[str] = None, role: Optional[str] = None,
 
 def _control_get_state(name: Optional[str] = None, role: Optional[str] = None,
                        app_name: Optional[str] = None,
-                       automation_id: Optional[str] = None) -> Optional[dict]:
+                       automation_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Adapter: read everything a native control currently holds, in one call."""
     from je_auto_control.utils.accessibility import control_get_state
     return control_get_state(name=name, role=role, app_name=app_name,
@@ -3061,7 +3072,7 @@ def _idle_point(busy_samples: Any, quiet_samples: Any = 3) -> Dict[str, Any]:
     return {"index": idle_point(samples, quiet_samples=int(quiet_samples))}
 
 
-def _coerce_rgb(value: Any) -> tuple:
+def _coerce_rgb(value: Any) -> Tuple[int, int, int]:
     """Normalise an RGB argument (JSON '[r,g,b]' string / list) to (r, g, b)."""
     seq = _coerce_list(value) if isinstance(value, str) else list(value)
     return (int(seq[0]), int(seq[1]), int(seq[2]))
@@ -3342,7 +3353,7 @@ def _assert_session_active() -> Dict[str, Any]:
     return {"interactive": ensure_interactive_session()}
 
 
-def _queue(db: str, name: str):
+def _queue(db: str, name: str) -> "WorkQueue":
     from je_auto_control.utils.work_queue import WorkQueue
     return WorkQueue(db, name)
 
@@ -3429,7 +3440,7 @@ def _select_tests(flows: List[str], k: Optional[int] = None,
         window=int(window))}
 
 
-def _element_repo(path: str):
+def _element_repo(path: str) -> "ElementRepository":
     from je_auto_control.utils.element_repository import ElementRepository
     return ElementRepository(path)
 
@@ -3468,7 +3479,7 @@ def _debug_trace(actions: List[Any], dry_run: bool = False) -> Dict[str, Any]:
     return {"trace": trace_actions(actions, dry_run=_as_bool(dry_run))}
 
 
-def _skill_lib(path: str):
+def _skill_lib(path: str) -> "SkillLibrary":
     from je_auto_control.utils.skill_library import SkillLibrary
     return SkillLibrary(path)
 
@@ -3553,7 +3564,7 @@ def _write_presentation(path: str, slides: List[Any]) -> Dict[str, Any]:
     return {"path": write_presentation(path, slides)}
 
 
-def _memory(db: str):
+def _memory(db: str) -> "AgentMemory":
     from je_auto_control.utils.agent_memory import AgentMemory
     return AgentMemory(db)
 
@@ -3620,7 +3631,7 @@ def _observe_handler(actions: List[Any]) -> Callable[[str, Any], None]:
     return handler
 
 
-def _observe_predicate(kind: str, params: Dict[str, Any]):
+def _observe_predicate(kind: str, params: Dict[str, Any]) -> Callable[[], Any]:
     from je_auto_control.utils.observer import (
         image_predicate, pixel_predicate, text_predicate)
     builders = {
@@ -4154,7 +4165,7 @@ def _move_mouse_relative(dx: Any, dy: Any) -> Dict[str, Any]:
     return move_mouse_relative(int(dx), int(dy))
 
 
-def _stop_record_timeline() -> List[dict]:
+def _stop_record_timeline() -> List[Dict[str, Any]]:
     """Adapter: stop recording and return the full replayable timeline."""
     from je_auto_control.wrapper.auto_control_record import (
         stop_record_timeline,
@@ -4704,7 +4715,7 @@ def _find_rectangles(region: Any = None, min_area: Any = 400, max_area: Any = No
     return {"count": len(rects), "rectangles": rects}
 
 
-def _resolve_screen(screen: Any) -> list:
+def _resolve_screen(screen: Any) -> List[int]:
     """Parse a JSON screen rect, or default to the live primary screen work area."""
     import json
     if isinstance(screen, str):
@@ -4788,7 +4799,7 @@ def _monitor_at_point(x: Any, y: Any) -> Dict[str, Any]:
             "monitor": monitor.to_dict() if monitor else None}
 
 
-def _region_pixel_token(bbox):
+def _region_pixel_token(bbox: Sequence[int]) -> int:
     """Stability token: a hash of the bbox region's pixels (changes on movement).
 
     Sampled where the match was found, through ``grab_logical``: the bbox is in
@@ -4809,7 +4820,7 @@ def _wait_actionable(template: str, timeout_s: Any = 5.0, stable_for_s: Any = 0.
     if isinstance(region, str):
         region = json.loads(region) if region.strip() else None
 
-    def locate():
+    def locate() -> Optional[Tuple[int, int, int, int]]:
         match = match_template(template, region=region, min_score=float(min_score))
         return (match.x, match.y, match.width, match.height) if match else None
 
@@ -4826,7 +4837,7 @@ def _fuse_elements(ocr: Any = None, icon: Any = None, a11y: Any = None,
     import json
     from je_auto_control.utils.element_parse import fuse_elements
 
-    def parse(value: Any) -> list:
+    def parse(value: Any) -> List[Dict[str, Any]]:
         if isinstance(value, str):
             return json.loads(value) if value.strip() else []
         return list(value) if value else []
@@ -4953,7 +4964,7 @@ def _expect_poll(action: Any, key: Any = None, op: str = "truthy",
                 "truthy": to_be_truthy}
     matcher = builders.get(str(op), to_be_truthy)()
 
-    def getter():
+    def getter() -> Any:
         try:
             record = _running_executor().execute_action([list(action)], raise_on_error=True)
         except (AutoControlException, OSError, RuntimeError, ValueError,
@@ -4974,7 +4985,7 @@ def _expect_poll(action: Any, key: Any = None, op: str = "truthy",
             "waited_s": result.waited_s}
 
 
-def _apply_locate_op(candidates, op: Dict[str, Any]):
+def _apply_locate_op(candidates: "Candidates", op: Dict[str, Any]) -> "Candidates":
     """Apply one locate-chain op spec to a Candidates set."""
     name = op.get("op")
     if name == "within":
@@ -5097,7 +5108,7 @@ def _diff_formats(before: Any, after: Any) -> Dict[str, Any]:
     return diff_formats(before, after)
 
 
-def _coerce_paths(paths: Any) -> list:
+def _coerce_paths(paths: Any) -> List[str]:
     """Normalise a paths argument (JSON list string / single path / list).
 
     A string is a JSON list only if it parses as one: "[draft] notes.txt"
@@ -5115,7 +5126,7 @@ def _coerce_paths(paths: Any) -> list:
     return [str(p) for p in paths]
 
 
-def _coerce_point(point: Any) -> tuple:
+def _coerce_point(point: Any) -> Tuple[int, int]:
     """Normalise a point argument (JSON '[x,y]' / list / default origin)."""
     import json
     if isinstance(point, str):
@@ -5139,7 +5150,7 @@ def _drop_files(hwnd: Any, paths: Any, point: Any = None) -> Dict[str, Any]:
     return {"dropped": bool(dropped), "count": len(coerced)}
 
 
-def _coerce_region(region: Any):
+def _coerce_region(region: Any) -> Any:
     """Normalise a region argument (JSON '[x,y,w,h]' string / list / None)."""
     import json
     if isinstance(region, str):
@@ -5163,7 +5174,7 @@ def _quality_gate(source: Any = None, region: Any = None,
                         min_contrast=float(min_contrast))
 
 
-def _coerce_scales(scales: Any):
+def _coerce_scales(scales: Any) -> Any:
     """Normalise a scales argument (JSON '[1.0,1.5]' string / list / None)."""
     import json
     if isinstance(scales, str):
@@ -5335,7 +5346,7 @@ def _has_motion(before: str, after: Any = None, threshold: Any = 25,
             "activity": activity_score(before, resolved, threshold=int(threshold))}
 
 
-def _resolve_after(after: Any):
+def _resolve_after(after: Any) -> Any:
     """Return the 'after' frame, grabbing the screen when it is not given."""
     if after is not None:
         return after
@@ -5632,7 +5643,7 @@ def _replay_trace(trace: Any) -> Dict[str, Any]:
         trace = (json.loads(trace) if trace.strip().startswith("[")
                  else from_jsonl(trace))
 
-    def runner(action):
+    def runner(action: Any) -> Any:
         record = _running_executor().execute_action([list(action)])
         return next(iter(record.values()), None)
 
@@ -6121,7 +6132,7 @@ def _parse_sse(text: str) -> Dict[str, Any]:
     return {"events": [event.to_dict() for event in parse_event_stream(text)]}
 
 
-def _build_layered_config(layers: Any):
+def _build_layered_config(layers: Any) -> "LayeredConfig":
     """Build a LayeredConfig from a list of {name, mapping, priority?} dicts."""
     import json
     from je_auto_control.utils.layered_config import LayeredConfig
@@ -6219,7 +6230,7 @@ def _check_row_count(rows: Any, minimum: Any = None,
     return check_row_count(_json_rows(rows), low, high)
 
 
-def _coerce_diff_inputs(old_rows: Any, new_rows: Any, key: Any):
+def _coerce_diff_inputs(old_rows: Any, new_rows: Any, key: Any) -> Tuple[Any, Any, Any]:
     import json
     if isinstance(old_rows, str):
         old_rows = json.loads(old_rows)
@@ -7274,7 +7285,7 @@ class Executor:
     # ``catch``/``finally`` belong here too: AC_try only binds ``error_var``
     # once the body has failed, so eagerly interpolating them at dispatch
     # would resolve ${err} before it exists.
-    _DEFERRED_ARG_KEYS: frozenset = frozenset(
+    _DEFERRED_ARG_KEYS: FrozenSet[str] = frozenset(
         {"body", "then", "else", "branches", "catch", "finally"})
 
     # Commands that run an action list held under another key. Expanding it
@@ -7282,7 +7293,7 @@ class Executor:
     # *value*: text read from OCR, HTTP or a file that contained
     # ``${secrets.NAME}`` was resolved from the vault. Per command, because
     # the same key is plain data elsewhere (``AC_tween_drag``'s ``steps``).
-    _DEFERRED_COMMAND_KEYS: Dict[str, frozenset] = {
+    _DEFERRED_COMMAND_KEYS: Dict[str, FrozenSet[str]] = {
         "AC_execute_action": frozenset({"action_list"}),
         "AC_expect_poll": frozenset({"action"}),
         "AC_run_saga": frozenset({"steps"}),
@@ -7322,13 +7333,13 @@ class Executor:
     def variables(self, scope: VariableScope) -> None:
         self._own_variables = scope
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._block_commands = BLOCK_COMMANDS
         self.variables = VariableScope()
         # Named, parameterised macros registered via AC_define_macro.
         self.macros: Dict[str, Any] = {}
         # 事件字典，對應字串名稱到函式
-        self.event_dict: dict = {
+        self.event_dict: Dict[str, Callable[..., Any]] = {
             **AGENT_TASK_COMMANDS,
             # Mouse 滑鼠相關
             **MOUSE_BUTTON_COMMANDS,
@@ -8278,11 +8289,11 @@ class Executor:
         """Add packages, and their submodules, to the allowlist of ``AC_add_package_to_executor``."""
         package_manager.allow_packages(*packages)
 
-    def known_commands(self) -> set:
+    def known_commands(self) -> Set[str]:
         """Return the set of all command names the executor recognises."""
         return set(self.event_dict.keys()) | set(self._block_commands.keys())
 
-    def unknown_commands_in(self, action_list: list | dict) -> List[str]:
+    def unknown_commands_in(self, action_list: List[Any] | Dict[str, Any]) -> List[str]:
         """Return the unrecognised command names in ``action_list``, in order.
 
         Nothing is executed. Structural problems raise exactly as
@@ -8329,7 +8340,7 @@ class Executor:
             return [interpolate_value(item, self.variables) for item in args]
         return args
 
-    def _execute_event(self, action: list) -> Any:
+    def _execute_event(self, action: List[Any]) -> Any:
         """
         執行單一事件
         Execute a single event
@@ -8364,16 +8375,16 @@ class Executor:
             return event()
         raise AutoControlActionException(cant_execute_action_error_message + " " + describe_action(action))
 
-    def execute_one(self, name: str, arguments: Optional[Dict[str, Any]] = None) -> Any:
+    def execute_one(self, name: str, arguments: Optional[Mapping[str, Any]] = None) -> Any:
         """Execute one public command through validation, policy and journal boundaries."""
         from je_auto_control.utils.executor.dispatch import execute_one
         return execute_one(self, name, arguments)
 
-    def execute_action(self, action_list: list | dict,
+    def execute_action(self, action_list: List[Any] | Dict[str, Any],
                        raise_on_error: bool = False,
                        _validated: bool = False,
                        dry_run: bool = False,
-                       step_callback: Optional[Callable[[list], None]] = None,
+                       step_callback: Optional[Callable[[List[Any]], None]] = None,
                        result_callback: Optional[ResultHook] = None,
                        ) -> Dict[str, str]:
         """
@@ -8415,9 +8426,9 @@ class Executor:
             _STRICT_BODIES.value = inherited
             _RUNNING.value = running
 
-    def _execute_list(self, action_list: list | dict, raise_on_error: bool,
+    def _execute_list(self, action_list: List[Any] | Dict[str, Any], raise_on_error: bool,
                       _validated: bool, dry_run: bool,
-                      step_callback: Optional[Callable[[list], None]],
+                      step_callback: Optional[Callable[[List[Any]], None]],
                       ) -> Dict[str, str]:
         """The body of :meth:`execute_action`, with strictness already settled."""
         action_list = self._unwrap_action_list(action_list)
@@ -8441,8 +8452,8 @@ class Executor:
             autocontrol_logger.info("%s -> %s", key, redact_result(record_command(key), value))
         return execute_record_dict
 
-    def _execute_list_step(self, action: list, record: Dict[str, Any], raise_on_error: bool,
-                           validated: bool, dry_run: bool, callback: Optional[Callable[[list], None]]) -> None:
+    def _execute_list_step(self, action: List[Any], record: Dict[str, Any], raise_on_error: bool,
+                           validated: bool, dry_run: bool, callback: Optional[Callable[[List[Any]], None]]) -> None:
         """Dispatch one step inside its optional journal capture boundary."""
         if callback is not None:
             callback(action)
@@ -8489,7 +8500,7 @@ class Executor:
         _count_recorded_failure()
 
     @staticmethod
-    def _unwrap_action_list(action_list: list | dict) -> list:
+    def _unwrap_action_list(action_list: List[Any] | Dict[str, Any]) -> List[Any]:
         """Normalise the ``action_list`` argument or raise on invalid input."""
         actions: Any = action_list
         if isinstance(actions, dict):
@@ -8500,7 +8511,7 @@ class Executor:
             raise AutoControlActionNullException(action_is_null_error_message)
         return actions
 
-    def _run_one_action(self, action: list, record: Dict[str, Any],
+    def _run_one_action(self, action: List[Any], record: Dict[str, Any],
                         raise_on_error: bool, key: str) -> None:
         """Execute a single action, recording the result under ``key`` or raising."""
         import time as _time
@@ -8542,7 +8553,7 @@ class Executor:
             record[key] = repr(error)
             _count_recorded_failure()
 
-    def execute_files(self, execute_files_list: list) -> List[Dict[str, str]]:
+    def execute_files(self, execute_files_list: List[str]) -> List[Dict[str, str]]:
         """
         執行 action files
         Execute actions from files
@@ -8605,7 +8616,7 @@ executor._run_scoped = True  # the one executor every entry point shares
 package_manager.executor = executor
 
 
-def add_command_to_executor(command_dict: dict) -> None:
+def add_command_to_executor(command_dict: Dict[str, Any]) -> None:
     """
     新增自訂指令到 Executor
     Add custom commands to Executor
@@ -8619,9 +8630,9 @@ def add_command_to_executor(command_dict: dict) -> None:
             raise AutoControlAddCommandException(add_command_exception_error_message)
 
 
-def execute_action(action_list: list | dict, *,
+def execute_action(action_list: List[Any] | Dict[str, Any], *,
                    raise_on_error: bool = False, dry_run: bool = False,
-                   step_callback: Optional[Callable[[list], None]] = None,
+                   step_callback: Optional[Callable[[List[Any]], None]] = None,
                    result_callback: Optional[ResultHook] = None,
                    ) -> Dict[str, str]:
     """Run ``action_list`` on the shared executor; return its execution record.
@@ -8639,11 +8650,11 @@ def execute_action(action_list: list | dict, *,
         step_callback=step_callback, result_callback=result_callback)
 
 
-def execute_files(execute_files_list: list) -> List[Dict[str, str]]:
+def execute_files(execute_files_list: List[str]) -> List[Dict[str, str]]:
     return executor.execute_files(execute_files_list)
 
 
-def execute_action_with_vars(action_list: list, variables: dict,
+def execute_action_with_vars(action_list: List[Any], variables: Dict[str, Any],
                              run_id: Optional[str] = None) -> Dict[str, str]:
     """Run ``action_list`` in a fresh variable scope seeded with ``variables``.
 

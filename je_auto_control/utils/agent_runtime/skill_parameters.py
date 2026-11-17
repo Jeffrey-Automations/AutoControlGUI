@@ -20,7 +20,7 @@ def digest(value: Any) -> str:
     return hashlib.sha256(json.dumps(detached(value), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def _slot(document: dict, pointer: str) -> tuple[Any, Any]:
+def _slot(document: dict[str, Any], pointer: str) -> tuple[Any, Any]:
     if not isinstance(pointer, str) or _DATA.fullmatch(pointer) is None or "~" in pointer:
         raise AgentTaskError("skill slots must address explicit action/input/criterion data values")
     pieces = pointer.split("/")[1:]
@@ -46,7 +46,7 @@ def _typed(value: Any, kind: str) -> Any:
     return detached(value)
 
 
-def parameter_schema(spec: dict, slots: Any) -> dict:
+def parameter_schema(spec: dict[str, Any], slots: Any) -> dict[str, Any]:
     """Freeze explicit primitive defaults from a recorded flow; reject duplicate/overlapping slots."""
     if not isinstance(slots, dict) or len(slots) > 50:
         raise AgentTaskError("skill parameters must be an object with at most fifty entries")
@@ -80,7 +80,7 @@ def _overlaps(path: str, occupied: list[str]) -> bool:
     return any(path == other or path.startswith(other + "/") or other.startswith(path + "/") for other in occupied)
 
 
-def instantiate(spec: dict, schema: dict, parameters: Any) -> dict:
+def instantiate(spec: dict[str, Any], schema: dict[str, Any], parameters: Any) -> dict[str, Any]:
     """Apply only named literal parameters to detached, explicitly declared data slots."""
     if not isinstance(parameters, dict) or set(parameters) - set(schema):
         raise AgentTaskError("unknown skill parameters")
@@ -93,7 +93,7 @@ def instantiate(spec: dict, schema: dict, parameters: Any) -> dict:
     return result
 
 
-def repair_data(spec: dict, changes: Any) -> dict:
+def repair_data(spec: dict[str, Any], changes: Any) -> dict[str, Any]:
     """Produce a detached repair proposal limited to existing semantic selector data."""
     if not isinstance(changes, list) or not 1 <= len(changes) <= 100:
         raise AgentTaskError("repair requires between one and one hundred semantic selector changes")

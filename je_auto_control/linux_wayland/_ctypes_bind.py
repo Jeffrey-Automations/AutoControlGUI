@@ -15,7 +15,7 @@ from typing import Any, Iterable, Optional, Sequence, Tuple
 
 
 #: ``(name, restype, argtypes)`` as ctypes wants them.
-Prototype = Tuple[str, Any, tuple]
+Prototype = Tuple[str, Any, Tuple[Any, ...]]
 
 
 class BoundSymbols:
@@ -35,7 +35,7 @@ class BoundSymbols:
             # at the call site, so an argtypes tuple would be wrong here.
             self._fn[name] = getattr(lib, name)
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str) -> Any:
         try:
             return self._fn[name]
         except KeyError:

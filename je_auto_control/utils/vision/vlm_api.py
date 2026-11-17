@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import List, Optional, Tuple
 
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.vision.backends import get_backend
 from je_auto_control.utils.cv2_utils.locator_frame import (
     LocatorFrame, LocatorFrameOwner, current_locator_frame, provided_locator_frame,
@@ -49,6 +50,8 @@ def locate_by_description(description: str,
         image_bytes = frame.png
     else:
         image_bytes, frame = capture_with_geometry(_capture_screenshot_bytes, screen_region)
+    # A task stopped while the screen was captured does not pay for a model request.
+    cancellation_checkpoint()
     coords = bound.locate(image_bytes, description, model=model)
     if coords is None:
         return None
@@ -107,6 +110,9 @@ def click_by_description(description: str,
     if coords is None:
         return False
     cx, cy = coords
+    # The model can answer after the task was stopped or timed out; that
+    # answer must not still move the mouse and click.
+    cancellation_checkpoint()
     # pylint: disable-next=import-outside-toplevel  # reason: native input initializes only for an explicit click
     from je_auto_control.wrapper.auto_control_mouse import (
         click_mouse, set_mouse_position,

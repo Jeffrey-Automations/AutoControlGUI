@@ -1,9 +1,10 @@
 """Scheduler tab: register interval-based action JSON runs."""
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
-    QCheckBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QCheckBox, QFileDialog, QLabel, QLineEdit, QMessageBox,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -11,6 +12,8 @@ from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui._qt_typed import filled_item
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -61,7 +64,7 @@ class SchedulerTab(TranslatableMixin, QWidget):
             self._timer.stop()
         self._apply_status()
 
-    def showEvent(self, event) -> None:  # noqa: N802  # reason: Qt override
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802  # reason: Qt override
         """Catch up with an engine started or stopped elsewhere while hidden."""
         super().showEvent(event)
         self.sync_with_engine()
@@ -90,18 +93,17 @@ class SchedulerTab(TranslatableMixin, QWidget):
         # Browse/add/remove/start/stop commands run from the Actions menu;
         # the tab keeps only the inputs, the jobs table, and the status.
         root = QVBoxLayout(self)
-        form = QHBoxLayout()
-        form.addWidget(self._tr(QLabel(), "sch_script_label"))
-        form.addWidget(self._path_input, stretch=1)
-        form.addWidget(self._tr(QLabel(), "sch_interval_label"))
-        form.addWidget(self._interval_input)
-        form.addWidget(self._repeat_check)
-        root.addLayout(form)
-
-        root.addWidget(self._table, stretch=1)
+        root.setSpacing(12)
+        inputs = Card().add(field_pair(self._tr(QLabel(), "sch_script_label"), self._path_input))
+        inputs.add(flow_of(field_pair(self._tr(QLabel(), "sch_interval_label"), self._interval_input),
+                           self._repeat_check))
+        root.addWidget(inputs)
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("browse", self._browse),
@@ -153,7 +155,7 @@ class SchedulerTab(TranslatableMixin, QWidget):
         # stop() joins the engine thread (up to 2 s), which used to hold the
         # GUI thread; a second Stop while it is out is ignored.
         if self._engine_op.run(default_scheduler.stop, on_done=self._on_engine_stopped,
-                               on_error=self._on_engine_stopped):
+                               on_error=self._on_engine_stopped, retain_failure=True):
             self.sync_with_engine()
 
     def _on_engine_stopped(self, _outcome: object = None) -> None:

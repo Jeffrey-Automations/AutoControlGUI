@@ -70,6 +70,39 @@ def lease(source):
     pytest.fail('synthetic observer never acquired its verified sixty-second idle')
 
 
+def check(source, token):
+    # The same 0.25 s cap as ``lease``. A check that misses it read nothing and
+    # changed nothing: it was refused before dispatch, or its late answer (the
+    # same one a retry gets) was dropped. So a deadline miss is retried too.
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            return source.request('check', token)
+        except AgentControlBusy:
+            threading.Event().wait(0.001)
+        except AgentTaskError as error:
+            if 'deadline exhausted' not in str(error):
+                raise
+    pytest.fail('synthetic observer never answered a check inside its deadline')
+
+
+def settled(source):
+    # An ``inspect`` that only waits for the observer to have drained what was
+    # blocked. It shares the 0.25 s cap, reads passive state and changes nothing,
+    # so a deadline miss on a slow runner is retried like ``check``
+    # (Windows 3.12, run 43991182772).
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            return source.request('inspect', {})
+        except AgentControlBusy:
+            threading.Event().wait(0.001)
+        except AgentTaskError as error:
+            if 'deadline exhausted' not in str(error):
+                raise
+    pytest.fail('synthetic observer never answered an inspect inside its deadline')
+
+
 def test_inert_inspection_does_not_create_a_native_api_or_thread():
     api = FakeAPI()
     source = actor(api)
@@ -88,15 +121,15 @@ def test_source_keeps_one_generation_and_revalidates_fresh_physical_events():
     try:
         source.start()
         first = lease(source)
-        assert source.request('check', first)['state'] == 'monitoring'
+        assert check(source, first)['state'] == 'monitoring'
         api.emit = True
         with pytest.raises(AgentTaskError, match='resume'):
-            source.request('check', first)
+            check(source, first)
         second = lease(source)
         assert first['generation'] == second['generation']
         assert first['lease_id'] != second['lease_id']
         assert source.request('release', first) == {'released': True}
-        assert source.request('check', second)['native_evidence'] == 'not_recorded'
+        assert check(source, second)['native_evidence'] == 'not_recorded'
     finally:
         source.close()
     assert api.opened == api.closed == 1
@@ -156,9 +189,9 @@ def test_timed_out_request_does_not_allocate_a_late_lease():
             source.request('acquire', {}, timeout=0.05)
         api.block.clear()
         api.allow.set()
-        source.request('inspect', {})
+        settled(source)
         assert len(source._state._leases) == 1
-        assert source.request('check', first)['state'] == 'monitoring'
+        assert check(source, first)['state'] == 'monitoring'
     finally:
         api.allow.set()
         source.close()
@@ -204,7 +237,7 @@ def test_timeout_during_fresh_native_poll_cannot_create_even_a_temporary_late_le
         assert api.blocked.is_set()
         api.block.clear()
         api.allow.set()
-        source.request('inspect', {})
+        settled(source)
         assert calls == []
     finally:
         api.allow.set()

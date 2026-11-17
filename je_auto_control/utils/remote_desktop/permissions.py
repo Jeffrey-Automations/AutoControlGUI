@@ -51,7 +51,7 @@ class SessionPermissions:
     def from_read_only(cls, read_only: bool) -> "SessionPermissions":
         return cls.view_only() if read_only else cls.full_control()
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, bool]:
         return {
             "allow_view": self.allow_view,
             "allow_audio": self.allow_audio,

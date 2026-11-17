@@ -97,7 +97,7 @@ def _is_allowed(value: Any, allowed: Any) -> bool:
 
 
 def _validate_row(index: int, row: Dict[str, Any], schema: Dict[str, Any],
-                  seen_unique: Dict[str, set]) -> List[Dict[str, Any]]:
+                  seen_unique: Dict[str, Set[Any]]) -> List[Dict[str, Any]]:
     errors: List[Dict[str, Any]] = []
     for field, rule in schema.items():
         if field not in row or row[field] in (None, ""):

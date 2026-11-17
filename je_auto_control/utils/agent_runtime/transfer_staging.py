@@ -26,7 +26,7 @@ def _object(path: Path, identity: list[int], *, directory: bool) -> None:
         raise AgentTaskError('owned staging filesystem identity changed')
 
 
-def _stage(root: Path, root_identity: list[int], witness: dict) -> Path:
+def _stage(root: Path, root_identity: list[int], witness: dict[str, Any]) -> Path:
     stage = Path(witness['path'])
     if stage.parent != root or not stage.name.startswith('.incoming-') or not stage.is_absolute():
         raise AgentTaskError('staging journal is outside its exact import root')
@@ -43,7 +43,7 @@ def _known_path(stage: Path, name: str) -> Path:
     return path
 
 
-def _parents(stage: Path, path: Path, directories: dict) -> None:
+def _parents(stage: Path, path: Path, directories: dict[str, list[int]]) -> None:
     for parent in (path.parent, *path.parent.parents):
         if parent == stage.parent:
             break
@@ -57,12 +57,12 @@ def _present(path: Path) -> bool:
     return path.exists() or path.is_symlink()
 
 
-def _known_objects(stage: Path, witness: dict) -> set[Path]:
+def _known_objects(stage: Path, witness: dict[str, Any]) -> set[Path]:
     return {stage, *[_known_path(stage, name) for name in witness['directories'] if name],
             *[_known_path(stage, name) for name in witness['files']]}
 
 
-def _validate_contents(stage: Path, witness: dict) -> None:
+def _validate_contents(stage: Path, witness: dict[str, Any]) -> None:
     directories, files = witness['directories'], witness['files']
     known = _known_objects(stage, witness)
     for name, identity in directories.items():
@@ -79,7 +79,7 @@ def _validate_contents(stage: Path, witness: dict) -> None:
             _object(path, identity, directory=False)
 
 
-def cleanup_staging(root: Path, root_identity: list[int], witness: dict) -> None:
+def cleanup_staging(root: Path, root_identity: list[int], witness: dict[str, Any]) -> None:
     """Remove only journaled files and empty directories after validating the complete candidate tree."""
     stage = _stage(root, root_identity, witness)
     if not _present(stage):
@@ -104,15 +104,15 @@ def cleanup_staging(root: Path, root_identity: list[int], witness: dict) -> None
 
 @dataclass
 class _StagingState:
-    witness: dict = field(default_factory=dict)
+    witness: dict[str, Any] = field(default_factory=dict[str, Any])
     used: set[str] = field(default_factory=set)
 
 
 class ImportStaging:
     """Preallocate and journal all exclusive output identities before the shared publisher writes bytes."""
 
-    def __init__(self, root: Path, identity: list[int], record: Callable[[dict], None],
-                 retired: Callable[[dict], None]) -> None:
+    def __init__(self, root: Path, identity: list[int], record: Callable[[dict[str, Any]], None],
+                 retired: Callable[[dict[str, Any]], None]) -> None:
         self.root, self.identity, self.record, self.retired = root, identity, record, retired
         self._state = _StagingState()
 

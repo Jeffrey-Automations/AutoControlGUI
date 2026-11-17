@@ -155,27 +155,16 @@ def test_an_advertiser_that_comes_up_for_a_panel_that_is_gone_is_closed(advertis
     assert pump_until(lambda: [entry[0] for entry in advertisers.log] == ["build", "stop"])
 
 
-def test_a_stats_poller_stop_only_schedules_a_cancel(monkeypatch):
-    """Why the pollers' ``stop()`` may stay on the GUI thread: no join, no future to wait for."""
-    scheduled = []
+def test_a_stats_poller_stop_cancels_its_owned_future_without_a_bridge(monkeypatch):
+    from concurrent.futures import Future
 
-    class _Bridge:
-        def call_soon(self, callback, *args):
-            scheduled.append(callback)
+    def unavailable():
+        raise AssertionError("stop must not acquire the shared bridge")
 
-        def submit(self, _coroutine):
-            raise AssertionError("stop() must not wait for the loop")
-
-    class _Task:
-        def cancel(self):
-            raise AssertionError("cancelled on the calling thread instead of the loop's")
-
-    monkeypatch.setattr(webrtc_transport, "get_bridge", _Bridge)
+    monkeypatch.setattr(webrtc_transport, "get_bridge", unavailable)
     poller = webrtc_stats.StatsPoller(None, lambda _snapshot: None)
-    poller.stop()                                   # never started: nothing to schedule
-    assert scheduled == []
-    task = _Task()
-    poller._task = task
+    future = Future()
+    poller._future = future
     poller.stop()
-    assert scheduled == [task.cancel]
-    assert poller._task is None
+    assert future.cancelled()
+    assert poller._future is None

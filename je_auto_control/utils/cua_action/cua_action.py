@@ -86,7 +86,7 @@ def canonical_action(action_type: str, **fields: Any) -> Dict[str, Any]:
     return result
 
 
-def _xy(coordinate) -> Dict[str, int]:
+def _xy(coordinate: Any) -> Dict[str, int]:
     if not coordinate:
         return {}
     return {"x": int(coordinate[0]), "y": int(coordinate[1])}

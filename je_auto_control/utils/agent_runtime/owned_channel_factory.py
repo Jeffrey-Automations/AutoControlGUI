@@ -25,7 +25,7 @@ class HelperChannel(Protocol):
         """True only once the helper is proven settled."""
 
     def request(self, operation: str, payload: Any, *, timeout: float, check: Callable[[], None] = ...,
-                on_event: Callable[[dict], None] | None = None) -> Any:
+                on_event: Callable[[dict[str, Any]], None] | None = None) -> Any:
         """Send one operation and return its reply."""
 
     def close(self) -> None:

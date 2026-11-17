@@ -93,3 +93,39 @@ def test_clearing_an_optional_field_drops_the_key(qapp):
     out = step_to_action(step)
     assert "x" not in out[1]
     assert out[1]["y"] == 20
+
+
+@pytest.mark.parametrize("kind,initial,edited,expected", [
+    ("string", "old", "new", "new"),
+    ("json", {"old": 1}, '{"new": [2]}', {"new": [2]}),
+    ("int", 3, "42", 42),
+    ("float", 1.5, "2.75", 2.75),
+    ("bool", False, True, True),
+    ("enum", "unlisted", "second", "second"),
+    ("file_path", "old.json", "new.json", "new.json"),
+    ("rgb", [1, 2, 3], "10,20,30", [10, 20, 30]),
+])
+def test_each_editor_round_trips_and_commits_its_native_value(qapp, monkeypatch, kind, initial, edited, expected):
+    from je_auto_control.gui.script_builder.command_schema import CommandSpec, FieldSpec, FieldType
+    from je_auto_control.gui.script_builder import step_form_view
+
+    field_type = FieldType(kind)
+    spec = CommandSpec("AC_test_form", "Test", "Test", fields=(
+        FieldSpec("value", field_type, choices=("first", "second")),
+    ))
+    monkeypatch.setitem(step_form_view.COMMAND_SPECS, spec.command, spec)
+    step = action_to_step([spec.command, {"value": initial, "extra": "preserved"}])
+    view = StepFormView()
+    view.load_step(step)
+    assert step.params == {"value": initial, "extra": "preserved"}
+    editor = view._editors["value"]
+    if field_type is FieldType.BOOL:
+        editor.setChecked(edited)
+    elif field_type is FieldType.ENUM:
+        assert editor.currentText() == initial
+        editor.setCurrentText(edited)
+    elif field_type is FieldType.FILE_PATH:
+        editor.property("line_edit").setText(edited)
+    else:
+        editor.setText(edited)
+    assert step_to_action(step) == [spec.command, {"value": expected, "extra": "preserved"}]

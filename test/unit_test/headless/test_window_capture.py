@@ -149,3 +149,60 @@ def test_saved_entries_are_all_restorable():
         layout, mover=lambda title, *rect: moved.append(title) or True)
     assert restored == len(layout) == 2
     assert moved == ["Editor", "Browser"]
+
+
+# --- maximized windows in a layout -------------------------------------------
+
+def test_a_maximized_window_is_saved_with_its_restored_rectangle(monkeypatch):
+    from je_auto_control.utils.window_capture import window_capture as module
+    states = {1: ((150, 160, 600, 300), True), 2: ((0, 0, 80, 40), False)}
+    monkeypatch.setattr(module, "_handle_layout", lambda hwnd: states[hwnd])
+    layout = save_window_layout(lister=lambda: [(1, "Max"), (2, "Normal")])
+    assert layout == [
+        {"title": "Max", "x": 150, "y": 160, "width": 600, "height": 300, "maximized": True},
+        {"title": "Normal", "x": 0, "y": 0, "width": 80, "height": 40},
+    ]
+
+
+def _recording_mover(calls):
+    def mover(title, x, y, width, height, **options):
+        calls.append((title, (x, y, width, height), options))
+        return True
+    return mover
+
+
+_MAXIMIZED_LAYOUT = [
+    {"title": "Max", "x": 1, "y": 2, "width": 3, "height": 4, "maximized": True},
+    {"title": "Normal", "x": 5, "y": 6, "width": 7, "height": 8},
+]
+
+
+def test_restore_leaves_a_maximized_entry_normal_unless_asked():
+    """Maximizing activates the window, so it is never done without ``maximize=True``."""
+    calls = []
+    assert restore_window_layout(_MAXIMIZED_LAYOUT, mover=_recording_mover(calls)) == 2
+    assert [options for _title, _rect, options in calls] == [{}, {}]
+
+
+def test_restore_with_maximize_asks_only_for_the_entries_saved_maximized():
+    calls = []
+    assert restore_window_layout(_MAXIMIZED_LAYOUT, mover=_recording_mover(calls), maximize=True) == 2
+    assert calls == [("Max", (1, 2, 3, 4), {"maximize": True}), ("Normal", (5, 6, 7, 8), {})]
+
+
+def test_a_five_argument_mover_still_restores_a_layout_without_maximize():
+    """Movers written before the option keep working as long as it is not used."""
+    moved = []
+    count = restore_window_layout(_MAXIMIZED_LAYOUT,
+                                  mover=lambda title, x, y, w, h: moved.append(title) or True)
+    assert (count, moved) == (2, ["Max", "Normal"])
+
+
+def test_the_executor_command_passes_maximize_through(monkeypatch):
+    from je_auto_control.utils import window_capture
+    from je_auto_control.utils.executor import action_executor
+    seen = {}
+    monkeypatch.setattr(window_capture, "restore_window_layout",
+                        lambda layout, maximize=False: seen.update(layout=layout, maximize=maximize) or 1)
+    assert action_executor._restore_window_layout([], maximize=True) == {"restored": 1}
+    assert seen == {"layout": [], "maximize": True}

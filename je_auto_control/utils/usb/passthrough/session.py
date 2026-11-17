@@ -678,7 +678,7 @@ def _encode_json_payload(obj: object) -> bytes:
     return json.dumps(obj, ensure_ascii=False).encode("utf-8")
 
 
-def _decode_json_payload(payload: bytes) -> dict:
+def _decode_json_payload(payload: bytes) -> Dict[str, Any]:
     if not payload:
         raise ValueError("empty payload")
     decoded = json.loads(payload.decode("utf-8"))

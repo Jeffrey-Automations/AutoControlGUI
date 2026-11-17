@@ -13,16 +13,15 @@ matchers discard — plus the shared ``Match`` / ``_nms``. The ``haystack`` is i
 (ndarray / path / PIL); the analysis is unit-testable on synthetic arrays. OpenCV + NumPy
 are imported lazily. Imports no ``PySide6``.
 """
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from je_auto_control.utils.visual_match.visual_match import (
     Match, _score_map, _score_map_with_origin,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 
-
-def _separability(scaled, threshold: float) -> float:
+def _separability(scaled: Any, threshold: float) -> float:
     """Otsu separability eta = between-class variance / total variance (0..1)."""
     total_var = float(scaled.var())
     if total_var < 1e-9:
@@ -35,7 +34,7 @@ def _separability(scaled, threshold: float) -> float:
     return max(0.0, min(1.0, between / total_var))
 
 
-def _otsu_on_scores(score_map):
+def _otsu_on_scores(score_map: Any) -> Tuple[float, float]:
     """Return ``(threshold_in_score_units, separability)`` for a correlation surface."""
     import cv2
     import numpy as np
@@ -66,7 +65,7 @@ def auto_threshold(template: ImageSource, *, haystack: Optional[ImageSource] = N
             "n_above": int(np.count_nonzero(score_map >= threshold))}
 
 
-def _blob_peaks(score_map, mask):
+def _blob_peaks(score_map: Any, mask: Any) -> List[Tuple[int, int, float]]:
     """``(x, y, score)`` of the highest score inside each connected blob.
 
     Searched within the blob itself: its bounding box can hold another blob,

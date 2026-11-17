@@ -11,13 +11,13 @@ from je_auto_control.utils.agent_runtime.store import request_spec_digest
 from je_auto_control.utils.dag.graph import DagDefinition, parse_definition
 
 
-def definition_dict(dag: DagDefinition) -> dict:
+def definition_dict(dag: DagDefinition) -> dict[str, Any]:
     """Serialize managed node contracts without borrowing mutable caller arrays."""
     return {"nodes": [{"id": node.id, "host": node.host, "depends_on": sorted(node.depends_on),
                        "task": thaw(node.task)} for node in sorted(dag.nodes, key=lambda item: item.id)]}
 
 
-def batch_definition(value: Any) -> dict:
+def batch_definition(value: Any) -> dict[str, Any]:
     """Reject ambiguous/legacy/action nodes before producing a stable, bounded graph digest."""
     data = detached(value)
     if not isinstance(data, dict) or set(data) != {"nodes"}:
@@ -44,7 +44,7 @@ def _node_fields(node: Any) -> None:
     _node_dependencies(node)
 
 
-def _node_identity(node: dict) -> None:
+def _node_identity(node: dict[str, Any]) -> None:
     if not isinstance(node["id"], str) or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", node["id"]) is None:
         raise AgentTaskError("managed batch node id is invalid")
     host = node.get("host", "local")
@@ -52,14 +52,14 @@ def _node_identity(node: dict) -> None:
         raise AgentTaskError("managed batch host identity is invalid")
 
 
-def _node_dependencies(node: dict) -> None:
+def _node_dependencies(node: dict[str, Any]) -> None:
     deps = node.get("depends_on", [])
     if not isinstance(deps, list) or not all(isinstance(item, str) for item in deps) or len(deps) != len(set(deps)):
         raise AgentTaskError("managed batch dependencies must be distinct node identities")
 
 
 def bind_definition(definition: Mapping[str, Any], batch_id: str, graph_hash: str,
-                    bindings: Mapping[str, Any] | None = None) -> dict:
+                    bindings: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Bind every destination spec/key to the same immutable batch, topology and node identity."""
     result = detached(definition)
     for node in result["nodes"]:

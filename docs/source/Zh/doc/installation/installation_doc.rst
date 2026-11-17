@@ -22,6 +22,10 @@
 
    pip install je_auto_control[gui]
 
+GUI（``start_autocontrol_gui()``）開著時，自動回收會關閉，改由 GUI 執行緒上的計時器回收循環垃圾，
+程式結束時再打開。這樣 worker 執行緒不會碰到 PySide6 6.12 會延後刪除的 Qt 物件（那條路徑在 Windows 上曾讓程序 abort）。
+只 import ``je_auto_control`` 不會改變任何事。
+
 Linux 前置套件
 ==============
 

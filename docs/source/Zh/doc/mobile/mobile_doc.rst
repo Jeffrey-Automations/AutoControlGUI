@@ -166,14 +166,16 @@ iOS 只請求 WDA 的 ``/status``\ 。
      - WDA touch-and-hold
    * - ``Swipe(x1, y1, x2, y2, duration_s)``
      - ``input swipe``
-     - WDA drag
+     - 不按住的 WDA drag；移動速度由 WDA 決定，\ ``duration_s`` 沒有作用
+       （WDA drag 的 duration 是按住的時間）
    * - ``Drag(x1, y1, x2, y2, hold_s, duration_s)``
      - ``input draganddrop``\ ；裝置的 ``input`` 沒有這個子指令時退回
        ``uiautomator2``
      - WDA drag，\ ``hold_s`` 是按住的時間
    * - ``Pinch(x, y, scale, duration_s, span)``
      - ``uiautomator2`` 的雙指手勢；\ ``adb shell input`` 只有一個觸控點，
-       沒裝的話丟 ``DeviceUnsupportedError``
+       沒裝的話丟 ``DeviceUnsupportedError``\ 。手指的起點或終點落在螢幕左方／上方
+       時丟 ``DeviceError``
      - 對最前景的 App 做 pinch。WDA 的 pinch 對象是元素而不是座標，所以
        ``x`` / ``y`` / ``span`` 會被忽略。
 
@@ -301,8 +303,11 @@ Device matrix 的裝置規格可以寫 ``app_id``\ ：第一個步驟之前會�
    * - ``clipboard``
      - 透過 ``uiautomator2``\ ；沒裝時是 ``needs_dependency``\ ，因為新版
        Android 上 ``adb`` 碰不到剪貼簿。
-     - 只能寫入。WDA 只在 WDA 自己位於前景時才允許讀取；\ ``facebook-wda``
-       版本沒有 ``get_clipboard`` 時丟 ``DeviceUnsupportedError``\ 。
+     - 可寫入；WDA 只在 WDA 自己位於前景時才允許讀取。\ ``facebook-wda`` 1.5.4
+       的 ``get_clipboard`` 會請 Siri 開啟 WebDriverAgentRunner、等 3 秒、讀取，
+       再重新啟動原本在前景的 App，期間受測 App 離開前景。因此讀取需要
+       ``allow_app_switch=True``\ （\ ``get_clipboard`` 與 ``AC_ios_get_clipboard``\ ）；
+       沒有給、或版本沒有 ``get_clipboard`` 時丟 ``DeviceUnsupportedError``\ ，不送任何東西。
    * - ``recording``
      - ``adb shell screenrecord``\ （最長 180 秒），以 ``SIGINT`` 停止好讓檔案
        收尾，再拉回主機並從裝置刪除。錄影是裝置端的狀態：關閉 session 不會

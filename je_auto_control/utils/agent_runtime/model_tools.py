@@ -17,7 +17,7 @@ REFERENCE_SCHEMA = {"oneOf": [
 ]}
 
 
-def offered_tools(names: Sequence[str]) -> list[dict]:
+def offered_tools(names: Sequence[str]) -> list[dict[str, Any]]:
     """Clone offered schemas and add a host-resolved target option only to reviewed point tools."""
     from je_auto_control.utils.tool_use_schema import export_openai_tools
     from je_auto_control.utils.agent_runtime.commands import CATALOG
@@ -51,7 +51,7 @@ def _point_schema(function: dict[str, Any]) -> None:
     ]})
 
 
-def referenced_proposal(name: str, arguments: dict) -> dict:
+def referenced_proposal(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """Separate reserved model reference data from real executor keyword arguments."""
     arguments = detached(arguments)
     reference = arguments.pop("observed_target", None)

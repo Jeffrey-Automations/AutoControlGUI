@@ -5,6 +5,8 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _ViewerPanelPart
+
 from typing import Optional
 
 
@@ -31,12 +33,11 @@ from je_auto_control.utils.remote_desktop.webrtc_transport import (
     fps_for_preset,
 )
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
-    _PanelPart,
     _QUALITY_DOT_STYLE, _av_frame_to_qimage,
 )
 
 
-class _ViewerMediaMixin(_PanelPart):
+class _ViewerMediaMixin(_ViewerPanelPart):
     """Methods of ``_WebRTCViewerPanel``; the module docstring says which group."""
 
     # State this group owns; the panel's __init__ sets the starting values.
@@ -105,7 +106,8 @@ class _ViewerMediaMixin(_PanelPart):
             # reports the button says so and takes no click.
             self._record_btn.setText(_t("gui_op_stopping"))
             self._record_btn.setEnabled(False)
-            self._stops.retire(recorder.stop, on_done=self._on_recording_stopped, args=(recorder,))
+            self._stops.retire(recorder.stop, on_done=self._on_recording_stopped,
+                               on_error=self._on_recording_stop_failed, args=(recorder,))
 
     def _on_recording_stopped(self, recorder: SessionRecorderT, _outcome: object = None) -> None:
         """GUI thread: the recording is on disk (or no frame ever arrived)."""
@@ -115,6 +117,14 @@ class _ViewerMediaMixin(_PanelPart):
         # "Saved" was reported for a file that no frame ever created.
         key = "rd_webrtc_recording_saved" if recorder.has_output else "rd_webrtc_recording_empty"
         QMessageBox.information(self, "WebRTC", _t(key).format(path=str(recorder.output_path)))
+
+    def _on_recording_stop_failed(self, recorder: SessionRecorderT, error: object) -> None:
+        """GUI thread: finalising failed -- never "saved"; the stop is kept in Diagnostics for a retry."""
+        self._record_btn.setEnabled(True)
+        if self._recorder is None:
+            self._record_btn.setText(_t("rd_webrtc_start_recording"))
+        QMessageBox.warning(self, "WebRTC", _t("rd_webrtc_recording_unconfirmed").format(
+            path=str(recorder.output_path), error=error))
 
     def _on_stats(self, snapshot: StatsSnapshot) -> None:
         parts = []
@@ -227,7 +237,7 @@ class _ViewerMediaMixin(_PanelPart):
             return
         self._stop_stats_polling()
         self._stats_poller = StatsPoller(
-            self._viewer._pc, self._on_viewer_stats_sample,
+            self._viewer._pc, self._view.callback("_on_viewer_stats_sample"),
         )
         self._stats_poller.start()
 

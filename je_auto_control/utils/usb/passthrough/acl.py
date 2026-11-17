@@ -88,7 +88,7 @@ import secrets
 import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.json_store.json_store import (
@@ -112,13 +112,13 @@ class UsbAclBusyError(AutoControlException, TimeoutError):
     """Another process held the ACL's lock for too long; the change was not made."""
 
 
-def _canonical(body: dict) -> bytes:
+def _canonical(body: Dict[str, Any]) -> bytes:
     """The bytes an embedded signature covers: ``body`` without formatting choices."""
     return json.dumps(body, sort_keys=True, separators=(",", ":"),
                       ensure_ascii=False).encode("utf-8")
 
 
-def _parse(raw: bytes) -> Tuple[Optional[dict], object]:
+def _parse(raw: bytes) -> Tuple[Optional[Dict[str, Any]], object]:
     """``(body, embedded signature)`` of a file; ``(None, None)`` when it is not an object."""
     try:
         payload = json.loads(raw.decode("utf-8"))
@@ -191,11 +191,11 @@ class AclRule:
             return True
         return self.serial == serial
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, payload: dict) -> "AclRule":
+    def from_dict(cls, payload: Dict[str, Any]) -> "AclRule":
         return cls(
             vendor_id=str(payload["vendor_id"]),
             product_id=str(payload["product_id"]),
@@ -318,7 +318,7 @@ class UsbAcl:
                 self._save()
         return removed
 
-    def export_rules(self) -> dict:
+    def export_rules(self) -> Dict[str, Any]:
         """Return a portable snapshot (no signature/key) for sharing/backup."""
         with self._lock:
             return {
@@ -327,7 +327,7 @@ class UsbAcl:
                 "rules": [r.to_dict() for r in self._state.rules],
             }
 
-    def import_rules(self, payload: dict, *, replace: bool = False,
+    def import_rules(self, payload: Dict[str, Any], *, replace: bool = False,
                      persist: bool = True) -> int:
         """Merge (or replace) rules from an exported snapshot.
 
@@ -430,7 +430,7 @@ class UsbAcl:
     def _compute_sig(data: bytes, key: bytes) -> str:
         return hmac.new(key, data, hashlib.sha256).hexdigest()
 
-    def _verified(self, raw: bytes, body: Optional[dict], embedded: object) -> bool:
+    def _verified(self, raw: bytes, body: Optional[Dict[str, Any]], embedded: object) -> bool:
         """Whether the file is intact: by its own signature, else the sidecar's rules."""
         if embedded is None or body is None:
             return self._verify_signature(raw)
@@ -488,7 +488,7 @@ class UsbAcl:
             return False
         return hmac.compare_digest(expected, self._compute_sig(raw, key))
 
-    def _signed(self, body: dict) -> dict:
+    def _signed(self, body: Dict[str, Any]) -> Dict[str, Any]:
         """``body`` with its signature embedded; unsigned when no key can be had."""
         key = self._resolve_key(create=True)
         if key is None:

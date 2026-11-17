@@ -28,14 +28,14 @@ import math
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Any, Callable, Dict, List, Set, Tuple
+from typing import Any, Callable, Dict, List, Set, Tuple, Union
 from urllib.parse import unquote
 
 from je_auto_control.utils.exception.exceptions import (
     AutoControlAssertionException, AutoControlJsonException)
 from je_auto_control.utils.json_schema.ecma_regex import compile_ecma_pattern
 
-Schema = Any  # a dict, or a bool (a boolean schema)
+Schema = Union[Dict[str, Any], bool]  # a dict, or a bool (a boolean schema)
 
 
 @dataclass(frozen=True)
@@ -148,7 +148,7 @@ def _has_duplicates(items: List[Any]) -> bool:
 
 # --- keyword checkers (each returns a list of error dicts) ----------------
 
-def _check_type(instance: Any, schema: Dict, path: str, _root: _Root) -> List[Dict]:
+def _check_type(instance: Any, schema: Dict[str, Any], path: str, _root: _Root) -> List[Dict[str, str]]:
     if "type" not in schema:
         return []
     types = schema["type"]
@@ -158,8 +158,8 @@ def _check_type(instance: Any, schema: Dict, path: str, _root: _Root) -> List[Di
     return [_err(path, "type", f"expected type {schema['type']}")]
 
 
-def _check_enum_const(instance: Any, schema: Dict, path: str, _root: _Root) -> List[Dict]:
-    errors: List[Dict] = []
+def _check_enum_const(instance: Any, schema: Dict[str, Any], path: str, _root: _Root) -> List[Dict[str, str]]:
+    errors: List[Dict[str, str]] = []
     if "const" in schema and not _json_equal(instance, schema["const"]):
         errors.append(_err(path, "const", f"must equal {schema['const']!r}"))
     if "enum" in schema and not any(
@@ -176,10 +176,10 @@ _NUMBER_BOUNDS = (
 )
 
 
-def _check_number(instance: Any, schema: Dict, path: str, _root: _Root) -> List[Dict]:
+def _check_number(instance: Any, schema: Dict[str, Any], path: str, _root: _Root) -> List[Dict[str, str]]:
     if not _is_number(instance):
         return []
-    errors: List[Dict] = []
+    errors: List[Dict[str, str]] = []
     for key, ok, message in _NUMBER_BOUNDS:
         if key in schema and not ok(instance, schema[key]):
             errors.append(_err(path, key, f"{message} {schema[key]}"))
@@ -189,10 +189,10 @@ def _check_number(instance: Any, schema: Dict, path: str, _root: _Root) -> List[
     return errors
 
 
-def _check_string(instance: Any, schema: Dict, path: str, _root: _Root) -> List[Dict]:
+def _check_string(instance: Any, schema: Dict[str, Any], path: str, _root: _Root) -> List[Dict[str, str]]:
     if not isinstance(instance, str):
         return []
-    errors: List[Dict] = []
+    errors: List[Dict[str, str]] = []
     if "minLength" in schema and len(instance) < schema["minLength"]:
         errors.append(_err(path, "minLength", f"shorter than {schema['minLength']}"))
     if "maxLength" in schema and len(instance) > schema["maxLength"]:
@@ -213,8 +213,8 @@ def _search(pattern: str, text: str) -> bool:
     return compile_ecma_pattern(pattern).search(text) is not None
 
 
-def _array_size_errors(instance: List, schema: Dict, path: str) -> List[Dict]:
-    errors: List[Dict] = []
+def _array_size_errors(instance: List[Any], schema: Dict[str, Any], path: str) -> List[Dict[str, str]]:
+    errors: List[Dict[str, str]] = []
     if "minItems" in schema and len(instance) < schema["minItems"]:
         errors.append(_err(path, "minItems", f"fewer than {schema['minItems']} items"))
     if "maxItems" in schema and len(instance) > schema["maxItems"]:
@@ -224,8 +224,8 @@ def _array_size_errors(instance: List, schema: Dict, path: str) -> List[Dict]:
     return errors
 
 
-def _array_item_errors(instance: List, schema: Dict, path: str, root: _Root) -> List[Dict]:
-    errors: List[Dict] = []
+def _array_item_errors(instance: List[Any], schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
+    errors: List[Dict[str, str]] = []
     prefix = schema.get("prefixItems")
     start = 0
     if isinstance(prefix, list):
@@ -239,7 +239,7 @@ def _array_item_errors(instance: List, schema: Dict, path: str, root: _Root) -> 
     return errors
 
 
-def _array_contains_errors(instance: List, schema: Dict, path: str, root: _Root) -> List[Dict]:
+def _array_contains_errors(instance: List[Any], schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
     if "contains" not in schema:
         return []
     subschema = schema["contains"]
@@ -248,7 +248,7 @@ def _array_contains_errors(instance: List, schema: Dict, path: str, root: _Root)
     return [_err(path, "contains", "no items match the 'contains' schema")]
 
 
-def _check_array(instance: Any, schema: Dict, path: str, root: _Root) -> List[Dict]:
+def _check_array(instance: Any, schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
     if not isinstance(instance, list):
         return []
     errors = _array_size_errors(instance, schema, path)
@@ -257,8 +257,8 @@ def _check_array(instance: Any, schema: Dict, path: str, root: _Root) -> List[Di
     return errors
 
 
-def _object_size_required_errors(instance: Dict, schema: Dict, path: str) -> List[Dict]:
-    errors: List[Dict] = []
+def _object_size_required_errors(instance: Dict[str, Any], schema: Dict[str, Any], path: str) -> List[Dict[str, str]]:
+    errors: List[Dict[str, str]] = []
     for key in schema.get("required", []):
         if key not in instance:
             errors.append(_err(path, "required", f"missing required property '{key}'"))
@@ -271,7 +271,7 @@ def _object_size_required_errors(instance: Dict, schema: Dict, path: str) -> Lis
     return errors
 
 
-def _additional_property_errors(value: Any, additional: Any, path: str, root: _Root) -> List[Dict]:
+def _additional_property_errors(value: Any, additional: Any, path: str, root: _Root) -> List[Dict[str, str]]:
     if additional is None or additional is True:
         return []
     if additional is False:
@@ -279,7 +279,7 @@ def _additional_property_errors(value: Any, additional: Any, path: str, root: _R
     return _validate(value, additional, path, root)
 
 
-def _one_property_errors(key: str, value: Any, schema: Dict, path: str, root: _Root) -> List[Dict]:
+def _one_property_errors(key: str, value: Any, schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
     child = f"{path}.{key}"
     matched: List[Schema] = []
     if key in schema.get("properties", {}):
@@ -288,7 +288,7 @@ def _one_property_errors(key: str, value: Any, schema: Dict, path: str, root: _R
         sub for pattern, sub in schema.get("patternProperties", {}).items()
         if _search(pattern, key))
     if matched:
-        errors: List[Dict] = []
+        errors: List[Dict[str, str]] = []
         for subschema in matched:
             errors.extend(_validate(value, subschema, child, root))
         return errors
@@ -296,7 +296,7 @@ def _one_property_errors(key: str, value: Any, schema: Dict, path: str, root: _R
         value, schema.get("additionalProperties"), child, root)
 
 
-def _check_object(instance: Any, schema: Dict, path: str, root: _Root) -> List[Dict]:
+def _check_object(instance: Any, schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
     if not isinstance(instance, dict):
         return []
     errors = _object_size_required_errors(instance, schema, path)
@@ -305,14 +305,14 @@ def _check_object(instance: Any, schema: Dict, path: str, root: _Root) -> List[D
     return errors
 
 
-def _check_all_of(instance: Any, schema: Dict, path: str, root: _Root) -> List[Dict]:
-    errors: List[Dict] = []
+def _check_all_of(instance: Any, schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
+    errors: List[Dict[str, str]] = []
     for subschema in schema.get("allOf", []):
         errors.extend(_validate(instance, subschema, path, root))
     return errors
 
 
-def _check_any_of(instance: Any, schema: Dict, path: str, root: _Root) -> List[Dict]:
+def _check_any_of(instance: Any, schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
     options = schema.get("anyOf")
     if not options:
         return []
@@ -321,7 +321,7 @@ def _check_any_of(instance: Any, schema: Dict, path: str, root: _Root) -> List[D
     return [_err(path, "anyOf", "does not match any schema in anyOf")]
 
 
-def _check_one_of(instance: Any, schema: Dict, path: str, root: _Root) -> List[Dict]:
+def _check_one_of(instance: Any, schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
     options = schema.get("oneOf")
     if not options:
         return []
@@ -331,7 +331,7 @@ def _check_one_of(instance: Any, schema: Dict, path: str, root: _Root) -> List[D
     return [_err(path, "oneOf", f"matched {matches} schemas in oneOf, expected 1")]
 
 
-def _check_not(instance: Any, schema: Dict, path: str, root: _Root) -> List[Dict]:
+def _check_not(instance: Any, schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
     if "not" not in schema:
         return []
     if _validate(instance, schema["not"], path, root):
@@ -339,7 +339,7 @@ def _check_not(instance: Any, schema: Dict, path: str, root: _Root) -> List[Dict
     return [_err(path, "not", "must not match the 'not' schema")]
 
 
-def _check_combinators(instance: Any, schema: Dict, path: str, root: _Root) -> List[Dict]:
+def _check_combinators(instance: Any, schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
     errors = _check_all_of(instance, schema, path, root)
     errors.extend(_check_any_of(instance, schema, path, root))
     errors.extend(_check_one_of(instance, schema, path, root))
@@ -380,7 +380,7 @@ def _resolve_ref(ref: str, root: Schema) -> Schema:
     return node
 
 
-def _validate(instance: Any, schema: Schema, path: str, root: _Root) -> List[Dict]:
+def _validate(instance: Any, schema: Schema, path: str, root: _Root) -> List[Dict[str, str]]:
     if schema is True:
         return []
     if schema is False:
@@ -397,8 +397,8 @@ def _validate(instance: Any, schema: Schema, path: str, root: _Root) -> List[Dic
         root.active.discard(key)
 
 
-def _validate_keywords(instance: Any, schema: Dict, path: str, root: _Root) -> List[Dict]:
-    errors: List[Dict] = []
+def _validate_keywords(instance: Any, schema: Dict[str, Any], path: str, root: _Root) -> List[Dict[str, str]]:
+    errors: List[Dict[str, str]] = []
     if "$ref" in schema:
         # Draft 2020-12 applies the keywords next to a $ref as well.
         errors.extend(_validate(instance, _resolve_ref(schema["$ref"], root.schema),

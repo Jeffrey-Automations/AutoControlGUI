@@ -34,7 +34,7 @@ def reconcile(store: Any, task_id: str, request: Mapping[str, Any]) -> None:
     _commit_review(store, task_id, value)
 
 
-def _commit_review(store: Any, task_id: str, value: dict) -> None:
+def _commit_review(store: Any, task_id: str, value: dict[str, Any]) -> None:
     identity = current_authorization()
     with store.connection(write=True) as connection:
         action = connection.execute("SELECT status,result FROM agent_actions WHERE id=? AND task_id=?",
@@ -64,7 +64,7 @@ def row_report(spec: AgentTaskSpec, receipts: Sequence[Mapping[str, Any]]) -> li
     return [{"row": label, "status": _row_state(states)} for label, states in rows.items()]
 
 
-def _step_state(action: Mapping, receipt: Mapping | None, values: Mapping) -> str:
+def _step_state(action: Mapping[str, Any], receipt: Mapping[str, Any] | None, values: Mapping[str, Any]) -> str:
     if receipt is None:
         return "not_started"
     if receipt["status"] != "confirmed":

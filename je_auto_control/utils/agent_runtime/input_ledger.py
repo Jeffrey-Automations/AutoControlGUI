@@ -10,7 +10,7 @@ from je_auto_control.utils.agent_runtime.models import detached
 _RELEASES = frozenset({"key_release", "key_released", "mouse_release", "mouse_released"})
 
 
-def _key(event: dict) -> str:
+def _key(event: dict[str, Any]) -> str:
     value = event.get("keycode")
     if isinstance(value, bool) or not isinstance(value, (str, int)):
         raise AgentTaskError("native input requires a concrete key code")
@@ -21,8 +21,8 @@ class InputLedger:
     """Keep only keys/buttons this owner authorized, never another task's state."""
 
     def __init__(self) -> None:
-        self._keys: dict[str, dict] = {}
-        self._buttons: dict[str, dict] = {}
+        self._keys: dict[str, dict[str, Any]] = {}
+        self._buttons: dict[str, dict[str, Any]] = {}
 
     @property
     def empty(self) -> bool:
@@ -33,7 +33,7 @@ class InputLedger:
         """Copy only the owned input needed for narrowly scoped cleanup."""
         return detached({"keys": list(self._keys.values()), "buttons": list(self._buttons.values())})
 
-    def consume(self, event: dict, *, cleanup: bool = False) -> None:
+    def consume(self, event: dict[str, Any], *, cleanup: bool = False) -> None:
         """Check an event before acknowledging it to the helper."""
         kind = event.get("kind")
         if cleanup and kind not in _RELEASES:
@@ -46,7 +46,7 @@ class InputLedger:
             raise AgentTaskError("unrecognized native input event")
         handlers[kind](event)
 
-    def _key_press(self, event: dict) -> None:
+    def _key_press(self, event: dict[str, Any]) -> None:
         key = _key(event)
         if key in self._keys:
             raise AgentTaskError("key is already held by this task")
@@ -57,17 +57,17 @@ class InputLedger:
         if event.get("unicode"):
             self._keys[key]["unicode"] = True
 
-    def _key_release(self, event: dict) -> None:
+    def _key_release(self, event: dict[str, Any]) -> None:
         if _key(event) not in self._keys:
             raise AgentTaskError("cannot release a key this task does not own")
         if self._keys[_key(event)]["is_shift"] != event.get("is_shift", False):
             raise AgentTaskError("cannot change a held key's modifier ownership")
 
-    def _key_released(self, event: dict) -> None:
+    def _key_released(self, event: dict[str, Any]) -> None:
         self._key_release(event)
         self._keys.pop(_key(event))
 
-    def _mouse_press(self, event: dict) -> None:
+    def _mouse_press(self, event: dict[str, Any]) -> None:
         key = _key(event)
         if key in self._buttons:
             raise AgentTaskError("button is already held by this task")
@@ -75,14 +75,14 @@ class InputLedger:
             raise AgentTaskError("native pointer requires integer coordinates")
         self._buttons[key] = {name: event[name] for name in ("keycode", "x", "y")}
 
-    def _mouse_release(self, event: dict) -> None:
+    def _mouse_release(self, event: dict[str, Any]) -> None:
         if _key(event) not in self._buttons:
             raise AgentTaskError("cannot release a button this task does not own")
 
-    def _mouse_released(self, event: dict) -> None:
+    def _mouse_released(self, event: dict[str, Any]) -> None:
         self._mouse_release(event)
         self._buttons.pop(_key(event))
 
     @staticmethod
-    def _nonholding(_event: dict) -> None:
+    def _nonholding(_event: dict[str, Any]) -> None:
         return None

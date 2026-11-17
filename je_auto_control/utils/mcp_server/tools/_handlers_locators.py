@@ -5,11 +5,14 @@ they survive the JSON-RPC boundary, with every project import lazy -- split out
 by theme because ``_handlers.py`` is over the 750-line limit.
 """
 import math
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence
 
-from je_auto_control.utils.mcp_server.tools._handlers_executor_bridge import (
+from je_auto_control.utils.mcp_server.tools._handlers_automation_executor import (
     _observe_handler,
 )
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.element_repository import ElementRepository
 
 
 def a11y_list(app_name: Optional[str] = None,
@@ -67,51 +70,57 @@ def a11y_click(name: Optional[str] = None,
                                              app_name=app_name))
 
 
-def control_get_value(name=None, role=None, app_name=None,
-                      automation_id=None):
+def control_get_value(name: Optional[str] = None, role: Optional[str] = None,
+                      app_name: Optional[str] = None,
+                      automation_id: Optional[str] = None) -> Optional[str]:
     from je_auto_control.utils.accessibility import control_get_value as _g
     return _g(name=name, role=role, app_name=app_name,
               automation_id=automation_id)
 
 
-def control_get_state(name=None, role=None, app_name=None,
-                      automation_id=None):
+def control_get_state(name: Optional[str] = None, role: Optional[str] = None,
+                      app_name: Optional[str] = None,
+                      automation_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     from je_auto_control.utils.accessibility import control_get_state as _g
     return _g(name=name, role=role, app_name=app_name,
               automation_id=automation_id)
 
 
-def control_set_value(value, name=None, role=None, app_name=None,
-                      automation_id=None):
+def control_set_value(value: str, name: Optional[str] = None, role: Optional[str] = None,
+                      app_name: Optional[str] = None,
+                      automation_id: Optional[str] = None) -> bool:
     from je_auto_control.utils.accessibility import control_set_value as _s
     return _s(value, name=name, role=role, app_name=app_name,
               automation_id=automation_id)
 
 
-def control_invoke(name=None, role=None, app_name=None, automation_id=None):
+def control_invoke(name: Optional[str] = None, role: Optional[str] = None,
+                   app_name: Optional[str] = None, automation_id: Optional[str] = None) -> bool:
     from je_auto_control.utils.accessibility import control_invoke as _i
     return _i(name=name, role=role, app_name=app_name,
               automation_id=automation_id)
 
 
-def control_toggle(name=None, role=None, app_name=None, automation_id=None):
+def control_toggle(name: Optional[str] = None, role: Optional[str] = None,
+                   app_name: Optional[str] = None, automation_id: Optional[str] = None) -> bool:
     from je_auto_control.utils.accessibility import control_toggle as _t
     return _t(name=name, role=role, app_name=app_name,
               automation_id=automation_id)
 
 
-def read_table(name=None, role=None, app_name=None, automation_id=None):
+def read_table(name: Optional[str] = None, role: Optional[str] = None,
+               app_name: Optional[str] = None, automation_id: Optional[str] = None) -> List[List[str]]:
     from je_auto_control.utils.accessibility import read_control_table as _r
     return _r(name=name, role=role, app_name=app_name,
               automation_id=automation_id)
 
 
-def _element_repo(path):
+def _element_repo(path: str) -> "ElementRepository":
     from je_auto_control.utils.element_repository import ElementRepository
     return ElementRepository(path)
 
 
-def _observe_predicate(kind, params):
+def _observe_predicate(kind: str, params: Dict[str, Any]) -> Callable[[], Any]:
     from je_auto_control.utils.observer import (
         image_predicate, pixel_predicate, text_predicate)
     builders = {
@@ -126,82 +135,83 @@ def _observe_predicate(kind, params):
     return builders[kind]()
 
 
-def observe_add(name, kind="image", event="appear", actions=None, **params):
+def observe_add(name: str, kind: str = "image", event: str = "appear",
+                actions: Optional[List[Any]] = None, **params: Any) -> Dict[str, str]:
     from je_auto_control.utils.observer import default_observer
     default_observer.add(name, _observe_predicate(kind, params),
                          _observe_handler(actions or []), events=(event,))
     return {"name": name, "kind": kind, "event": event}
 
 
-def observe_remove(name):
+def observe_remove(name: str) -> Dict[str, bool]:
     from je_auto_control.utils.observer import default_observer
     return {"removed": default_observer.remove(name)}
 
 
-def observe_list():
+def observe_list() -> Dict[str, List[str]]:
     from je_auto_control.utils.observer import default_observer
     return {"names": default_observer.names()}
 
 
-def observe_poll():
+def observe_poll() -> Dict[str, List[Dict[str, Any]]]:
     from je_auto_control.utils.observer import default_observer
     return {"fired": default_observer.poll_once()}
 
 
-def observe_start():
+def observe_start() -> Dict[str, bool]:
     from je_auto_control.utils.observer import default_observer
     default_observer.start()
     return {"running": default_observer.running}
 
 
-def observe_stop():
+def observe_stop() -> Dict[str, bool]:
     from je_auto_control.utils.observer import default_observer
     default_observer.stop()
     return {"running": default_observer.running}
 
 
-def mark_screen(app_name=None, render_path=None):
+def mark_screen(app_name: Optional[str] = None, render_path: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.set_of_marks import mark_screen as _ms
     return _ms(app_name=app_name, render_path=render_path)
 
 
-def mark_click(mark_id):
+def mark_click(mark_id: int) -> Dict[str, bool]:
     from je_auto_control.utils.set_of_marks import mark_click as _mc
     return {"clicked": _mc(int(mark_id))}
 
 
-def screen_snapshot(app_name=None):
+def screen_snapshot(app_name: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
     from je_auto_control.utils.screen_state import snapshot_screen
     return {"snapshot": snapshot_screen(app_name=app_name)}
 
 
-def screen_diff(before, after):
+def screen_diff(before: List[Dict[str, Any]], after: List[Dict[str, Any]]) -> Dict[str, Any]:
     from je_auto_control.utils.screen_state import diff_snapshots
     return diff_snapshots(before, after)
 
 
-def screen_changed(app_name=None):
+def screen_changed(app_name: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.screen_state import screen_changed as _sc
     return _sc(app_name=app_name)
 
 
-def describe_screen(app_name=None):
+def describe_screen(app_name: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.screen_state import describe_screen as _ds
     return _ds(app_name=app_name)
 
 
-def heal_stats(limit=200):
+def heal_stats(limit: int = 200) -> Dict[str, Any]:
     from je_auto_control.utils.heal_analytics import analyze_heal_log
     return analyze_heal_log(limit=int(limit))
 
 
-def image_hash(path, algo="average"):
+def image_hash(path: str, algo: str = "average") -> Dict[str, str]:
     from je_auto_control.utils.image_dedup import average_hash, dhash
     hasher = dhash if algo == "dhash" else average_hash
     return {"hash": hasher(path)}
 
 
-def dedupe_images(paths, max_distance=5):
+def dedupe_images(paths: Sequence[str], max_distance: int = 5) -> Dict[str, List[str]]:
     from je_auto_control.utils.image_dedup import dedupe_images as _dedupe
     return {"unique": _dedupe(paths, max_distance=max_distance)}
 
@@ -214,7 +224,8 @@ def _finite(**values: Any) -> None:
             raise ValueError(f"{name} must be a finite number, got {value!r}")
 
 
-def to_physical(x, y, physical_w, physical_h, model_w, model_h):
+def to_physical(x: float, y: float, physical_w: int, physical_h: int, model_w: int,
+                model_h: int) -> Dict[str, int]:
     from je_auto_control.utils.coordinate_space import CoordinateSpace
     _finite(x=x, y=y, physical_w=physical_w, physical_h=physical_h,
             model_w=model_w, model_h=model_h)
@@ -223,7 +234,8 @@ def to_physical(x, y, physical_w, physical_h, model_w, model_h):
     return {"x": px, "y": py}
 
 
-def to_model(x, y, physical_w, physical_h, model_w, model_h):
+def to_model(x: int, y: int, physical_w: int, physical_h: int, model_w: int,
+             model_h: int) -> Dict[str, int]:
     from je_auto_control.utils.coordinate_space import CoordinateSpace
     _finite(x=x, y=y, physical_w=physical_w, physical_h=physical_h,
             model_w=model_w, model_h=model_h)
@@ -232,8 +244,9 @@ def to_model(x, y, physical_w, physical_h, model_w, model_h):
     return {"x": mx, "y": my}
 
 
-def repair_record(key, method, coordinates=None, description=None,
-                  confidence=1.0, auto_threshold=0.9, db=None):
+def repair_record(key: str, method: str, coordinates: Optional[List[int]] = None,
+                  description: Optional[str] = None, confidence: float = 1.0,
+                  auto_threshold: float = 0.9, db: Optional[str] = None) -> Dict[str, Any]:
     from je_auto_control.utils.locator_repair import repair_store
     sug = repair_store(db).record(
         key, method=method, coordinates=coordinates, description=description,
@@ -241,17 +254,17 @@ def repair_record(key, method, coordinates=None, description=None,
     return {"id": sug.id, "status": sug.status}
 
 
-def repair_resolved(key, db=None):
+def repair_resolved(key: str, db: Optional[str] = None) -> Dict[str, Optional[Dict[str, Any]]]:
     from je_auto_control.utils.locator_repair import repair_store
     return {"locator": repair_store(db).resolved(key)}
 
 
-def repair_pending(db=None):
+def repair_pending(db: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
     from je_auto_control.utils.locator_repair import repair_store
     return {"pending": repair_store(db).pending()}
 
 
-def repair_approve(suggestion_id, db=None):
+def repair_approve(suggestion_id: str, db: Optional[str] = None) -> Dict[str, bool]:
     from je_auto_control.utils.locator_repair import repair_store
     return {"approved": repair_store(db).approve(suggestion_id)}
 

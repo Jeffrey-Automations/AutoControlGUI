@@ -17,7 +17,7 @@ _LIFETIME = 300
 _UNAVAILABLE = "retained browser context is unavailable"
 
 
-def _binding(row: Mapping) -> dict:
+def _binding(row: Mapping[str, Any]) -> dict[str, Any]:
     return {"id": row["id"], "spec": deepcopy(row["spec"]), "owner": deepcopy(row["owner"])}
 
 
@@ -25,9 +25,9 @@ def _binding(row: Mapping) -> dict:
 class RetainedBrowser:
     """One host-only reservation; neither a saved proof nor a matching ID creates ownership."""
 
-    source: dict
+    source: dict[str, Any]
     channel: Any = None
-    proof: dict | None = None
+    proof: dict[str, Any] | None = None
     expires: float = 0
     busy: bool = False
     invalid: bool = False
@@ -49,7 +49,7 @@ class RetainedBrowsers:
             return len(self._records) >= _CAPACITY
 
     @contextmanager
-    def reserve(self, row: Mapping) -> Iterator[RetainedBrowser | None]:
+    def reserve(self, row: Mapping[str, Any]) -> Iterator[RetainedBrowser | None]:
         """Atomically reserve a bounded slot; never hold the lock during SDK/IPC or cleanup."""
         source = _binding(row)
         with self._lock:
@@ -66,7 +66,7 @@ class RetainedBrowsers:
             if entry is not None and entry.proof is None:
                 self.discard(source["id"])
 
-    def commit(self, entry: RetainedBrowser, channel: Any, proof: dict) -> None:
+    def commit(self, entry: RetainedBrowser, channel: Any, proof: dict[str, Any]) -> None:
         """Accept only the actual reserved slot; failed proof validation still owns detached cleanup."""
         with self._lock:
             if self._records.get(entry.source["id"]) is not entry or entry.channel is not None:
@@ -78,7 +78,7 @@ class RetainedBrowsers:
                 raise AgentTaskError(_UNAVAILABLE)
             entry.proof = description
 
-    def require(self, row: Mapping) -> RetainedBrowser:
+    def require(self, row: Mapping[str, Any]) -> RetainedBrowser:
         """Validate original task/spec/owner and current lifetime; never manufacture a replacement."""
         source = _binding(row)
         with self._lock:
@@ -95,7 +95,7 @@ class RetainedBrowsers:
         self.discard(source["id"])
         raise AgentTaskError(_UNAVAILABLE)
 
-    def borrow(self, row: Mapping) -> RetainedBrowser:
+    def borrow(self, row: Mapping[str, Any]) -> RetainedBrowser:
         """Grant one transient read borrower while process lifetime stays with this collection."""
         entry = self.require(row)
         with self._lock:
@@ -127,7 +127,7 @@ class RetainedBrowsers:
             if self._records.get(task_id) is entry:
                 del self._records[task_id]
 
-    def sources(self) -> list[dict]:
+    def sources(self) -> list[dict[str, Any]]:
         """Return private copies for maintenance, including failed transfers but not live reservations."""
         with self._lock:
             return [deepcopy(entry.source) for entry in self._records.values()

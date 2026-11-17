@@ -10,7 +10,8 @@ _BINDING_FIELDS = {'contract', 'source_task', 'source_snapshot', 'effect_task', 
                    'reviewer', 'source_owner', 'effect_owner'}
 
 
-def decode_private_object(value: str, message: str, *, error_type: type[AgentTaskError] = AgentTaskError) -> dict:
+def decode_private_object(value: str, message: str, *,
+                          error_type: type[AgentTaskError] = AgentTaskError) -> dict[str, Any]:
     """Decode a private JSON object with a typed refusal before any task capability is selected."""
     try:
         details = json.loads(value)
@@ -21,7 +22,7 @@ def decode_private_object(value: str, message: str, *, error_type: type[AgentTas
     return details
 
 
-def decode_completion_binding(value: str) -> dict:
+def decode_completion_binding(value: str) -> dict[str, Any]:
     """Reject corrupt private completion markers without converting them to ordinary task admission."""
     details = decode_private_object(value, 'invalid private completion binding')
     if set(details) != _BINDING_FIELDS:

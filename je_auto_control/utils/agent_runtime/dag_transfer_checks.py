@@ -12,7 +12,7 @@ from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 _ERRORS = (AutoControlException, OSError, RuntimeError, ValueError, TypeError, LookupError)
 
 
-def remote_reports(batch: dict, reports: list[dict]) -> list[dict]:
+def remote_reports(batch: dict[str, Any], reports: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Select actual remote handoff decisions from the immutable coordinator graph."""
     hosts = {node['id']: node['host'] for node in batch['definition']['nodes']}
     return [report for report in reports if 'handoff_id' in report['decision']
@@ -22,9 +22,10 @@ def remote_reports(batch: dict, reports: list[dict]) -> list[dict]:
 class DagTransferChecks:
     """A persisted pending phase supplies no authority to dispatch or accept downstream completion."""
 
-    def __init__(self, store: Any, batch: dict, verify: Callable[[], None], *, baseline: dict | None = None) -> None:
+    def __init__(self, store: Any, batch: dict[str, Any], verify: Callable[[], None], *,
+                 baseline: dict[str, Any] | None = None) -> None:
         self.store, self.batch, self.verify = store, batch, verify
-        self.pinned: tuple | None = None
+        self.pinned: tuple[Any, ...] | None = None
         self.owner = DeferredAuthorization.capture()
         with store.connection() as connection:
             self.local = self._snapshot(connection)
@@ -35,7 +36,7 @@ class DagTransferChecks:
         if baseline is not None:
             self._baseline(baseline)
 
-    def _baseline(self, baseline: dict) -> None:
+    def _baseline(self, baseline: dict[str, Any]) -> None:
         nodes = tuple(tuple(row[name] for name in ('node_id', 'phase', 'receipt', 'updated'))
                       for row in sorted(baseline['nodes'], key=lambda item: item['node_id']))
         bindings = tuple(sorted(baseline['batch']['bindings'].items()))
@@ -43,7 +44,7 @@ class DagTransferChecks:
         if self.local[1:] != (nodes, bindings, inputs):
             raise AgentTaskError('coordinator node claims or bindings changed during remote review')
 
-    def _snapshot(self, connection: Any) -> tuple:
+    def _snapshot(self, connection: Any) -> tuple[Any, ...]:
         row = connection.execute('SELECT id,state,attempt,graph_hash,owner,definition,hosts,max_parallel '
                                  'FROM agent_dag_batches WHERE id=?', (self.batch['id'],)).fetchone()
         nodes = connection.execute('SELECT node_id,phase,receipt,updated FROM agent_dag_nodes '
@@ -58,7 +59,7 @@ class DagTransferChecks:
                 tuple((item['node_id'], json.loads(item['task'])) for item in bindings),
                 None if inputs is None else json.loads(inputs[0]))
 
-    def _approval(self, connection: Any, identifier: str) -> tuple:
+    def _approval(self, connection: Any, identifier: str) -> tuple[Any, ...]:
         row = connection.execute('SELECT id,batch_id,source_snapshot,plan_hash,details,created '
             'FROM agent_dag_approvals WHERE id=? AND batch_id=?', (identifier, self.batch['id'])).fetchone()
         if row is None:
@@ -77,7 +78,7 @@ class DagTransferChecks:
                 self._approval(connection, identifier) != self.pinned):
             raise AgentTaskError('provisional remote consent or coordinator state changed')
 
-    def finish(self, identifier: str, phase: str, commit: Callable) -> None:
+    def finish(self, identifier: str, phase: str, commit: Callable[[Any], None]) -> None:
         """Resolve outside the writer, then atomically accept only the same still-pending local intent."""
         try:
             with self.owner.scope():

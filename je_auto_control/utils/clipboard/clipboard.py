@@ -53,7 +53,7 @@ def get_clipboard_image() -> Optional[bytes]:
     return _linux_get_image()
 
 
-def _as_png_bytes(image: bytes | bytearray | str | os.PathLike) -> bytes:
+def _as_png_bytes(image: bytes | bytearray | str | os.PathLike[str]) -> bytes:
     """PNG bytes for either raw bytes or a path to any Pillow-readable file."""
     if isinstance(image, (bytes, bytearray)):
         if not image:
@@ -75,7 +75,7 @@ def _as_png_bytes(image: bytes | bytearray | str | os.PathLike) -> bytes:
 
 
 def set_clipboard_image(
-        image: bytes | bytearray | str | os.PathLike) -> None:
+        image: bytes | bytearray | str | os.PathLike[str]) -> None:
     """Place an image on the clipboard, from PNG bytes **or** a file path.
 
     Both are accepted because both callers are real: the remote-desktop viewer
@@ -153,7 +153,7 @@ class ClipboardError(AutoControlException, RuntimeError):
     """
 
 
-def _run_tool(argv: list, data: Optional[bytes] = None) -> "subprocess.CompletedProcess":
+def _run_tool(argv: list[str], data: Optional[bytes] = None) -> "subprocess.CompletedProcess[bytes]":
     """Run a clipboard tool with a 5 s limit; its failure is a :class:`ClipboardError`."""
     try:
         # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
@@ -162,7 +162,7 @@ def _run_tool(argv: list, data: Optional[bytes] = None) -> "subprocess.Completed
         raise ClipboardError(f"{argv[0]} failed: {error!r}") from error
 
 
-def _checked(result: "subprocess.CompletedProcess") -> "subprocess.CompletedProcess":
+def _checked(result: "subprocess.CompletedProcess[bytes]") -> "subprocess.CompletedProcess[bytes]":
     if result.returncode != 0:
         detail = result.stderr.decode("utf-8", errors="replace").strip()
         raise ClipboardError(f"{result.args[0]} exited {result.returncode}: {detail}")
@@ -171,7 +171,7 @@ def _checked(result: "subprocess.CompletedProcess") -> "subprocess.CompletedProc
 
 # === Linux backend ===========================================================
 
-def _linux_cmd() -> Optional[list]:
+def _linux_cmd() -> Optional[list[str]]:
     if shutil.which("xclip"):
         return ["xclip", "-selection", "clipboard"]
     if shutil.which("xsel"):

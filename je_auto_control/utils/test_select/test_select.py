@@ -17,7 +17,10 @@ is in ``[0, 1]``::
 A flow that has never run scores ``0.8`` — untested means risky.
 """
 import time
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.run_history import HistoryStore
 
 _WEIGHT_FAILURE = 0.5
 _WEIGHT_LAST_FAILED = 0.2
@@ -28,7 +31,7 @@ _STALE_DAYS = 30.0
 _SECONDS_PER_DAY = 86400.0
 
 
-def _open_store(history_path: Optional[str]):
+def _open_store(history_path: Optional[str]) -> Tuple["HistoryStore", bool]:
     """Return ``(store, owned)``; ``owned`` stores must be closed by caller."""
     from je_auto_control.utils.run_history import (
         HistoryStore, default_history_store)
@@ -52,7 +55,7 @@ def _runs_by_flow(store: Any, flows: List[str], limit: int) -> Dict[str, List[An
             for flow in flows}
 
 
-def _flaky(chrono: List[str]) -> tuple:
+def _flaky(chrono: List[str]) -> Tuple[float, int]:
     """Return ``(flaky_rate, transition_count)`` over a status sequence."""
     if len(chrono) < 2:
         return 0.0, 0

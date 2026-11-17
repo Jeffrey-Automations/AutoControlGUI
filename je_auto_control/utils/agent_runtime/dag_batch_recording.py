@@ -14,7 +14,7 @@ from je_auto_control.utils.rbac.authorization import AuthorizationError
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
 
-def bound_node(batch: dict, identifier: Any) -> dict:
+def bound_node(batch: dict[str, Any], identifier: Any) -> dict[str, Any]:
     """Resolve a node solely from the immutable batch instead of accepting a caller's destination spec."""
     definition = bind_definition(batch["definition"], batch["id"], batch["graph_hash"], batch.get("bindings"))
     for node in definition["nodes"]:
@@ -23,7 +23,7 @@ def bound_node(batch: dict, identifier: Any) -> dict:
     raise AgentTaskError("batch node does not exist")
 
 
-def claim_node(connection: Any, batch: dict, request: dict) -> None:
+def claim_node(connection: Any, batch: dict[str, Any], request: dict[str, Any]) -> None:
     """Record possible delivery before networking; a missing reply can never reset this claim."""
     node = bound_node(batch, request["node_id"])
     if managed_tasks.task_host_binding(node["host"]) != batch["hosts"][node["host"]]:
@@ -39,7 +39,7 @@ def claim_node(connection: Any, batch: dict, request: dict) -> None:
         raise AgentTaskError("batch node was already claimed; explicit recovery is required")
 
 
-def verify_node(batch: dict, node: dict, task_id: str) -> None:
+def verify_node(batch: dict[str, Any], node: dict[str, Any], task_id: str) -> None:
     """Require the exact tagged spec/key, task identity and independent completion/retirement contract."""
     owner = DeferredAuthorization.capture()
     managed_tasks.authorize_task_host(owner, node["host"])
@@ -64,7 +64,7 @@ def verify_node(batch: dict, node: dict, task_id: str) -> None:
     managed_tasks.validate_recorded_completion(task, node["task"]["spec"])
 
 
-def validate_receipt(receipt: Any) -> dict:
+def validate_receipt(receipt: Any) -> dict[str, Any]:
     """Reject malformed coordination data before any destination lookup or durable transition."""
     if not isinstance(receipt, dict) or set(receipt) != {"outcome", "task_id"}:
         raise AgentTaskError("batch receipt requires outcome and task_id only")
@@ -82,7 +82,7 @@ def _receipt_identity(identifier: Any, required: bool) -> None:
         raise AgentTaskError("invalid batch receipt task identity")
 
 
-def record_node(connection: Any, batch: dict, request: dict) -> None:
+def record_node(connection: Any, batch: dict[str, Any], request: dict[str, Any]) -> None:
     """Store only bounded coordination identity; completion was independently checked before this transaction."""
     receipt = validate_receipt(request["receipt"])
     phase = "confirmed" if receipt["outcome"] == "completed" else "unknown"

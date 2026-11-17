@@ -12,12 +12,12 @@ from je_auto_control.utils.agent_runtime.transfer_models import _canonical, _dea
 from je_auto_control.utils.agent_runtime.transfer_records import _text
 
 
-def evidence_digest(summary: Mapping) -> str:
+def evidence_digest(summary: Mapping[str, Any]) -> str:
     """Hash only the exact unresolved public summary approved by the actual source service."""
     return sha256(_canonical(portable_evidence(summary, resolved=False))).hexdigest()
 
 
-def evidence_request(operation: str, request: Mapping) -> dict:
+def evidence_request(operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
     """Accept finite source-local identities and explicit consent fields, never caller-supplied principals."""
     value = dict(_object(request, EVIDENCE_FIELDS[operation]))
     if operation == 'review_evidence':
@@ -35,7 +35,7 @@ def evidence_request(operation: str, request: Mapping) -> dict:
     return deepcopy(value)
 
 
-def evidence_reply(operation: str, reply: Mapping, request: dict) -> dict:
+def evidence_reply(operation: str, reply: Mapping[str, Any], request: dict[str, Any]) -> dict[str, Any]:
     """Check closed management envelopes independently of authenticated evidence resolution and input."""
     if operation == 'review_evidence':
         return _review(reply, request)
@@ -50,7 +50,7 @@ def evidence_reply(operation: str, reply: Mapping, request: dict) -> dict:
     return {'evidence': record}
 
 
-def _review(reply: Mapping, request: dict) -> dict:
+def _review(reply: Mapping[str, Any], request: dict[str, Any]) -> dict[str, Any]:
     value = _object(reply, {'review', 'digest', 'evidence', 'review_expires', 'approval_required'})
     _hex(value['review'], 32)
     _hex(value['digest'], 64)
@@ -64,7 +64,7 @@ def _review(reply: Mapping, request: dict) -> dict:
             'review_expires': value['review_expires'], 'approval_required': True}
 
 
-def _record(reply: Any) -> dict:
+def _record(reply: Any) -> dict[str, Any]:
     value = _object(reply, {'grant_id', 'state', 'summary'})
     _hex(value['grant_id'], 32)
     summary = portable_evidence(value['summary'], resolved=False)
@@ -75,7 +75,7 @@ def _record(reply: Any) -> dict:
     return {'grant_id': value['grant_id'], 'state': state, 'summary': summary}
 
 
-def _listing(reply: Mapping, source_task: str) -> dict:
+def _listing(reply: Mapping[str, Any], source_task: str) -> dict[str, Any]:
     values = _object(reply, {'evidence'})['evidence']
     if not isinstance(values, list) or len(values) > 200:
         raise AgentTaskError('evidence management list exceeds its finite quota')

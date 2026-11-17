@@ -7,7 +7,7 @@ import weakref
 import pytest
 
 pytest.importorskip('PySide6.QtWidgets', exc_type=ImportError)
-from headless._qt_settle import settle
+from headless._qt_settle import pump_until, settle
 from headless.test_remote_registry_owners_gui import qapp as qapp, _tab
 from je_auto_control.utils.clipboard import clipboard
 from je_auto_control.utils.rbac import AuthorizationContext, Role, UserStore, authorization_scope, current_authorization
@@ -259,6 +259,9 @@ def test_disconnected_clipboard_callback_does_not_retain_its_own_viewer_until_gc
         reference = weakref.ref(peer)
         panel._disconnect()
         del peer
+        # The socket closes on a worker (a join); the viewer is held until that has run.
+        assert pump_until(lambda: panel._stops.pending == 0)
+        qapp.processEvents()
         assert reference() is None, 'the clipboard callback retained its own viewer and native panel until arbitrary GC'
     finally:
         panel._disconnect()

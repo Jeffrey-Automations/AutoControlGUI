@@ -95,20 +95,18 @@ def test_thumb_interval_zero_stops_the_timer(populated_admin_tab):
     assert tab._thumb_timer.interval() == 15_000  # noqa: SLF001
 
 
-def test_thumbnail_worker_pulls_through_admin_client(populated_admin_tab):
-    """The headless worker calls fetch_thumbnails and emits the result."""
-    from je_auto_control.gui.admin_console_tab import _ThumbnailWorker
-    _tab, client = populated_admin_tab
+def test_thumbnail_refresh_pulls_through_admin_client(populated_admin_tab):
+    """A refresh calls fetch_thumbnails off the GUI thread and paints its result."""
+    from headless._qt_settle import pump_until
+    tab, client = populated_admin_tab
     png = _png_bytes()
-    captured = []
     with patch.object(
         client.__class__, "fetch_thumbnails",
         return_value={"alpha": png, "beta": None},
     ):
-        worker = _ThumbnailWorker(client)
-        worker.finished.connect(captured.append)
-        worker.run()  # run synchronously — no QThread in this test
-    assert captured == [{"alpha": png, "beta": None}]
+        tab._refresh_thumbnails()  # noqa: SLF001
+        assert pump_until(lambda: not tab._thumbs.running)  # noqa: SLF001
+    assert tab._thumbnails.count() == 2  # noqa: SLF001
 
 
 def test_apply_thumbnails_from_worker_result(populated_admin_tab):

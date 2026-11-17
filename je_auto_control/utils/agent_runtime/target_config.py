@@ -108,7 +108,7 @@ class AgentTargetProfile:
             raise AgentTaskError("task roots exceed the host target profile") from error
 
 
-def _settings(kind: str, value: Mapping) -> dict:
+def _settings(kind: str, value: Mapping[str, Any]) -> dict[str, Any]:
     data = detached(value)
     if not isinstance(data, dict):
         raise AgentTaskError("target profile settings must be an object")
@@ -129,7 +129,7 @@ def _settings(kind: str, value: Mapping) -> dict:
     return data
 
 
-def _normalize_origins(data: dict) -> None:
+def _normalize_origins(data: dict[str, Any]) -> None:
     origins = data.get("allowed_origins", [])
     if not isinstance(origins, list) or len(origins) > 50 or not all(isinstance(item, str) for item in origins):
         raise AgentTaskError("target origins must be a bounded list of strings")

@@ -24,7 +24,7 @@ class SourceProcess:
         self._channel: Any = None
         self._started = False
 
-    def start(self) -> dict:
+    def start(self) -> dict[str, Any]:
         """The fixed child is contained before it receives the internal source bootstrap."""
         if self._started:
             raise AgentTaskError('physical presence source process cannot restart')
@@ -45,7 +45,7 @@ class SourceProcess:
             self._channel = None
 
 
-def _namespace(payload: dict) -> str | None:
+def _namespace(payload: dict[str, Any]) -> str | None:
     if set(payload) != {'namespace'}:
         raise AgentTaskError('physical presence source bootstrap fields are invalid')
     value = payload['namespace']

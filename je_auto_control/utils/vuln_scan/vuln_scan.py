@@ -238,7 +238,7 @@ def match_package(ecosystem: str, name: str, version: str,
 
 def scan_components(components: Sequence[Mapping[str, Any]],
                     advisories: Optional[Sequence[Mapping[str, Any]]] = None, *,
-                    fetcher: Optional[Callable[[str, str], Sequence]] = None
+                    fetcher: Optional[Callable[[str, str], Sequence[Mapping[str, Any]]]] = None
                     ) -> List[Dict[str, Any]]:
     """Scan SBOM ``components`` against ``advisories`` (and an optional fetcher)."""
     base = list(advisories or [])

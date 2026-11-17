@@ -14,14 +14,14 @@ from je_auto_control.utils.agent_runtime.browser_validation import (
 )
 
 
-def browser_options(config: dict) -> dict:
+def browser_options(config: dict[str, Any]) -> dict[str, Any]:
     """Require explicit task origins and refuse a desktop-app fallback in a browser draft."""
     if config.get("apps"):
         raise AgentTaskError("browser workflow cannot grant desktop applications")
     return {"backend": "browser", "allowed_origins": browser_origins(config.get("allowed_origins", []))}
 
 
-def browser_workflow(workflow: str, config: dict, policy: TaskPolicy) -> dict:
+def browser_workflow(workflow: str, config: dict[str, Any], policy: TaskPolicy) -> dict[str, Any]:
     """Build only supported browser workflows without opening a session or starting a task."""
     if workflow == "batch_form":
         return {"actions": _forms(config, policy)}
@@ -32,7 +32,7 @@ def browser_workflow(workflow: str, config: dict, policy: TaskPolicy) -> dict:
     raise AgentTaskError("browser backend currently supports batch_form, transfer and download_archive")
 
 
-def _downloads(config: dict, policy: TaskPolicy) -> dict:
+def _downloads(config: dict[str, Any], policy: TaskPolicy) -> dict[str, Any]:
     from je_auto_control.utils.agent_runtime.workflow_specs import _items
     from je_auto_control.utils.agent_runtime.workflow_files import _destination
     from je_auto_control.utils.agent_runtime.browser_transfers import _expected
@@ -71,26 +71,26 @@ def _text(value: Any, name: str, *, empty: bool = False, maximum: int = 8000) ->
     return value
 
 
-def _locator(selector: Any, frame: Any = "") -> dict:
+def _locator(selector: Any, frame: Any = "") -> dict[str, Any]:
     return {"selector": _text(selector, "selector", maximum=4096),
             "frame": _text(frame, "frame", empty=True, maximum=4096)}
 
 
-def _action(tool: str, arguments: dict, expected: Any = None) -> dict:
+def _action(tool: str, arguments: dict[str, Any], expected: Any = None) -> dict[str, Any]:
     result = {"tool": tool, "arguments": arguments}
     if expected is not None:
         result["expect_result"] = expected
     return result
 
 
-def _navigate(url: Any, policy: TaskPolicy) -> dict:
+def _navigate(url: Any, policy: TaskPolicy) -> dict[str, Any]:
     _text(url, "URL", maximum=4096)
     if _url_origin(url) not in policy.spec.options["allowed_origins"]:
         raise AgentTaskError("browser workflow navigation is outside its reviewed origins")
     return _action("AC_browser_navigate", {"url": url}, True)
 
 
-def _forms(config: dict, policy: TaskPolicy) -> list[dict]:
+def _forms(config: dict[str, Any], policy: TaskPolicy) -> list[dict[str, Any]]:
     from je_auto_control.utils.agent_runtime.workflow_specs import _items, _rows
     rows, fields = _rows(config, policy), _items(config, "fields")
     if 1 + len(rows) * (len(fields) * 2 + 4) > 1000:
@@ -110,7 +110,8 @@ def _forms(config: dict, policy: TaskPolicy) -> list[dict]:
     return actions
 
 
-def _form_field(actions: list[dict], field: dict, row: dict, config: dict) -> None:
+def _form_field(actions: list[dict[str, Any]], field: dict[str, Any], row: dict[str, Any],
+                config: dict[str, Any]) -> None:
     if set(field) - {"column", "selector", "frame", "transform"} or field.get("column") not in row:
         raise AgentTaskError("browser field requires a mapped table column and reviewed locator")
     locator = _locator(field.get("selector"), field.get("frame", ""))
@@ -122,7 +123,7 @@ def _form_field(actions: list[dict], field: dict, row: dict, config: dict) -> No
     actions.append(_action("AC_browser_wait", _wait_arguments(config, locator, "value", value), value))
 
 
-def _row_confirmation(config: dict, row: dict) -> str | None:
+def _row_confirmation(config: dict[str, Any], row: dict[str, Any]) -> str | None:
     column = config.get("confirmation_column")
     if column is None:
         return None
@@ -131,7 +132,7 @@ def _row_confirmation(config: dict, row: dict) -> str | None:
     return _text(row[column], "row confirmation")
 
 
-def _commit(actions: list[dict], config: dict, confirmation: Any = None) -> None:
+def _commit(actions: list[dict[str, Any]], config: dict[str, Any], confirmation: Any = None) -> None:
     expected = _text(confirmation if confirmation is not None else config.get("confirmation_value"), "confirmation")
     locator = _locator(config.get("confirmation_selector"), config.get("confirmation_frame", ""))
     submit = _locator(config.get("submit_selector"), config.get("submit_frame", ""))
@@ -142,14 +143,14 @@ def _commit(actions: list[dict], config: dict, confirmation: Any = None) -> None
     ])
 
 
-def _wait_arguments(config: dict, locator: dict, operation: str, expected: Any) -> dict:
+def _wait_arguments(config: dict[str, Any], locator: dict[str, Any], operation: str, expected: Any) -> dict[str, Any]:
     from je_auto_control.utils.agent_runtime.models import positive
     timeout = config.get("wait_seconds", 5)
     positive(timeout, "browser workflow wait", 60)
     return {**locator, "operation": operation, "expected": expected, "timeout_seconds": timeout}
 
 
-def _transfer(config: dict, policy: TaskPolicy) -> list[dict]:
+def _transfer(config: dict[str, Any], policy: TaskPolicy) -> list[dict[str, Any]]:
     from je_auto_control.utils.agent_runtime.workflow_specs import _items
     fields = _items(config, "fields")
     if len(fields) * 3 + 5 > 1000:
@@ -174,7 +175,7 @@ def _transfer(config: dict, policy: TaskPolicy) -> list[dict]:
     return actions
 
 
-def _transfer_field(field: dict) -> None:
+def _transfer_field(field: dict[str, Any]) -> None:
     allowed = {"source", "source_frame", "source_operation", "destination", "destination_frame", "transform"}
     if set(field) - allowed or field.get("source_operation", "value") not in {"text", "value"}:
         raise AgentTaskError("browser transfer field contains unreviewed settings")

@@ -18,7 +18,7 @@ def _assets(manifest: TransferManifest) -> AssetManifest:
     return AssetManifest(tuple(AssetFile(item.name, item.blob.sha256, item.blob.size) for item in manifest.files))
 
 
-def publication_root(record: dict, publication: dict) -> Path:
+def publication_root(record: dict[str, Any], publication: dict[str, Any]) -> Path:
     """Require the exact host-derived directory and persisted filesystem identity before inspecting bytes."""
     root = Path(record['scope']['destination']['directory']) / ('import-' + record['id'])
     if publication.get('root') != str(root) or publication.get('phase') not in {'owned', 'verified'}:
@@ -29,7 +29,7 @@ def publication_root(record: dict, publication: dict) -> Path:
     return root
 
 
-def retire_import_staging(record: dict, publication: dict) -> dict | None:
+def retire_import_staging(record: dict[str, Any], publication: dict[str, Any]) -> dict[str, Any] | None:
     """Retire a journaled allocation without touching published generations or unrelated output."""
     if not publication or publication.get('phase') == 'preparing':
         return None
@@ -43,7 +43,7 @@ def retire_import_staging(record: dict, publication: dict) -> dict | None:
     return witness
 
 
-def inspect_import(record: dict, manifest: TransferManifest, publication: dict,
+def inspect_import(record: dict[str, Any], manifest: TransferManifest, publication: dict[str, Any],
                    check: Callable[[], None]) -> AssetSyncResult:
     """Hash an owned existing generation through the shared validator without creating, deleting or publishing files."""
     root, assets = publication_root(record, publication), _assets(manifest)
@@ -72,8 +72,8 @@ class ImportAssetTransport:
         return self.cache.store.open(self.account, selected.blob)
 
 
-def receive_chunks(record: dict, manifest: TransferManifest, cache: Any, read: Callable,
-                   check: Callable[[], None]) -> None:
+def receive_chunks(record: dict[str, Any], manifest: TransferManifest, cache: Any,
+                   read: Callable[[str], dict[str, Any]], check: Callable[[], None]) -> None:
     """Commit bounded content-addressed blobs only after current authority is rechecked around every cache effect."""
     for item in manifest.files:
         check()
@@ -90,9 +90,9 @@ def receive_chunks(record: dict, manifest: TransferManifest, cache: Any, read: C
         check()
 
 
-def publish_import(record: dict, manifest: TransferManifest, cache: Any, check: Callable[[], None],
-                   record_publication: Callable[[dict], None],
-                   stage_retired: Callable[[dict], None] | None = None) -> AssetSyncResult:
+def publish_import(record: dict[str, Any], manifest: TransferManifest, cache: Any, check: Callable[[], None],
+                   record_publication: Callable[[dict[str, Any]], None],
+                   stage_retired: Callable[[dict[str, Any]], None] | None = None) -> AssetSyncResult:
     """Use an exclusive per-import directory and the established generation layout without replacing user output."""
     directory = Path(record['scope']['destination']['directory'])
     root = directory / ('import-' + record['id'])
@@ -112,10 +112,10 @@ def publish_import(record: dict, manifest: TransferManifest, cache: Any, check: 
         if resolved(root) != root or [root.stat().st_dev, root.stat().st_ino] != publication['identity']:
             raise AgentTaskError('owned import publication directory changed')
         return False
-    def staged(witness: dict) -> None:
+    def staged(witness: dict[str, Any]) -> None:
         publication['staging'] = witness
         record_publication(publication)
-    def retired(witness: dict) -> None:
+    def retired(witness: dict[str, Any]) -> None:
         publication['staging'] = {**witness, 'cleaned': True}
         if stage_retired is not None:
             stage_retired(witness)

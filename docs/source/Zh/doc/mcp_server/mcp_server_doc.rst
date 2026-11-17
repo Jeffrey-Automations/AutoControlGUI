@@ -80,7 +80,10 @@ list-changed 通知與 elicitation。
   ``ac_execute_actions``、``ac_execute_action_file``、
   ``ac_list_action_commands``、``ac_list_run_history``、
   ``ac_stop_execution``、``ac_list_executions``（停止／列出可停止的執行；把清單包進
-  ``AC_run_stoppable`` 就是可停止的）。
+  ``AC_run_stoppable`` 就是可停止的）。每個 ``tools/call`` 本身也是一個可停止的執行，
+  執行期間以 ``mcp-…`` 列出（``ac_list_executions`` 不列自己這次呼叫）：停止會讓
+  ``ac_execute_actions`` 的清單或 ``ac_wait_for_image``／``ac_wait_for_pixel`` 的輪詢在
+  下一個檢查點結束，該次呼叫回報為工具錯誤。
 
 排程 / 觸發 / 熱鍵
   ``ac_scheduler_add_job``、``ac_scheduler_remove_job``、
@@ -161,7 +164,8 @@ Logging 通知 / Progress / Cancellation
   ``ctx.progress(value, total, message)`` 推送
   ``notifications/progress``(client 須提供 ``progressToken``);呼
   叫 ``ctx.check_cancelled()`` 在收到 ``notifications/cancelled``
-  時合作式中止。
+  時合作式中止。取消同時會停掉該次呼叫的可停止執行：工具執行的動作清單在下一個動作前停下，
+  睡在 ``run_control.pause`` 上的等待立即醒來；該次呼叫以 ``-32800`` 回覆，而不是結果。
 
 以程式啟動伺服器
 ================
@@ -300,7 +304,7 @@ Bearer token 也可從 ``JE_AUTOCONTROL_MCP_TOKEN`` 環境變數讀取。
 同一個檔案。未設定存放檔的有效工具 session 會使用 operator 身分；主機管理工具需要
 已驗證的管理員。stdio 傳輸沒有 bearer token，其有效工具 session 也受相同 operator 範圍約束。
 
-- 工具預設依 ``readOnlyHint`` 使用 ``read_screen``，否則為 ``drive_input``，另有明確
+- 工具預設依 ``readOnlyHint`` 使用 ``read_data``，否則為 ``drive_input``，另有明確
   的 capability 覆寫。敏感讀取需要 ``drive_input`` （operator／admin）：剪貼簿與歷史、
   本機文件／資料／SQL、dotenv 與參照解析、JWT／OTP 產生、持久存放區讀取、對外
   HTTP／port／S3 檢查、麥克風擷取與外部 VLM 請求。斷言容器的 spec 可能讀取相同資源，
@@ -324,12 +328,11 @@ Bearer token 也可從 ``JE_AUTOCONTROL_MCP_TOKEN`` 環境變數讀取。
   具名儲存區（``ac_sql_query``、``ac_assert_db``、``ac_get_asset``、``ac_list_assets``、
   ``ac_cas_get``、``ac_outbox_pending``、``ac_checkpoint_status``、``ac_memory_recall``、
   ``ac_memory_recent``、``ac_s3_list``）；參照與 token（``ac_resolve_ref``、
-  ``ac_resolve_refs``、``ac_generate_otp``、``ac_jwt_encode``、``ac_jwt_decode``）；
+  ``ac_resolve_refs``、``ac_generate_otp``、``ac_jwt_encode``）；
   以及行程清單、網路與麥克風探測（``ac_list_processes``、``ac_assert_process``、
   ``ac_wait_for_process``、``ac_assert_http``、``ac_wait_for_port``、
   ``ac_assert_audio``）。完整清單是 ``je_auto_control.utils.rbac.policy`` 的
-  ``DATA_TOOLS``。其餘唯讀工具 ``viewer`` 都保留：螢幕尺寸、視窗、像素、影像與文字
-  定位、無障礙讀取、等待。
+  ``DATA_TOOLS``。
 - 這份清單背後的規則：回傳\ **主機保存的紀錄或設定**\ 的工具需要 ``read_data``；
   只觀察目前畫面的工具需要 ``read_screen``。所以 ``read_data`` 也包含執行歷史與由它
   算出來的結果（``ac_list_run_history``、``ac_flaky_report``、``ac_rank_tests``、
@@ -345,21 +348,15 @@ Bearer token 也可從 ``JE_AUTOCONTROL_MCP_TOKEN`` 環境變數讀取。
   以及連線裝置的剪貼簿（``ac_android_get_clipboard``、
   ``ac_ios_get_clipboard``）。這些以前是 ``read_screen``，所以\ **viewer 的 token
   現在不能呼叫它們**\ ；``operator`` 與 ``admin`` 不受影響。
-- 一次呼叫要花多少錢不是一種能力。``ac_vlm_locate`` 與 ``ac_self_heal_locate`` 讀的是
-  畫面，雖然呼叫可能被模型供應商計費，仍然是 ``read_screen``；要限制花費，請用
-  rate limiter，或不要在 viewer 連得到的伺服器上設定 VLM 後端。
-- REST API 依同一條規則：``GET /history`` 與 ``GET /usb/acl`` 和
-  ``ac_list_run_history``、``ac_usb_acl_list`` 一樣需要 ``read_data``，所以 viewer 的
-  token 在那裡也讀不到執行歷史與 USB ACL（見維運章節的 REST 表格）。
+- 已審查的 REST 路由依相同來源權限：歷史、USB ACL、排程、session、USB passthrough
+  狀態及 loopback／remote 清單需要 ``read_data``。診斷與被動後端中繼資料也需要
+  資料權限。對應已註冊的 AC 狀態／診斷指令會在執行提供者前檢查；唯讀標記不授予
+  viewer 存取權。端點表格與指令審查範圍見維運章節。
 - resource 適用同一條規則。\ ``autocontrol://history``\ （最近 100 筆執行歷史）與
   ``autocontrol://files/`` 底下的動作檔需要 ``read_data``\ ；\ ``autocontrol://commands``
   與即時畫面需要 ``read_screen``\ 。\ ``resources/list`` 只列出呼叫者讀得到的，
   ``resources/read`` 與 ``resources/subscribe`` 對其餘的回 ``-32003``\ 。伺服器不認得的
   resource URI（自訂 provider 的）視為已儲存的資料，需要 ``read_data``\ 。
-- 回報這個行程目前狀態、而不是保存紀錄的工具——``ac_list_executions``、
-  ``ac_scheduler_list_jobs``、``ac_trigger_list``、``ac_hotkey_list``、
-  ``ac_observe_list``、``ac_watchdog_list``、``ac_journal_status``、USB 裝置清單——
-  維持 ``read_screen``。
 - ``tools/list`` 只回呼叫者可以呼叫的工具；對其他工具 ``tools/call`` 會回 JSON-RPC
   錯誤 ``-32003``\ （``Forbidden: ...``、``data.required_capability``），且不會執行。
 - 接受動作清單的工具（``ac_execute_actions`` 等）在清單含有呼叫者角色沒有的指令時
@@ -700,14 +697,14 @@ Plugin Hot-Reload
 
 這個工具就會以 ``readOnlyHint`` 為 true 註冊。唯讀伺服器在三種工具模式下都會列出並執行它
 (``full``、``progressive`` —— 啟用之後 —— 以及 profile 有列它的 ``static``),在 RBAC 下
-只需要 ``read_screen``,所以 ``viewer`` 可以呼叫。從 plugin 取用的只有唯讀這一項;
+需要 ``read_data``,所以 ``viewer`` 不能呼叫。從 plugin 取用的只有唯讀這一項;
 工具不會被標成 idempotent。
 
 .. warning::
 
    這個宣告是\ **被信任的,不是被驗證的**。它只是 plugin 作者的說法:伺服器無從得知
    任意的 Python 程式做了什麼,一個宣告自己唯讀、實際上卻寫檔或送出輸入的 callable,
-   在唯讀伺服器上、對 viewer 也照樣會那樣做。宣告不會把它關進沙箱。把 plugin 放進
+   在唯讀伺服器上、對有權限的呼叫者也照樣會那樣做。宣告不會把它關進沙箱。把 plugin 放進
    唯讀或給 viewer 用的伺服器所監看的目錄之前,請先審查它。每次註冊這樣的工具,
    伺服器都會記一筆指名它的 warning(``plugin tool 'plugin_ac_queue_depth' is
    registered read-only because its plugin declared mcp_read_only=True; the
@@ -767,3 +764,7 @@ CI runner 也能走完所有 MCP 工具:
 受管任務、觸發範本及技能驗證持續檢查來源根目錄政策。撤銷、遺失或損壞的政策紀錄會阻止後續操作。MCP 客戶端根目錄與非同步更新依連線階段隔離，過期回覆不能恢復已終止的授權。主機固定政策在更換前保留；客戶端政策在來源結束時撤銷。HTTP 客戶端根目錄不再改寫共用資源提供者的工作目錄。服務停止會取消所有實際執行中的 worker，包含尚未取得 lease 的模型初始化；尚未啟動的派送保留供服務重啟。
 
 舊式 MCP 包裝及平行／本機 DAG worker 保留來源限制的交集。工具 context 的綁定不會自行建立紀錄，由受管任務分派延後解析。
+
+MCP 唯讀標記不授予 viewer 存取權。已審查的即時畫面與呼叫者資料運算使用 ``read_screen``；檔案、裝置資料及未知工具需要 ``read_data``。別名共用標準名稱的權限，較強的明確設定優先。提供影像來源、從環境變數讀取設定欄位或規劃開啟本機檔案時需要 ``read_data``。Anchor locator 的 accessibility／OCR 允許觀測即時畫面，影像範本需要 ``read_data``，VLM 請求需要 ``drive_input``。唯讀呼叫拒絕擷取產物及 VLM 分支，目錄排除可自選 ADB 執行檔的工具。MCP CI annotations 只回傳格式化文字，不寫入 stdout。未審查的 plugin 與 WebRunner 初始化工具不列入唯讀目錄，等待相依版本的個別審查。
+
+主機唯讀模式對外部提供的目錄及後續註冊套用相同限制，接收請求及重新核對身分後的呼叫都檢查混合用途參數。MCP 設定的失敗截圖需要可寫入的工具及重新核對後具輸入操作權限的呼叫者；唯讀呼叫與 viewer 不會觸發截圖。這不表示所有相依套件或診斷讀取均無初始化副作用。

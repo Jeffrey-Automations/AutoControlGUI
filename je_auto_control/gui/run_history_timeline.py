@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPaintEvent, QPainter
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from je_auto_control.utils.run_history.history_store import (
@@ -61,7 +61,7 @@ class RunHistoryTimeline(QWidget):
         self._highlight_id = run_id
         self.update()
 
-    def paintEvent(self, event) -> None:
+    def paintEvent(self, event: QPaintEvent) -> None:
         del event
         painter = QPainter(self)
         try:

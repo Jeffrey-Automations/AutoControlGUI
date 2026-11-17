@@ -15,18 +15,22 @@ is unit-testable on synthetic arrays without a real screen; only the default
 import dataclasses
 import functools
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Protocol, Sequence, TypeVar
+from typing import Any, Callable, Dict, List, Optional, ParamSpec, Protocol, Sequence, Tuple, TypeVar
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.exception.exceptions import (
     AutoControlFlatTemplateException, AutoControlScreenException,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 # cv2 method name -> the OpenCV constant is resolved lazily in _method().
 _METHOD_NAMES = ("ccoeff_normed", "ccorr_normed", "sqdiff_normed")
-ImageSource = Any
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 
-def _contain_cv2_error(fn):
+def _contain_cv2_error(fn: Callable[_P, _R]) -> Callable[_P, _R]:
     """Convert OpenCV's ``cv2.error`` into a contained AutoControlScreenException.
 
     A degenerate template/mask makes ``cv2.matchTemplate``/``minMaxLoc`` raise
@@ -35,7 +39,7 @@ def _contain_cv2_error(fn):
     instead of being recorded as a failed match step.
     """
     @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         import cv2
         try:
             return fn(*args, **kwargs)
@@ -86,7 +90,7 @@ def _gray_code(channels: int, is_bgr: bool) -> int:
     return cv2.COLOR_BGR2GRAY if is_bgr else cv2.COLOR_RGB2GRAY
 
 
-def _to_gray(source: ImageSource):
+def _to_gray(source: ImageSource) -> Any:
     """Load a path / ndarray / PIL image as a 2-D grayscale ndarray.
 
     The channel order is tracked so luminance weights stay correct: images
@@ -119,11 +123,11 @@ def _to_gray(source: ImageSource):
     return cv2.cvtColor(array, _gray_code(array.shape[2], is_bgr))
 
 
-def _grab_gray(region: Optional[Sequence[int]]):
+def _grab_gray(region: Optional[Sequence[int]]) -> Any:
     return _grab_gray_with_origin(region)[0]
 
 
-def _grab_gray_with_origin(region: Optional[Sequence[int]]):
+def _grab_gray_with_origin(region: Optional[Sequence[int]]) -> Tuple[Any, int, int]:
     """``(gray screen, origin_x, origin_y)`` in the coordinate space of the mouse.
 
     Goes through ``monitor_layout.grab_logical`` rather than a plain screenshot:
@@ -168,12 +172,12 @@ def _move_dict(moved: Dict[str, Any], origin_x: int, origin_y: int) -> Dict[str,
 
 
 def _haystack_gray(haystack: Optional[ImageSource],
-                   region: Optional[Sequence[int]]):
+                   region: Optional[Sequence[int]]) -> Any:
     return _haystack_gray_with_origin(haystack, region)[0]
 
 
 def _haystack_gray_with_origin(haystack: Optional[ImageSource],
-                               region: Optional[Sequence[int]]):
+                               region: Optional[Sequence[int]]) -> Tuple[Any, int, int]:
     """``(gray haystack, origin_x, origin_y)``.
 
     A caller-supplied ``haystack`` is its own coordinate space, so its origin is
@@ -184,7 +188,7 @@ def _haystack_gray_with_origin(haystack: Optional[ImageSource],
     return _grab_gray_with_origin(region)
 
 
-def _imread(path: str, flags: int):
+def _imread(path: str, flags: int) -> Any:
     """Read an image file, tolerating non-ASCII paths.
 
     ``cv2.imread`` goes through the C locale on Windows and simply returns
@@ -210,7 +214,7 @@ def _imread(path: str, flags: int):
 FLAT_TEMPLATE_STD = 1.0
 
 
-def _reject_flat_template(template) -> None:
+def _reject_flat_template(template: Any) -> None:
     """Raise if ``template`` is too uniform for normalised correlation."""
     import numpy as np
     if float(np.asarray(template, dtype=np.float64).std()) < FLAT_TEMPLATE_STD:
@@ -219,7 +223,7 @@ def _reject_flat_template(template) -> None:
             "cannot locate it; crop a region with a pattern or text in it")
 
 
-def _resize(template, scale: float):
+def _resize(template: Any, scale: float) -> Any:
     import cv2
     if abs(scale - 1.0) < 1e-9:
         return template
@@ -231,7 +235,7 @@ def _resize(template, scale: float):
 @_contain_cv2_error
 def _score_map(template: ImageSource, haystack: Optional[ImageSource] = None, *,
                region: Optional[Sequence[int]] = None,
-               method: str = "ccoeff_normed", scale: float = 1.0):
+               method: str = "ccoeff_normed", scale: float = 1.0) -> Tuple[Any, Any]:
     """Return ``(full correlation score map, scaled gray template)``.
 
     The map is oriented so higher = better for every method (``sqdiff_normed``
@@ -248,7 +252,7 @@ def _score_map(template: ImageSource, haystack: Optional[ImageSource] = None, *,
 
 def _score_map_with_origin(template: ImageSource, haystack: Optional[ImageSource] = None, *,
                            region: Optional[Sequence[int]] = None,
-                           method: str = "ccoeff_normed", scale: float = 1.0):
+                           method: str = "ccoeff_normed", scale: float = 1.0) -> Tuple[Any, Any, int, int]:
     """:func:`_score_map` plus the frame's origin: ``(map, template, origin_x, origin_y)``.
 
     Add the origin to a map position to get a screen coordinate. Without it
@@ -264,7 +268,7 @@ def _score_map_with_origin(template: ImageSource, haystack: Optional[ImageSource
     hay, origin_x, origin_y = _haystack_gray_with_origin(haystack, region)
     if tmpl.shape[0] > hay.shape[0] or tmpl.shape[1] > hay.shape[1]:
         return None, tmpl, origin_x, origin_y
-    result = cv2.matchTemplate(hay, tmpl, _method(method))
+    result = stoppable_call(cv2.matchTemplate, hay, tmpl, _method(method))
     if method == "sqdiff_normed":
         result = 1.0 - result
     return result, tmpl, origin_x, origin_y
@@ -291,7 +295,7 @@ def match_template(template: ImageSource, *, haystack: Optional[ImageSource] = N
         scaled = _resize(tmpl, float(scale))
         if scaled.shape[0] > hay.shape[0] or scaled.shape[1] > hay.shape[1]:
             continue
-        _, max_val, _, max_loc = cv2.minMaxLoc(cv2.matchTemplate(hay, scaled,
+        _, max_val, _, max_loc = cv2.minMaxLoc(stoppable_call(cv2.matchTemplate, hay, scaled,
                                                                  metric))
         if max_val >= min_score and (best is None or max_val > best.score):
             best = Match(int(max_loc[0]) + origin_x, int(max_loc[1]) + origin_y,
@@ -351,7 +355,7 @@ _NMS_CANDIDATE_FACTOR = 50
 _NMS_CANDIDATE_MIN = 200
 
 
-def _select_candidates(result, min_score: float, width: int, height: int,
+def _select_candidates(result: Any, min_score: float, width: int, height: int,
                        max_results: int, origin: Sequence[int] = (0, 0),
                        ) -> List[Match]:
     """Candidate matches >= ``min_score``, capped to the top scorers.
@@ -394,7 +398,7 @@ def match_template_all(template: ImageSource, *,
     height, width = tmpl.shape[:2]
     if height > hay.shape[0] or width > hay.shape[1]:
         return []
-    result = cv2.matchTemplate(hay, tmpl, cv2.TM_CCOEFF_NORMED)
+    result = stoppable_call(cv2.matchTemplate, hay, tmpl, cv2.TM_CCOEFF_NORMED)
     candidates = _select_candidates(result, min_score, width, height,
                                     max_results, (origin_x, origin_y))
     return _nms(candidates, float(nms_iou))[:int(max_results)]
@@ -409,7 +413,7 @@ def best_matches(template: ImageSource, *,
                               min_score=-1.0, max_results=int(top_n))
 
 
-def _load_unchanged(source: ImageSource):
+def _load_unchanged(source: ImageSource) -> Tuple[Any, bool]:
     """Return ``(array, is_bgr)`` keeping an alpha channel if present.
 
     ``is_bgr`` is True only for ``cv2.imread`` paths so the caller converts to
@@ -427,7 +431,7 @@ def _load_unchanged(source: ImageSource):
     return np.asarray(source), False
 
 
-def _template_and_mask(template: ImageSource, mask: Optional[ImageSource]):
+def _template_and_mask(template: ImageSource, mask: Optional[ImageSource]) -> Tuple[Any, Any]:
     """Return (gray_template, uint8_mask_or_None); alpha is the implicit mask."""
     import cv2
     import numpy as np
@@ -451,7 +455,7 @@ def _template_and_mask(template: ImageSource, mask: Optional[ImageSource]):
 
 def _masked_scores(template: ImageSource, mask: Optional[ImageSource],
                    haystack: Optional[ImageSource],
-                   region: Optional[Sequence[int]]):
+                   region: Optional[Sequence[int]]) -> Tuple[Any, Any, int, int]:
     """Return (score_map, gray_template, origin_x, origin_y) for masked correlation.
 
     NaNs are zeroed. The origin is what to add to a map position; dropping it
@@ -463,7 +467,7 @@ def _masked_scores(template: ImageSource, mask: Optional[ImageSource],
     hay, origin_x, origin_y = _haystack_gray_with_origin(haystack, region)
     if tmpl.shape[0] > hay.shape[0] or tmpl.shape[1] > hay.shape[1]:
         return None, tmpl, origin_x, origin_y
-    result = cv2.matchTemplate(hay, tmpl, cv2.TM_CCORR_NORMED, mask=msk)
+    result = stoppable_call(cv2.matchTemplate, hay, tmpl, cv2.TM_CCORR_NORMED, mask=msk)
     return np.nan_to_num(result, nan=0.0, posinf=0.0, neginf=0.0), tmpl, origin_x, origin_y
 
 

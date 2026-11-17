@@ -188,6 +188,7 @@ class Display:
         self.closed = False
         self.events = []
         self.keycodes = {}      # keysym -> keycode
+        self.keymap = {}        # keycode -> keysyms by shift level (0 plain, 1 Shift)
         self._windows = {}
         self.root = Window(self, 1)
         self._windows[1] = self.root
@@ -216,6 +217,10 @@ class Display:
 
     def keysym_to_keycode(self, keysym: int) -> int:
         return self.keycodes.get(keysym, 0)
+
+    def keycode_to_keysym(self, keycode: int, index: int) -> int:
+        levels = self.keymap.get(keycode, ())
+        return levels[index] if index < len(levels) else 0
 
     def pending_events(self) -> int:
         return len(self.events)

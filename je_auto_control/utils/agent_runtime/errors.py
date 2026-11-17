@@ -1,4 +1,6 @@
 """Typed failures for managed tasks, observations and control ownership."""
+from typing import Any
+
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
 
@@ -18,4 +20,4 @@ class AgentHumanReview(AgentTaskError):
     """A dialog or unsaved-content gate requires explicit human review before continuing."""
 
     #: Verification reports the review was raised on, recorded with the waiting_user state.
-    reports: tuple = ()
+    reports: tuple[dict[str, Any], ...] = ()

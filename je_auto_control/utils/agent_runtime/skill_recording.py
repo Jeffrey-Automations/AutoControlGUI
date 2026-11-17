@@ -12,14 +12,15 @@ _POINT_TOOLS = frozenset({"AC_click_mouse", "AC_set_mouse_position", "AC_mouse_s
                           "AC_press_mouse", "AC_release_mouse"})
 
 
-def recorded_spec(runtime: Any, task_id: str, criteria: Any = None) -> dict:
+def recorded_spec(runtime: Any, task_id: str, criteria: Any = None) -> dict[str, Any]:
     """Record a succeeded flow without inventing success from an agent's stop signal."""
     row = runtime._row(task_id)
     assert_verified(row)
     return recording_template(runtime, row, criteria)
 
 
-def verified_skill_actions(spec: dict, receipts: list[dict], *, complete: bool = False) -> list[dict]:
+def verified_skill_actions(spec: dict[str, Any], receipts: list[dict[str, Any]], *,
+                           complete: bool = False) -> list[dict[str, Any]]:
     """Verify actual finite semantic effects without restoring captures or constructing executable plans."""
     # pylint: disable-next=import-outside-toplevel  # reason: receipt semantics are needed only for explicit evidence review
     from je_auto_control.utils.agent_runtime.workflow_values import complete as whole, verified_prefix
@@ -35,7 +36,7 @@ def verified_skill_actions(spec: dict, receipts: list[dict], *, complete: bool =
     return active
 
 
-def _strict_effects(spec: AgentTaskSpec, receipts: list[dict]) -> bool:
+def _strict_effects(spec: AgentTaskSpec, receipts: list[dict[str, Any]]) -> bool:
     # pylint: disable-next=import-outside-toplevel  # reason: strict review shares existing capture/expectation semantics
     from je_auto_control.utils.agent_runtime.workflow_values import captures, expected, resolve
     values = captures(spec, receipts)
@@ -54,7 +55,8 @@ def _strict_effects(spec: AgentTaskSpec, receipts: list[dict]) -> bool:
     return True
 
 
-def recording_template(runtime: Any, row: dict, criteria: Any = None, *, scope: dict | None = None) -> dict:
+def recording_template(runtime: Any, row: dict[str, Any], criteria: Any = None, *,
+                       scope: dict[str, Any] | None = None) -> dict[str, Any]:
     """Derive semantic actions after the trusted caller has separately verified source completion."""
     spec = detached(scope if scope is not None else row['spec'])
     spec["actions"] = _actions(runtime, row)
@@ -71,7 +73,7 @@ def recording_template(runtime: Any, row: dict, criteria: Any = None, *, scope: 
     return runtime._validated_spec(spec).to_dict()
 
 
-def _actions(runtime: Any, row: dict) -> list[dict]:
+def _actions(runtime: Any, row: dict[str, Any]) -> list[dict[str, Any]]:
     receipts = effective_actions(runtime.store.actions(row["id"]))
     if not receipts or any(receipt["status"] != "confirmed" for receipt in receipts):
         raise AgentTaskError("skill recording requires confirmed action receipts")
@@ -85,14 +87,14 @@ def _actions(runtime: Any, row: dict) -> list[dict]:
     return [{"tool": receipt["command"], "arguments": receipt["arguments"]} for receipt in receipts]
 
 
-def assert_verified(row: dict) -> None:
+def assert_verified(row: dict[str, Any]) -> None:
     """Require durable succeeded state and all real completion checks passing."""
     reports = row["verification"]
     if row["state"] != "succeeded" or not reports or any(item["status"] != "passed" for item in reports):
         raise AgentTaskError("skill evidence task must have independently verified success")
 
 
-def independent_evidence(spec: dict) -> bool:
+def independent_evidence(spec: dict[str, Any]) -> bool:
     """Accept explicit evidence or reviewed semantic read-back, never dispatch-only completion."""
     if any(clause["kind"] != "actions_complete" for clause in spec["success_criteria"]):
         return True
@@ -100,6 +102,6 @@ def independent_evidence(spec: dict) -> bool:
                and ("expect_result" in action or "expect_capture" in action) for action in spec["actions"])
 
 
-def _read_back(action: dict) -> bool:
+def _read_back(action: dict[str, Any]) -> bool:
     return (action["tool"] in {"AC_workflow_wait", "AC_browser_wait", "AC_browser_read"} or
             action["tool"] == "AC_workflow_control" and action["arguments"].get("operation") in {"get", "state"})

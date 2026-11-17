@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.exception.exceptions import ImageNotFoundException
 from je_auto_control.wrapper.device_context import DeviceError
 
@@ -153,7 +154,7 @@ class DeviceFrame:
         if needle.shape[0] > haystack.shape[0] or needle.shape[1] > haystack.shape[1]:
             raise ImageNotFoundException("template is larger than the device frame")
         try:
-            scores = cv2.matchTemplate(haystack, needle, cv2.TM_CCOEFF_NORMED)
+            scores = stoppable_call(cv2.matchTemplate, haystack, needle, cv2.TM_CCOEFF_NORMED)
         except cv2.error as error:
             raise ImageNotFoundException(f"cannot match template image: {error}") from error
         _low, best, _low_at, (left, top) = cv2.minMaxLoc(scores)

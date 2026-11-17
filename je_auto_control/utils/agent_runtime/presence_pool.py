@@ -15,6 +15,7 @@ from je_auto_control.utils.agent_runtime.owned_channel_factory import owned_chan
 from je_auto_control.utils.agent_runtime.presence_frames import (
     identifier, presence_body, unsigned, validate_response,
 )
+from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
 
 
 @dataclass(eq=False)
@@ -35,7 +36,7 @@ class _Ticket:
 @dataclass
 class _Grant:
     ticket: _Ticket
-    binding: dict
+    binding: dict[str, Any]
     released: threading.Event = field(default_factory=threading.Event)
 
 
@@ -43,6 +44,7 @@ class _Grant:
 class _Owner:
     channel: Any = None
     generation: str | None = None
+    endpoint: Any = None
     thread: threading.Thread | None = None
     stop: threading.Event = field(default_factory=threading.Event)
     retired: threading.Event = field(default_factory=threading.Event)
@@ -74,15 +76,19 @@ class PresenceReference:
         """Report actual shared process/thread retirement, never a native-input cleanup proof."""
         return self._pool.retired
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         """Inspect this reference's shared source without creating resources or granting input."""
         return self._pool.status()
 
-    def acquire(self, check: Callable[[], None], timeout: float) -> dict:
+    def acquire(self, check: Callable[[], None], timeout: float) -> dict[str, Any]:
         """Wait within this caller's budget; cancellation abandons only this caller's grant."""
         return self._pool.acquire_reference(self._owner, check, timeout)
 
-    def release(self, binding: dict) -> None:
+    def endpoint(self, binding: dict[str, Any]) -> dict[str, Any] | None:
+        """Snapshot launch metadata for this reference's exact live grant, without discovery."""
+        return self._pool.endpoint_reference(self._owner, binding)
+
+    def release(self, binding: dict[str, Any]) -> None:
         """Schedule negative-only retirement of a token issued to this exact reference."""
         self._pool.release_reference(self._owner, binding)
 
@@ -108,7 +114,7 @@ class PresencePool:
         thread = self._owner.thread
         return self._owner.retired.is_set() and (thread is None or not thread.is_alive())
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         """Return passive connection availability, never an input permission or native evidence claim."""
         with self._mutex:
             if self._owner.stop.is_set() or self._owner.failure is not None:
@@ -136,7 +142,7 @@ class PresencePool:
         return (not ticket.owner.closed.is_set() and not ticket.abandoned.is_set()
                 and time.monotonic() < ticket.deadline)
 
-    def acquire_reference(self, owner: _Reference, check: Callable[[], None], timeout: float) -> dict:
+    def acquire_reference(self, owner: _Reference, check: Callable[[], None], timeout: float) -> dict[str, Any]:
         """Queue a bounded ticket; caller checkpoints are never passed into the shared owned RPC."""
         ticket = _Ticket(owner, _deadline(timeout))
         check()
@@ -175,7 +181,7 @@ class PresencePool:
                     self._owner.retired.set()
             raise AgentTaskError('shared presence thread could not start') from error
 
-    def _wait(self, ticket: _Ticket, check: Callable[[], None]) -> dict:
+    def _wait(self, ticket: _Ticket, check: Callable[[], None]) -> dict[str, Any]:
         while True:
             check()
             self._check_owner()
@@ -198,7 +204,20 @@ class PresencePool:
                 ticket.accepted.set()
                 return dict(value.binding)
 
-    def release_reference(self, owner: _Reference, binding: dict) -> None:
+    def endpoint_reference(self, owner: _Reference, binding: dict[str, Any]) -> dict[str, Any] | None:
+        """Check ownership and copy the pinned endpoint atomically with reference/grant retirement."""
+        binding = presence_body('check', binding)
+        with self._mutex:
+            self._check_owner()
+            grant = owner.tokens.get(binding['lease_id'])
+            if (owner not in self._references or owner.closed.is_set() or grant is None
+                    or grant.binding != binding or grant.released.is_set()
+                    or not grant.ticket.accepted.is_set()):
+                raise AgentTaskError('presence endpoint requires this reference live grant')
+            endpoint = self._owner.endpoint
+            return endpoint_to_wire(endpoint) if endpoint is not None else None
+
+    def release_reference(self, owner: _Reference, binding: dict[str, Any]) -> None:
         """Mark only a recorded owned grant; the I/O owner performs its negative release."""
         binding = presence_body('release', binding)
         with self._mutex:
@@ -248,11 +267,15 @@ class PresencePool:
             value = self._owner.channel.request('bootstrap', {}, timeout=15, check=self._check_owner)
             if value == {'ready': False, 'status': 'busy'} and value['ready'] is False:
                 raise AgentControlBusy('shared presence source is not ready')
-            if not isinstance(value, dict) or set(value) != {'ready', 'generation'} or value['ready'] is not True:
+            if (not isinstance(value, dict)
+                    or set(value) not in ({'ready', 'generation'}, {'ready', 'generation', 'endpoint'})
+                    or value['ready'] is not True):
                 raise AgentTaskError('shared presence bootstrap is invalid')
+            endpoint = endpoint_from_wire(value['endpoint']) if 'endpoint' in value else None
             self._owner.generation = identifier(value['generation'])
+            self._owner.endpoint = endpoint
 
-    def _rpc(self, operation: str, body: dict) -> dict:
+    def _rpc(self, operation: str, body: dict[str, Any]) -> dict[str, Any]:
         self._check_owner()
         generation = self._owner.generation
         if generation is None:
@@ -373,7 +396,7 @@ def shared_reference() -> PresenceReference:
         return _SHARED.pool.reference()
 
 
-def shared_status() -> dict:
+def shared_status() -> dict[str, Any]:
     """Inspect the default host pool without creating a reference, broker or native observer."""
     with _SHARED.mutex:
         if _SHARED.pool is None:

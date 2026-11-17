@@ -20,8 +20,8 @@ from je_auto_control.utils.exception.exceptions import AutoControlFlatTemplateEx
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.preprocess.preprocess import _eight_bit
 from je_auto_control.utils.visual_match.visual_match import _contain_cv2_error
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 # Common Windows display scales (100% / 125% / 150% / 175% / 200%).
 _DEFAULT_SCALES = (1.0, 1.25, 1.5, 1.75, 2.0)
 

@@ -27,6 +27,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 # - xvfb + xauth: virtual X server so the host can capture a "screen".
 # - x11-utils + xdotool: useful for diagnostics, optional.
 # - libgl1: PySide6 + opencv-python hard-require libGL.so.1 at import.
+# - libegl1: PySide6 6.12's QtGui also loads libEGL.so.1 at import.
 # - libglib2.0-0: opencv-python needs libgthread-2.0.so.0 from glib.
 # - libxkbcommon-x11-0 + libdbus-1-3 + libxcb-*: Qt platform plugins.
 # - libusb-1.0-0: USB enumeration via pyusb / libusb.
@@ -34,6 +35,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         libdbus-1-3 \
+        libegl1 \
         libgl1 \
         libglib2.0-0 \
         libusb-1.0-0 \

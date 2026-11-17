@@ -340,14 +340,17 @@ JSON action 範例::
 - *USB 分享* 分頁是簡易的 AnyDesk 風介面：左側啟用分享並對本機裝置
   做 ACL 允許／封鎖；右側經 in-process channel 列出分享裝置並 *開啟*
   其中一個（讀描述元即證明整條堆疊運作）。*USB Browser* 分頁的 *Open*
-  按鈕現在對 **localhost** 目標也會走同一條 loopback 路徑。分享只跟著面板存在：
+  按鈕現在對 **localhost** 目標也會走同一條 loopback 路徑。它的 *Fetch* 與 *Open*
+  一次只跑一個，Actions 選單有\ **停止執行**\ ，期限 30 秒；已停止、逾時或分頁已關閉的請求，
+  回應會被丟棄。分享只跟著面板存在：
   容納它的視窗被銷毀時，它的 loopback 與熱插拔監看會關閉，它開啟的功能旗標也會關回去。
 - 跨機器已完整串接：WebRTC host 建立 ``usb`` DataChannel，viewer 以
   ``viewer.usb_client()`` 暴露 ``UsbChannelClient``\ （含 ``list_devices``
   / ``open`` / ``resume``\ ）。*USB 分享* 面板有 **來源** 下拉：選
   *遠端(WebRTC)* 時 List / Open 會對 live WebRTC viewer 的主機操作
   （經 ``registry.webrtc_usb_client()``\ ）；選 *本機(loopback)* 則走同機。
-  亦可從 Python 驅動。
+  亦可從 Python 驅動。面板的 List、Open 與遠端 REST 抓取一次只跑一個，
+  Actions 選單有\ **停止執行**\ ，期限 30 秒，不再回應的對端不會卡住面板；遲來的回應會被丟棄。
 - Windows WinUSB 與 macOS IOKit 的 transfer 路徑已寫但尚未對實體硬體
   驗證。在 Phase 2e 硬體測試矩陣通過前請勿用於 production。
 - Phase 2e 外部安全審查尚未簽核；feature flag 必須維持顯式 opt-in。

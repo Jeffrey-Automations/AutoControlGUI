@@ -10,19 +10,21 @@ import re
 from typing import Any, Callable, Optional
 
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QFormLayout, QLabel, QLineEdit, QMessageBox,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
 from je_auto_control.gui.selector import open_region_selector
 from je_auto_control.gui.tab_task_controller import CancellationToken, TaskHandle, task_controller
 from je_auto_control.utils.ocr.ocr_engine import (
-    find_text_regex, read_text_in_region,
+    TextMatch, find_text_regex, read_text_in_region,
 )
 
 
@@ -30,7 +32,7 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _matches_to_json(matches) -> str:
+def _matches_to_json(matches: list[TextMatch]) -> str:
     rows = [
         {
             "text": m.text, "x": m.x, "y": m.y,
@@ -72,29 +74,24 @@ class OCRReaderTab(TranslatableMixin, QWidget):
         # Pick/dump/find commands run from the Actions menu; the tab keeps
         # only the region/params/regex inputs, the results view, and status.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
 
-        region_group = self._tr(QGroupBox(), "ocr_region_group")
-        region_layout = QHBoxLayout()
-        region_layout.addWidget(self._tr(QLabel(), "ocr_region_label"))
-        region_layout.addWidget(self._region, stretch=1)
-        region_group.setLayout(region_layout)
-        root.addWidget(region_group)
+        region_layout = QFormLayout()
+        region_layout.addRow(self._tr(QLabel(), "ocr_region_label"), self._region)
+        root.addWidget(Card("ocr_region_group").add(region_layout))
 
-        params_layout = QHBoxLayout()
-        params_layout.addWidget(self._tr(QLabel(), "ocr_lang_label"))
-        params_layout.addWidget(self._lang)
-        params_layout.addWidget(self._tr(QLabel(), "ocr_min_conf_label"))
-        params_layout.addWidget(self._min_conf)
-        params_layout.addStretch()
-        root.addLayout(params_layout)
+        params = Card()
+        params.add(flow_of(field_pair(self._tr(QLabel(), "ocr_lang_label"), self._lang),
+                           field_pair(self._tr(QLabel(), "ocr_min_conf_label"), self._min_conf)))
+        params.add(field_pair(self._tr(QLabel(), "ocr_regex_label"), self._regex))
+        root.addWidget(params)
 
-        regex_layout = QHBoxLayout()
-        regex_layout.addWidget(self._tr(QLabel(), "ocr_regex_label"))
-        regex_layout.addWidget(self._regex, stretch=1)
-        root.addLayout(regex_layout)
-
-        root.addWidget(self._tr(QLabel(), "ocr_results_label"))
-        root.addWidget(self._result, stretch=1)
+        results = Card()
+        results.add(self._tr(QLabel(), "ocr_results_label"))
+        results.add(self._result, stretch=1)
+        root.addWidget(results, stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
     def dispose(self) -> None:
@@ -105,7 +102,7 @@ class OCRReaderTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("ocr_pick_region", self._on_pick_region),
@@ -120,7 +117,7 @@ class OCRReaderTab(TranslatableMixin, QWidget):
         x, y, width, height = region
         self._region.setText(f"{x}, {y}, {width}, {height}")
 
-    def _parse_region(self) -> Optional[list]:
+    def _parse_region(self) -> Optional[list[int]]:
         text = self._region.text().strip()
         if not text:
             return None
@@ -154,7 +151,7 @@ class OCRReaderTab(TranslatableMixin, QWidget):
             return
         self._run_ocr("ocr_find_regex", find_text_regex, {"pattern": compiled})
 
-    def _run_ocr(self, title_key: str, backend: Callable[..., list], extra: dict) -> None:
+    def _run_ocr(self, title_key: str, backend: Callable[..., list[TextMatch]], extra: dict[str, Any]) -> None:
         """Read the fields, then run ``backend`` off the GUI thread; one read at a time."""
         if self._task is not None:
             return
@@ -176,7 +173,7 @@ class OCRReaderTab(TranslatableMixin, QWidget):
     def _on_task_finished(self) -> None:
         self._task = None
 
-    def _show_matches(self, matches: list) -> None:
+    def _show_matches(self, matches: list[TextMatch]) -> None:
         self._result.setText(_matches_to_json(matches))
         self._status.setText(
             _t("ocr_match_count").replace("{n}", str(len(matches)))
@@ -190,6 +187,7 @@ class OCRReaderTab(TranslatableMixin, QWidget):
         QMessageBox.warning(self, _t(self._title_key), str(error))
 
 
-def _call_backend(backend: Callable[..., list], options: dict, _token: CancellationToken) -> Any:
+def _call_backend(backend: Callable[..., list[TextMatch]], options: dict[str, Any],
+                  _token: CancellationToken) -> Any:
     """Worker thread: one OCR read with the options read from the tab."""
     return backend(**options)

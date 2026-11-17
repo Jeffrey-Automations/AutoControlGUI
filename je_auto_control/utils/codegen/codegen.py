@@ -19,7 +19,7 @@ import os
 import pprint
 import re
 import textwrap
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any, Callable, Dict, Sequence, Set, Tuple
 
 from je_auto_control.utils.json.json_file import read_action_json
 from je_auto_control.utils.json_store.json_store import atomic_write_text
@@ -62,7 +62,7 @@ def _non_finite(value: Any) -> bool:
     return False
 
 
-def _math_import(actions: Sequence) -> str:
+def _math_import(actions: Sequence[Sequence[Any]]) -> str:
     """The import ``repr`` output needs when the actions hold NaN or infinity.
 
     ``json`` reads ``NaN`` / ``Infinity``, and ``repr`` writes them as the
@@ -78,14 +78,14 @@ def _unwrapped(actions: Any) -> Any:
     return actions
 
 
-def _call_context() -> Tuple[dict, set]:
+def _call_context() -> Tuple[Dict[str, Callable[..., Any]], Set[str]]:
     """Return ``(event_dict, public_names)`` for mapping commands to calls."""
     import je_auto_control as ac
     from je_auto_control.utils.executor.action_executor import executor
     return executor.event_dict, set(getattr(ac, "__all__", ()))
 
 
-def _action_to_call(action: Sequence, event_dict: dict, public: set) -> str:
+def _action_to_call(action: Sequence[Any], event_dict: Dict[str, Callable[..., Any]], public: Set[str]) -> str:
     """Render one action as a Python statement (call or executor fall-back)."""
     name = action[0]
     params = action[1] if len(action) == 2 else None
@@ -148,13 +148,13 @@ def _keyword_safe(params: object) -> bool:
         for key in params)
 
 
-def _calls_body(actions: Sequence) -> str:
+def _calls_body(actions: Sequence[Sequence[Any]]) -> str:
     event_dict, public = _call_context()
     return "\n".join(
         _action_to_call(action, event_dict, public) for action in actions)
 
 
-def _actions_body(actions: Sequence) -> str:
+def _actions_body(actions: Sequence[Sequence[Any]]) -> str:
     # sort_dicts=False: the replay is meant to be exact, and a dict value's
     # key order is what str() of it -- text a script may type -- shows.
     literal = pprint.pformat([list(action) for action in actions],
@@ -162,7 +162,7 @@ def _actions_body(actions: Sequence) -> str:
     return f"actions = {literal}\n" + _REPLAY.format("actions")
 
 
-def _body(actions: Sequence, style: str) -> str:
+def _body(actions: Sequence[Sequence[Any]], style: str) -> str:
     if style == "actions":
         return _actions_body(actions)
     if style == "calls":
@@ -170,7 +170,7 @@ def _body(actions: Sequence, style: str) -> str:
     raise ValueError(f"unknown codegen style: {style!r}")
 
 
-def _render_pytest(actions: Sequence, name: str, style: str,
+def _render_pytest(actions: Sequence[Sequence[Any]], name: str, style: str,
                    failure_bundle: bool = False) -> str:
     raw_body = _body(actions, style)
     if failure_bundle:
@@ -190,7 +190,7 @@ def _render_pytest(actions: Sequence, name: str, style: str,
             + f"def test_{_slug(name)}():\n{body}\n")
 
 
-def _render_python(actions: Sequence, name: str, style: str,
+def _render_python(actions: Sequence[Sequence[Any]], name: str, style: str,
                    _failure_bundle: bool = False) -> str:
     slug = _slug(name)
     body = textwrap.indent(_body(actions, style), "    ")
@@ -202,7 +202,7 @@ def _render_python(actions: Sequence, name: str, style: str,
             f"    {slug}()\n")
 
 
-def _render_robot(actions: Sequence, name: str, _style: str,
+def _render_robot(actions: Sequence[Sequence[Any]], name: str, _style: str,
                   _failure_bundle: bool = False) -> str:
     # Base64, not a raw-string literal: ''' in any value closed the literal
     # and the rest ran as Python inside Evaluate, and Robot itself splits
@@ -237,7 +237,7 @@ def _robot_test_name(name: str) -> str:
     return text.title() or "Recorded Flow"
 
 
-def _check_shapes(actions: list) -> None:
+def _check_shapes(actions: list[Any]) -> None:
     """Refuse what the executor would refuse to run, before rendering it.
 
     ``[1]`` or ``[[]]`` ended in a traceback, and ``["AC_click_mouse", {...},
@@ -255,7 +255,7 @@ _RENDERERS = {
 }
 
 
-def generate_code(actions: Sequence | Dict[str, Any], target: str = "pytest",
+def generate_code(actions: Sequence[Sequence[Any]] | Dict[str, Any], target: str = "pytest",
                   name: str = "recorded_flow", style: str = "calls",
                   failure_bundle: bool = False) -> str:
     """Render ``actions`` as source code for ``target`` (pytest/python/robot).
@@ -281,7 +281,7 @@ def generate_code(actions: Sequence | Dict[str, Any], target: str = "pytest",
     return code
 
 
-def generate_code_file(source, output_path: str, target: str = "pytest",
+def generate_code_file(source: list[Any] | Dict[str, Any] | str, output_path: str, target: str = "pytest",
                        name: str = "recorded_flow", style: str = "calls",
                        failure_bundle: bool = False) -> str:
     """Generate code from a list or JSON action-file path; write and return it."""

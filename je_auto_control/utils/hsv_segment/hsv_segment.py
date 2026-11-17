@@ -15,17 +15,16 @@ from typing import Any, Dict, List, Optional, Sequence
 
 # Reuse the RGB loader / screen grab from color_region (single source of truth).
 from je_auto_control.utils.color_region.color_region import _grab_rgb, _origin, _to_rgb
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 
-
-def _hsv(haystack: Optional[ImageSource], region: Optional[Sequence[int]]):
+def _hsv(haystack: Optional[ImageSource], region: Optional[Sequence[int]]) -> Any:
     import cv2
     rgb = _to_rgb(haystack) if haystack is not None else _grab_rgb(region)
     return cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
 
 
-def _uint8_bound(values: Sequence[int]):
+def _uint8_bound(values: Sequence[int]) -> Any:
     """An inRange bound, clamped to 0..255: numpy 2 raises on 256 or -1."""
     import numpy as np
     return np.array([min(255, max(0, int(value))) for value in values],
@@ -34,7 +33,7 @@ def _uint8_bound(values: Sequence[int]):
 
 def color_mask(haystack: Optional[ImageSource] = None, *,
                region: Optional[Sequence[int]] = None,
-               lower_hsv: Sequence[int], upper_hsv: Sequence[int]):
+               lower_hsv: Sequence[int], upper_hsv: Sequence[int]) -> Any:
     """Return a uint8 mask of pixels inside the ``lower_hsv``..``upper_hsv`` band.
 
     HSV ranges are OpenCV's: H in 0..179, S and V in 0..255. A bound outside
@@ -56,7 +55,7 @@ def segment_hsv(haystack: Optional[ImageSource] = None, *,
     return connected_boxes(mask, int(min_area), origin=_origin(haystack, region))
 
 
-def _hue_mask(hsv, hue: int, hue_tol: int, sat_min: int, val_min: int):
+def _hue_mask(hsv: Any, hue: int, hue_tol: int, sat_min: int, val_min: int) -> Any:
     """Build an inRange mask for ``hue`` ± ``hue_tol``, OR-ing the two parts when it wraps 0/180.
 
     The hue is taken round OpenCV's 180-step circle and a tolerance of 90 or
@@ -68,7 +67,7 @@ def _hue_mask(hsv, hue: int, hue_tol: int, sat_min: int, val_min: int):
         raise ValueError(f"hue_tol must be >= 0, got {hue_tol}")
     floor = [int(sat_min), int(val_min)]
 
-    def band(start: int, end: int):
+    def band(start: int, end: int) -> Any:
         return cv2.inRange(hsv, _uint8_bound([start, *floor]),
                            _uint8_bound([end, 255, 255]))
 

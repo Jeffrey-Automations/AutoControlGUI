@@ -51,3 +51,13 @@ def test_facade_exports():
     for attr in ("tween_points", "tween_drag", "easing_names"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_the_mcp_handler_wants_two_coordinates_per_point():
+    """``tuple(start)`` passed a three-value point on, which failed deep in the path maths."""
+    import pytest
+    from je_auto_control.utils.mcp_server.tools import _handlers
+    with pytest.raises(ValueError, match="start must be"):
+        _handlers.tween_drag([1, 2, 3], [4, 5])
+    with pytest.raises(ValueError, match="end must be"):
+        _handlers.tween_drag([1, 2], [4])

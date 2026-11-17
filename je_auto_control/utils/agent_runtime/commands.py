@@ -22,7 +22,7 @@ from je_auto_control.utils.agent_runtime.browser_commands import (
 _ID = {"task_id": {"type": "string", "minLength": 1}}
 
 # name: (function, JSON properties, required, read_only, host_management)
-CATALOG: dict[str, tuple[Any, dict, tuple[str, ...], bool, bool]] = {
+CATALOG: dict[str, tuple[Any, dict[str, Any], tuple[str, ...], bool, bool]] = {
     "AC_agent_transfer": (api.manage_agent_transfer,
         {"operation": {"type": "string", "enum": list(TRANSFER_OPERATIONS)}, "request": {"type": "object"}},
         ("operation",), False, False),

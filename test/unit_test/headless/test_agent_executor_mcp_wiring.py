@@ -64,7 +64,7 @@ def test_mcp_handler_round_trips(monkeypatch):
     _patch_backends(monkeypatch, [
         {"stop": True, "message": "mcp-ok"},
     ])
-    from je_auto_control.utils.mcp_server.tools._handlers_executor_bridge import (
+    from je_auto_control.utils.mcp_server.tools._handlers_automation_executor import (
         run_agent,
     )
     record = run_agent(

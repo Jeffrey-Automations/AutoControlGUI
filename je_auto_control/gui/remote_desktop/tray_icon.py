@@ -73,7 +73,7 @@ class HostTrayIcon(QObject):
         self._tray.setIcon(_build_icon(color))
         self._tray.setToolTip(tip)
 
-    def _on_activated(self, reason) -> None:
+    def _on_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.open_requested.emit()
 
@@ -90,8 +90,8 @@ class HostTrayIcon(QObject):
         self._tray.hide()
 
 
-def install_host_tray(*, on_open: Callable, on_stop: Callable,
-                      on_quit: Callable,
+def install_host_tray(*, on_open: Callable[[], None], on_stop: Callable[[], None],
+                      on_quit: Callable[[], None],
                       parent: Optional[QObject] = None) -> Optional[HostTrayIcon]:
     """Build a tray icon if the system supports it; return None otherwise."""
     if not QSystemTrayIcon.isSystemTrayAvailable():

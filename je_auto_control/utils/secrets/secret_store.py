@@ -28,12 +28,15 @@ import os
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple, Type
 
 from je_auto_control.utils.exception.exceptions import (
     AutoControlException, CryptographyUnavailableError,
 )
 from je_auto_control.utils.json_store.json_store import _file_lock, atomic_write_text
+
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet, InvalidToken
 
 
 _VERIFIER_PLAINTEXT = b"autocontrol-vault-v1"
@@ -41,7 +44,7 @@ _KEY_ITERATIONS = 600_000
 _SALT_BYTES = 16
 
 
-def _fernet_types() -> tuple:
+def _fernet_types() -> Tuple[Type["Fernet"], Type["InvalidToken"]]:
     """Return ``(Fernet, InvalidToken)``, or explain why the vault cannot open.
 
     ``cryptography`` publishes no ``win_arm64`` wheel, so on Windows arm64 it
@@ -84,7 +87,7 @@ def _derive_key(passphrase: str, salt: bytes, iterations: int) -> bytes:
     return base64.urlsafe_b64encode(raw)
 
 
-def _load_vault(path: Path) -> Optional[dict]:
+def _load_vault(path: Path) -> Optional[Dict[str, Any]]:
     if not path.exists():
         return None
     try:
@@ -98,7 +101,7 @@ def _load_vault(path: Path) -> Optional[dict]:
     return data
 
 
-def _check_vault_fields(data: dict) -> None:
+def _check_vault_fields(data: Dict[str, Any]) -> None:
     """Raise ``SecretStoreError`` for a vault whose fields cannot be used.
 
     A missing salt raised ``KeyError`` from :meth:`SecretManager.unlock`, and
@@ -120,7 +123,7 @@ def _check_vault_fields(data: dict) -> None:
         raise SecretStoreError("vault salt is not base64") from error
 
 
-def _atomic_write(path: Path, payload: dict) -> None:
+def _atomic_write(path: Path, payload: Dict[str, Any]) -> None:
     """Replace the vault file; the temp file is unique and 0600 from creation.
 
     A fixed ``vault.json.tmp`` let two writers truncate each other's temp file
@@ -135,7 +138,7 @@ def _atomic_write(path: Path, payload: dict) -> None:
         pass
 
 
-def _new_vault(passphrase: str) -> Tuple[Any, dict]:
+def _new_vault(passphrase: str) -> Tuple[Any, Dict[str, Any]]:
     """Return ``(fernet, payload)`` for an empty vault keyed by ``passphrase``."""
     fernet_cls, _ = _fernet_types()
     salt = os.urandom(_SALT_BYTES)
@@ -166,8 +169,9 @@ class SecretManager:
         self._explicit_path: Optional[Path] = (
             Path(path) if path is not None else None)
         self._lock = threading.RLock()
-        self._fernet = None  # type: ignore[assignment]
-        self._vault: Optional[dict] = None
+        self._fernet: Optional["Fernet"] = None
+
+        self._vault: Optional[Dict[str, Any]] = None
 
     @property
     def _path(self) -> Path:
@@ -329,7 +333,8 @@ class SecretManager:
         finally:
             lock.__exit__(None, None, None)
 
-    def _require_unlocked(self) -> Tuple[Any, dict]:
+    def _require_unlocked(self) -> Tuple[Any, Dict[str, Any]]:
+
         """Return the key and the vault as it is on disk now, or raise if locked.
 
         Every operation re-reads the file: each manager used to write back its

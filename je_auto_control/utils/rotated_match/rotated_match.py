@@ -16,15 +16,15 @@ NumPy arrive via the project's ``je_open_cv`` dependency and are imported lazily
 Imports no ``PySide6``.
 """
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.visual_match.visual_match import (
     _NMS_CANDIDATE_FACTOR, _NMS_CANDIDATE_MIN, _contain_cv2_error,
     _haystack_gray_with_origin, _method, _nms, _reject_flat_template, _resize,
     _to_gray, _to_screen,
 )
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ class RotatedMatch:
         return data
 
 
-def _rotate(template, angle: float):
+def _rotate(template: Any, angle: float) -> Any:
     """Rotate ``template`` by ``angle`` degrees, expanding the canvas to fit it."""
     import cv2
     if abs(angle) < 1e-9:
@@ -68,7 +68,7 @@ def _rotate(template, angle: float):
     return cv2.warpAffine(template, matrix, (new_w, new_h))
 
 
-def _rotate_with_mask(template, angle: float):
+def _rotate_with_mask(template: Any, angle: float) -> Tuple[Any, Any]:
     """The rotated template and a mask of its real pixels.
 
     The enlarged canvas is padded with black, and without a mask the black
@@ -87,21 +87,23 @@ def scale_space(min_scale: float = 0.8, max_scale: float = 1.25,
             for s in np.linspace(float(min_scale), float(max_scale), int(steps))]
 
 
-def _scores_at(hay, tmpl, scale: float, angle: float, metric: int):
+def _scores_at(hay: Any, tmpl: Any, scale: float, angle: float,
+               metric: int) -> Optional[Tuple[Any, int, int]]:
     """The score map (higher is better) for one (scale, angle) and the warped size, or ``None``."""
     import cv2
     import numpy as np
     warped, mask = _rotate_with_mask(_resize(tmpl, float(scale)), float(angle))
     if warped.shape[0] > hay.shape[0] or warped.shape[1] > hay.shape[1]:
         return None
-    scores = cv2.matchTemplate(hay, warped, metric, mask=mask)
+    scores = stoppable_call(cv2.matchTemplate, hay, warped, metric, mask=mask)
     if metric == cv2.TM_SQDIFF_NORMED:
         scores = 1.0 - scores  # lower is better for sqdiff; the maximum was the worst spot
     # Masked correlation over a flat window divides by zero.
     return np.nan_to_num(scores, nan=-1.0, posinf=-1.0, neginf=-1.0), warped.shape[1], warped.shape[0]
 
 
-def _best_at(hay, tmpl, scale: float, angle: float, metric: int):
+def _best_at(hay: Any, tmpl: Any, scale: float, angle: float,
+             metric: int) -> Optional[RotatedMatch]:
     """Return the best ``RotatedMatch`` for one (scale, angle), or ``None``."""
     import cv2
     found = _scores_at(hay, tmpl, scale, angle, metric)
@@ -113,7 +115,7 @@ def _best_at(hay, tmpl, scale: float, angle: float, metric: int):
                         round(float(max_val), 4), float(scale), float(angle))
 
 
-def _hits_at(hay, tmpl, scale: float, angle: float, metric: int,
+def _hits_at(hay: Any, tmpl: Any, scale: float, angle: float, metric: int,
              min_score: float, cap: int) -> List[RotatedMatch]:
     """Every position of one (scale, angle) scoring >= ``min_score``, the best ``cap`` of them.
 

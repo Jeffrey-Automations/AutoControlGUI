@@ -13,7 +13,7 @@ pip install je_auto_control[gui]       # 加上 PySide6 桌面应用
 
 | Extra | 启用的功能 |
 |---|---|
-| `gui` | PySide6 桌面应用（51 个标签页）：左侧可搜索的导航面板（`Ctrl+K`）按分类列出全部功能，标签页在第一次打开时才创建，**View → Theme** 切换深色／浅色。窄窗口的内容可滚动；关闭窗口时，主题、字号、导航面板显示（`Ctrl+B`）与宽度会保存到 `~/.je_auto_control/gui.ini`。主题直接使用 Qt，不需要 `qt-material`。 |
+| `gui` | PySide6 桌面应用（51 个标签页）：左侧可搜索的导航面板（`Ctrl+K`）按分类列出全部功能，标签页在第一次打开时才创建（启动时打开的三个标签页只先创建 Record；Script Builder 与 Remote Desktop 在第一次被选中时才创建），**View → Theme** 切换深色／浅色。窄窗口的内容可滚动；关闭窗口时，主题、字号、导航面板显示（`Ctrl+B`）与宽度会保存到 `~/.je_auto_control/gui.ini`。主题直接使用 Qt，不需要 `qt-material`。 |
 | `webrtc` | WebRTC 远程桌面、USB 直通（`aiortc`、`av`） |
 | `signaling` | 独立的信令／rendezvous 服务器（`fastapi`、`uvicorn`） |
 | `discovery` | mDNS / Zeroconf 局域网主机发现 |
@@ -21,7 +21,7 @@ pip install je_auto_control[gui]       # 加上 PySide6 桌面应用
 | `fuzzy` / `locale` | `rapidfuzz` 模糊匹配、`babel` 区域解析 |
 | `s3` / `audio` | S3 制品存储、系统音量控制 |
 
-使用标签页关闭按钮关闭 factory 创建的功能面板时，下一次 Qt event loop 会释放 widget、订阅与计时器；重新打开会创建新面板。**View → Tabs** 与嵌入用的 `hide_tab` 只隐藏并保留状态。`tab_registry.open/close` 与 `close_tab` 提供明确的生命周期接口。既有的所有者表单与 Remote Desktop 在生命周期迁移完成前，关闭后仍保留以供重用。
+使用标签页关闭按钮关闭 factory 创建的功能面板时，下一次 Qt event loop 会释放 widget、订阅与计时器；重新打开会创建新面板。**View → Tabs** 与嵌入用的 `hide_tab` 只隐藏并保留状态。`tab_registry.open/close` 与 `close_tab` 提供明确的生命周期接口。核心分页与 Remote Desktop 也会在关闭时释放。共享 registry 的 TCP／WebSocket 连接仍可供脚本使用；页面拥有的 WebRTC 连接在后台停止。重新打开会创建新控件，不自动接回现有连接；待处理批准与延迟页面回调会被拒绝。嵌入者直接提供的 widget 保持原有所有权契约。
 
 **Windows arm64** 装得起来也跑得起来，少的是上游在那里发不出来的那些：
 `opencv-python` 与 `cryptography` 都没发 `win_arm64` wheel。所以 `find_image*`、
@@ -292,3 +292,9 @@ AutoControl 读取的每一个环境变量。这里没有任何一项是必填�
 | `JE_AUTOCONTROL_PYTEST_ARTIFACTS` | `./autocontrol_screenshots` | 测试没有使用 `autocontrol_screenshot_dir` fixture 时，pytest 插件写入失败截图的目录。 |
 
 ---
+
+Report 标签页在首次打开时创建。关闭会释放控件和本地结果视图；重新打开会创建新页面并读取当前录制状态。关闭标签页不会禁用共享 recorder。
+
+Screenshot 标签页同样在首次打开时创建，关闭时释放。屏幕尺寸查询、截图和像素读取在后台执行，显示运行状态，每次接受一项任务，并使用启动时的输入值。关闭后丢弃迟到结果；已开始的截图仍可能写入文件。隐藏会保留页面。选区和浏览文件仍须由用户明确操作。
+
+报表在后台生成并显示运行状态。每个标签页一次接受一个生成任务，使用开始时输入的名称。关闭会丢弃迟到结果；已开始的文件写入仍可能完成。

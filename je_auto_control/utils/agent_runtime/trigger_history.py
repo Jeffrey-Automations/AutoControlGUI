@@ -22,7 +22,7 @@ def require_current(connection: Any, identifier: str) -> None:
         raise AgentTaskError("trigger has a reviewed replacement; use that registration")
 
 
-def event_state(connection: Any, identifier: str, event_hash: str) -> tuple[dict | None, int]:
+def event_state(connection: Any, identifier: str, event_hash: str) -> tuple[dict[str, Any] | None, int]:
     """Read deduplication and pending count from the same original or renewed event namespace."""
     family = lineage(connection, identifier)
     if family is None:

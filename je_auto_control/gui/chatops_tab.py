@@ -4,16 +4,17 @@ A command is dispatched off the GUI thread (``/run`` executes a whole script),
 one at a time, as a stoppable executor run.
 """
 import functools
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLabel, QLineEdit, QTextEdit,
+    QFileDialog, QFormLayout, QLabel, QLineEdit, QTextEdit,
     QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask, was_stopped
+from je_auto_control.gui.adaptive.surfaces import Card
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -26,7 +27,7 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _dispatch(router: CommandRouter, message: str, context: dict) -> Any:
+def _dispatch(router: CommandRouter, message: str, context: dict[str, Any]) -> Any:
     """Worker thread: route one message; the router is not touched by the GUI meanwhile."""
     return router.dispatch(message, context=context)
 
@@ -58,21 +59,16 @@ class ChatOpsTab(TranslatableMixin, QWidget):
         # Browse/send commands run from the Actions menu; the tab keeps
         # only the root/command inputs and the output log.
         root = QVBoxLayout(self)
-        root_row = QHBoxLayout()
+        root.setSpacing(12)
         self._root_label = QLabel()
-        root_row.addWidget(self._root_label)
-        root_row.addWidget(self._script_root, stretch=1)
-        root.addLayout(root_row)
-
-        cmd_row = QHBoxLayout()
         self._cmd_label = QLabel()
-        cmd_row.addWidget(self._cmd_label)
-        cmd_row.addWidget(self._command_input, stretch=1)
-        root.addLayout(cmd_row)
+        form = QFormLayout()
+        form.addRow(self._root_label, self._script_root)
+        form.addRow(self._cmd_label, self._command_input)
+        root.addWidget(Card().add(form))
 
         self._output_label = QLabel()
-        root.addWidget(self._output_label)
-        root.addWidget(self._output, stretch=1)
+        root.addWidget(Card().add(self._output_label).add(self._output, stretch=1), stretch=1)
         self._apply_translations()
 
     def dispose(self) -> None:
@@ -83,7 +79,7 @@ class ChatOpsTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("chatops_browse_btn", self._on_browse),

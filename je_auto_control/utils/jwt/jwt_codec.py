@@ -25,7 +25,7 @@ import math
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple, Union
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
@@ -153,7 +153,7 @@ def _json_object(segment: str, what: str) -> Dict[str, Any]:
     return value
 
 
-def _split_token(token: str) -> tuple:
+def _split_token(token: str) -> Tuple[str, str, str]:
     if not isinstance(token, str):
         raise JwtError("token must be a string")
     parts = token.split(".")

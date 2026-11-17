@@ -6,7 +6,7 @@ import shutil
 import subprocess  # nosec B404  # reason: needed to drive certbot
 import threading
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from je_auto_control.utils.http_headers import LocalThreadingHTTPServer
 
@@ -40,7 +40,7 @@ class _ChallengeHandler(http.server.BaseHTTPRequestHandler):
 
     # Silence the default stderr access log; this server is short-lived
     # and noisy logging on every challenge poll just confuses the user.
-    def log_message(self, format: str, *args) -> None:  # noqa: A002, D401  # pylint: disable=W0622  # reason: signature dictated by BaseHTTPRequestHandler
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002, D401  # pylint: disable=W0622  # reason: signature dictated by BaseHTTPRequestHandler
         return
 
 

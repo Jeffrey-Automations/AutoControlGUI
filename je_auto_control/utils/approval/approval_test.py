@@ -19,7 +19,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Tuple
 
 DEFAULT_DIR = ".approvals"
 
@@ -57,7 +57,7 @@ def _safe_extension(extension: str) -> str:
     return ext
 
 
-def _paths(name: str, approvals_dir: str, extension: str):
+def _paths(name: str, approvals_dir: str, extension: str) -> Tuple[Path, Path]:
     base = Path(approvals_dir)
     ext = _safe_extension(extension)
     return (base / f"{_safe_name(name)}.approved.{ext}",

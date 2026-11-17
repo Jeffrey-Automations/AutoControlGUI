@@ -1,6 +1,7 @@
 """AdbClient — thin wrapper around the ``adb`` CLI for Android automation."""
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import shutil
@@ -147,7 +148,7 @@ class AdbClient:
     def run(self, args: Sequence[str], *, serial: Optional[str] = None,
             input_bytes: Optional[bytes] = None,
             timeout: Optional[float] = None,
-            check: bool = True) -> subprocess.CompletedProcess:
+            check: bool = True) -> subprocess.CompletedProcess[bytes]:
         """Invoke adb with ``args``. Honours the per-instance default serial."""
         cmd: List[str] = [self._adb]
         target = serial if serial is not None else self._default_serial
@@ -321,7 +322,7 @@ class AdbClient:
         )
         return result.stdout
 
-    def save_screenshot(self, file_path,
+    def save_screenshot(self, file_path: str | os.PathLike[str],
                         *, serial: Optional[str] = None) -> Path:
         """Persist the live screen capture to ``file_path``; returns the path."""
         target = Path(file_path)

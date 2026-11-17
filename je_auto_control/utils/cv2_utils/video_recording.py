@@ -14,7 +14,7 @@ class RecordingThread(threading.Thread):
     - 使用 OpenCV VideoWriter 寫入影片檔案
     """
 
-    def __init__(self, video_name: str = "autocontrol_recording", fps: int = 20):
+    def __init__(self, video_name: str = "autocontrol_recording", fps: int = 20) -> None:
         super().__init__()
         autocontrol_logger.info("Init RecordingThread")
         self.recording_flag = True
@@ -22,7 +22,7 @@ class RecordingThread(threading.Thread):
         self.daemon = True
         self.fps = fps
 
-    def set_recording_flag(self, recording_flag: bool):
+    def set_recording_flag(self, recording_flag: bool) -> None:
         """
         設定錄影旗標
         Set recording flag
@@ -32,14 +32,14 @@ class RecordingThread(threading.Thread):
         autocontrol_logger.info(f"RecordingThread set_recording_flag: {recording_flag}")
         self.recording_flag = recording_flag
 
-    def stop(self):
+    def stop(self) -> None:
         """
         停止錄影
         Stop recording
         """
         self.set_recording_flag(False)
 
-    def run(self):
+    def run(self) -> None:
         """
         執行錄影迴圈
         Run recording loop

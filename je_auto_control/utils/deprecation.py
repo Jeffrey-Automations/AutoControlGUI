@@ -3,16 +3,16 @@ from __future__ import annotations
 
 import functools
 import warnings
-from typing import Callable, TypeVar, cast
+from typing import Any, Callable, TypeVar, cast
 
-F = TypeVar("F", bound=Callable)
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 class AutoControlDeprecationWarning(FutureWarning):
     """A user-visible warning for an API scheduled for removal."""
 
 
-def deprecated(*, since: str, removal: str, replacement: str = ""):
+def deprecated(*, since: str, removal: str, replacement: str = "") -> Callable[[F], F]:
     """Mark a callable deprecated with actionable lifecycle metadata."""
     def decorate(func: F) -> F:
         message = f"{func.__qualname__} is deprecated since {since}"
@@ -21,7 +21,7 @@ def deprecated(*, since: str, removal: str, replacement: str = ""):
             message += f" Use {replacement} instead."
 
         @functools.wraps(func)
-        def wrapped(*args, **kwargs):
+        def wrapped(*args: Any, **kwargs: Any) -> Any:
             warnings.warn(message, AutoControlDeprecationWarning,
                           stacklevel=2)
             return func(*args, **kwargs)

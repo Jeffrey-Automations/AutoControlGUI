@@ -13,8 +13,7 @@ Reuses ``ssim.ssim_compare``, ``visual_match.match_template`` and
 (ndarray / path / PIL); OpenCV + NumPy arrive lazily via those modules. Imports no ``PySide6``.
 """
 from typing import Any, Dict, List, Optional, Sequence
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 def region_stability(frames: Sequence[ImageSource], *,

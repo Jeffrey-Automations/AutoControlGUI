@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from functools import partial
-from typing import Any
+from typing import Any, Callable
 from pathlib import Path
 
 from PySide6.QtWidgets import (  # pylint: disable=no-name-in-module  # reason: compiled Qt exports, tested offscreen
@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (  # pylint: disable=no-name-in-module  # reason: 
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.task_controller import TaskController, TaskOutcome
 from je_auto_control.gui.agent_transfer_view import AgentTransferView
@@ -42,7 +44,7 @@ def _translate(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _request(operation: str, payload: dict, token: CancellationToken) -> dict:
+def _request(operation: str, payload: dict[str, Any], token: CancellationToken) -> dict[str, Any]:
     token.checkpoint()
     if operation == "start":
         return start_agent_runtime()
@@ -77,13 +79,19 @@ class AgentTasksTab(TranslatableMixin, QWidget):
         self._table.cellClicked.connect(self._select)
         self._status = QLabel()
         self._task_id.textChanged.connect(self._clear_observation)
-        layout = QVBoxLayout(self)
-        layout.addWidget(self._task_id)
-        layout.addWidget(self._pages)
-        layout.addWidget(self._status)
-        layout.addWidget(self._table)
-        layout.addWidget(self._output)
+        self._build_layout()
         self.retranslate()
+
+    def _build_layout(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.addWidget(Card().add(self._task_id))
+        layout.addWidget(self._pages, stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
+        layout.addWidget(self._status)
+        results = ResponsiveBox(Card().add(self._table, stretch=1), Card().add(self._output, stretch=1))
+        layout.addWidget(results, stretch=1)
 
     def _setup_fields(self) -> None:
         self._goal, self._target, self._task_id = QLineEdit(), QLineEdit("local-desktop"), QLineEdit()
@@ -159,8 +167,9 @@ class AgentTasksTab(TranslatableMixin, QWidget):
             raise RuntimeError("the observation page was built without a layout")
         page_layout.addWidget(self._observation)
 
-    def _page(self, key: str, fields: tuple) -> None:
+    def _page(self, key: str, fields: tuple[tuple[str, QWidget], ...]) -> None:
         page = QWidget()
+        page.setProperty("role", "bare")
         form = QFormLayout()
         for label_key, control in fields:
             label = QLabel()
@@ -198,7 +207,7 @@ class AgentTasksTab(TranslatableMixin, QWidget):
             text = _translate("agent_target_" + self._target_operation.itemData(index))
             self._target_operation.setItemText(index, text)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose lifecycle commands through the common Actions menu."""
         return [("agent_start", partial(self._dispatch, "start")),
                 ("agent_stop_service", partial(self._dispatch, "stop")),
@@ -336,7 +345,7 @@ class AgentTasksTab(TranslatableMixin, QWidget):
         self._observation.clear()
         self._remainder_request.setPlainText("{}")
 
-    def _pick_reference(self, reference: dict) -> None:
+    def _pick_reference(self, reference: dict[str, Any]) -> None:
         try:
             action = json.loads(self._action.toPlainText())
             if not isinstance(action, dict) or not isinstance(action.get("arguments", {}), dict):
@@ -459,7 +468,7 @@ class AgentTasksTab(TranslatableMixin, QWidget):
             return
         self._dispatch("submit", payload)
 
-    def _task_spec(self) -> dict:
+    def _task_spec(self) -> dict[str, Any]:
         spec = json.loads(self._scope.toPlainText())
         return AgentTaskSpec.from_dict({**spec, "goal": self._goal.text(), "target": self._target.text(),
                                         "mode": self._mode.currentText()}).to_dict()
@@ -475,7 +484,7 @@ class AgentTasksTab(TranslatableMixin, QWidget):
             self._trigger_config.setPlainText("{}")
         self._dispatch("trigger", {"operation": operation, "request": request})
 
-    def _trigger_request(self, operation: str) -> dict:
+    def _trigger_request(self, operation: str) -> dict[str, Any]:
         if operation == "list":
             return {}
         if operation == "register":
@@ -491,7 +500,7 @@ class AgentTasksTab(TranslatableMixin, QWidget):
             request.update(event_key=self._event_key.text(), payload=json.loads(self._trigger_config.toPlainText()))
         return request
 
-    def _dispatch(self, operation: str, payload: dict | None = None) -> None:
+    def _dispatch(self, operation: str, payload: dict[str, Any] | None = None) -> None:
         if self._handle is not None and self._handle.outcome is None:
             if operation not in {"pause", "cancel", "stop", "stop_all"}:
                 return
@@ -505,7 +514,7 @@ class AgentTasksTab(TranslatableMixin, QWidget):
         self._handle = self._controller.submit(partial(_request, operation, data), owner=self)
         self._handle.finished.connect(self._completed)
 
-    def _select_request_view(self, operation: str, data: dict) -> None:
+    def _select_request_view(self, operation: str, data: dict[str, Any]) -> None:
         self._view_task = str(data.get("task_id", ""))
         self._handoff_view = None
         if operation == "recovery":
@@ -539,7 +548,7 @@ class AgentTasksTab(TranslatableMixin, QWidget):
             return self._view_task == _TRIGGER_VIEW_PREFIX + self._trigger_id.text()
         return not self._view_task or self._view_task == self._task_id.text()
 
-    def _present_result(self, result: dict) -> None:
+    def _present_result(self, result: dict[str, Any]) -> None:
         self._present_lookup(result)
         if not self._present_trigger_authorization(result):
             return
@@ -563,14 +572,14 @@ class AgentTasksTab(TranslatableMixin, QWidget):
                 for column, name in enumerate(("task_id", "goal", "state", "reason")):
                     self._table.setItem(index, column, QTableWidgetItem(str(row.get(name, ""))))
 
-    def _present_observation(self, result: dict) -> None:
+    def _present_observation(self, result: dict[str, Any]) -> None:
         if "observation_id" in result:
             try:
                 self._observation.present(result)
             except AgentTaskError as error:
                 self._status.setText(str(error))
 
-    def _present_trigger_authorization(self, result: dict) -> bool:
+    def _present_trigger_authorization(self, result: dict[str, Any]) -> bool:
         if "trigger_id" not in result or "approval_required" not in result:
             return True
         if result["trigger_id"] != self._trigger_id.text():
@@ -583,12 +592,12 @@ class AgentTasksTab(TranslatableMixin, QWidget):
         self._pages.setCurrentIndex(self._page_keys.index("agent_page_triggers"))
         return True
 
-    def _present_lookup(self, result: dict) -> None:
+    def _present_lookup(self, result: dict[str, Any]) -> None:
         found = result.get("task")
         if result.get("found") is True and isinstance(found, dict) and isinstance(found.get("task_id"), str):
             self._task_id.setText(found["task_id"])
 
-    def _present_remainder(self, result: dict) -> None:
+    def _present_remainder(self, result: dict[str, Any]) -> None:
         draft = result.get("draft")
         if not isinstance(draft, dict):
             draft = result.get("review_template")

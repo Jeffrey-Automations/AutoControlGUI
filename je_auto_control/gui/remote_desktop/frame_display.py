@@ -5,7 +5,7 @@ from typing import Optional
 from PySide6.QtCore import QPoint, QRect, Qt, Signal
 from PySide6.QtGui import (
     QColor, QDragEnterEvent, QDropEvent, QImage, QKeyEvent, QMouseEvent,
-    QPainter, QPen, QWheelEvent,
+    QPaintEvent, QPainter, QPen, QWheelEvent,
 )
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
@@ -40,7 +40,7 @@ class _FrameDisplay(QWidget):
         # Remote host cursor position in *host* screen coords. ``None``
         # while no CURSOR message has been received yet; the overlay is
         # then suppressed so we don't draw a stale arrow over the frame.
-        self._remote_cursor: Optional[tuple] = None
+        self._remote_cursor: Optional[tuple[int, int]] = None
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)
         self.setSizePolicy(
@@ -79,7 +79,7 @@ class _FrameDisplay(QWidget):
 
     # --- painting -------------------------------------------------------
 
-    def paintEvent(self, _event) -> None:  # noqa: N802  Qt override
+    def paintEvent(self, _event: QPaintEvent) -> None:  # noqa: N802  Qt override
         painter = QPainter(self)
         painter.fillRect(self.rect(), Qt.GlobalColor.black)
         image = self._image
@@ -135,7 +135,7 @@ class _FrameDisplay(QWidget):
         y = (widget_h - scaled_h) // 2
         return QRect(x, y, scaled_w, scaled_h)
 
-    def _to_remote(self, pos: QPoint) -> Optional[tuple]:
+    def _to_remote(self, pos: QPoint) -> Optional[tuple[int, int]]:
         rect = self._fit_rect()
         if not rect.isValid() or not rect.contains(pos):
             return None

@@ -30,10 +30,11 @@ or the script-side methods above), the previous owner's ``on_displaced``
 callback is called with ``(slot, by)`` so it can drop its window and state.
 The callback runs on the thread that did the replacing.
 """
+import functools
 import itertools
 import ssl
 import threading
-from typing import Any, Callable, Dict, NamedTuple, Optional, Sequence
+from typing import Any, Callable, Dict, NamedTuple, Optional, Sequence, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -78,7 +79,7 @@ class _Claim(NamedTuple):
     on_displaced: Optional[DisplacedCallback]
 
 
-def _load_webrtc_classes():
+def _load_webrtc_classes() -> Tuple[Any, Any, Any]:
     """Lazy import — aiortc/av are optional extras; absent ⇒ (None, None, None)."""
     try:
         from je_auto_control.utils.remote_desktop.webrtc_host import (
@@ -209,6 +210,22 @@ class _RemoteDesktopRegistry:
             return False
         self._shut(slot, claim, timeout, by=owner)
         return True
+
+    def detach(self, slot: str, by: str, *, only_own: bool = False,
+               timeout: float = 2.0) -> Optional[Callable[[], None]]:
+        """Empty ``slot`` now and return the call that stops what it held; ``None`` if it held nothing.
+
+        :meth:`evict` (or, with ``only_own``, :meth:`release`) split in two
+        for a caller that must not block: the slot is free as soon as this
+        returns, so a new host or viewer can take it, and the returned call
+        -- which joins the old one's threads -- runs wherever the caller
+        chooses, typically a worker. The displaced owner is told when that
+        call runs, as with ``evict``.
+        """
+        claim = self._take(slot, only_owner=by if only_own else None)
+        if claim is None:
+            return None
+        return functools.partial(self._shut, slot, claim, timeout, by)
 
     def owner_of(self, slot: str) -> Optional[str]:
         """Return the owner of ``slot``'s occupant, or None when it is empty."""
@@ -442,7 +459,7 @@ class _RemoteDesktopRegistry:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _require_webrtc():
+    def _require_webrtc() -> Tuple[Any, Any, Any]:
         host_cls, viewer_cls, config_cls = _load_webrtc_classes()
         if host_cls is None:
             raise RuntimeError(
@@ -546,7 +563,7 @@ class _RemoteDesktopRegistry:
             "authenticated": getattr(viewer, "authenticated", False),
         }
 
-    def webrtc_usb_client(self):
+    def webrtc_usb_client(self) -> Any:
         """Return the live WebRTC viewer's USB passthrough client, or None.
 
         The viewer exposes ``usb_client()`` once the host has opened the

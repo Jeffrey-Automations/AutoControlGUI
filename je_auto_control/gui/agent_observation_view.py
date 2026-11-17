@@ -9,6 +9,7 @@ from PySide6.QtGui import QMouseEvent, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QLabel, QScrollArea, QTableWidget,
                                QTableWidgetItem, QVBoxLayout, QWidget)
 
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.images import observation_image_bytes
@@ -45,7 +46,10 @@ class AgentObservationView(QWidget):
         self._image = _Image()
         self._image.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self._image.picked.connect(self.picked.emit)
+        self.setProperty("role", "bare")
         self._notice = QLabel()
+        self._notice.setWordWrap(True)
+        set_role(self._notice, "danger")
         scroll = QScrollArea()
         scroll.setWidgetResizable(False)
         scroll.setWidget(self._image)
@@ -85,7 +89,7 @@ class AgentObservationView(QWidget):
         if isinstance(image, dict):
             self._present_image(image)
 
-    def _present_elements(self, elements: list) -> None:
+    def _present_elements(self, elements: list[Any]) -> None:
         for index, element in enumerate(elements):
             if not isinstance(element, dict) or element.get("index", index) != index:
                 raise AgentTaskError("observation preview element index is ambiguous")
@@ -97,7 +101,7 @@ class AgentObservationView(QWidget):
                     value = {"selector": element["selector"], "frame": element.get("frame", "")}
                 self._elements.setItem(index, column, QTableWidgetItem(str(value)))
 
-    def _present_image(self, image: dict) -> None:
+    def _present_image(self, image: dict[str, Any]) -> None:
         try:
             pixels = observation_image_bytes(image)
             pixmap = QPixmap()

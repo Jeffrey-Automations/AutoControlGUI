@@ -10,10 +10,13 @@ They are registered in ``flow_control.BLOCK_COMMANDS`` alongside the real
 flow-control commands, which is the only table the executor reads.
 """
 import json
-from typing import Any, Callable, Dict, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Dict, Mapping
 
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
 from je_auto_control.utils.executor.flags import as_bool
+
+if TYPE_CHECKING:
+    import datetime
 
 
 def exec_shell_to_var(executor: Any, args: Mapping[str, Any]) -> Dict[str, Any]:
@@ -59,7 +62,7 @@ def exec_shell_to_var(executor: Any, args: Mapping[str, Any]) -> Dict[str, Any]:
             "returncode": completed.returncode}
 
 
-def _now():
+def _now() -> "datetime.datetime":
     import datetime as _dt
     return _dt.datetime.now()
 

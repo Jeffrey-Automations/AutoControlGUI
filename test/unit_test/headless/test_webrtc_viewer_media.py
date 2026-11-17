@@ -315,12 +315,13 @@ def test_a_sender_that_rejects_the_detach_still_stops_the_capture():
     slot.sender.replace_error = RuntimeError("connection closed")
     pc.transceivers = [slot]
     viewer._viewer_screen_track = track
-    viewer.toggle_share_screen(False)
+    with pytest.raises(RuntimeError):
+        viewer.toggle_share_screen(False)
     assert track.stopped
-    assert viewer._viewer_screen_track is None
+    assert viewer._viewer_screen_track is track
 
 
-def test_a_capture_that_fails_to_stop_is_still_forgotten():
+def test_a_capture_that_fails_to_stop_remains_owned():
     viewer, pc = _connected()
 
     class _StubbornTrack(Track):
@@ -330,8 +331,9 @@ def test_a_capture_that_fails_to_stop_is_still_forgotten():
     track = _StubbornTrack("video")
     pc.transceivers = [Transceiver("video", track=track)]
     viewer._viewer_screen_track = track
-    viewer.toggle_share_screen(False)
-    assert viewer._viewer_screen_track is None
+    with pytest.raises(OSError):
+        viewer.toggle_share_screen(False)
+    assert viewer._viewer_screen_track is track
 
 
 # --- host-initiated renegotiation ---------------------------------------------

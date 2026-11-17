@@ -278,7 +278,7 @@ class AcmeClient:
                      payload: Optional[Mapping[str, Any]],
                      *, use_jwk: bool = False,
                      accept: Optional[str] = None,
-                     ) -> tuple:
+                     ) -> tuple[int, Any, Dict[str, str]]:
         status, parsed, headers = self._post_once(
             url, payload, use_jwk=use_jwk, accept=accept,
         )
@@ -293,7 +293,7 @@ class AcmeClient:
 
     def _post_once(self, url: str,
                    payload: Optional[Mapping[str, Any]],
-                   *, use_jwk: bool, accept: Optional[str]) -> tuple:
+                   *, use_jwk: bool, accept: Optional[str]) -> tuple[int, Any, Dict[str, str]]:
         """Sign and POST once; cache the server's next Replay-Nonce."""
         nonce = self._nonce or self._fresh_nonce()
         self._nonce = None
@@ -323,7 +323,7 @@ class AcmeClient:
               body: Optional[bytes] = None,
               content_type: Optional[str] = None,
               accept: Optional[str] = None,
-              ) -> tuple:
+              ) -> tuple[int, Any, Dict[str, str]]:
         headers = {"User-Agent": _USER_AGENT}
         if content_type:
             headers["Content-Type"] = content_type

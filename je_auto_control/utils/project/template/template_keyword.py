@@ -1,4 +1,6 @@
-template_keyword_1: list = [
+from typing import Any, List
+
+template_keyword_1: List[List[Any]] = [
     ["AC_set_record_enable", [True]],
     ["AC_write", {"write_string": "Hello World"}],
     ["AC_type_keyboard", {"keycode": "return"}],
@@ -21,7 +23,7 @@ template_keyword_1: list = [
     ["AC_type_keyboard", {"keycode": "return"}]
 ]
 
-template_keyword_2: list = [
+template_keyword_2: List[List[Any]] = [
     ["AC_set_record_enable", [True]],
     ["AC_write", {"write_string": "in this keyword file we will change the mouse position"}],
     ["AC_type_keyboard", {"keycode": "return"}],

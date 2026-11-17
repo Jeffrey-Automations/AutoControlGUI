@@ -10,8 +10,8 @@ from je_auto_control.utils.agent_runtime.policy import durable_payload
 from je_auto_control.utils.agent_runtime.trigger_config import next_due
 
 
-def insert_registration(connection: Any, identifier: str, value: dict, spec: AgentTaskSpec,
-                        config: dict, owner: dict, now: float) -> None:
+def insert_registration(connection: Any, identifier: str, value: dict[str, Any], spec: AgentTaskSpec,
+                        config: dict[str, Any], owner: dict[str, Any], now: float) -> None:
     """Persist a reviewed binding enabled for future notifications, never a schedule backlog."""
     if connection.execute("SELECT COUNT(*) FROM agent_triggers").fetchone()[0] >= 200:
         raise AgentTaskError("a runtime supports at most two hundred configured task triggers")

@@ -25,7 +25,7 @@ def _dialog_library() -> Any:
     return user
 
 
-def _window_metadata(hwnd: int) -> dict:
+def _window_metadata(hwnd: int) -> dict[str, Any]:
     user = _dialog_library()
     owner = user.GetWindow(hwnd, 4)  # GW_OWNER; parent/owner is not an input authority grant.
     name = ctypes.create_unicode_buffer(256)

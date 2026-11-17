@@ -7,8 +7,9 @@ and timestamp formatters live in ``_helpers``.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView, QDialog, QFileDialog, QFormLayout, QHBoxLayout,
@@ -16,15 +17,21 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui.adaptive.flow_layout import flow_of
 from je_auto_control.gui.remote_desktop._helpers import (
     _format_last_seen, _short_fp, _t,
 )
+
+if TYPE_CHECKING:
+    from datetime import datetime, timedelta
+
+    from je_auto_control.utils.remote_desktop.fingerprint import KnownHosts
 
 
 class KnownHostsDialog(QDialog):
     """Browse + forget the persistent KnownHosts (TOFU app + DTLS fingerprints)."""
 
-    def __init__(self, known_hosts, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, known_hosts: KnownHosts, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._known = known_hosts
         self.setWindowTitle(_t("rd_webrtc_known_hosts_title"))
@@ -53,35 +60,26 @@ class KnownHostsDialog(QDialog):
             QAbstractItemView.EditTrigger.NoEditTriggers,
         )
         layout.addWidget(self._table)
+        buttons = []
+        for key, slot in (
+            ("rd_webrtc_kh_add", self._on_add_manual),
+            ("rd_webrtc_kh_import", self._on_import),
+            ("rd_webrtc_kh_export", self._on_export),
+            ("rd_webrtc_kh_copy_app", self._on_copy_app),
+            ("rd_webrtc_kh_copy_dtls", self._on_copy_dtls),
+            ("rd_webrtc_kh_forget", self._on_forget),
+            ("rd_webrtc_kh_forget_stale", self._on_forget_stale),
+            ("rd_webrtc_kh_clear_all", self._on_clear_all),
+        ):
+            button = QPushButton(_t(key))
+            button.clicked.connect(slot)
+            buttons.append(button)
+        # Eight actions wrap onto a second line in a narrow dialog; Close stays on the right.
         button_row = QHBoxLayout()
-        add_btn = QPushButton(_t("rd_webrtc_kh_add"))
-        add_btn.clicked.connect(self._on_add_manual)
-        button_row.addWidget(add_btn)
-        import_btn = QPushButton(_t("rd_webrtc_kh_import"))
-        import_btn.clicked.connect(self._on_import)
-        button_row.addWidget(import_btn)
-        export_btn = QPushButton(_t("rd_webrtc_kh_export"))
-        export_btn.clicked.connect(self._on_export)
-        button_row.addWidget(export_btn)
-        copy_app_btn = QPushButton(_t("rd_webrtc_kh_copy_app"))
-        copy_app_btn.clicked.connect(self._on_copy_app)
-        button_row.addWidget(copy_app_btn)
-        copy_dtls_btn = QPushButton(_t("rd_webrtc_kh_copy_dtls"))
-        copy_dtls_btn.clicked.connect(self._on_copy_dtls)
-        button_row.addWidget(copy_dtls_btn)
-        forget_btn = QPushButton(_t("rd_webrtc_kh_forget"))
-        forget_btn.clicked.connect(self._on_forget)
-        button_row.addWidget(forget_btn)
-        forget_stale_btn = QPushButton(_t("rd_webrtc_kh_forget_stale"))
-        forget_stale_btn.clicked.connect(self._on_forget_stale)
-        button_row.addWidget(forget_stale_btn)
-        clear_btn = QPushButton(_t("rd_webrtc_kh_clear_all"))
-        clear_btn.clicked.connect(self._on_clear_all)
-        button_row.addWidget(clear_btn)
-        button_row.addStretch()
+        button_row.addLayout(flow_of(*buttons, spacing=8), stretch=1)
         close_btn = QPushButton(_t("rd_webrtc_kh_close"))
         close_btn.clicked.connect(self.accept)
-        button_row.addWidget(close_btn)
+        button_row.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignBottom)
         layout.addLayout(button_row)
         self._refresh()
 
@@ -97,8 +95,8 @@ class KnownHostsDialog(QDialog):
                                now=now, stale_after=stale_after,
                                stale_color=stale_color)
 
-    def _populate_row(self, row: int, host_id: str, fps: dict, *,
-                      now, stale_after, stale_color) -> None:
+    def _populate_row(self, row: int, host_id: str, fps: Dict[str, Optional[str]], *,
+                      now: datetime, stale_after: timedelta, stale_color: QColor) -> None:
         items = [
             QTableWidgetItem(host_id),
             QTableWidgetItem(_short_fp(fps.get("app_fp"))),
@@ -115,7 +113,7 @@ class KnownHostsDialog(QDialog):
             self._table.setItem(row, col, item)
 
     @staticmethod
-    def _is_stale(last_seen, *, now, stale_after) -> bool:
+    def _is_stale(last_seen: Optional[str], *, now: datetime, stale_after: timedelta) -> bool:
         if not last_seen:
             return False
         from datetime import datetime, timezone
@@ -212,7 +210,7 @@ class KnownHostsDialog(QDialog):
         )
         self._refresh()
 
-    def _prompt_import_data(self):
+    def _prompt_import_data(self) -> Optional[Dict[str, Any]]:
         import json
         path, _filter = QFileDialog.getOpenFileName(
             self, _t("rd_webrtc_kh_import"), "", "JSON (*.json);;All (*)",
@@ -232,7 +230,8 @@ class KnownHostsDialog(QDialog):
             return None
         return data
 
-    def _import_one(self, host_id, value, existing) -> str:
+    def _import_one(self, host_id: object, value: object,
+                    existing: Dict[str, Dict[str, Optional[str]]]) -> str:
         """Return ``"added"``, ``"skipped"``, or ``"ignored"`` per entry."""
         if not isinstance(host_id, str):
             return "ignored"
@@ -248,7 +247,7 @@ class KnownHostsDialog(QDialog):
         return "added"
 
     @staticmethod
-    def _extract_fingerprints(value):
+    def _extract_fingerprints(value: object) -> Tuple[object, object]:
         if isinstance(value, str):
             return value, None
         if isinstance(value, dict):
@@ -338,7 +337,7 @@ class _ManualKnownHostDialog(QDialog):
         button_row.addWidget(ok)
         layout.addLayout(button_row)
 
-    def values(self) -> tuple:
+    def values(self) -> Tuple[str, str, str]:
         return (
             self._host_edit.text().strip(),
             self._app_edit.text().strip(),

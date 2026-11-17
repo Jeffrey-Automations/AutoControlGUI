@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, List, Protocol, runtime_checkable
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
 if TYPE_CHECKING:  # pragma: no cover
+    from PIL import Image
+
     from je_auto_control.utils.ocr.ocr_engine import TextMatch
 
 
@@ -31,7 +33,7 @@ class OCRBackend(Protocol):
         """True if the backend's dependencies are importable."""
 
     def image_to_matches(self,
-                         image,
+                         image: "Image.Image",
                          lang: str,
                          min_confidence: float) -> "List[TextMatch]":
         """Extract text from ``image`` (PIL.Image) at confidence ≥ threshold.

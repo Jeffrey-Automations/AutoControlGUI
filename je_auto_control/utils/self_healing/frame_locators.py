@@ -7,6 +7,7 @@ from math import ceil, floor
 from time import perf_counter
 from typing import Any, Optional
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.cv2_utils.optional import require_cv2
 from je_auto_control.utils.cv2_utils.template_detection import _to_gray
 from je_auto_control.utils.self_healing.evaluation_models import (
@@ -99,7 +100,7 @@ class TemplateFrameLocator:
         if height > frame.shape[0] or width > frame.shape[1]:
             return None
         # pylint: disable-next=no-member  # reason: optional OpenCV exports these C extension symbols at runtime
-        scores = cv2.matchTemplate(frame, template, cv2.TM_CCOEFF_NORMED)
+        scores = stoppable_call(cv2.matchTemplate, frame, template, cv2.TM_CCOEFF_NORMED)
         # pylint: disable-next=no-member  # reason: optional OpenCV exports this C extension symbol at runtime
         _low, score, _low_at, (x, y) = cv2.minMaxLoc(scores)
         if score < min(self.threshold, 1.0 - 1e-5):

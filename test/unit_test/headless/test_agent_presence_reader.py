@@ -370,3 +370,34 @@ def test_reader_loss_does_not_block_worker_owned_release_only_ack_cleanup(harnes
     assert 'cleaned' in boundary.events
     with pytest.raises(AgentTaskError):
         harness.reader.check()
+
+
+class _UnservedProbes:
+    """Takes probes and never hands them to the I/O thread, so a caller waits on its own deadline."""
+
+    def __init__(self):
+        import queue
+        self.empty = queue.Empty
+        self.taken = []
+        self.arrived = threading.Event()
+
+    def put_nowait(self, probe):
+        self.taken.append(probe)
+        self.arrived.set()
+
+    def get(self, timeout):
+        time.sleep(timeout)
+        raise self.empty
+
+
+def test_close_wakes_a_probe_the_watch_is_still_waiting_on(harness):
+    """The watch's probe waits up to 0.25 s, the same budget close() has to join it (macOS 3.14 CI teardown)."""
+    harness.reader.ready()
+    unserved = _UnservedProbes()
+    harness.reader._probes = unserved
+    assert unserved.arrived.wait(2)
+    waiting = unserved.taken[0]
+    harness.reader.close()
+    assert time.monotonic() < waiting.deadline  # woken by close, not by its own deadline
+    assert harness.reader.retired
+    assert harness.events.count('notice') == 0  # a closed reader is not a lost one

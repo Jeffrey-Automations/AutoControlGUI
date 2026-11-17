@@ -23,7 +23,7 @@ from je_auto_control.gui import (  # noqa: E402
     email_triggers_tab, hotkeys_tab, rest_api_tab, scheduler_tab, triggers_tab,
     usb_passthrough_panel, webhooks_tab,
 )
-from je_auto_control.gui._slow_op import SlowOp, StopQueue, stop_each  # noqa: E402
+from je_auto_control.gui._slow_op import SlowOp, StopQueue, StopsFailed, stop_each  # noqa: E402
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper  # noqa: E402
 from je_auto_control.gui.remote_desktop import host_panel  # noqa: E402
 from je_auto_control.gui.tab_task_controller import TaskUsageError  # noqa: E402
@@ -441,8 +441,11 @@ def test_stop_each_runs_every_stop_even_after_one_failed():
     def broken():
         raise RuntimeError("already closed")
 
-    stop_each(lambda: ran.append(1), broken, lambda: ran.append(2))
+    # The rest still run; the failure is reported afterwards so a StopQueue can keep it for a retry.
+    with pytest.raises(StopsFailed) as raised:
+        stop_each(lambda: ran.append(1), broken, lambda: ran.append(2))
     assert ran == [1, 2]
+    assert [stop for stop, _error in raised.value.failures] == [broken]
 
 
 def test_a_dropped_owner_is_not_kept_alive_by_its_callbacks(qapp):

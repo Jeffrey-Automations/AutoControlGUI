@@ -13,7 +13,7 @@ _FIELDS = {'inspect': set(), 'acquire': set(), 'check': {'generation', 'lease_id
 _STATES = {'not_started', 'waiting_idle', 'monitoring', 'locked', 'unavailable'}
 
 
-def encode_frame(value: dict) -> bytes:
+def encode_frame(value: dict[str, Any]) -> bytes:
     """Encode one bounded finite object without arbitrary object serialization."""
     if not isinstance(value, dict):
         raise AgentTaskError('physical presence frame must be an object')
@@ -26,7 +26,7 @@ def encode_frame(value: dict) -> bytes:
     return result
 
 
-def _unique(pairs: list[tuple[str, Any]]) -> dict:
+def _unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result = {}
     for key, value in pairs:
         if key in result:
@@ -35,7 +35,7 @@ def _unique(pairs: list[tuple[str, Any]]) -> dict:
     return result
 
 
-def decode_frame(raw: bytes) -> dict:
+def decode_frame(raw: bytes) -> dict[str, Any]:
     """Reject oversized/invalid/duplicate JSON before any presence operation is dispatched."""
     if not isinstance(raw, bytes) or len(raw) > 4096:
         raise AgentTaskError('physical presence frame must be at most4096bytes')
@@ -61,13 +61,13 @@ def unsigned(value: Any, maximum: int, minimum: int = 0) -> int:
     return value
 
 
-def _fields(value: Any, expected: set[str]) -> dict:
+def _fields(value: Any, expected: set[str]) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != expected:
         raise AgentTaskError('physical presence fields are invalid')
     return value
 
 
-def presence_body(operation: str, value: dict) -> dict:
+def presence_body(operation: str, value: dict[str, Any]) -> dict[str, Any]:
     """Share the source's exact finite operation/lease body contract."""
     if not isinstance(operation, str) or operation not in _FIELDS:
         raise AgentTaskError('unknown physical presence operation')
@@ -77,7 +77,7 @@ def presence_body(operation: str, value: dict) -> dict:
     return dict(body)
 
 
-def validate_request(value: dict) -> tuple[int, str, dict]:
+def validate_request(value: dict[str, Any]) -> tuple[int, str, dict[str, Any]]:
     """Read a closed request with a bounded integer connection sequence."""
     value = _fields(value, {'request_id', 'operation', 'body'})
     sequence = unsigned(value['request_id'], (1 << 63) - 1, 1)
@@ -85,7 +85,7 @@ def validate_request(value: dict) -> tuple[int, str, dict]:
     return sequence, value['operation'], body
 
 
-def _snapshot(value: dict, generation: str) -> None:
+def _snapshot(value: dict[str, Any], generation: str) -> None:
     value = _fields(value, {'state', 'idle_seconds', 'interactive', 'held', 'generation',
                             'revision', 'native_evidence'})
     if not isinstance(value['state'], str) or value['state'] not in _STATES:
@@ -103,7 +103,7 @@ def _idle(idle: Any) -> None:
         raise AgentTaskError('physical presence idle is invalid')
 
 
-def _result(operation: str, value: dict, generation: str) -> None:
+def _result(operation: str, value: dict[str, Any], generation: str) -> None:
     if operation in ('inspect', 'check'):
         _snapshot(value, generation)
     elif operation == 'acquire':
@@ -117,7 +117,7 @@ def _result(operation: str, value: dict, generation: str) -> None:
         raise AgentTaskError('unknown physical presence response operation')
 
 
-def validate_response(value: dict, operation: str, sequence: int, generation: str) -> dict:
+def validate_response(value: dict[str, Any], operation: str, sequence: int, generation: str) -> dict[str, Any]:
     """Validate exact result/status/sequence and the actual live connection's generation."""
     try:
         value = _fields(value, {'request_id', 'status', 'result'})

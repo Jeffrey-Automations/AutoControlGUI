@@ -42,6 +42,14 @@ def test_child_result_output_and_runtime_versions_survive_the_wrapper(tmp_path, 
     assert 'AC_CONTROLLED_PRIVATE_TEST_VALUE' not in log + raw
 
 
+def test_the_child_is_told_where_to_leave_its_own_evidence(tmp_path):
+    directory = tmp_path / 'evidence'
+    code = "import os;print('dir=' + os.environ['AUTOCONTROL_NATIVE_ARTIFACT_DIR'])"
+    result = run_child(directory, code)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f'dir={directory.resolve()}' in result.stdout
+
+
 @pytest.mark.skipif(sys.platform != 'linux' or shutil.which('gdb') is None, reason='requires Linux GDB')
 def test_real_native_abort_retains_a_backtrace_and_fails(tmp_path):
     directory = tmp_path / 'native-abort'
@@ -119,3 +127,9 @@ def test_ci_workflows_keep_native_diagnostics_after_failure(name):
     assert upload['with']['path'] in runner['run']
     assert ('python -m coverage run -m pytest' if name == 'quality.yml' else 'python -m pytest') in runner['run']
     assert any('gdb' in step.get('run', '') and step.get('if') == "runner.os == 'Linux'" for step in steps)
+    # Windows: crash minidumps land inside the retained folder, configured before the suite starts.
+    dumps = next(step for step in steps if step.get('name') == 'Keep native crash dumps (Windows)')
+    assert dumps['if'] == "runner.os == 'Windows'"
+    assert steps.index(dumps) < steps.index(runner)
+    assert r'LocalDumps\python.exe' in dumps['run'] and 'DumpFolder' in dumps['run']
+    assert r"autocontrol-native\dumps" in dumps['run'] and upload['with']['path'].endswith('autocontrol-native')

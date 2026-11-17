@@ -96,7 +96,7 @@ class BrowserTarget:
         """Report the monotonic input gate, independently of whether SDK cleanup was confirmed."""
         return self._readonly is not None
 
-    def freeze_readonly(self) -> dict:
+    def freeze_readonly(self) -> dict[str, Any]:
         """Permanently retire the actual SDK owner before issuing any same-context proof."""
         if self._readonly is not None:
             return self.readonly_capabilities()
@@ -114,7 +114,7 @@ class BrowserTarget:
         self._readonly = result["context_id"]
         return result
 
-    def readonly_capabilities(self) -> dict:
+    def readonly_capabilities(self) -> dict[str, Any]:
         """Check the current actual SDK view rather than trusting a saved description."""
         if not self._readonly or self._session is None:
             raise AgentTaskError(_RETIREMENT_UNCONFIRMED)
@@ -131,7 +131,7 @@ class BrowserTarget:
             raise AgentTaskError("read-only browser has no original scope")
         return self._reader_spec if self._reader_spec is not None else self._spec
 
-    def bind_readonly(self, value: Any, *, validate: Callable[[AgentTaskSpec], Any]) -> dict:
+    def bind_readonly(self, value: Any, *, validate: Callable[[AgentTaskSpec], Any]) -> dict[str, Any]:
         """Bind only a host-admitted no-action verification scope; never configure or launch input."""
         proof = self.readonly_capabilities()
         if self._spec is None:
@@ -142,11 +142,11 @@ class BrowserTarget:
         self._reader_spec = proposed
         return proof
 
-    def check_resume(self, spec: AgentTaskSpec, receipts: list[dict]) -> None:
+    def check_resume(self, spec: AgentTaskSpec, receipts: list[dict[str, Any]]) -> None:
         """Refuse a finite prefix after context retirement; an unchanged live context remains usable."""
         require_context_continuity(spec, receipts, self._session is not None and self._spec == spec, kind="browser")
 
-    def observe(self) -> dict:
+    def observe(self) -> dict[str, Any]:
         """Flatten semantic main/frame elements into observation-local indexes; no values or image files."""
         if self._session is None:
             raise AgentTaskError("browser session is unavailable")
@@ -156,7 +156,7 @@ class BrowserTarget:
             if getattr(error, "reason", "") == "human_review_required":
                 raise AgentHumanReview("browser dialog requires human review") from None
             raise AgentTaskError("managed WebRunner observation failed") from None
-        elements: list[dict] = []
+        elements: list[dict[str, Any]] = []
         self._elements(elements, raw.get("elements", []), "")
         for frame in raw.get("frames", []):
             self._elements(elements, frame.get("elements", []), frame["selector"])
@@ -165,13 +165,13 @@ class BrowserTarget:
                 "semantic_observation": True, "text_redacted": True}
 
     @staticmethod
-    def _elements(result: list[dict], values: list[dict], frame: str) -> None:
+    def _elements(result: list[dict[str, Any]], values: list[dict[str, Any]], frame: str) -> None:
         for value in values:
             result.append({"index": len(result), "selector": value["selector"], "frame": frame,
                            "name": value.get("text", ""), "role": value.get("role") or value.get("tag", ""),
                            "enabled": value.get("is_enabled", False), "visible": value.get("is_visible", False)})
 
-    def perform(self, name: str, arguments: dict) -> Any:
+    def perform(self, name: str, arguments: dict[str, Any]) -> Any:
         """Use the shared command authority gates, with the session bound only for this dispatch."""
         if self._readonly is not None:
             raise AgentTaskError("read-only browser cannot perform tools")
@@ -203,6 +203,6 @@ class BrowserTarget:
         except Exception:  # noqa: BLE001 - SDK URL/read failures must not expose raw browser data
             raise AgentTaskError("managed browser verification is unavailable") from None
 
-    def validate_input(self, _event: dict) -> None:
+    def validate_input(self, _event: dict[str, Any]) -> None:
         """Browser sessions grant no native mouse, keyboard, clipboard or file-dialog access."""
         raise AgentTaskError("browser tasks cannot drive native desktop input")

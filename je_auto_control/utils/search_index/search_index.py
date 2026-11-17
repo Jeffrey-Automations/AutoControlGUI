@@ -15,7 +15,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from typing import (
-    Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union,
+    Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union,
 )
 
 # \w: "[a-z0-9]+" dropped every non-ASCII character, so "登入" was never
@@ -109,7 +109,7 @@ class SearchIndex:
         return True
 
     @classmethod
-    def build(cls, docs: Docs, **kwargs) -> "SearchIndex":
+    def build(cls, docs: Docs, **kwargs: Any) -> "SearchIndex":
         """Build an index from a ``{doc_id: text}`` map or ``(id, text)`` pairs."""
         index = cls(**kwargs)
         items = docs.items() if isinstance(docs, dict) else docs

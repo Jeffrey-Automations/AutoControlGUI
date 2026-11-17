@@ -18,7 +18,7 @@ from je_auto_control.android.adb_client import (
     AdbError, AdbUnsupportedError, adb_text_safe,
 )
 from je_auto_control.android.client import UIAutomatorDevice, translate_device_errors
-from je_auto_control.wrapper.device_context import Drag, LongPress, Pinch, Swipe, Tap
+from je_auto_control.wrapper.device_context import DeviceError, Drag, LongPress, Pinch, Swipe, Tap
 
 #: The IME of the ADBKeyBoard project, which accepts text as a broadcast.
 ADB_KEYBOARD_IME = "com.android.adbkeyboard/.AdbIME"
@@ -142,6 +142,11 @@ def pinch_points(gesture: Pinch) -> Tuple[Tuple[int, int], Tuple[int, int],
 @translate_device_errors
 def _ui_pinch(ui_device: UIAutomatorDevice, gesture: Pinch) -> None:
     start1, start2, end1, end2 = pinch_points(gesture)
+    if min(min(point) for point in (start1, start2, end1, end2)) < 0:
+        # uiautomator2's pos_rel2abs asserts x >= 0 and y >= 0: say so before it does.
+        raise DeviceError(
+            f"the pinch at ({gesture.x}, {gesture.y}) with span {gesture.span} "
+            "reaches past the left edge of the screen")
     steps = max(2, round(gesture.duration_s * _STEPS_PER_SECOND))
     # A two-pointer gesture is performed on a UI object but takes absolute
     # points, so the empty selector (the root node) serves for any position.

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.remote_desktop._helpers import _t
 from je_auto_control.gui.remote_desktop.connection_screen import (
     QuickConnectScreen,
@@ -52,7 +53,7 @@ def _build_webrtc_placeholder() -> QWidget:
     message = QLabel(_t("rd_webrtc_missing_extras"))
     message.setWordWrap(True)
     message.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    message.setStyleSheet("font-size: 11pt; color: #555;")
+    set_role(message, "hint")
     layout.addWidget(message)
     layout.addStretch(1)
     return widget
@@ -163,7 +164,7 @@ class RemoteDesktopTab(TranslatableMixin, QWidget):
     def dispose(self) -> None:
         """Release what the sub-panels hold beyond their widgets, through each panel's own ``dispose()``.
 
-        Called by ``close_tab(key, release=True)``; safe to call twice.
+        Called by ``close_tab(key)``; safe to call twice.
         Timers stop, connects and transfers still out are cancelled and the
         pop-out windows close. A TCP / WebSocket host or session a panel
         opened is left running -- it belongs to the registry, where scripts

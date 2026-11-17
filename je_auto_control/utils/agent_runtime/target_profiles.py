@@ -22,7 +22,7 @@ _PROBE_STATUSES = frozenset({"python_dependencies_ready", "dependency_missing", 
                               "not_supported"})
 
 
-def _transfer_profile(profile: AgentTargetProfile, row: Any) -> dict:
+def _transfer_profile(profile: AgentTargetProfile, row: Any) -> dict[str, Any]:
     if row is None or row['digest'] != profile.digest or row['config'] != json.dumps(profile.to_dict()):
         raise AgentTaskError('destination target profile integrity changed')
     if profile.kind != 'files' or not profile.roots:
@@ -38,7 +38,7 @@ class AgentTargetProfiles:
         self._runtime = runtime
         self._profiles: dict[str, AgentTargetProfile] = {}
         self._enabled: dict[str, bool] = {}
-        self._last_probes: dict[str, dict] = {}
+        self._last_probes: dict[str, dict[str, Any]] = {}
         with runtime.store.connection() as connection:
             rows = connection.execute("SELECT * FROM agent_target_profiles ORDER BY created,name LIMIT 101").fetchall()
             controls = connection.execute("SELECT * FROM agent_target_controls").fetchall()
@@ -55,7 +55,7 @@ class AgentTargetProfiles:
                 raise AgentTaskError("stored target enable control is invalid")
             self._enabled[row["name"]] = bool(row["enabled"])
 
-    def control(self, operation: str, request: Mapping | None = None) -> dict:
+    def control(self, operation: str, request: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Register an immutable profile or explicitly change target availability with host authority."""
         identity = current_authorization()
         if identity is not None and not identity.allows("manage_hosts"):
@@ -73,7 +73,7 @@ class AgentTargetProfiles:
                 self._toggle(name, operation == "enable")
             return self._details(name)
 
-    def _probe(self, value: dict) -> dict:
+    def _probe(self, value: dict[str, Any]) -> dict[str, Any]:
         with self._runtime._mutex:
             name = self._request_name(value)
             adapter = self._runtime._targets[name]
@@ -91,14 +91,14 @@ class AgentTargetProfiles:
             details["probe"] = detached(self._last_probes[name])
             return details
 
-    def _request_name(self, value: dict) -> str:
+    def _request_name(self, value: dict[str, Any]) -> str:
         if set(value) != {"name"} or not isinstance(value["name"], str):
             raise AgentTaskError("target operation requires one configured name")
         if value["name"] not in self._runtime._targets:
             raise AgentTaskError("target operation requires one configured name")
         return value["name"]
 
-    def _register(self, value: dict) -> dict:
+    def _register(self, value: dict[str, Any]) -> dict[str, Any]:
         profile = AgentTargetProfile.from_dict(value)
         name = profile.name
         if name in self._runtime._targets or name in self._enabled:
@@ -150,12 +150,12 @@ class AgentTargetProfiles:
             raise AgentTaskError("task target profile identity changed or its pin is invalid")
         profile.check(spec)
 
-    def describe(self) -> dict:
+    def describe(self) -> dict[str, Any]:
         """List resource names and declared adapter support without native probes or sensitive configuration."""
         with self._runtime._mutex:
             return {"targets": [self._summary(name) for name in sorted(self._runtime._targets)]}
 
-    def transfer_profile(self, name: str, *, connection: Any = None) -> dict:
+    def transfer_profile(self, name: str, *, connection: Any = None) -> dict[str, Any]:
         """Require an actual enabled immutable files profile using the caller's existing SQL snapshot."""
         if not isinstance(name, str) or name not in self._profiles:
             raise AgentTaskError('destination requires a configured files target profile')
@@ -167,7 +167,7 @@ class AgentTargetProfiles:
                 raise AgentTaskError('destination target profile is disabled')
             return _transfer_profile(self._profiles[name], row)
 
-    def _summary(self, name: str) -> dict:
+    def _summary(self, name: str) -> dict[str, Any]:
         profile = self._profiles.get(name)
         if profile is not None:
             kind, tools = profile.kind, list(profile.allowed_tools)
@@ -190,7 +190,7 @@ class AgentTargetProfiles:
             result["last_probe"] = detached(self._last_probes[name])
         return result
 
-    def _details(self, name: str) -> dict:
+    def _details(self, name: str) -> dict[str, Any]:
         profile = self._profiles.get(name)
         result = self._summary(name)
         if profile is not None:

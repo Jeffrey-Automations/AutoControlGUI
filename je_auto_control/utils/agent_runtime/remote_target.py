@@ -19,7 +19,7 @@ class NativeRemoteTarget:  # pylint: disable=too-many-instance-attributes  # rea
     """Trusted adapter prerequisite; no built-in device profile or SDK support is advertised."""
 
     def __init__(self, *, argv: Sequence[str], platform: str, physical_id: str,
-                 recovery_probe: Callable[[], dict] | None = None, resource_path: Path | None = None) -> None:
+                 recovery_probe: Callable[[], dict[str, Any]] | None = None, resource_path: Path | None = None) -> None:
         if not argv or any(not isinstance(part, str) or not part for part in argv):
             raise AgentTaskError("remote helper requires fixed trusted host arguments")
         self._device = device_identity(platform, physical_id)
@@ -40,7 +40,7 @@ class NativeRemoteTarget:  # pylint: disable=too-many-instance-attributes  # rea
         return (self._channel is not None and not self._channel.retired and self._journal is not None
                 and not self._journal.pending and self._journal.read().get("in_flight") is None)
 
-    def check_resume(self, spec: AgentTaskSpec, receipts: list[dict]) -> None:
+    def check_resume(self, spec: AgentTaskSpec, receipts: list[dict[str, Any]]) -> None:
         """An old finite UI prefix cannot establish a new device/app context."""
         connected = self._channel is not None and not self._channel.retired
         require_context_continuity(spec, receipts, connected, kind="desktop")
@@ -88,7 +88,7 @@ class NativeRemoteTarget:  # pylint: disable=too-many-instance-attributes  # rea
             threading.Thread(target=self._takeover, name="RemoteTakeover", daemon=True).start()
 
     @staticmethod
-    def _binding() -> dict:
+    def _binding() -> dict[str, Any]:
         context = current_operation()
         if context is None:
             raise AgentTaskError("remote target has no managed owner")
@@ -96,7 +96,7 @@ class NativeRemoteTarget:  # pylint: disable=too-many-instance-attributes  # rea
         identity = {"user_id": owner.user_id, "role": owner.role, "store_path": owner.store_path} if owner else {}
         return {"spec": context.spec.to_dict(), "owner": identity}
 
-    def _request(self, operation: str, payload: dict) -> Any:
+    def _request(self, operation: str, payload: dict[str, Any]) -> Any:
         with self._mutex:
             context = current_operation()
             if context is None:
@@ -157,7 +157,7 @@ class NativeRemoteTarget:  # pylint: disable=too-many-instance-attributes  # rea
                 self._resource.close()
                 self._resource = None
 
-    def recover(self, note: str, *, actor: str) -> dict:
+    def recover(self, note: str, *, actor: str) -> dict[str, Any]:
         """Review without replay; host-provided proof is mandatory even after host restart."""
         with self._mutex:
             if self._probe is None:

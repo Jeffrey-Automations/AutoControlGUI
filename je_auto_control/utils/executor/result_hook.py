@@ -21,8 +21,12 @@ called after each command that returned, nested ones included, with
 
 A command that failed has no result and is not reported; neither is a
 ``dry_run``. The hook belongs to the thread that registered it and ends with
-the ``with`` block: a thread started during the run (``AC_parallel``, a
-scheduler) does not inherit it, and its commands are not reported. Nothing
+the ``with`` block. An ``AC_parallel`` branch is handed it
+(:func:`capture_branch_hook` / :func:`bound_branch_hook`): its commands are
+reported with the path of the ``AC_parallel`` step, the branch's 1-based
+index as that step's ``run``, and the callback is never entered by two
+branches at once. Any other thread started during the run (a scheduler, a
+tool's own worker) does not inherit it, and its commands are not reported. Nothing
 about the run changes: what it returns, records and logs is the same with and
 without a hook, and a callback that raises is logged by its exception type and
 otherwise ignored. With no hook registered the executor pays one lookup per
@@ -32,6 +36,7 @@ action list and one per command.
 *before* each action of the list it was passed with, with that action alone,
 and is not handed down to nested bodies -- its callers count top-level steps.
 """
+import threading
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator, List, NamedTuple, Optional, Tuple
 
@@ -78,12 +83,21 @@ class _Frame:
 class _Observation:
     """One registered callback and the stack of action lists running under it."""
 
-    __slots__ = ("callback", "frames", "started")
+    __slots__ = ("callback", "frames", "started", "lock")
 
-    def __init__(self, callback: ResultHook) -> None:
+    def __init__(self, callback: ResultHook, lock: Optional[threading.RLock] = None) -> None:
         self.callback = callback
         self.frames: List[_Frame] = []
         self.started = 0
+        # Shared with the run's AC_parallel branches, which report concurrently.
+        self.lock = lock if lock is not None else threading.RLock()
+
+
+class BranchHook(NamedTuple):
+    """What an ``AC_parallel`` branch needs to report to the run's hook."""
+    callback: ResultHook
+    lock: threading.RLock
+    path: StepPath
 
 
 _ACTIVE: "ThreadBoundVar[Optional[_Observation]]" = ThreadBoundVar("autocontrol_result_hook", None)
@@ -105,6 +119,35 @@ def observe_results(callback: ResultHook) -> Iterator[None]:
     if not callable(callback):
         raise AutoControlActionException("result_callback must be callable")
     token = _ACTIVE.set(_Observation(callback))
+    try:
+        yield
+    finally:
+        _ACTIVE.reset(token)
+
+
+def capture_branch_hook() -> Optional[BranchHook]:
+    """On the thread running ``AC_parallel``: the hook its branches report to, if any."""
+    observation = _ACTIVE.get()
+    if observation is None or not observation.frames:
+        return None
+    path = tuple(StepPosition(frame.run, frame.position, frame.command)
+                 for frame in observation.frames)
+    return BranchHook(observation.callback, observation.lock, path)
+
+
+@contextmanager
+def bound_branch_hook(hook: Optional[BranchHook], index: int) -> Iterator[None]:
+    """On a branch thread: report to ``hook`` as branch ``index`` (0-based) of its step."""
+    if hook is None:
+        yield
+        return
+    observation = _Observation(hook.callback, hook.lock)
+    for position in hook.path:
+        frame = _Frame(position.run)
+        frame.position, frame.command = position.position, position.command
+        observation.frames.append(frame)
+    observation.frames[-1].started = index   # the branch's own list runs as index + 1
+    token = _ACTIVE.set(observation)
     try:
         yield
     finally:
@@ -141,10 +184,12 @@ def report_result(action: Any, result: Any) -> None:
                  for frame in observation.frames)
     arguments = action[1] if isinstance(action, list) and len(action) > 1 else None
     try:
-        observation.callback(_command_of(action), arguments, result, path)
+        with observation.lock:
+            observation.callback(_command_of(action), arguments, result, path)
     except Exception as error:  # noqa: BLE001  # reason: an observer must not fail the run it watches
         # The type only: the message could quote the result it was handed.
         autocontrol_logger.warning("result hook raised %s; ignored", type(error).__name__)
 
 
-__all__ = ["ResultHook", "StepPath", "StepPosition", "observe_results"]
+__all__ = ["BranchHook", "ResultHook", "StepPath", "StepPosition", "bound_branch_hook",
+           "capture_branch_hook", "observe_results"]

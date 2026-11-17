@@ -5,6 +5,10 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.view_frames import ViewFrames
+
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _ViewerPanelPart
+
 import functools
 from typing import TYPE_CHECKING, Callable, Optional
 
@@ -31,7 +35,6 @@ if TYPE_CHECKING:  # the facade types optional members as possibly None
 else:
     from je_auto_control.utils.remote_desktop import WebRTCDesktopViewer
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
-    _PanelPart,
     _read_webrtc_config,
 )
 
@@ -45,7 +48,7 @@ def _process_offer(viewer: WebRTCDesktopViewerT, offer_sdp: str, expected_dtls: 
     return viewer.process_offer(offer_sdp, expected_dtls_fingerprint=expected_dtls)
 
 
-class _ViewerConnectionMixin(_PanelPart):
+class _ViewerConnectionMixin(_ViewerPanelPart):
     """Methods of ``_WebRTCViewerPanel``; the module docstring says which group."""
 
     # State this group owns; the panel's __init__ sets the starting values.
@@ -203,14 +206,16 @@ class _ViewerConnectionMixin(_PanelPart):
             token=token,
             config=_read_webrtc_config(self),
             viewer_id=self._viewer_id,
-            on_frame=self._on_av_frame,
-            on_state_change=self._signals.state.emit,
-            on_auth_result=self._signals.auth.emit,
+            on_frame=ViewFrames(self._view.callback("_on_frame_image"),
+                                self._view.getter(lambda owner: owner._recorder, None)),
+            on_state_change=self._view.callback("_on_state"),
+            on_auth_result=self._view.callback("_on_auth"),
         )
-        bind_folder_receipts(viewer, lambda: self._viewer, lambda: self._sync_engine,
-                             self._on_received_file)
-        viewer.set_inbox_listing_callback(self._signals.inbox_listing.emit)
-        viewer.set_inbox_op_result_callback(self._signals.inbox_op.emit)
+        bind_folder_receipts(viewer, self._view.getter(lambda owner: owner._viewer, None),
+                             self._view.getter(lambda owner: owner._sync_engine, None),
+                             self._view.callback("_on_file_received_ui"))
+        viewer.set_inbox_listing_callback(self._view.callback("_on_inbox_listing"))
+        viewer.set_inbox_op_result_callback(self._view.callback("_on_inbox_op_result"))
         return viewer
 
     def _stop_viewer_if_any(self) -> None:

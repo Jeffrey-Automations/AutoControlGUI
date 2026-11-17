@@ -17,7 +17,7 @@ _HELLO = {'protocol', 'challenge', 'birth', 'generation'}
 _PROOF = {'protocol', 'server_challenge', 'challenge', 'birth'}
 
 
-def _receive(connection: Any, fields: set[str]) -> dict:
+def _receive(connection: Any, fields: set[str]) -> dict[str, Any]:
     value = decode_frame(connection.recv_bytes(4096))
     if set(value) != fields or unsigned(value.get('protocol'), 1, 1) != 1:
         raise AgentTaskError('physical presence handshake fields are invalid')
@@ -27,7 +27,7 @@ def _receive(connection: Any, fields: set[str]) -> dict:
     return value
 
 
-def _verify(value: dict, peer: PeerProcess, challenge: str, field: str = 'challenge') -> None:
+def _verify(value: dict[str, Any], peer: PeerProcess, challenge: str, field: str = 'challenge') -> None:
     if value[field] != challenge or value['birth'] != peer.identity.birth or not peer.alive():
         raise AgentTaskError('physical presence live peer challenge failed')
 

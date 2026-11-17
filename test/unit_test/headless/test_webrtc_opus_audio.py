@@ -262,11 +262,13 @@ def test_a_capture_that_fails_to_close_still_leaves_the_track_stopped():
     async def _drive():
         track = OpusMicAudioTrack()
         _FakeCapture.instances[0].stop_error = OSError("device unplugged")
-        track.stop()
+        with pytest.raises(OSError):
+            track.stop()
         return track
 
     track = asyncio.run(_drive())
-    assert track._capture is None
+    assert track.readyState == "ended"
+    assert track._capture is _FakeCapture.instances[0]
 
 
 # --- the host's inbound receiver ----------------------------------------------
@@ -386,9 +388,12 @@ def test_stopping_the_receiver_cancels_the_drain_and_closes_the_player():
         receiver = OpusMicReceiver()
         receiver.consume(FrameTrack(_frame(np.array([[1]], dtype=np.int16))))
         task = receiver._task
+        with pytest.raises(RuntimeError):
+            receiver.stop()
+        assert receiver._task is task
+        await asyncio.sleep(0)
         receiver.stop()
         assert receiver._task is None
-        await asyncio.sleep(0)
         return task
 
     task = asyncio.run(_drive())
@@ -402,8 +407,10 @@ def test_stopping_a_receiver_that_never_consumed_still_closes_the_player():
     assert _FakePlayer.instances[0].stopped
 
 
-def test_a_player_that_fails_to_close_does_not_escape_stop(monkeypatch):
+def test_a_player_that_fails_to_close_is_reported_and_retained(monkeypatch):
     receiver = OpusMicReceiver()
     monkeypatch.setattr(
         _FakePlayer.instances[0], "stop_error", OSError("stream already closed"))
-    receiver.stop()
+    with pytest.raises(OSError):
+        receiver.stop()
+    assert receiver._player is _FakePlayer.instances[0]

@@ -127,9 +127,59 @@ class PerThread:
         self._slot(instance).value = value
 
 
+#: ``CoGetApartmentType`` answers: the thread is in the multi-threaded apartment.
+_APTTYPE_MTA = 1
+
+
+def _current_apartment_type() -> Optional[int]:
+    """This thread's ``APTTYPE``; ``None`` when COM is not initialised on it, or there is no COM."""
+    if sys.platform != "win32":
+        return None
+    import ctypes
+    ole32 = ctypes.WinDLL("ole32")
+    kind, qualifier = ctypes.c_int(), ctypes.c_int()
+    result = int(ole32.CoGetApartmentType(ctypes.byref(kind), ctypes.byref(qualifier))) & 0xFFFFFFFF
+    return int(kind.value) if result == _S_OK else None
+
+
+def coinit_flags_for_this_thread(apartment_type: Optional[int] = None) -> int:
+    """The flags ``comtypes`` must initialise COM with on this thread when it is imported here.
+
+    ``comtypes`` calls ``CoInitializeEx(sys.coinit_flags)`` on the thread that
+    imports it, single-threaded by default. Measured with comtypes 1.5.0 on
+    Windows 11 (U-20261113-01): imported first on a worker, it put that worker
+    in a single-threaded apartment, so the worker never joined the MTA this
+    module intends; imported first on a thread already in the MTA, it raised
+    ``OSError`` 0x80010106 (``RPC_E_CHANGED_MODE``). The flags therefore follow
+    the apartment the thread is already in, and otherwise this module's rule.
+    """
+    kind = _current_apartment_type() if apartment_type is None else apartment_type
+    if kind is None:
+        on_main = threading.current_thread() is threading.main_thread()
+        return COINIT_APARTMENTTHREADED if on_main else COINIT_MULTITHREADED
+    return COINIT_MULTITHREADED if kind == _APTTYPE_MTA else COINIT_APARTMENTTHREADED
+
+
+def import_comtypes_client() -> Any:
+    """Import ``comtypes.client`` so that its import-time COM initialisation fits this thread.
+
+    Only the first import initialises anything. ``sys.coinit_flags`` is set for
+    it, and removed again, only when no one else has set it.
+    """
+    chosen = "comtypes" not in sys.modules and not hasattr(sys, "coinit_flags")
+    if chosen:
+        setattr(sys, "coinit_flags", coinit_flags_for_this_thread())
+    try:
+        import comtypes.client
+    finally:
+        if chosen and hasattr(sys, "coinit_flags"):
+            delattr(sys, "coinit_flags")
+    return comtypes.client
+
+
 def _is_available() -> bool:
     try:
-        import comtypes.client  # noqa: F401  # reason: probe import
+        import_comtypes_client()
         return True
     except ImportError:
         return False

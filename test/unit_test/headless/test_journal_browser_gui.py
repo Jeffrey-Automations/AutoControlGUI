@@ -25,8 +25,7 @@ def browser(app):
     widget = JournalBrowser()
     yield widget
     widget.cancel()
-    if widget._handle is not None:
-        widget._handle.wait(5)
+    _until(app, lambda: not widget._task.running)
     widget.deleteLater()
     app.processEvents()
 
@@ -69,7 +68,7 @@ def test_queued_source_retains_caller_authority_and_obeys_close(browser, app, mo
             browser.close()
     finally:
         release.set()
-    _until(app, lambda: browser._handle is None)
+    _until(app, lambda: not browser._task.running)
     assert calls == ["old.jsonl"]
     assert browser._events == []
     if next_action == "viewer":
@@ -78,7 +77,7 @@ def test_queued_source_retains_caller_authority_and_obeys_close(browser, app, mo
 
 def test_browser_has_only_inputs_and_views_until_an_action(browser):
     assert browser.findChildren(QPushButton) == []
-    assert browser._handle is None
+    assert not browser._task.running
     assert browser._table.rowCount() == 0
     assert browser._limit.minimum() == 1
     assert browser._limit.maximum() == 10000
@@ -91,7 +90,7 @@ def test_real_read_keeps_lifecycle_snapshots_and_source(browser, app, tmp_path):
     original = path.read_bytes()
     browser._path.setText(str(path))
     browser.read()
-    _until(app, lambda: browser._handle is None)
+    _until(app, lambda: not browser._task.running)
     assert browser._table.rowCount() == 2
     assert [row["status"] for row in browser._events] == ["incomplete", "ok"]
     browser._table.selectRow(1)
@@ -104,13 +103,13 @@ def test_links_select_run_without_automatic_file_io(browser, app, tmp_path):
     _journal(path, "one")
     _journal(path, "two")
     browser.set_links([JournalLink(1, str(path), "one"), JournalLink(1, str(path), "two")])
-    assert browser._handle is None
+    assert not browser._task.running
     assert browser._table.rowCount() == 0
     browser._links.setCurrentIndex(2)
     assert browser._run_id.text() == "two"
     browser._limit.setValue(1)
     browser.read()
-    _until(app, lambda: browser._handle is None)
+    _until(app, lambda: not browser._task.running)
     assert len(browser._events) == 1
     assert browser._events[0]["run_id"] == "two"
     assert browser._events[0]["status"] == "incomplete"
@@ -121,13 +120,11 @@ def test_precancelled_worker_does_not_open_input(app, monkeypatch):
         pytest.fail("cancelled worker opened a file")
     monkeypatch.setattr("je_auto_control.gui.journal_browser_worker.inspect_journal", forbidden)
     worker = JournalReadWorker(JournalReadRequest(1, "unused", None, 100))
-    outcomes = []
-    worker.finished.connect(outcomes.append)
-    worker.request_stop()
-    worker.run()
-    assert outcomes[0].status == "cancelled"
-    assert outcomes[0].events == []
-    worker.deleteLater()
+    stop = threading.Event()
+    stop.set()
+    outcome = worker(stop)
+    assert outcome.status == "cancelled"
+    assert outcome.events == []
 
 
 def test_worker_rechecks_captured_viewer_authority(app, monkeypatch):
@@ -135,12 +132,8 @@ def test_worker_rechecks_captured_viewer_authority(app, monkeypatch):
     monkeypatch.setattr("je_auto_control.gui.journal_browser_worker.inspect_journal", lambda *a, **k: calls.append(1))
     with authorization_scope(AuthorizationContext("viewer", Role.VIEWER)):
         worker = JournalReadWorker(JournalReadRequest(1, "unused", None, 100))
-    outcomes = []
-    worker.finished.connect(outcomes.append)
-    worker.run()
-    assert outcomes[0].status == "error"
+    assert worker(threading.Event()).status == "error"
     assert calls == []
-    worker.deleteLater()
 
 
 def test_worker_retains_enclosing_path_policy(app, tmp_path):
@@ -148,12 +141,9 @@ def test_worker_retains_enclosing_path_policy(app, tmp_path):
     allowed.mkdir()
     with ac.journal_scope(ac.ActionJournal(allowed / "outer.jsonl"), path_policy=ac.PathPolicy([allowed])):
         worker = JournalReadWorker(JournalReadRequest(1, str(tmp_path / "outside.jsonl"), None, 100))
-    outcomes = []
-    worker.finished.connect(outcomes.append)
-    worker.run()
-    assert outcomes[0].status == "error"
-    assert "PathNotAllowedError" in outcomes[0].error
-    worker.deleteLater()
+    outcome = worker(threading.Event())
+    assert outcome.status == "error"
+    assert "PathNotAllowedError" in outcome.error
 
 
 def test_worker_progress_cancels_between_records(app, monkeypatch):
@@ -165,13 +155,16 @@ def test_worker_progress_cancels_between_records(app, monkeypatch):
         return []
     monkeypatch.setattr("je_auto_control.gui.journal_browser_worker.inspect_journal", inspect)
     worker = JournalReadWorker(JournalReadRequest(1, "unused", None, 100))
-    worker.progress.connect(lambda request, count: worker.request_stop() if count == 100 else None)
-    outcomes = []
-    worker.finished.connect(outcomes.append)
-    worker.run()
-    assert outcomes[0].status == "cancelled"
+    stop, reports = threading.Event(), []
+
+    def report(value):
+        reports.append(value)
+        if value == (1, 100):
+            stop.set()
+
+    assert worker(stop, report).status == "cancelled"
+    assert reports == [(1, 0), (1, 100)]
     assert max(scanned) <= 101
-    worker.deleteLater()
 
 
 def _blocked_reader(monkeypatch):
@@ -192,10 +185,10 @@ def test_cancel_does_not_block_gui(browser, app, monkeypatch):
     try:
         assert entered.wait(2)
         browser.cancel()
-        assert browser._handle.isRunning()
+        assert browser._task.running            # Cancel returns at once; the read unwinds behind it
     finally:
         release.set()
-    _until(app, lambda: browser._handle is None)
+    _until(app, lambda: not browser._task.running)
     assert browser._events == []
     assert browser._status_key == "journal_cancelled"
 
@@ -209,7 +202,7 @@ def test_changing_target_discards_stale_completion(browser, app, monkeypatch):
         browser.set_links([JournalLink(7, "new", "new-run")])
     finally:
         release.set()
-    _until(app, lambda: browser._handle is None)
+    _until(app, lambda: not browser._task.running)
     assert browser._path.text() == "new"
     assert browser._run_id.text() == "new-run"
     assert browser._events == []
@@ -218,18 +211,28 @@ def test_changing_target_discards_stale_completion(browser, app, monkeypatch):
 
 def test_destroying_owner_requests_stop_and_drops_late_results(app, monkeypatch):
     entered, release = _blocked_reader(monkeypatch)
+    stops, done = [], threading.Event()
+    real_call = JournalReadWorker.__call__
+
+    def call(self, stop_event, report):
+        stops.append(stop_event)
+        try:
+            return real_call(self, stop_event, report)
+        finally:
+            done.set()
+
+    monkeypatch.setattr(JournalReadWorker, "__call__", call)
     widget = JournalBrowser()
     widget._path.setText("unused")
     widget.read()
-    handle, worker = widget._handle, widget._worker
     try:
         assert entered.wait(2)
         widget.deleteLater()
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-        assert worker._stop.is_set()
+        assert stops[0].is_set()
     finally:
         release.set()
-        assert handle.wait(5)
+        assert done.wait(5)
     app.processEvents()
 
 
@@ -237,7 +240,7 @@ def test_viewer_is_refused_before_worker_creation(browser):
     browser._path.setText("private.jsonl")
     with authorization_scope(AuthorizationContext("viewer", Role.VIEWER)):
         browser.read()
-    assert browser._handle is None
+    assert not browser._task.running
     assert browser._status_key == "journal_error"
 
 
@@ -246,11 +249,11 @@ def test_corrupt_read_clears_previous_snapshots(browser, app, tmp_path):
     _journal(path)
     browser._path.setText(str(path))
     browser.read()
-    _until(app, lambda: browser._handle is None)
+    _until(app, lambda: not browser._task.running)
     assert browser._events
     path.write_text("invalid\n", encoding="utf-8")
     browser.read()
-    _until(app, lambda: browser._handle is None)
+    _until(app, lambda: not browser._task.running)
     assert browser._events == []
     assert browser._table.rowCount() == 0
     assert browser._status_key == "journal_error"
@@ -273,7 +276,7 @@ def test_history_menu_loads_links_without_reading(app, monkeypatch, tmp_path):
         actions["journal_selected_run"]()
         assert tab._journal._path.text() == str(tmp_path / "events.jsonl")
         assert tab._journal._run_id.text() == "chosen"
-        assert tab._journal._handle is None
+        assert not tab._journal._task.running
     finally:
         tab.deleteLater()
         store.close()
@@ -286,10 +289,10 @@ def test_close_requests_cancellation_before_deferred_deletion(browser, app, monk
     try:
         assert entered.wait(2)
         browser.close()
-        assert browser._worker._stop.is_set()
+        assert browser._task.stopping
     finally:
         release.set()
-    _until(app, lambda: browser._handle is None)
+    _until(app, lambda: not browser._task.running)
     assert browser._status_key == "journal_cancelled"
 
 
@@ -308,12 +311,9 @@ def test_worker_refreshes_store_backed_owner_before_io(app, monkeypatch, tmp_pat
     def forbidden(*args, **kwargs):
         pytest.fail("revoked owner read private data")
     monkeypatch.setattr("je_auto_control.gui.journal_browser_worker.inspect_journal", forbidden)
-    outcomes = []
-    worker.finished.connect(outcomes.append)
-    worker.run()
-    assert outcomes[0].status == "error"
-    assert outcomes[0].events == []
-    worker.deleteLater()
+    outcome = worker(threading.Event())
+    assert outcome.status == "error"
+    assert outcome.events == []
 
 
 def test_history_retranslates_browser_and_preserves_state(app, monkeypatch, tmp_path):
@@ -364,7 +364,7 @@ def test_browse_viewer_is_refused_before_file_dialog(browser, monkeypatch):
     with authorization_scope(AuthorizationContext("viewer", Role.VIEWER)):
         browser.browse()
     assert browser._status_key == "journal_error"
-    assert browser._handle is None
+    assert not browser._task.running
 
 
 def test_worker_masks_errors_in_active_captured_context(app, monkeypatch):
@@ -373,16 +373,13 @@ def test_worker_masks_errors_in_active_captured_context(app, monkeypatch):
     def fail(*args, **kwargs):
         raise ValueError(secret)
     monkeypatch.setattr("je_auto_control.gui.journal_browser_worker.inspect_journal", fail)
-    outcomes = []
     with secret_log_scope():
         remember_secret(secret)
         worker = JournalReadWorker(JournalReadRequest(1, "unused", None, 100))
-        worker.finished.connect(outcomes.append)
-        worker.run()
-    assert outcomes[0].status == "error"
-    assert secret not in outcomes[0].error
-    assert "***" in outcomes[0].error
-    worker.deleteLater()
+        outcome = worker(threading.Event())
+    assert outcome.status == "error"
+    assert secret not in outcome.error
+    assert "***" in outcome.error
 
 
 def test_error_details_are_plain_text(browser):
@@ -406,7 +403,7 @@ def test_progress_is_delivered_on_gui_thread(browser, app, monkeypatch):
     monkeypatch.setattr("je_auto_control.gui.journal_browser_worker.inspect_journal", inspect)
     browser._path.setText("unused")
     browser.read()
-    _until(app, lambda: browser._handle is None)
+    _until(app, lambda: not browser._task.running)
     assert calls
     assert set(calls) == {gui_ident}
 
@@ -419,16 +416,14 @@ def test_history_close_cancels_its_child_reader(app, monkeypatch, tmp_path):
     tab = history_module.RunHistoryTab()
     tab._journal._path.setText("unused")
     tab._journal.read()
-    handle = tab._journal._handle
     try:
         assert entered.wait(2)
         tab.close()
-        assert tab._journal._worker._stop.is_set()
+        assert tab._journal._task.stopping
         assert not tab._timer.isActive()
     finally:
         release.set()
-        assert handle.wait(5)
-        app.processEvents()
+        _until(app, lambda: not tab._journal._task.running)
         tab.deleteLater()
         store.close()
 
@@ -442,7 +437,7 @@ def test_lookup_error_invalidates_an_older_read(browser, app, monkeypatch):
         browser.report_error("new history lookup failed")
     finally:
         release.set()
-    _until(app, lambda: browser._handle is None)
+    _until(app, lambda: not browser._task.running)
     assert browser._events == []
     assert browser._status_key == "journal_error"
     assert "new history lookup failed" in browser._status.text()

@@ -82,7 +82,7 @@ def _matching_supported(reply: Any) -> bool:
 
 
 def _match_request(host: str, task: Mapping[str, Any], owner: DeferredAuthorization, deadline: float,
-                   connection: managed_tasks.Call, initial: dict) -> dict[str, Any]:
+                   connection: managed_tasks.Call, initial: dict[str, Any]) -> dict[str, Any]:
     if not _matching_supported(initial):
         return {}
     spec = task["spec"]
@@ -100,7 +100,7 @@ def _match_request(host: str, task: Mapping[str, Any], owner: DeferredAuthorizat
     return _match_snapshot(initial, reply, spec)
 
 
-def _match_snapshot(initial: dict, reply: Any, spec: Mapping[str, Any]) -> dict[str, Any]:
+def _match_snapshot(initial: dict[str, Any], reply: Any, spec: Mapping[str, Any]) -> dict[str, Any]:
     if not _matching_supported(reply):
         return {"request_match": "unverifiable"}
     try:
@@ -118,7 +118,7 @@ def _match_snapshot(initial: dict, reply: Any, spec: Mapping[str, Any]) -> dict[
     return snapshot
 
 
-def _matched_completion(task: dict, spec: Mapping[str, Any]) -> bool:
+def _matched_completion(task: dict[str, Any], spec: Mapping[str, Any]) -> bool:
     try:
         managed_tasks.validate_recorded_completion(task, spec)
     except AgentTaskError:
@@ -155,7 +155,7 @@ def _task_identity(task: Any) -> tuple[str, str]:
     return identifier, state
 
 
-def _recorded_completion(task: dict, metadata: dict) -> bool:
+def _recorded_completion(task: dict[str, Any], metadata: dict[str, Any]) -> bool:
     version, reports = metadata.get("completion_contract"), task.get("verification")
     # pylint: disable-next=unidiomatic-typecheck  # reason: the protocol excludes bool and int subclasses
     if type(version) is not int or version != 1 or metadata.get("input_released") is not True:

@@ -8,52 +8,52 @@ from typing import (
 )
 
 def AC_a11y_click(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    window_title: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    window_title: str | None = ...,
     contains: bool = ...,
 ) -> bool:
     """Click the center of the first element matching the filters."""
 
-def AC_a11y_dump(app_name: Optional[str] = ..., max_results: int = ...) -> Dict[str, Any]:
+def AC_a11y_dump(app_name: str | None = ..., max_results: int = ...) -> Dict[str, Any]:
     """Executor adapter: dump the accessibility tree as nested dict."""
 
 def AC_a11y_find(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    window_title: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    window_title: str | None = ...,
     contains: Any = ...,
-) -> Optional[dict]:
+) -> Dict[str, Any] | None:
     """Executor adapter: find an accessibility element, return its dict."""
 
 def AC_a11y_find_all(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    window_title: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    window_title: str | None = ...,
     contains: Any = ...,
     max_results: int = ...,
     scan_limit: int = ...,
-) -> List[dict]:
+) -> List[Dict[str, Any]]:
     """Executor adapter: every matching accessibility element, best match first."""
 
-def AC_a11y_focused(app_name: Optional[str] = ...) -> Optional[dict]:
+def AC_a11y_focused(app_name: str | None = ...) -> Dict[str, Any] | None:
     """Executor adapter: the element holding keyboard focus, as a dict."""
 
 def AC_a11y_list(
-    app_name: Optional[str] = ...,
+    app_name: str | None = ...,
     max_results: int = ...,
-    window_title: Optional[str] = ...,
-) -> List[dict]:
+    window_title: str | None = ...,
+) -> List[Dict[str, Any]]:
     """Executor adapter: list accessibility elements as plain dicts."""
 
 def AC_a11y_record_events() -> List[Dict[str, Any]]:
     """Executor adapter: peek at events without stopping the recorder."""
 
 def AC_a11y_record_start(
-    app_name: Optional[str] = ...,
+    app_name: str | None = ...,
     poll_interval_s: float = ...,
     min_movement_px: int = ...,
 ) -> Dict[str, Any]:
@@ -110,22 +110,22 @@ def AC_add_package_to_callback_executor(package: str) -> None:
 def AC_add_package_to_executor(package: str) -> None:
     """將套件成員加入 Executor"""
 
-def AC_admin_add_host(label: str, base_url: str, token: str, tags: Optional[List[str]] = ...) -> Dict[str, Any]:
+def AC_admin_add_host(label: str, base_url: str, token: str, tags: List[str] | None = ...) -> Dict[str, Any]:
     """Executor adapter: register a remote AutoControl REST endpoint."""
 
-def AC_admin_broadcast_execute(actions: List[Any], labels: Optional[List[str]] = ...) -> List[Dict[str, Any]]:
+def AC_admin_broadcast_execute(actions: List[Any], labels: List[str] | None = ...) -> List[Dict[str, Any]]:
     ...
 
 def AC_admin_list_hosts() -> List[Dict[str, Any]]:
     ...
 
-def AC_admin_poll(labels: Optional[List[str]] = ...) -> List[Dict[str, Any]]:
+def AC_admin_poll(labels: List[str] | None = ...) -> List[Dict[str, Any]]:
     ...
 
 def AC_admin_remove_host(label: str) -> Dict[str, Any]:
     ...
 
-def AC_agent_card(path: Optional[str] = ...) -> Dict[str, Any]:
+def AC_agent_card(path: str | None = ...) -> Dict[str, Any]:
     """Adapter: build (or write) the A2A agent card."""
 
 def AC_agent_dag(operation: str, request: Mapping[str, Any] | None = ...) -> dict[str, Any]:
@@ -248,41 +248,41 @@ def AC_anchor_locate_all(
     """Executor adapter: every anchor-relative match, nearest-first."""
 
 def AC_android_alert_accept(
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Accept the alert or system dialog showing."""
 
 def AC_android_alert_dismiss(
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Dismiss the alert or system dialog showing."""
 
 def AC_android_app_state(
     app_id: str,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """not_installed, not_running, background or foreground."""
 
 def AC_android_click_element(
-    text: Optional[str] = ...,
-    resource_id: Optional[str] = ...,
-    description: Optional[str] = ...,
-    class_name: Optional[str] = ...,
+    text: str | None = ...,
+    resource_id: str | None = ...,
+    description: str | None = ...,
+    class_name: str | None = ...,
     timeout_s: float = ...,
-    serial: Optional[str] = ...,
+    serial: str | None = ...,
 ) -> Dict[str, int]:
     """Tap the first widget matching the selectors; return click centre."""
 
 def AC_android_device_info(
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Backend, versions and capabilities of the device. Sends no input."""
 
@@ -293,32 +293,32 @@ def AC_android_drag(
     y2: int,
     hold_s: float = ...,
     duration_s: float = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Press, hold so the item lifts, and move it."""
 
-def AC_android_dump_hierarchy(serial: Optional[str] = ...) -> str:
+def AC_android_dump_hierarchy(serial: str | None = ...) -> str:
     """Return the device's widget tree as an XML string."""
 
 def AC_android_find_by_description(
     description: str,
-    model: Optional[str] = ...,
+    model: str | None = ...,
     tap: bool = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Ask a vision-language model where something is on the device screen."""
 
 def AC_android_find_element(
-    text: Optional[str] = ...,
-    resource_id: Optional[str] = ...,
-    description: Optional[str] = ...,
-    class_name: Optional[str] = ...,
+    text: str | None = ...,
+    resource_id: str | None = ...,
+    description: str | None = ...,
+    class_name: str | None = ...,
     timeout_s: float = ...,
-    serial: Optional[str] = ...,
+    serial: str | None = ...,
 ) -> Dict[str, int]:
     """Find an Android widget via uiautomator2; return its bounding rect."""
 
@@ -326,9 +326,9 @@ def AC_android_find_image(
     template_path: str,
     detect_threshold: float = ...,
     tap: bool = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Template-match in the device screen; answers in device points."""
 
@@ -337,48 +337,49 @@ def AC_android_find_text(
     lang: str = ...,
     min_confidence: float = ...,
     tap: bool = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """OCR the device screen for text; answers in device points."""
 
 def AC_android_get_clipboard(
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    allow_app_switch: bool = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Read the device clipboard's text."""
 
 def AC_android_install_app(
     path: str,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Install an app package from the host."""
 
-def AC_android_key(key: str, serial: Optional[str] = ..., adb_path: Optional[str] = ...) -> None:
+def AC_android_key(key: str, serial: str | None = ..., adb_path: str | None = ...) -> None:
     """Send a keycode (``KEYCODE_HOME`` etc.) via ``input keyevent``."""
 
 def AC_android_launch_app(
     app_id: str,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Launch an app; returns its state."""
 
-def AC_android_list_devices(adb_path: Optional[str] = ...) -> list:
+def AC_android_list_devices(adb_path: str | None = ...) -> List[Dict[str, Any]]:
     """Return ``{serial, state, model, …}`` for every adb-attached device."""
 
 def AC_android_long_press(
     x: int,
     y: int,
     duration_s: float = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Press and hold at a point."""
 
@@ -388,86 +389,86 @@ def AC_android_pinch(
     scale: float,
     duration_s: float = ...,
     span: int = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Two-finger pinch: scale above 1 zooms in, below 1 out."""
 
 def AC_android_pull_file(
     remote_path: str,
     local_path: str,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Copy a device file to the host."""
 
 def AC_android_push_file(
     local_path: str,
     remote_path: str,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Copy a host file to the device."""
 
 def AC_android_screen_info(
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Pixel size, point size, scale and orientation of the current screen."""
 
-def AC_android_screenshot(file_path: str, serial: Optional[str] = ..., adb_path: Optional[str] = ...) -> str:
+def AC_android_screenshot(file_path: str, serial: str | None = ..., adb_path: str | None = ...) -> str:
     """Capture the live Android screen and save it as PNG at ``file_path``."""
 
 def AC_android_self_heal(
-    template_path: Optional[str] = ...,
-    description: Optional[str] = ...,
+    template_path: str | None = ...,
+    description: str | None = ...,
     detect_threshold: float = ...,
-    model: Optional[str] = ...,
+    model: str | None = ...,
     tap: bool = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Template first, VLM on a miss, against the device screen."""
 
 def AC_android_set_clipboard(
     text: str,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Put text on the device clipboard."""
 
-def AC_android_shell(command: str, serial: Optional[str] = ..., adb_path: Optional[str] = ...) -> str:
+def AC_android_shell(command: str, serial: str | None = ..., adb_path: str | None = ...) -> str:
     """Run an ``adb shell`` command and return its stdout."""
 
 def AC_android_start_recording(
-    remote_path: Optional[str] = ...,
-    time_limit_s: Optional[int] = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    remote_path: str | None = ...,
+    time_limit_s: int | None = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Start recording the device screen."""
 
 def AC_android_stop_app(
     app_id: str,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Stop an app; returns its state."""
 
 def AC_android_stop_recording(
     local_path: str,
-    remote_path: Optional[str] = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    remote_path: str | None = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Stop recording and save the video on the host."""
 
@@ -477,22 +478,22 @@ def AC_android_swipe(
     x2: int,
     y2: int,
     duration_ms: int = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
 ) -> None:
     """Send a touch swipe via ``input swipe``."""
 
-def AC_android_tap(x: int, y: int, serial: Optional[str] = ..., adb_path: Optional[str] = ...) -> None:
+def AC_android_tap(x: int, y: int, serial: str | None = ..., adb_path: str | None = ...) -> None:
     """Send a single ``input tap`` to an Android device."""
 
-def AC_android_text(text: str, serial: Optional[str] = ..., adb_path: Optional[str] = ...) -> None:
+def AC_android_text(text: str, serial: str | None = ..., adb_path: str | None = ...) -> None:
     """Type a string: ``input text`` for ASCII, a Unicode-capable path otherwise."""
 
 def AC_android_type_text(
     text: str,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Type text through a path that can carry it; raises when none can."""
 
@@ -500,17 +501,13 @@ def AC_android_wait_for_app(
     app_id: str,
     timeout_s: float = ...,
     state: str = ...,
-    serial: Optional[str] = ...,
-    adb_path: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    serial: str | None = ...,
+    adb_path: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Wait until an app reaches a state; raises on timeout."""
 
-def AC_annotate_screenshot(
-    source: str,
-    annotations: Union[List[Dict[str, Any]], str],
-    output_path: str,
-) -> Dict[str, Any]:
+def AC_annotate_screenshot(source: str, annotations: List[Dict[str, Any]] | str, output_path: str) -> Dict[str, Any]:
     """Executor adapter: draw annotations onto a screenshot and save it."""
 
 def AC_apply_json_patch(doc: Any, patch: Any) -> Dict[str, Any]:
@@ -522,16 +519,16 @@ def AC_apply_unified(text: str, diff: str) -> Dict[str, Any]:
 def AC_apply_vex(findings: Any, vex: Any) -> Dict[str, Any]:
     """Adapter: suppress VEX'd vulnerability findings (each JSON string/obj)."""
 
-def AC_approval_approve(token: str, approver: str, db: Optional[str] = ...) -> Dict[str, Any]:
+def AC_approval_approve(token: str, approver: str, db: str | None = ...) -> Dict[str, Any]:
     """Adapter: approve a request as ``approver`` (must differ from maker)."""
 
-def AC_approval_reject(token: str, approver: str, db: Optional[str] = ...) -> Dict[str, Any]:
+def AC_approval_reject(token: str, approver: str, db: str | None = ...) -> Dict[str, Any]:
     """Adapter: reject a request as ``approver`` (must differ from maker)."""
 
-def AC_approval_request(action: str, requester: str = ..., db: Optional[str] = ...) -> Dict[str, Any]:
+def AC_approval_request(action: str, requester: str = ..., db: str | None = ...) -> Dict[str, Any]:
     """Adapter: file a maker-checker approval request; return its token."""
 
-def AC_approval_status(token: str, db: Optional[str] = ...) -> Dict[str, Any]:
+def AC_approval_status(token: str, db: str | None = ...) -> Dict[str, Any]:
     """Adapter: report the status and approved flag of a request token."""
 
 def AC_approve_artifact(name: str, approvals_dir: str = ..., extension: str = ...) -> Dict[str, Any]:
@@ -580,9 +577,9 @@ def AC_assert_eventually(
 def AC_assert_file(
     path: str,
     exists: bool = ...,
-    contains: Optional[str] = ...,
-    sha256: Optional[str] = ...,
-    min_size: Optional[int] = ...,
+    contains: str | None = ...,
+    sha256: str | None = ...,
+    min_size: int | None = ...,
     raise_on_fail: bool = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: assert a file's existence / content / hash / size."""
@@ -590,7 +587,7 @@ def AC_assert_file(
 def AC_assert_http(
     url: str,
     status: int = ...,
-    contains: Optional[str] = ...,
+    contains: str | None = ...,
     timeout: float = ...,
     method: str = ...,
     raise_on_fail: bool = ...,
@@ -640,7 +637,7 @@ def AC_assert_session_active() -> Dict[str, Any]:
 
 def AC_assert_text(
     text: str,
-    region: Optional[List[int]] = ...,
+    region: List[int] | None = ...,
     lang: str = ...,
     regex: bool = ...,
     present: bool = ...,
@@ -654,20 +651,20 @@ def AC_assert_text(
 def AC_assert_video_changes(
     video_path: str,
     start_s: float = ...,
-    end_s: Optional[float] = ...,
+    end_s: float | None = ...,
     threshold: float = ...,
     expect_motion: bool = ...,
-    region: Optional[List[int]] = ...,
+    region: List[int] | None = ...,
     raise_on_fail: bool = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: assert a video segment has motion / is static."""
 
 def AC_assert_visual(
     golden_path: str,
-    region: Optional[List[int]] = ...,
+    region: List[int] | None = ...,
     tolerance: float = ...,
     per_pixel_threshold: int = ...,
-    diff_path: Optional[str] = ...,
+    diff_path: str | None = ...,
     create_if_missing: bool = ...,
     raise_on_fail: bool = ...,
 ) -> Dict[str, Any]:
@@ -676,8 +673,8 @@ def AC_assert_visual(
 def AC_assert_vlm(
     description: str,
     present: bool = ...,
-    screen_region: Optional[List[int]] = ...,
-    model: Optional[str] = ...,
+    screen_region: List[int] | None = ...,
+    model: str | None = ...,
     raise_on_fail: bool = ...,
     capture_on_fail: bool = ...,
 ) -> Dict[str, Any]:
@@ -699,9 +696,9 @@ def AC_associate_fields(text_boxes: Any, directions: Any = ..., max_gap: Any = .
     """Adapter: pair form labels with their nearest aligned value boxes."""
 
 def AC_audit_accessibility(
-    app_name: Optional[str] = ...,
-    contrast_pairs: Optional[List[Dict[str, Any]]] = ...,
-    texts: Optional[List[str]] = ...,
+    app_name: str | None = ...,
+    contrast_pairs: List[Dict[str, Any]] | None = ...,
+    texts: List[str] | None = ...,
     min_ratio: float = ...,
     max_results: int = ...,
 ) -> Dict[str, Any]:
@@ -710,15 +707,15 @@ def AC_audit_accessibility(
 def AC_audit_contrast(foreground: List[int], background: List[int], min_ratio: float = ...) -> Dict[str, Any]:
     """Executor adapter: WCAG contrast ratio for one colour pair."""
 
-def AC_audit_focus_order(app_name: Optional[str] = ..., max_results: int = ...) -> Dict[str, Any]:
+def AC_audit_focus_order(app_name: str | None = ..., max_results: int = ...) -> Dict[str, Any]:
     """Executor adapter: WCAG focus-order audit over the app's elements."""
 
 def AC_audit_log_clear() -> Dict[str, Any]:
     ...
 
 def AC_audit_log_list(
-    event_type: Optional[str] = ...,
-    host_id: Optional[str] = ...,
+    event_type: str | None = ...,
+    host_id: str | None = ...,
     limit: int = ...,
 ) -> List[Dict[str, Any]]:
     """Executor adapter: query the audit log."""
@@ -753,7 +750,7 @@ def AC_browser_check(selector: str, frame: str = ...) -> bool:
 def AC_browser_click(selector: str, frame: str = ...) -> bool:
     """Click one unique visible enabled element once, without retrying submissions."""
 
-def AC_browser_download(url: str, directory: str, name: str, sha256: str = ...) -> dict:
+def AC_browser_download(url: str, directory: str, name: str, sha256: str = ...) -> dict[str, Any]:
     """Download through WebRunner and publish a complete file within explicit task roots."""
 
 def AC_browser_fill(selector: str, value: str, frame: str = ...) -> bool:
@@ -771,7 +768,7 @@ def AC_browser_read(operation: str, selector: str, frame: str = ...) -> Any:
 def AC_browser_select(selector: str, value: str, frame: str = ...) -> bool:
     """Select one option through the owned WebRunner session."""
 
-def AC_browser_upload(selector: str, path: str, sha256: str = ..., frame: str = ...) -> dict:
+def AC_browser_upload(selector: str, path: str, sha256: str = ..., frame: str = ...) -> dict[str, Any]:
     """Send one rooted bounded file as immutable bytes; never submit the form automatically."""
 
 def AC_browser_wait(
@@ -831,10 +828,10 @@ def AC_categorical_drift(reference: Any, current: Any) -> Dict[str, Any]:
 def AC_cell_by_header(
     row: Any,
     column_header: str,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: read the cell at (row, named column) — assert by header."""
 
@@ -858,8 +855,8 @@ def AC_changed_regions(
 
 def AC_chatops_dispatch(
     message: str,
-    context: Optional[Dict[str, Any]] = ...,
-    script_root: Optional[str] = ...,
+    context: Dict[str, Any] | None = ...,
+    script_root: str | None = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: route one chat message through the default router."""
 
@@ -875,16 +872,16 @@ def AC_check_compatibility(old: Any, new: Any, mode: str = ...) -> Dict[str, Any
 def AC_check_foreign_key(child_rows: Any, child_col: str, parent_rows: Any, parent_col: str) -> Dict[str, Any]:
     """Adapter: foreign-key referential check across two row-sets."""
 
-def AC_check_key_is_press(keycode: int | str) -> Optional[bool]:
+def AC_check_key_is_press(keycode: int | str) -> bool | None:
     """檢查某個鍵是否正在被按下"""
 
 def AC_check_licenses(components: Any, allow: Any = ..., deny: Any = ...) -> Dict[str, Any]:
     """Adapter: evaluate SBOM component licenses against allow/deny lists."""
 
 def AC_check_overflow(
-    elements: Optional[List[Any]] = ...,
+    elements: List[Any] | None = ...,
     avg_char_px: float = ...,
-    app_name: Optional[str] = ...,
+    app_name: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: flag text wider than its widget (live a11y unless given)."""
 
@@ -939,14 +936,14 @@ def AC_click_mouse(
     y: int | None = ...,
     clicks: int = ...,
     interval: float = ...,
-) -> Tuple[Any, int, int]:
+) -> Tuple[Tuple[int, int, int], int, int]:
     """在指定座標按下並放開滑鼠按鍵；``clicks=2`` 就是雙擊"""
 
 def AC_click_text(
     target: str,
     mouse_keycode: int | str = ...,
     lang: str = ...,
-    region: Optional[Sequence[int]] = ...,
+    region: Sequence[int] | None = ...,
     min_confidence: float = ...,
     case_sensitive: bool = ...,
     backend: Any = ...,
@@ -993,10 +990,10 @@ def AC_cofailure_pairs(runs: Any, threshold: Any = ...) -> Dict[str, Any]:
     """Adapter: test pairs that fail together above a Jaccard threshold."""
 
 def AC_collapse_control(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: collapse a tree node / combobox (ExpandCollapsePattern)."""
 
@@ -1024,16 +1021,16 @@ def AC_compare_field_value(expected: Any, actual: Any, mode: Any = ...) -> Dict[
 def AC_compliance_report(
     evidence: Any,
     frameworks: Any = ...,
-    path: Optional[str] = ...,
+    path: str | None = ...,
     fmt: str = ...,
 ) -> Dict[str, Any]:
     """Adapter: map governance evidence to SOC2/ISO controls; optionally write."""
 
 def AC_computer_use(
     goal: str,
-    display_width_px: Optional[int] = ...,
-    display_height_px: Optional[int] = ...,
-    display_number: Optional[int] = ...,
+    display_width_px: int | None = ...,
+    display_height_px: int | None = ...,
+    display_number: int | None = ...,
     max_steps: int = ...,
     wall_seconds: float = ...,
     model: str = ...,
@@ -1047,18 +1044,18 @@ def AC_config_causal_commit(
     bucket: dict[str, object],
     actor: dict[str, object],
     operation_id: str,
-    options: Optional[dict[str, object]] = ...,
+    options: dict[str, object] | None = ...,
     *,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     ...
 
 def AC_config_causal_fetch(
     endpoint: str,
     user_id: str,
-    options: Optional[dict[str, object]] = ...,
+    options: dict[str, object] | None = ...,
     *,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     ...
 
@@ -1095,67 +1092,67 @@ def AC_consensus_point(candidates: Any, cluster_radius: Any = ...) -> Dict[str, 
     """Adapter: agreed target point from clustered grounding proposals."""
 
 def AC_control_expand_state(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: the expand/collapse state of a control."""
 
 def AC_control_get_state(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
-) -> Optional[dict]:
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
+) -> Dict[str, Any] | None:
     """Adapter: read everything a native control currently holds, in one call."""
 
 def AC_control_get_value(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
-) -> Optional[str]:
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
+) -> str | None:
     """Adapter: read a native control's value via the accessibility backend."""
 
 def AC_control_invoke(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: invoke a native control (e.g. press a button)."""
 
 def AC_control_range(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: read a slider / progress range (RangeValuePattern)."""
 
 def AC_control_set_value(
     value: str,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: set a native control's value via the accessibility backend."""
 
 def AC_control_text_attributes(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: read a control selection's font/colour formatting (TextPattern)."""
 
 def AC_control_toggle(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: toggle a native control (e.g. a checkbox)."""
 
@@ -1173,19 +1170,19 @@ def AC_costs_record(
     model: str,
     input_tokens: int,
     output_tokens: int,
-    label: Optional[str] = ...,
-    run_id: Optional[str] = ...,
-    user: Optional[str] = ...,
+    label: str | None = ...,
+    run_id: str | None = ...,
+    user: str | None = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: append one LLM call to the cost-telemetry log."""
 
 def AC_costs_summary(limit: int = ...) -> Dict[str, Any]:
     """Executor adapter: aggregate cost events by model / provider / day."""
 
-def AC_create_project(project_path: Optional[str] = ..., parent_name: str = ...) -> None:
+def AC_create_project(project_path: str | None = ..., parent_name: str = ...) -> None:
     """Create project directory structure and templates."""
 
-def AC_create_signing_keypair(private_path: str, public_path: str, passphrase: Optional[str] = ...) -> Dict[str, Any]:
+def AC_create_signing_keypair(private_path: str, public_path: str, passphrase: str | None = ...) -> Dict[str, Any]:
     """Executor adapter: create an Ed25519 action-signing key pair."""
 
 def AC_critical_steps(steps: Any, top: Any = ...) -> Dict[str, Any]:
@@ -1206,7 +1203,7 @@ def AC_decode_body(headers: Any, body_base64: str) -> Dict[str, Any]:
 def AC_decode_conversion_mode(flags: Any) -> Dict[str, Any]:
     """Adapter: decode an IMM32 conversion bitmask into named flags (pure)."""
 
-def AC_decrypt_action_file(enc_path: str, key: Optional[str] = ..., output_path: Optional[str] = ...) -> Dict[str, Any]:
+def AC_decrypt_action_file(enc_path: str, key: str | None = ..., output_path: str | None = ...) -> Dict[str, Any]:
     """Executor adapter: decrypt a Fernet-encrypted action file."""
 
 def AC_dedup_check(name: str, message_id: str, ttl_s: Any = ...) -> Dict[str, Any]:
@@ -1225,7 +1222,7 @@ def AC_delta_observation(
 ) -> Dict[str, Any]:
     """Adapter: token-budgeted \"what changed\" delta between two element frames."""
 
-def AC_describe_screen(app_name: Optional[str] = ...) -> Dict[str, Any]:
+def AC_describe_screen(app_name: str | None = ...) -> Dict[str, Any]:
     """Adapter: structured 'where am I' description of the live screen."""
 
 def AC_describe_stats(values: Any) -> Dict[str, Any]:
@@ -1317,7 +1314,7 @@ def AC_edge_match_all(
 def AC_effect_near_point(before: Any, after: Any, point: Any, radius: Any = ...) -> Dict[str, Any]:
     """Adapter: did any before/after change land within radius of a point."""
 
-def AC_egress_allow(allow: Optional[List[str]] = ..., deny: Optional[List[str]] = ...) -> Dict[str, Any]:
+def AC_egress_allow(allow: List[str] | None = ..., deny: List[str] | None = ...) -> Dict[str, Any]:
     """Adapter: lock the HTTP client to an egress allow/deny policy."""
 
 def AC_egress_check(url: str) -> Dict[str, Any]:
@@ -1341,9 +1338,9 @@ def AC_element_remove(path: str, key: str) -> Dict[str, Any]:
 def AC_element_save(
     path: str,
     key: str,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: save a named native-UI locator (object repository)."""
 
@@ -1352,7 +1349,7 @@ def AC_email_trigger_add(
     username: str,
     password: str,
     script_path: str,
-    port: Optional[int] = ...,
+    port: int | None = ...,
     use_ssl: bool = ...,
     mailbox: str = ...,
     search_criteria: str = ...,
@@ -1380,20 +1377,20 @@ def AC_emit_event(
     event_type: str,
     data: Any = ...,
     source: str = ...,
-    subject: Optional[str] = ...,
-    url: Optional[str] = ...,
+    subject: str | None = ...,
+    url: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: build a CloudEvent; optionally POST it (egress-guarded)."""
 
-def AC_encrypt_action_file(path: str, key: Optional[str] = ...) -> Dict[str, Any]:
+def AC_encrypt_action_file(path: str, key: str | None = ...) -> Dict[str, Any]:
     """Executor adapter: Fernet-encrypt an action file to <path>.enc."""
 
 def AC_ensure_field_value(
     desired: Any,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
     attempts: Any = ...,
 ) -> Dict[str, Any]:
     """Adapter: idempotently set a native control's value and verify (read-act)."""
@@ -1404,7 +1401,7 @@ def AC_enumerate_monitors() -> Dict[str, Any]:
 def AC_evaluate_flag(flags: Any, key: str, context: Any = ...) -> Dict[str, Any]:
     """Adapter: evaluate a feature flag (flags/context dict or JSON string)."""
 
-def AC_evaluate_slo(records: Any, target: float, window_s: Optional[float] = ...) -> Dict[str, Any]:
+def AC_evaluate_slo(records: Any, target: float, window_s: float | None = ...) -> Dict[str, Any]:
     """Adapter: SLI + error budget for outcome records (list or JSON string)."""
 
 def AC_evaluate_trajectory(trajectory: Any, rubric: Any) -> Dict[str, Any]:
@@ -1414,26 +1411,26 @@ def AC_ewma(values: Any, alpha: Any = ...) -> Dict[str, Any]:
     """Adapter: exponentially-weighted moving average."""
 
 def AC_execute_action(
-    action_list: Union[list, dict],
+    action_list: List[Any] | Dict[str, Any],
     raise_on_error: bool = ...,
     _validated: bool = ...,
     dry_run: bool = ...,
-    step_callback: Optional[Callable[[list], None]] = ...,
+    step_callback: Callable[[List[Any]], None] | None = ...,
     result_callback: Any = ...,
 ) -> Dict[str, str]:
     """執行 action list"""
 
-def AC_execute_files(execute_files_list: list) -> List[Dict[str, str]]:
+def AC_execute_files(execute_files_list: List[str]) -> List[Dict[str, str]]:
     """執行 action files"""
 
 def AC_execute_process(exe_path: str) -> None:
     """Start an external executable file."""
 
 def AC_expand_control(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: expand a tree node / combobox (ExpandCollapsePattern)."""
 
@@ -1450,13 +1447,13 @@ def AC_expect_poll(
 def AC_explain_config(layers: Any, key: str) -> Dict[str, Any]:
     """Adapter: report the value and winning layer for a dotted config key."""
 
-def AC_export_sarif(findings: Any, path: Optional[str] = ..., tool_name: str = ...) -> Dict[str, Any]:
+def AC_export_sarif(findings: Any, path: str | None = ..., tool_name: str = ...) -> Dict[str, Any]:
     """Adapter: build (and optionally write) a SARIF 2.1.0 document."""
 
 def AC_extract_fields(
     text: str,
-    fields: Optional[List[str]] = ...,
-    patterns: Optional[Dict[str, str]] = ...,
+    fields: List[str] | None = ...,
+    patterns: Dict[str, str] | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: extract structured fields from free text."""
 
@@ -1470,10 +1467,10 @@ def AC_failure_hook_fire(
     source: str,
     source_id: str,
     error_text: str = ...,
-    script_path: Optional[str] = ...,
-    screenshot_path: Optional[str] = ...,
+    script_path: str | None = ...,
+    screenshot_path: str | None = ...,
     log_tail: str = ...,
-    metadata: Optional[Dict[str, Any]] = ...,
+    metadata: Dict[str, Any] | None = ...,
 ) -> List[Dict[str, Any]]:
     """Executor adapter: file a ticket through every registered backend."""
 
@@ -1501,10 +1498,10 @@ def AC_find_color_region(rgb: Any, tolerance: Any = ..., min_area: Any = ..., re
 def AC_find_control_text(
     text: str,
     ignore_case: Any = ...,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: whether text occurs in a control (TextPattern.FindText)."""
 
@@ -1540,10 +1537,10 @@ def AC_find_text_lines(y_tolerance: Any = ..., region: Any = ...) -> Dict[str, A
 def AC_find_text_regex(
     pattern: str,
     lang: str = ...,
-    region: Optional[List[int]] = ...,
+    region: List[int] | None = ...,
     min_confidence: float = ...,
     flags: int = ...,
-) -> List[dict]:
+) -> List[Dict[str, Any]]:
     """Executor adapter: regex OCR search returning JSON-friendly dicts."""
 
 def AC_find_text_regions(
@@ -1565,10 +1562,10 @@ def AC_flow_order(boxes: Any, min_gap: Any = ...) -> Dict[str, Any]:
     """Adapter: column-aware reading order of OCR boxes (XY-cut)."""
 
 def AC_focus_control(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Executor adapter: set keyboard focus on a control (UIA SetFocus)."""
 
@@ -1646,7 +1643,7 @@ def AC_generate_candidate_from_log(
 
 def AC_generate_code(
     source: Any,
-    output: Optional[str] = ...,
+    output: str | None = ...,
     target: str = ...,
     name: str = ...,
     style: str = ...,
@@ -1656,9 +1653,9 @@ def AC_generate_code(
 def AC_generate_data(
     schema: Dict[str, Any],
     count: int = ...,
-    path: Optional[str] = ...,
-    fmt: Optional[str] = ...,
-    seed: Optional[int] = ...,
+    path: str | None = ...,
+    fmt: str | None = ...,
+    seed: int | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: generate synthetic rows; write to ``path`` when given."""
 
@@ -1674,10 +1671,10 @@ def AC_generate_json() -> Tuple[Dict[str, Dict[str, str]], Dict[str, Dict[str, s
 def AC_generate_json_report(json_file_name: str = ...) -> None:
     """Output JSON report files (success and failure)."""
 
-def AC_generate_sbom(path: Optional[str] = ..., root: str = ...) -> Dict[str, Any]:
+def AC_generate_sbom(path: str | None = ..., root: str = ...) -> Dict[str, Any]:
     """Adapter: build (or write) a CycloneDX SBOM for the project."""
 
-def AC_generate_sop(actions: List[Any], title: str = ..., path: Optional[str] = ...) -> Dict[str, Any]:
+def AC_generate_sop(actions: List[Any], title: str = ..., path: str | None = ...) -> Dict[str, Any]:
     """Adapter: build (or write) a step-by-step SOP from an action list."""
 
 def AC_generate_xml() -> Tuple[str | bytes, str | bytes]:
@@ -1686,7 +1683,7 @@ def AC_generate_xml() -> Tuple[str | bytes, str | bytes]:
 def AC_generate_xml_report(xml_file_name: str = ...) -> None:
     """Output XML report files (success and failure)."""
 
-def AC_get_asset(name: str, environment: str = ..., db: Optional[str] = ...) -> Dict[str, Any]:
+def AC_get_asset(name: str, environment: str = ..., db: str | None = ...) -> Dict[str, Any]:
     """Adapter: read a typed asset (credential stays a reference)."""
 
 def AC_get_client_rect(title: str) -> Dict[str, Any]:
@@ -1705,51 +1702,51 @@ def AC_get_clipboard_rtf() -> Dict[str, Any]:
     """Adapter: read the clipboard's RTF document string (Windows)."""
 
 def AC_get_control_text(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: read a control's full text via TextPattern (multiline-safe)."""
 
 def AC_get_element_properties(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: read rich UIA properties (enabled/offscreen/help/status/keys)."""
 
-def AC_get_keyboard_keys_table() -> dict:
+def AC_get_keyboard_keys_table() -> dict[str, int]:
     """取得鍵盤對應表"""
 
 def AC_get_mouse_position() -> tuple[int, int] | None:
     """取得滑鼠目前位置"""
 
-def AC_get_mouse_table() -> dict:
+def AC_get_mouse_table() -> Dict[str, Tuple[int, int, int]]:
     """取得滑鼠按鍵對應表"""
 
 def AC_get_selected_text(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: read a control's currently selected text (TextPattern)."""
 
 def AC_get_selection(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: a container's selection state (SelectionPattern)."""
 
 def AC_get_visible_text(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: read only the on-screen text of a control (TextPattern)."""
 
@@ -1786,7 +1783,7 @@ def AC_guard_text(text: str, threshold: int = ...) -> Dict[str, Any]:
 def AC_handle_file_dialog(
     path: str,
     action: str = ...,
-    window_title: Optional[str] = ...,
+    window_title: str | None = ...,
     timeout_s: float = ...,
     confirm_key: str = ...,
 ) -> Dict[str, Any]:
@@ -1814,13 +1811,13 @@ def AC_history_capture(*, body: list[object], source_id: str = ..., script_path:
 def AC_history_clear() -> int:
     """Delete every row (and its artifact file); return rows removed."""
 
-def AC_history_list(limit: int = ..., source_type: Optional[str] = ...) -> List[dict]:
+def AC_history_list(limit: int = ..., source_type: str | None = ...) -> List[Dict[str, Any]]:
     """Executor adapter: list run history as plain dicts (JSON-friendly)."""
 
 def AC_hold_key(key: str, duration_s: Any = ..., rate_hz: Any = ...) -> Dict[str, Any]:
     """Adapter: hold a key for a duration (or auto-repeat at rate_hz)."""
 
-def AC_hotkey(key_code_list: list, is_shift: bool = ...) -> Tuple[str, str]:
+def AC_hotkey(key_code_list: Sequence[int | str], is_shift: bool = ...) -> Tuple[str, str]:
     """模擬組合鍵 (依序按下，再反向放開)"""
 
 def AC_http_replay(cassette: Any, url: str, method: str = ...) -> Dict[str, Any]:
@@ -1829,10 +1826,10 @@ def AC_http_replay(cassette: Any, url: str, method: str = ...) -> Dict[str, Any]
 def AC_http_request(
     url: str,
     method: str = ...,
-    headers: Optional[Mapping[str, Any]] = ...,
+    headers: Mapping[str, Any] | None = ...,
     json_body: Any = ...,
     data: Any = ...,
-    auth: Optional[Mapping[str, Any]] = ...,
+    auth: Mapping[str, Any] | None = ...,
     timeout: float = ...,
 ) -> Dict[str, Any]:
     """Perform an HTTP(S) request and return a response dict."""
@@ -1844,7 +1841,7 @@ def AC_human_move(
     curve: float = ...,
     overshoot: float = ...,
     jitter: float = ...,
-    seed: Optional[int] = ...,
+    seed: int | None = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: move the mouse to (x, y) along a human-like path."""
 
@@ -1853,7 +1850,7 @@ def AC_human_type(
     base_delay: float = ...,
     jitter: float = ...,
     pause_chance: float = ...,
-    seed: Optional[int] = ...,
+    seed: int | None = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: type text with humanized inter-key delays."""
 
@@ -1905,25 +1902,25 @@ def AC_inspector_reset() -> Dict[str, Any]:
 def AC_inspector_summary() -> Dict[str, Any]:
     ...
 
-def AC_ios_alert_accept(url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_alert_accept(url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """Accept the alert or system dialog showing."""
 
-def AC_ios_alert_dismiss(url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_alert_dismiss(url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """Dismiss the alert or system dialog showing."""
 
-def AC_ios_app_state(app_id: str, url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_app_state(app_id: str, url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """not_installed, not_running, background or foreground."""
 
 def AC_ios_click_element(
-    name: Optional[str] = ...,
-    class_name: Optional[str] = ...,
-    predicate: Optional[str] = ...,
+    name: str | None = ...,
+    class_name: str | None = ...,
+    predicate: str | None = ...,
     timeout_s: float = ...,
-    url: Optional[str] = ...,
+    url: str | None = ...,
 ) -> Dict[str, int]:
     ...
 
-def AC_ios_device_info(url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_device_info(url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """Backend, versions and capabilities of the device. Sends no input."""
 
 def AC_ios_drag(
@@ -1933,29 +1930,29 @@ def AC_ios_drag(
     y2: int,
     hold_s: float = ...,
     duration_s: float = ...,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Press, hold so the item lifts, and move it."""
 
-def AC_ios_dump_source(url: Optional[str] = ...) -> str:
+def AC_ios_dump_source(url: str | None = ...) -> str:
     ...
 
 def AC_ios_find_by_description(
     description: str,
-    model: Optional[str] = ...,
+    model: str | None = ...,
     tap: bool = ...,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Ask a vision-language model where something is on the device screen."""
 
 def AC_ios_find_element(
-    name: Optional[str] = ...,
-    class_name: Optional[str] = ...,
-    predicate: Optional[str] = ...,
+    name: str | None = ...,
+    class_name: str | None = ...,
+    predicate: str | None = ...,
     timeout_s: float = ...,
-    url: Optional[str] = ...,
+    url: str | None = ...,
 ) -> Dict[str, int]:
     ...
 
@@ -1963,8 +1960,8 @@ def AC_ios_find_image(
     template_path: str,
     detect_threshold: float = ...,
     tap: bool = ...,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Template-match in the device screen; answers in device points."""
 
@@ -1973,26 +1970,30 @@ def AC_ios_find_text(
     lang: str = ...,
     min_confidence: float = ...,
     tap: bool = ...,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """OCR the device screen for text; answers in device points."""
 
-def AC_ios_get_clipboard(url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_get_clipboard(
+    allow_app_switch: bool = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
+) -> Any:
     """Read the device clipboard's text."""
 
-def AC_ios_install_app(path: str, url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_install_app(path: str, url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """Install an app package from the host."""
 
-def AC_ios_launch_app(app_id: str, url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_launch_app(app_id: str, url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """Launch an app; returns its state."""
 
 def AC_ios_long_press(
     x: int,
     y: int,
     duration_s: float = ...,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Press and hold at a point."""
 
@@ -2002,91 +2003,84 @@ def AC_ios_pinch(
     scale: float,
     duration_s: float = ...,
     span: int = ...,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Two-finger pinch: scale above 1 zooms in, below 1 out."""
 
-def AC_ios_press_key(key: str, url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_press_key(key: str, url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """Press a hardware key (home, volumeUp, volumeDown)."""
 
 def AC_ios_pull_file(
     remote_path: str,
     local_path: str,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Copy a device file to the host."""
 
 def AC_ios_push_file(
     local_path: str,
     remote_path: str,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Copy a host file to the device."""
 
-def AC_ios_screen_info(url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_screen_info(url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """Pixel size, point size, scale and orientation of the current screen."""
 
-def AC_ios_screenshot(file_path: str, url: Optional[str] = ...) -> str:
+def AC_ios_screenshot(file_path: str, url: str | None = ...) -> str:
     ...
 
 def AC_ios_self_heal(
-    template_path: Optional[str] = ...,
-    description: Optional[str] = ...,
+    template_path: str | None = ...,
+    description: str | None = ...,
     detect_threshold: float = ...,
-    model: Optional[str] = ...,
+    model: str | None = ...,
     tap: bool = ...,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Template first, VLM on a miss, against the device screen."""
 
-def AC_ios_set_clipboard(text: str, url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_set_clipboard(text: str, url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """Put text on the device clipboard."""
 
 def AC_ios_start_recording(
-    remote_path: Optional[str] = ...,
-    time_limit_s: Optional[int] = ...,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    remote_path: str | None = ...,
+    time_limit_s: int | None = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Start recording the device screen."""
 
-def AC_ios_stop_app(app_id: str, url: Optional[str] = ..., device_timeout_s: Optional[float] = ...) -> Any:
+def AC_ios_stop_app(app_id: str, url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """Stop an app; returns its state."""
 
 def AC_ios_stop_recording(
     local_path: str,
-    remote_path: Optional[str] = ...,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    remote_path: str | None = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Stop recording and save the video on the host."""
 
-def AC_ios_swipe(
-    x1: int,
-    y1: int,
-    x2: int,
-    y2: int,
-    duration_s: float = ...,
-    url: Optional[str] = ...,
-) -> Dict[str, Any]:
+def AC_ios_swipe(x1: int, y1: int, x2: int, y2: int, duration_s: float = ..., url: str | None = ...) -> Dict[str, Any]:
     ...
 
-def AC_ios_tap(x: int, y: int, url: Optional[str] = ...) -> Dict[str, int]:
+def AC_ios_tap(x: int, y: int, url: str | None = ...) -> Dict[str, int]:
     ...
 
-def AC_ios_type(text: str, url: Optional[str] = ...) -> str:
+def AC_ios_type(text: str, url: str | None = ...) -> str:
     ...
 
 def AC_ios_wait_for_app(
     app_id: str,
     timeout_s: float = ...,
     state: str = ...,
-    url: Optional[str] = ...,
-    device_timeout_s: Optional[float] = ...,
+    url: str | None = ...,
+    device_timeout_s: float | None = ...,
 ) -> Any:
     """Wait until an app reaches a state; raises on timeout."""
 
@@ -2100,13 +2094,13 @@ def AC_journal_capture(
     *,
     body: list[object],
     path: str,
-    run_id: Optional[str] = ...,
-    device_id: Optional[str] = ...,
-    session_id: Optional[str] = ...,
+    run_id: str | None = ...,
+    device_id: str | None = ...,
+    session_id: str | None = ...,
 ) -> Any:
     """Capture named body arguments on their executor without eager interpolation."""
 
-def AC_journal_read(path: str | Path, *, run_id: Optional[str] = ..., limit: int = ...) -> list[dict[str, object]]:
+def AC_journal_read(path: str | Path, *, run_id: str | None = ..., limit: int = ...) -> list[dict[str, object]]:
     """Return bounded sanitized snapshots under the enclosing journal roots."""
 
 def AC_json_extract(data: Any, mapping: Any) -> Dict[str, Any]:
@@ -2119,7 +2113,7 @@ def AC_jwt_decode(
     token: str,
     key: str,
     algorithms: Any = ...,
-    audience: Optional[str] = ...,
+    audience: str | None = ...,
     leeway: float = ...,
 ) -> Dict[str, Any]:
     """Adapter: verify a JWT and return {ok, claims} or {ok: False, error}."""
@@ -2143,22 +2137,22 @@ def AC_lease_valid(token: str) -> Dict[str, Any]:
     """Adapter: report whether a lease token is still valid."""
 
 def AC_legacy_default_action(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: fire an old control's MSAA default action (Value/Invoke fallback)."""
 
 def AC_legacy_info(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: MSAA IAccessible info of an old control (LegacyIAccessible)."""
 
-def AC_list_assets(environment: Optional[str] = ..., db: Optional[str] = ...) -> Dict[str, Any]:
+def AC_list_assets(environment: str | None = ..., db: str | None = ...) -> Dict[str, Any]:
     """Adapter: list assets, optionally restricted to one environment."""
 
 def AC_list_executions() -> List[Dict[str, Any]]:
@@ -2171,10 +2165,10 @@ def AC_list_usb_devices() -> Dict[str, Any]:
     """Executor adapter: enumerate USB devices on this host."""
 
 def AC_list_views(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: a control's selectable views (MultipleViewPattern)."""
 
@@ -2183,16 +2177,16 @@ def AC_list_windows(titled_only: bool = ...) -> List[Tuple[int, str]]:
 
 def AC_llm_plan(
     description: str,
-    examples: Optional[list] = ...,
-    model: Optional[str] = ...,
+    examples: List[Dict[str, Any]] | None = ...,
+    model: str | None = ...,
     max_tokens: int = ...,
-) -> list:
+) -> List[List[Any]]:
     """Executor adapter: plan without executing, using current command set."""
 
 def AC_llm_run(
     description: str,
-    examples: Optional[list] = ...,
-    model: Optional[str] = ...,
+    examples: List[Dict[str, Any]] | None = ...,
+    model: str | None = ...,
     max_tokens: int = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: plan and execute, as the caller this thread already serves (so no ``owner``)."""
@@ -2235,7 +2229,7 @@ def AC_locate_image_center(image: Any, detect_threshold: float = ..., draw_image
 def AC_locate_text(
     target: str,
     lang: str = ...,
-    region: Optional[Sequence[int]] = ...,
+    region: Sequence[int] | None = ...,
     min_confidence: float = ...,
     case_sensitive: bool = ...,
     backend: Any = ...,
@@ -2257,7 +2251,7 @@ def AC_make_json_patch(old: Any, new: Any) -> Dict[str, Any]:
 def AC_mark_click(mark_id: int) -> Dict[str, Any]:
     """Adapter: click the element behind a numbered mark."""
 
-def AC_mark_screen(app_name: Optional[str] = ..., render_path: Optional[str] = ...) -> Dict[str, Any]:
+def AC_mark_screen(app_name: str | None = ..., render_path: str | None = ...) -> Dict[str, Any]:
     """Adapter: number live UI elements (Set-of-Marks) for VLM grounding."""
 
 def AC_mask_rows(rows: List[Dict[str, Any]], rules: Dict[str, str]) -> Dict[str, Any]:
@@ -2380,7 +2374,7 @@ def AC_match_with_trust(
 ) -> Dict[str, Any]:
     """Adapter: best template match with trust metrics (ambiguity / PSR)."""
 
-def AC_mcp_manifest(path: Optional[str] = ..., include_tools: bool = ...) -> Dict[str, Any]:
+def AC_mcp_manifest(path: str | None = ..., include_tools: bool = ...) -> Dict[str, Any]:
     """Adapter: build (or write) the MCP registry server.json manifest."""
 
 def AC_mcp_tool_schema(name: str, *, read_only: bool | None = ...) -> dict[str, Any]:
@@ -2401,9 +2395,9 @@ def AC_memory_recent(db: str, limit: int = ...) -> Dict[str, Any]:
 def AC_memory_remember(
     db: str,
     goal: str,
-    steps: Optional[List[Any]] = ...,
+    steps: List[Any] | None = ...,
     outcome: str = ...,
-    tags: Optional[List[str]] = ...,
+    tags: List[str] | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: store an agent episode (goal/trajectory/outcome)."""
 
@@ -2437,19 +2431,19 @@ def AC_most_salient(
 ) -> Dict[str, Any]:
     """Adapter: the single most visually-salient region (where to look)."""
 
-def AC_mouse_left(x: Optional[int] = ..., y: Optional[int] = ...) -> Tuple[int, int, int]:
+def AC_mouse_left(x: int | None = ..., y: int | None = ...) -> Tuple[Tuple[int, int, int], int, int]:
     """Click the mouse left mouse button at (x, y)."""
 
-def AC_mouse_middle(x: Optional[int] = ..., y: Optional[int] = ...) -> Tuple[int, int, int]:
+def AC_mouse_middle(x: int | None = ..., y: int | None = ...) -> Tuple[Tuple[int, int, int], int, int]:
     """Click the mouse middle mouse button at (x, y)."""
 
-def AC_mouse_right(x: Optional[int] = ..., y: Optional[int] = ...) -> Tuple[int, int, int]:
+def AC_mouse_right(x: int | None = ..., y: int | None = ...) -> Tuple[Tuple[int, int, int], int, int]:
     """Click the mouse right mouse button at (x, y)."""
 
 def AC_mouse_scroll(
     scroll_value: int,
-    x: Optional[int] = ...,
-    y: Optional[int] = ...,
+    x: int | None = ...,
+    y: int | None = ...,
     scroll_direction: str = ...,
 ) -> Tuple[int, int | str]:
     """模擬滑鼠滾輪操作"""
@@ -2460,10 +2454,10 @@ def AC_move_along_path(waypoints: Any, easing: str = ..., per_segment_steps: Any
 def AC_move_element(
     x: Any,
     y: Any,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: move a UIA element to (x, y) (TransformPattern)."""
 
@@ -2477,8 +2471,8 @@ def AC_move_window(
     title_substring: str,
     x: int,
     y: int,
-    width: Optional[int] = ...,
-    height: Optional[int] = ...,
+    width: int | None = ...,
+    height: int | None = ...,
     case_sensitive: bool = ...,
 ) -> bool:
     """Move (and optionally resize) the first matching window."""
@@ -2501,7 +2495,7 @@ def AC_normalize_url(url: str, sort_query: bool = ..., drop_fragment: bool = ...
 def AC_notify(title: str, message: str = ...) -> Dict[str, Any]:
     """Executor adapter: show a cross-platform desktop notification."""
 
-def AC_notify_webhook(url: str, text: str, transport: str = ..., title: Optional[str] = ...) -> Dict[str, Any]:
+def AC_notify_webhook(url: str, text: str, transport: str = ..., title: str | None = ...) -> Dict[str, Any]:
     """Adapter: send a chat/webhook notification (slack/discord/teams/raw)."""
 
 def AC_observation_index(elements: Any, viewport: Any = ..., max_elements: Any = ...) -> Dict[str, Any]:
@@ -2511,7 +2505,7 @@ def AC_observe_add(
     name: str,
     kind: str = ...,
     event: str = ...,
-    actions: Optional[List[Any]] = ...,
+    actions: List[Any] | None = ...,
     **params: Any,
 ) -> Dict[str, Any]:
     """Adapter: watch image/text/pixel; run ``actions`` on the event."""
@@ -2535,7 +2529,7 @@ def AC_ocr_languages() -> Dict[str, Any]:
     """Executor adapter: installed Tesseract languages; ``None`` when unknown."""
 
 def AC_ocr_read_structure(
-    region: Optional[List[int]] = ...,
+    region: List[int] | None = ...,
     lang: str = ...,
     min_confidence: float = ...,
 ) -> Dict[str, Any]:
@@ -2675,14 +2669,14 @@ def AC_presence_unregister(viewer_id: str) -> Dict[str, Any]:
 def AC_presence_update_cursor(viewer_id: str, x: int, y: int) -> Dict[str, Any]:
     ...
 
-def AC_press_keyboard_key(keycode: int | str, is_shift: bool = ..., skip_record: bool = ...) -> Optional[str]:
+def AC_press_keyboard_key(keycode: int | str, is_shift: bool = ..., skip_record: bool = ...) -> str | None:
     """按下指定鍵"""
 
 def AC_press_mouse(
     mouse_keycode: int | str,
-    x: Optional[int] = ...,
-    y: Optional[int] = ...,
-) -> tuple[Any, int, int] | None:
+    x: int | None = ...,
+    y: int | None = ...,
+) -> tuple[Tuple[int, int, int], int, int] | None:
     """按下滑鼠按鍵"""
 
 def AC_probe_capabilities() -> dict[str, object]:
@@ -2697,21 +2691,21 @@ def AC_profiler_disable() -> Dict[str, Any]:
 def AC_profiler_enable() -> Dict[str, Any]:
     ...
 
-def AC_profiler_hot_spots(limit: int = ...) -> List[dict]:
+def AC_profiler_hot_spots(limit: int = ...) -> List[Dict[str, object]]:
     """Executor adapter: top N actions by total time, as dicts."""
 
 def AC_profiler_reset() -> Dict[str, Any]:
     ...
 
-def AC_profiler_stats(limit: Optional[int] = ...) -> List[dict]:
+def AC_profiler_stats(limit: int | None = ...) -> List[Dict[str, object]]:
     """Executor adapter: dump profiler stats as JSON-friendly dicts."""
 
 def AC_propose_elements(region: Any = ..., min_area: Any = ..., iou_threshold: Any = ...) -> Dict[str, Any]:
     """Adapter: propose text/widget element boxes from pixels (device)."""
 
 def AC_pseudo_localize(
-    text: Optional[str] = ...,
-    mapping: Optional[Dict[str, Any]] = ...,
+    text: str | None = ...,
+    mapping: Dict[str, Any] | None = ...,
     expansion: float = ...,
 ) -> Dict[str, Any]:
     """Adapter: pseudo-localize a string or a whole catalog mapping."""
@@ -2744,7 +2738,7 @@ def AC_quarantine_list() -> List[Dict[str, Any]]:
 def AC_quarantine_remove(name: str) -> Dict[str, Any]:
     ...
 
-def AC_queue_add(db: str, data: Any, reference: Optional[str] = ..., name: str = ...) -> Dict[str, Any]:
+def AC_queue_add(db: str, data: Any, reference: str | None = ..., name: str = ...) -> Dict[str, Any]:
     """Adapter: enqueue a work item (skips live duplicate references)."""
 
 def AC_queue_complete(
@@ -2752,7 +2746,7 @@ def AC_queue_complete(
     item_id: int,
     output: Any = ...,
     name: str = ...,
-    claim: Optional[int] = ...,
+    claim: int | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: mark a work item successful (``claim`` from AC_queue_next)."""
 
@@ -2763,11 +2757,11 @@ def AC_queue_fail(
     kind: str = ...,
     max_retries: int = ...,
     name: str = ...,
-    claim: Optional[int] = ...,
+    claim: int | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: fail a work item (application errors retry, business don't)."""
 
-def AC_queue_next(db: str, name: str = ..., stale_after_s: Optional[float] = ...) -> Optional[Dict[str, Any]]:
+def AC_queue_next(db: str, name: str = ..., stale_after_s: float | None = ...) -> Dict[str, Any] | None:
     """Adapter: atomically claim the next work item (or None)."""
 
 def AC_queue_stats(db: str, name: str = ...) -> Dict[str, int]:
@@ -2776,7 +2770,7 @@ def AC_queue_stats(db: str, name: str = ...) -> Dict[str, int]:
 def AC_rank_changes(scored_boxes: Any, threshold: Any = ...) -> Dict[str, Any]:
     """Adapter: rank scored element boxes by how much they changed (pure)."""
 
-def AC_rank_tests(flows: List[str], history_path: Optional[str] = ..., window: int = ...) -> Dict[str, Any]:
+def AC_rank_tests(flows: List[str], history_path: str | None = ..., window: int = ...) -> Dict[str, Any]:
     """Adapter: score flows by risk (riskiest first)."""
 
 def AC_rate_limit(name: str, rate: float = ..., capacity: float = ..., n: float = ...) -> Dict[str, Any]:
@@ -2791,22 +2785,22 @@ def AC_read_document(path: str) -> Dict[str, Any]:
 def AC_read_presentation(path: str) -> Dict[str, Any]:
     """Adapter: read a .pptx file's per-slide text."""
 
-def AC_read_qr(region: Union[List[int], str, None] = ...) -> Dict[str, Any]:
+def AC_read_qr(region: List[int] | str | None = ...) -> Dict[str, Any]:
     """Executor adapter: decode QR codes in a screen region."""
 
 def AC_read_table(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> List[List[str]]:
     """Adapter: read a grid/table/list control as rows of cell strings."""
 
 def AC_read_text_in_region(
-    region: Optional[List[int]] = ...,
+    region: List[int] | None = ...,
     lang: str = ...,
     min_confidence: float = ...,
-) -> List[dict]:
+) -> List[Dict[str, Any]]:
     """Executor adapter: dump OCR hits in a region as JSON-friendly dicts."""
 
 def AC_read_workbook(path: str, sheet: str = ...) -> Dict[str, Any]:
@@ -2821,10 +2815,10 @@ def AC_reading_order(elements: Any, row_tol: Any = ...) -> Dict[str, Any]:
 def AC_realize_item(
     item_name: str,
     by: str = ...,
-    container_name: Optional[str] = ...,
-    container_role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    container_name: str | None = ...,
+    container_role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: find + realize a virtualized list/grid item (VirtualizedItem)."""
 
@@ -2839,18 +2833,18 @@ def AC_redact_pii(text: str, kinds: Any = ..., mode: str = ..., mask_char: str =
 
 def AC_redact_screenshot(
     file_path: str,
-    output_path: Optional[str] = ...,
+    output_path: str | None = ...,
     policy: str = ...,
-    regions: Optional[List[List[int]]] = ...,
-    accessibility: Optional[List[Dict[str, Any]]] = ...,
-    ocr: Optional[List[Dict[str, Any]]] = ...,
+    regions: List[List[int]] | None = ...,
+    accessibility: List[Dict[str, Any]] | None = ...,
+    ocr: List[Dict[str, Any]] | None = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: blur PII regions in a saved screenshot."""
 
 def AC_redact_secret_text(text: str, mask: str = ...) -> Dict[str, Any]:
     """Adapter: mask secret-looking tokens within a free-text string."""
 
-def AC_region_color_stats(region: Union[List[int], str, None] = ..., buckets: int = ...) -> Dict[str, Any]:
+def AC_region_color_stats(region: List[int] | str | None = ..., buckets: int = ...) -> Dict[str, Any]:
     """Executor adapter: average + dominant colour of a screen region."""
 
 def AC_region_contrast(region: Any = ...) -> Dict[str, Any]:
@@ -2859,14 +2853,14 @@ def AC_region_contrast(region: Any = ...) -> Dict[str, Any]:
 def AC_region_stability(frames: Any, settle_threshold: Any = ...) -> Dict[str, Any]:
     """Adapter: how settled an injected frame sequence is (consecutive SSIM)."""
 
-def AC_release_keyboard_key(keycode: int | str, is_shift: bool = ..., skip_record: bool = ...) -> Optional[str]:
+def AC_release_keyboard_key(keycode: int | str, is_shift: bool = ..., skip_record: bool = ...) -> str | None:
     """放開指定鍵"""
 
 def AC_release_mouse(
     mouse_keycode: int | str,
-    x: Optional[int] = ...,
-    y: Optional[int] = ...,
-) -> tuple[Any, int, int] | None:
+    x: int | None = ...,
+    y: int | None = ...,
+) -> tuple[Tuple[int, int, int], int, int] | None:
     """放開滑鼠按鍵"""
 
 def AC_remote_connect(host: str, port: int, token: str, timeout: float = ...) -> Dict[str, Any]:
@@ -2884,24 +2878,24 @@ def AC_remote_send_input(action: Dict[str, Any]) -> Dict[str, Any]:
 def AC_remote_viewer_status() -> Dict[str, Any]:
     ...
 
-def AC_repair_approve(suggestion_id: str, db: Optional[str] = ...) -> Dict[str, Any]:
+def AC_repair_approve(suggestion_id: str, db: str | None = ...) -> Dict[str, Any]:
     """Adapter: approve a pending locator-repair suggestion."""
 
-def AC_repair_pending(db: Optional[str] = ...) -> Dict[str, Any]:
+def AC_repair_pending(db: str | None = ...) -> Dict[str, Any]:
     """Adapter: list locator-repair suggestions awaiting review."""
 
 def AC_repair_record(
     key: str,
     method: str,
     coordinates: Any = ...,
-    description: Optional[str] = ...,
+    description: str | None = ...,
     confidence: float = ...,
     auto_threshold: float = ...,
-    db: Optional[str] = ...,
+    db: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: record a corrected locator from a heal (auto-apply or queue)."""
 
-def AC_repair_resolved(key: str, db: Optional[str] = ...) -> Dict[str, Any]:
+def AC_repair_resolved(key: str, db: str | None = ...) -> Dict[str, Any]:
     """Adapter: return the learned corrected locator for a key (or null)."""
 
 def AC_replay_timeline(events: List[Dict[str, Any]], speed: float = ...) -> Dict[str, Any]:
@@ -2913,10 +2907,10 @@ def AC_replay_trace(trace: Any) -> Dict[str, Any]:
 def AC_resize_element(
     width: Any,
     height: Any,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: resize a UIA element (TransformPattern)."""
 
@@ -2935,7 +2929,7 @@ def AC_resolve_refs(obj: Any) -> Dict[str, Any]:
 def AC_rest_api_start(
     host: str = ...,
     port: int = ...,
-    token: Optional[str] = ...,
+    token: str | None = ...,
     enable_audit: bool = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: start the singleton REST API server."""
@@ -2946,7 +2940,7 @@ def AC_rest_api_status() -> Dict[str, Any]:
 def AC_rest_api_stop() -> Dict[str, Any]:
     ...
 
-def AC_restore_window_layout(layout: Union[List[Dict[str, Any]], str]) -> Dict[str, Any]:
+def AC_restore_window_layout(layout: List[Dict[str, Any]] | str, maximize: bool = ...) -> Dict[str, Any]:
     """Executor adapter: move windows back to a saved layout (list or path)."""
 
 def AC_retry_after(response: Any) -> Dict[str, Any]:
@@ -2964,7 +2958,7 @@ def AC_retry_delay(
 def AC_revoke_lease(token: str) -> Dict[str, Any]:
     """Adapter: revoke a lease token immediately."""
 
-def AC_rrule_next(rule: str, dtstart: str, now: Optional[str] = ...) -> Dict[str, Any]:
+def AC_rrule_next(rule: str, dtstart: str, now: str | None = ...) -> Dict[str, Any]:
     """Adapter: next RRULE occurrence at/after now (ISO in, ISO out)."""
 
 def AC_rrule_occurrences(rule: str, dtstart: str, count: int = ...) -> Dict[str, Any]:
@@ -2975,7 +2969,7 @@ def AC_run_agent(
     backend: str = ...,
     max_steps: int = ...,
     wall_seconds: float = ...,
-    model: Optional[str] = ...,
+    model: str | None = ...,
     max_tokens: int = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: drive the closed-loop ``AgentLoop`` against ``goal``."""
@@ -2986,8 +2980,8 @@ def AC_run_chaos(spec: Any) -> Dict[str, Any]:
 def AC_run_dag(
     definition: Dict[str, Any],
     max_parallel: int = ...,
-    batch_id: Optional[str] = ...,
-    recovery: Optional[Dict[str, Any]] = ...,
+    batch_id: str | None = ...,
+    recovery: Dict[str, Any] | None = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: run a cross-host DAG definition."""
 
@@ -3003,7 +2997,7 @@ def AC_run_resumable(
     actions: List[Any],
     run_id: str,
     db: str,
-    variables: Optional[Dict[str, Any]] = ...,
+    variables: Dict[str, Any] | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: run actions with checkpoint/resume keyed by run_id."""
 
@@ -3015,10 +3009,10 @@ def AC_run_state_machine(spec: Any) -> Dict[str, Any]:
 
 def AC_run_suite(
     spec: Dict[str, Any],
-    tags: Optional[List[str]] = ...,
+    tags: List[str] | None = ...,
     respect_quarantine: bool = ...,
-    junit_path: Optional[str] = ...,
-    allure_dir: Optional[str] = ...,
+    junit_path: str | None = ...,
+    allure_dir: str | None = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: run a QA suite and optionally write CI reports."""
 
@@ -3028,10 +3022,10 @@ def AC_s3_delete(key: str) -> Dict[str, Any]:
 def AC_s3_download(key: str, local_path: str) -> Dict[str, Any]:
     """Adapter: download an artifact from the default S3 store."""
 
-def AC_s3_list(prefix: Optional[str] = ...) -> Dict[str, Any]:
+def AC_s3_list(prefix: str | None = ...) -> Dict[str, Any]:
     """Adapter: list artifact keys in the default S3 store."""
 
-def AC_s3_upload(local_path: str, key: Optional[str] = ...) -> Dict[str, Any]:
+def AC_s3_upload(local_path: str, key: str | None = ...) -> Dict[str, Any]:
     """Adapter: upload an artifact to the default S3 store; return the key."""
 
 def AC_salient_regions(
@@ -3043,7 +3037,7 @@ def AC_salient_regions(
 ) -> Dict[str, Any]:
     """Adapter: ranked visually-salient regions of an image / the screen."""
 
-def AC_save_window_layout(path: Optional[str] = ...) -> Dict[str, Any]:
+def AC_save_window_layout(path: str | None = ...) -> Dict[str, Any]:
     """Executor adapter: snapshot every window's geometry (optionally to file)."""
 
 def AC_scale_sweep(
@@ -3058,7 +3052,7 @@ def AC_scale_sweep(
 def AC_scan_secrets(data: Any) -> Dict[str, Any]:
     """Adapter: scan JSON/data for hardcoded secrets."""
 
-def AC_scan_vulns(components: Any, advisories: Any = ..., sarif_path: Optional[str] = ...) -> Dict[str, Any]:
+def AC_scan_vulns(components: Any, advisories: Any = ..., sarif_path: str | None = ...) -> Dict[str, Any]:
     """Adapter: match SBOM components against an OSV advisory database."""
 
 def AC_score_candidates(
@@ -3072,7 +3066,7 @@ def AC_score_candidates(
 def AC_score_step(record: Any) -> Dict[str, Any]:
     """Adapter: rule-based score of a critic record."""
 
-def AC_screen_changed(app_name: Optional[str] = ...) -> Dict[str, Any]:
+def AC_screen_changed(app_name: str | None = ...) -> Dict[str, Any]:
     """Adapter: diff the live screen against the last snapshot baseline."""
 
 def AC_screen_diff(before: List[Dict[str, Any]], after: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -3081,17 +3075,17 @@ def AC_screen_diff(before: List[Dict[str, Any]], after: List[Dict[str, Any]]) ->
 def AC_screen_size() -> Tuple[int, int]:
     """get screen size"""
 
-def AC_screen_snapshot(app_name: Optional[str] = ...) -> Dict[str, Any]:
+def AC_screen_snapshot(app_name: str | None = ...) -> Dict[str, Any]:
     """Adapter: snapshot the live a11y tree as a diff baseline."""
 
-def AC_screenshot(file_path: Optional[str] = ..., screen_region: Optional[list] = ...) -> Any:
+def AC_screenshot(file_path: str | None = ..., screen_region: List[int] | None = ...) -> Any:
     """use to capture current screen"""
 
 def AC_scroll_control_into_view(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: scroll a control into view (ScrollItemPattern)."""
 
@@ -3135,39 +3129,39 @@ def AC_segment_hsv(lower_hsv: Any, upper_hsv: Any, min_area: Any = ..., region: 
     """Adapter: locate blobs inside an explicit HSV band on the screen."""
 
 def AC_select_control_item(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: select a list / tree / tab item (SelectionItemPattern)."""
 
 def AC_select_control_text(
     text: str,
     ignore_case: Any = ...,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: find + select text in a control (TextPattern.FindText + Select)."""
 
 def AC_select_tests(
     flows: List[str],
-    k: Optional[int] = ...,
-    threshold: Optional[float] = ...,
-    history_path: Optional[str] = ...,
+    k: int | None = ...,
+    threshold: float | None = ...,
+    history_path: str | None = ...,
     window: int = ...,
 ) -> Dict[str, Any]:
     """Adapter: pick the riskiest flows to run (top-k / threshold)."""
 
 def AC_self_heal_click(
-    template_path: Optional[str] = ...,
-    description: Optional[str] = ...,
+    template_path: str | None = ...,
+    description: str | None = ...,
     mouse_keycode: str = ...,
     detect_threshold: float = ...,
-    screen_region: Optional[List[int]] = ...,
-    model: Optional[str] = ...,
+    screen_region: List[int] | None = ...,
+    model: str | None = ...,
     raise_on_miss: bool = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: locate with self-heal, then click."""
@@ -3176,11 +3170,11 @@ def AC_self_heal_evaluate(path: str) -> dict[str, object]:
     """Executor adapter shared by scripts, CLI and server action execution."""
 
 def AC_self_heal_locate(
-    template_path: Optional[str] = ...,
-    description: Optional[str] = ...,
+    template_path: str | None = ...,
+    description: str | None = ...,
     detect_threshold: float = ...,
-    screen_region: Optional[List[int]] = ...,
-    model: Optional[str] = ...,
+    screen_region: List[int] | None = ...,
+    model: str | None = ...,
     raise_on_miss: bool = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: template-first locate with VLM fallback."""
@@ -3214,7 +3208,7 @@ def AC_set_asset(
     value: Any,
     asset_type: str = ...,
     environment: str = ...,
-    db: Optional[str] = ...,
+    db: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: store a typed, environment-scoped asset."""
 
@@ -3232,10 +3226,10 @@ def AC_set_clipboard_rtf(text: str) -> Dict[str, Any]:
 
 def AC_set_control_range(
     value: Any,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: set a slider / progress / spinner value (RangeValuePattern)."""
 
@@ -3256,10 +3250,10 @@ def AC_set_topmost(title: str, on: Any = ...) -> Dict[str, Any]:
 
 def AC_set_view(
     view: str,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: switch a control to a named view (MultipleViewPattern)."""
 
@@ -3268,10 +3262,10 @@ def AC_set_volume(level: Any) -> Dict[str, Any]:
 
 def AC_set_window_state(
     state: str,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> bool:
     """Adapter: set a window's visual state normal/maximized/minimized."""
 
@@ -3281,23 +3275,19 @@ def AC_settle_point(churns: Any, quiet_samples: Any = ..., max_churn: Any = ...)
 def AC_shard_suite(
     flows: List[str],
     shards: int = ...,
-    history_path: Optional[str] = ...,
+    history_path: str | None = ...,
     window: int = ...,
 ) -> Dict[str, Any]:
     """Adapter: balance flows into duration-aware shards."""
 
-def AC_shell_command(
-    shell_command: Union[str, List[str], None] = ...,
-    *,
-    command: Union[str, List[str], None] = ...,
-) -> None:
+def AC_shell_command(shell_command: str | List[str] | None = ..., *, command: str | List[str] | None = ...) -> None:
     """Execute shell command with shell=False."""
 
 def AC_sign_action_file(
     path: str,
-    key: Optional[str] = ...,
-    private_key_path: Optional[str] = ...,
-    passphrase: Optional[str] = ...,
+    key: str | None = ...,
+    private_key_path: str | None = ...,
+    passphrase: str | None = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: write an Ed25519 or HMAC signature sidecar for a file."""
 
@@ -3321,7 +3311,7 @@ def AC_skill_save(
     name: str,
     actions: List[Any],
     description: str = ...,
-    tags: Optional[List[str]] = ...,
+    tags: List[str] | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: save a reusable action sequence (skill)."""
 
@@ -3360,7 +3350,7 @@ def AC_start_mcp_http_server(
     host: str = ...,
     port: int = ...,
     mcp: Any = ...,
-    auth_token: Optional[str] = ...,
+    auth_token: str | None = ...,
     ssl_context: Any = ...,
     user_store: Any = ...,
 ) -> Any:
@@ -3381,7 +3371,7 @@ def AC_start_remote_host(
     port: int = ...,
     fps: float = ...,
     quality: int = ...,
-    region: Optional[List[int]] = ...,
+    region: List[int] | None = ...,
     max_clients: int = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: start the singleton remote-desktop host."""
@@ -3389,7 +3379,7 @@ def AC_start_remote_host(
 def AC_start_webrtc_host(token: str, read_only: bool = ...) -> Dict[str, Any]:
     """Executor adapter: allocate the singleton WebRTC host."""
 
-def AC_start_webrtc_viewer(token: str, viewer_id: Optional[str] = ...) -> Dict[str, Any]:
+def AC_start_webrtc_viewer(token: str, viewer_id: str | None = ...) -> Dict[str, Any]:
     """Executor adapter: allocate the singleton WebRTC viewer."""
 
 def AC_start_ws_host(
@@ -3398,18 +3388,18 @@ def AC_start_ws_host(
     port: int = ...,
     fps: float = ...,
     quality: int = ...,
-    region: Optional[List[int]] = ...,
+    region: List[int] | None = ...,
     max_clients: int = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: start the singleton WebSocket-transport host."""
 
-def AC_stop_execution(run_id: Optional[str] = ..., reason: str = ...) -> Dict[str, Any]:
+def AC_stop_execution(run_id: str | None = ..., reason: str = ...) -> Dict[str, Any]:
     """Adapter: ask one stoppable run (or every other one) to stop."""
 
-def AC_stop_record() -> list:
+def AC_stop_record() -> List[List[Any]]:
     """stop current record"""
 
-def AC_stop_record_timeline() -> List[dict]:
+def AC_stop_record_timeline() -> List[Dict[str, Any]]:
     """Adapter: stop recording and return the full replayable timeline."""
 
 def AC_stop_remote_host() -> Dict[str, Any]:
@@ -3432,7 +3422,7 @@ def AC_sync_adapter_apply(
     entries: dict[str, dict[str, object]],
     *,
     path_policy: Any = ...,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     """Persist incoming portable versions as an inert profile, preserving all parallel alternatives."""
 
@@ -3444,7 +3434,7 @@ def AC_sync_adapter_resolve(
     is_deleted: bool = ...,
     *,
     path_policy: Any = ...,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     """Resolve exactly the reviewed alternatives into a value or tombstone; runtime sources stay untouched."""
 
@@ -3452,7 +3442,7 @@ def AC_sync_adapter_snapshot(
     profile: dict[str, object],
     *,
     path_policy: Any = ...,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     """Capture source changes and return portable heads without activating anything."""
 
@@ -3461,7 +3451,7 @@ def AC_sync_asset_manifest(
     paths: list[str],
     *,
     path_policy: Any = ...,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     """Read an explicit confined local selection into a portable content-addressed manifest."""
 
@@ -3471,7 +3461,7 @@ def AC_sync_assets(
     target_root: str,
     *,
     path_policy: Any = ...,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     """Copy an explicit local selection into one verified immutable generation without executing its data."""
 
@@ -3485,10 +3475,10 @@ def AC_sync_outbox_flush(
     path: str,
     endpoint: str,
     user_id: str,
-    options: Optional[dict[str, object]] = ...,
+    options: dict[str, object] | None = ...,
     *,
     path_policy: Any = ...,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     ...
 
@@ -3508,19 +3498,19 @@ def AC_sync_peer_control(
     endpoint: str,
     user_id: str,
     operation: str = ...,
-    options: Optional[dict[str, object]] = ...,
+    options: dict[str, object] | None = ...,
     *,
     path_policy: Any = ...,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     ...
 
 def AC_sync_peer_state(
     state: dict[str, object],
     operation: str,
-    peer_id: Optional[str] = ...,
-    revision: Optional[int] = ...,
-    epoch: Optional[int] = ...,
+    peer_id: str | None = ...,
+    revision: int | None = ...,
+    epoch: int | None = ...,
     full_resync: bool = ...,
 ) -> dict[str, object]:
     ...
@@ -3531,7 +3521,7 @@ def AC_sync_profile_load(
     expected_digest: str,
     *,
     path_policy: Any = ...,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     """Load one completely verified native working snapshot without registering or enabling received work."""
 
@@ -3540,45 +3530,45 @@ def AC_sync_profile_materialize(
     target_root: str,
     *,
     path_policy: Any = ...,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     """Publish one complete ready local profile generation without replacing active workspace files."""
 
 def AC_sync_workspace(
     configuration: dict[str, object],
     operation: str = ...,
-    options: Optional[dict[str, object]] = ...,
+    options: dict[str, object] | None = ...,
     *,
     path_policy: Any = ...,
-    cancelled: Optional[Callable[[], bool]] = ...,
+    cancelled: Callable[[], bool] | None = ...,
 ) -> dict[str, object]:
     """Coordinate explicit local profiles; even local status requires private DRIVE authority at server boundaries."""
 
-def AC_tab_order(app_name: Optional[str] = ..., max_results: int = ...) -> Dict[str, Any]:
+def AC_tab_order(app_name: str | None = ..., max_results: int = ...) -> Dict[str, Any]:
     """Executor adapter: focusable elements in keyboard Tab order."""
 
 def AC_table_cell(
     row: Any,
     column: Any,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: the cell at (row, column) with its span (GridItemPattern)."""
 
 def AC_table_headers(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: a table's row/column header labels (TablePattern)."""
 
 def AC_tag_kinds(elements: Any) -> Dict[str, Any]:
     """Adapter: label fused boxes text/widget by source (pure)."""
 
-def AC_take_golden(path: str, region: Optional[List[int]] = ...) -> str:
+def AC_take_golden(path: str, region: List[int] | None = ...) -> str:
     """Adapter: capture and save a golden/baseline image."""
 
 def AC_template_candidate_accept(bundle_path: str, dataset_path: str, expected_revision: str) -> dict[str, object]:
@@ -3639,11 +3629,11 @@ def AC_trace_inject(headers: Any = ..., traceparent: Any = ...) -> Dict[str, Any
 
 def AC_trace_record(
     operation: str,
-    model: Optional[str] = ...,
-    system: Optional[str] = ...,
-    input_tokens: Optional[int] = ...,
-    output_tokens: Optional[int] = ...,
-    tool_name: Optional[str] = ...,
+    model: str | None = ...,
+    system: str | None = ...,
+    input_tokens: int | None = ...,
+    output_tokens: int | None = ...,
+    tool_name: str | None = ...,
     duration_s: float = ...,
     status: str = ...,
 ) -> Dict[str, Any]:
@@ -3672,7 +3662,7 @@ def AC_tween_drag(
 ) -> Dict[str, Any]:
     """Adapter: drag along an eased path from start to end."""
 
-def AC_type_keyboard(keycode: int | str, is_shift: bool = ..., skip_record: bool = ...) -> Optional[str]:
+def AC_type_keyboard(keycode: int | str, is_shift: bool = ..., skip_record: bool = ...) -> str | None:
     """模擬輸入 (按下再放開)"""
 
 def AC_type_unicode(text: str, modifier: str = ...) -> Dict[str, Any]:
@@ -3693,7 +3683,7 @@ def AC_urls_equal(first: str, second: str) -> Dict[str, Any]:
 def AC_usb_acl_add(
     vendor_id: str,
     product_id: str,
-    serial: Optional[str] = ...,
+    serial: str | None = ...,
     allow: bool = ...,
     prompt_on_open: bool = ...,
     label: str = ...,
@@ -3709,7 +3699,7 @@ def AC_usb_acl_import(path: str, replace: bool = ...) -> Dict[str, Any]:
 def AC_usb_acl_list() -> Dict[str, Any]:
     ...
 
-def AC_usb_acl_remove(vendor_id: str, product_id: str, serial: Optional[str] = ...) -> Dict[str, Any]:
+def AC_usb_acl_remove(vendor_id: str, product_id: str, serial: str | None = ...) -> Dict[str, Any]:
     ...
 
 def AC_usb_acl_set_default(policy: str) -> Dict[str, Any]:
@@ -3718,7 +3708,7 @@ def AC_usb_acl_set_default(policy: str) -> Dict[str, Any]:
 def AC_usb_loopback_list() -> Dict[str, Any]:
     ...
 
-def AC_usb_loopback_open(vendor_id: str, product_id: str, serial: Optional[str] = ...) -> Dict[str, Any]:
+def AC_usb_loopback_open(vendor_id: str, product_id: str, serial: str | None = ...) -> Dict[str, Any]:
     ...
 
 def AC_usb_passthrough_enable(enabled: bool = ...) -> Dict[str, Any]:
@@ -3727,13 +3717,13 @@ def AC_usb_passthrough_enable(enabled: bool = ...) -> Dict[str, Any]:
 def AC_usb_passthrough_status() -> Dict[str, Any]:
     ...
 
-def AC_usb_recent_events(since: int = ..., limit: Optional[int] = ...) -> List[Dict[str, Any]]:
+def AC_usb_recent_events(since: int = ..., limit: int | None = ...) -> List[Dict[str, Any]]:
     ...
 
 def AC_usb_remote_list() -> Dict[str, Any]:
     ...
 
-def AC_usb_remote_open(vendor_id: str, product_id: str, serial: Optional[str] = ...) -> Dict[str, Any]:
+def AC_usb_remote_open(vendor_id: str, product_id: str, serial: str | None = ...) -> Dict[str, Any]:
     ...
 
 def AC_usb_watch_start(poll_interval_s: float = ...) -> Dict[str, Any]:
@@ -3746,21 +3736,21 @@ def AC_user_add(
     user_id: str,
     role: str = ...,
     display_name: str = ...,
-    tags: Optional[List[str]] = ...,
-    users_path: Optional[str] = ...,
+    tags: List[str] | None = ...,
+    users_path: str | None = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: add an RBAC user; the reply carries its token, once."""
 
-def AC_user_list(users_path: Optional[str] = ...) -> List[Dict[str, Any]]:
+def AC_user_list(users_path: str | None = ...) -> List[Dict[str, Any]]:
     """Executor adapter: list RBAC users (no tokens, no hashes)."""
 
-def AC_user_remove(user_id: str, users_path: Optional[str] = ...) -> Dict[str, Any]:
+def AC_user_remove(user_id: str, users_path: str | None = ...) -> Dict[str, Any]:
     """Executor adapter: remove an RBAC user."""
 
-def AC_user_rotate_token(user_id: str, users_path: Optional[str] = ...) -> Dict[str, Any]:
+def AC_user_rotate_token(user_id: str, users_path: str | None = ...) -> Dict[str, Any]:
     """Executor adapter: replace an RBAC user's token; the reply carries it, once."""
 
-def AC_user_set_role(user_id: str, role: str, users_path: Optional[str] = ...) -> Dict[str, Any]:
+def AC_user_set_role(user_id: str, role: str, users_path: str | None = ...) -> Dict[str, Any]:
     """Executor adapter: change an RBAC user's role."""
 
 def AC_validate_action(action: Any, screen: Any = ..., targets: Any = ...) -> Dict[str, Any]:
@@ -3777,9 +3767,9 @@ def AC_validate_rows(rows: List[Dict[str, Any]], schema: Dict[str, Any]) -> Dict
 
 def AC_verify_action_file(
     path: str,
-    key: Optional[str] = ...,
+    key: str | None = ...,
     raise_on_fail: bool = ...,
-    public_key_path: Optional[str] = ...,
+    public_key_path: str | None = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: verify an action file against its signature sidecar."""
 
@@ -3788,10 +3778,10 @@ def AC_verify_artifact(name: str, content: Any, approvals_dir: str = ..., extens
 
 def AC_verify_field_value(
     expected: Any,
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
     mode: Any = ...,
 ) -> Dict[str, Any]:
     """Adapter: read a native control's value back and compare to expected."""
@@ -3801,17 +3791,13 @@ def AC_verify_provenance(statement: Any, files: Any) -> Dict[str, Any]:
 
 def AC_vlm_click(
     description: str,
-    screen_region: Optional[List[int]] = ...,
-    model: Optional[str] = ...,
+    screen_region: List[int] | None = ...,
+    model: str | None = ...,
     backend: Any = ...,
 ) -> bool:
     """Locate by description, then click the center of the match."""
 
-def AC_vlm_locate(
-    description: str,
-    screen_region: Optional[List[int]] = ...,
-    model: Optional[str] = ...,
-) -> Optional[List[int]]:
+def AC_vlm_locate(description: str, screen_region: List[int] | None = ..., model: str | None = ...) -> List[int] | None:
     """Executor adapter: return VLM-located coords as a JSON-safe list."""
 
 def AC_voice_clear() -> Dict[str, Any]:
@@ -3839,8 +3825,8 @@ def AC_wait_actionable(
     """Adapter: wait until a template is visible + stable before acting."""
 
 def AC_wait_clipboard_change(
-    baseline: Optional[str] = ...,
-    target: Optional[str] = ...,
+    baseline: str | None = ...,
+    target: str | None = ...,
     contains: bool = ...,
     timeout_s: float = ...,
     poll_interval_s: float = ...,
@@ -3921,7 +3907,7 @@ def AC_wait_region_idle(
     """Executor adapter: smart wait for a sub-region to stop moving."""
 
 def AC_wait_screen_stable(
-    region: Optional[List[int]] = ...,
+    region: List[int] | None = ...,
     timeout_s: float = ...,
     poll_interval_s: float = ...,
     stable_for_s: float = ...,
@@ -3932,7 +3918,7 @@ def AC_wait_screen_stable(
 def AC_wait_text(
     target: str,
     lang: str = ...,
-    region: Optional[Sequence[int]] = ...,
+    region: Sequence[int] | None = ...,
     timeout: float = ...,
     poll: float = ...,
     min_confidence: float = ...,
@@ -3972,14 +3958,14 @@ def AC_wait_window_title(
 ) -> Dict[str, Any]:
     """Executor adapter: wait for a window title (regex) to appear / vanish."""
 
-def AC_walk_tree(app_name: Optional[str] = ..., max_results: int = ...) -> Dict[str, Any]:
+def AC_walk_tree(app_name: str | None = ..., max_results: int = ...) -> Dict[str, Any]:
     """Executor adapter: dump the a11y tree with friendly roles + node paths."""
 
 def AC_watchdog_add(
     title: str,
     action: str = ...,
     case_sensitive: bool = ...,
-    name: Optional[str] = ...,
+    name: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: register a popup-dismissal rule on the default watchdog."""
 
@@ -3993,9 +3979,9 @@ def AC_watchdog_stop() -> Dict[str, Any]:
     """Adapter: stop the background popup watchdog."""
 
 def AC_wcag_audit(
-    app_name: Optional[str] = ...,
-    contrast_pairs: Optional[List[Dict[str, Any]]] = ...,
-    texts: Optional[List[str]] = ...,
+    app_name: str | None = ...,
+    contrast_pairs: List[Dict[str, Any]] | None = ...,
+    texts: List[str] | None = ...,
     level: str = ...,
     min_target_px: int = ...,
     max_results: int = ...,
@@ -4008,7 +3994,7 @@ def AC_web_available() -> bool:
 def AC_web_current_url() -> Any:
     """Convenience executor: return the active browser tab's URL."""
 
-def AC_web_list_commands() -> list:
+def AC_web_list_commands() -> List[str]:
     """Return every WR_* command the local WebRunner install exposes."""
 
 def AC_web_open(url: str, browser: str = ..., **driver_kwargs: Any) -> Any:
@@ -4017,10 +4003,10 @@ def AC_web_open(url: str, browser: str = ..., **driver_kwargs: Any) -> Any:
 def AC_web_quit() -> Any:
     """Convenience executor: tear down WebRunner driver sessions."""
 
-def AC_web_run(action: Optional[Dict[str, Any]] = ..., **action_kwargs: Any) -> Any:
+def AC_web_run(action: Dict[str, Any] | None = ..., **action_kwargs: Any) -> Any:
     """Bridge one WR_* action into the WebRunner executor (Phase 7.7)."""
 
-def AC_web_run_actions(actions: List[Dict[str, Any]]) -> list:
+def AC_web_run_actions(actions: List[Dict[str, Any]]) -> List[Any]:
     """Bridge a list of WR_* actions through the WebRunner executor."""
 
 def AC_web_screenshot(file_path: str) -> Any:
@@ -4029,8 +4015,8 @@ def AC_web_screenshot(file_path: str) -> Any:
 def AC_webhook_add(
     path: str,
     script_path: str,
-    methods: Optional[List[str]] = ...,
-    token: Optional[str] = ...,
+    methods: List[str] | None = ...,
+    token: str | None = ...,
 ) -> Dict[str, Any]:
     ...
 
@@ -4058,7 +4044,7 @@ def AC_webrtc_create_offer(peer_label: str = ...) -> Dict[str, Any]:
 def AC_webrtc_host_status() -> Dict[str, Any]:
     ...
 
-def AC_webrtc_process_offer(offer_sdp: str, expected_dtls_fingerprint: Optional[str] = ...) -> Dict[str, Any]:
+def AC_webrtc_process_offer(offer_sdp: str, expected_dtls_fingerprint: str | None = ...) -> Dict[str, Any]:
     ...
 
 def AC_webrtc_send_input(action: Dict[str, Any]) -> Dict[str, Any]:
@@ -4068,10 +4054,10 @@ def AC_webrtc_viewer_status() -> Dict[str, Any]:
     ...
 
 def AC_window_interaction_state(
-    name: Optional[str] = ...,
-    role: Optional[str] = ...,
-    app_name: Optional[str] = ...,
-    automation_id: Optional[str] = ...,
+    name: str | None = ...,
+    role: str | None = ...,
+    app_name: str | None = ...,
+    automation_id: str | None = ...,
 ) -> Dict[str, Any]:
     """Adapter: a window's interaction state (ready/blocked/not_responding)."""
 
@@ -4099,10 +4085,10 @@ def AC_workflow_manifest(directory: str, path: str, names: list[str]) -> dict[st
 def AC_workflow_open(path: str) -> bool:
     """Open one explicitly approved existing document with its registered application."""
 
-def AC_workflow_wait(selector: dict, expected: Any, state: bool = ..., timeout_seconds: float = ...) -> Any:
+def AC_workflow_wait(selector: dict[str, Any], expected: Any, state: bool = ..., timeout_seconds: float = ...) -> Any:
     """Wait for one scoped control's exact value/state without replaying set, invoke or submit."""
 
-def AC_write(write_string: str, is_shift: bool = ...) -> Optional[str]:
+def AC_write(write_string: str, is_shift: bool = ...) -> str | None:
     """模擬輸入整個字串"""
 
 def AC_write_document(path: str, paragraphs: List[str]) -> Dict[str, Any]:

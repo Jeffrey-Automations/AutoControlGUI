@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import ctypes
 import platform
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from je_auto_control.utils.usb.passthrough.backend import (
     BackendDevice, LibusbBackend, UsbBackend, UsbHandle,
@@ -45,7 +45,7 @@ _CF_PATH = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
 _STRING_BUFFER_BYTES = 512
 
 
-def _load_frameworks():
+def _load_frameworks() -> Tuple[ctypes.CDLL, ctypes.CDLL]:
     """Load + bind IOKit and CoreFoundation; raise RuntimeError on failure."""
     try:
         iokit = ctypes.cdll.LoadLibrary(_IOKIT_PATH)
@@ -175,7 +175,7 @@ def _read_device(iokit: ctypes.CDLL, core: ctypes.CDLL,
 
 
 def _property_ref(iokit: ctypes.CDLL, core: ctypes.CDLL,
-                  service: int, key_name: str):
+                  service: int, key_name: str) -> Optional[int]:
     key = core.CFStringCreateWithCString(
         None, key_name.encode("utf-8"), _K_CFSTRING_UTF8,
     )

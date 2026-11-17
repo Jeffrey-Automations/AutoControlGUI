@@ -6,17 +6,18 @@ tree, so it runs off the GUI thread (:class:`~je_auto_control.gui._tab_task.TabT
 the contrast check is arithmetic and stays where it is.
 """
 import functools
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QHBoxLayout, QLabel, QLineEdit,
+    QAbstractItemView, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -30,13 +31,13 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-def _ints(raw: str):
+def _ints(raw: str) -> list[int]:
     return [int(p.strip()) for p in raw.split(",") if p.strip()]
 
 
-def _audit(app: Optional[str]) -> dict:
+def _audit(app: Optional[str]) -> dict[str, Any]:
     """Worker thread: run the audit and hand back plain data."""
-    report: dict = ac.run_audit(app_name=app).to_dict()
+    report: dict[str, Any] = ac.run_audit(app_name=app).to_dict()
     return report
 
 
@@ -79,19 +80,23 @@ class A11yAuditTab(TranslatableMixin, QWidget):
         # Audit/contrast commands run from the Actions menu; the tab keeps
         # only the inputs, the issue table, and the summary line.
         root = QVBoxLayout(self)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(_t("audit_app")))
-        row.addWidget(self._app, stretch=1)
-        root.addLayout(row)
-        crow = QHBoxLayout()
-        crow.addWidget(QLabel(_t("audit_contrast_label")))
+        root.setSpacing(12)
+        colours = QWidget()
+        colours.setProperty("role", "bare")
+        crow = QHBoxLayout(colours)
+        crow.setContentsMargins(0, 0, 0, 0)
         crow.addWidget(self._fg)
         crow.addWidget(self._bg)
-        root.addLayout(crow)
-        root.addWidget(self._table, stretch=1)
+        form = QFormLayout()
+        form.addRow(self._tr(QLabel(), "audit_app"), self._app)
+        form.addRow(self._tr(QLabel(), "audit_contrast_label"), colours)
+        root.addWidget(Card().add(form))
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._summary.setWordWrap(True)
+        set_role(self._summary, "hint")
         root.addWidget(self._summary)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("audit_run", self._on_run),
@@ -106,7 +111,7 @@ class A11yAuditTab(TranslatableMixin, QWidget):
     def _on_audit_error(self, error: object) -> None:
         self._summary.setText(str(error))
 
-    def _render(self, report: dict) -> None:
+    def _render(self, report: dict[str, Any]) -> None:
         issues = report["issues"]
         self._table.setRowCount(len(issues))
         for row, issue in enumerate(issues):

@@ -16,7 +16,7 @@ from je_auto_control.utils.rbac.users import Capability
 OPERATIONS = ("review_authorization", "create_authorized")
 
 
-def source_snapshot(connection: Any, parent: dict) -> str:
+def source_snapshot(connection: Any, parent: dict[str, Any]) -> str:
     """Require a real published current version and bind review to its immutable candidate."""
     latest = connection.execute("SELECT COALESCE(MAX(version),0) FROM agent_skill_candidates WHERE skill_id=?",
                                 (parent["skill_id"],)).fetchone()[0]
@@ -25,7 +25,7 @@ def source_snapshot(connection: Any, parent: dict) -> str:
     return digest({"candidate": parent["id"], "digest": parent["digest"], "version": latest})
 
 
-def existing_authorization(connection: Any, provenance: dict, spec_hash: str) -> str | None:
+def existing_authorization(connection: Any, provenance: dict[str, Any], spec_hash: str) -> str | None:
     """Find an identical approved candidate and reject publication races inside the insert transaction."""
     if provenance.get("kind") != "origin_reauthorization":
         return None
@@ -49,7 +49,7 @@ class SkillReauthorization:
     def __init__(self, skills: Any) -> None:
         self.skills = skills
 
-    def control(self, operation: str, request: dict) -> dict:
+    def control(self, operation: str, request: dict[str, Any]) -> dict[str, Any]:
         """Review passively or save a new draft; validation and publication remain separate operations."""
         fields = {"candidate_id"}
         if operation == "create_authorized":
@@ -73,9 +73,10 @@ class SkillReauthorization:
                 return self._review(parent, snapshot, authorization, template)
             return self._create(parent, request, authorization, template)
 
-    def _review(self, parent: dict, snapshot: str, authorization: dict, template: dict) -> dict:
+    def _review(self, parent: dict[str, Any], snapshot: str, authorization: dict[str, Any],
+                template: dict[str, Any]) -> dict[str, Any]:
         issues = []
-        reviewed: dict | None = None
+        reviewed: dict[str, Any] | None = None
         try:
             # pylint: disable-next=protected-access  # reason: reviewed templates use the common host/scope validator
             reviewed = self.skills.runtime._validated_spec(template).to_dict()
@@ -85,7 +86,8 @@ class SkillReauthorization:
                 "authorization": authorization["context"], "spec": reviewed, "issues": issues,
                 "approval_required": True, "validation_required": True, "publication_inherited": False}
 
-    def _create(self, parent: dict, request: dict, authorization: dict, template: dict) -> dict:
+    def _create(self, parent: dict[str, Any], request: dict[str, Any], authorization: dict[str, Any],
+                template: dict[str, Any]) -> dict[str, Any]:
         if (request["snapshot"] != authorization["context"]["source_snapshot"]
                 or request["authorization_review"] != authorization["review"]):
             raise AgentTaskError("skill authorization context changed; review authorization again")

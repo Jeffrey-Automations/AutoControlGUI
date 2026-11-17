@@ -14,12 +14,14 @@ from typing import Any, Dict, List, Optional, Tuple
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel,
+    QAbstractItemView, QCheckBox, QComboBox, QFormLayout, QGroupBox, QLabel,
     QLineEdit, QMessageBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import filled_item
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -65,25 +67,19 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
 
     def _build_layout(self) -> None:
         root = QVBoxLayout(self)
-        path_row = QHBoxLayout()
-        path_row.addWidget(self._tr(QLabel(), "rest_users_path"))
-        path_row.addWidget(self._path_input, stretch=1)
-        root.addLayout(path_row)
+        path_form = QFormLayout()
+        path_form.addRow(self._tr(QLabel(), "rest_users_path"), self._path_input)
+        root.addLayout(path_form)
         self._tr(self._enable_check, "rest_users_enable")
         root.addWidget(self._enable_check)
-        root.addWidget(self._table)
-        edit_row = QHBoxLayout()
-        edit_row.addWidget(self._tr(QLabel(), "rest_users_id"))
-        edit_row.addWidget(self._id_input, stretch=1)
-        edit_row.addWidget(self._tr(QLabel(), "rest_users_name"))
-        edit_row.addWidget(self._name_input, stretch=1)
-        edit_row.addWidget(self._tr(QLabel(), "rest_users_role"))
-        edit_row.addWidget(self._role_input)
-        root.addLayout(edit_row)
-        token_row = QHBoxLayout()
-        token_row.addWidget(self._tr(QLabel(), "rest_users_new_token"))
-        token_row.addWidget(self._token_value, stretch=1)
-        root.addLayout(token_row)
+        root.addWidget(self._table, stretch=1)
+        root.addLayout(flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
+            ("rest_users_id", self._id_input), ("rest_users_name", self._name_input),
+            ("rest_users_role", self._role_input)))))
+        token_form = QFormLayout()
+        token_form.addRow(self._tr(QLabel(), "rest_users_new_token"), self._token_value)
+        root.addLayout(token_form)
+        set_role(self._status_label, "hint")
         root.addWidget(self._status_label)
 
     def retranslate(self) -> None:

@@ -11,9 +11,10 @@ and can be imported directly from headless tests::
 Callers reach the tab via attribute access, which falls through to
 :func:`__getattr__` and loads the Qt submodule on demand.
 """
+from typing import Any
 
 
-def __getattr__(name):
+def __getattr__(name: str) -> Any:
     if name == "ScriptBuilderTab":
         import importlib
         module = importlib.import_module(

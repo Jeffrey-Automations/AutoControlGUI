@@ -12,7 +12,7 @@ class ScreenRecorder:
     - 可同時管理多個錄影執行緒
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.running_recorder: Dict[str, ScreenRecordThread] = {}
 
     def start_new_record(
@@ -22,7 +22,7 @@ class ScreenRecorder:
         codec: str = "XVID",
         frame_per_sec: int = 30,
         resolution: Tuple[int, int] = (1920, 1080)
-    ):
+    ) -> None:
         """
         Start a new screen recording
         開始新的螢幕錄影
@@ -46,7 +46,7 @@ class ScreenRecorder:
         record_thread.start()
         self.running_recorder[recorder_name] = record_thread
 
-    def stop_record(self, recorder_name: str):
+    def stop_record(self, recorder_name: str) -> None:
         """
         Stop a specific recorder
         停止指定的錄影器
@@ -67,7 +67,8 @@ class ScreenRecordThread(threading.Thread):
     - 持續擷取螢幕畫面並寫入影片檔案
     """
 
-    def __init__(self, path_and_filename, codec, frame_per_sec, resolution: Tuple[int, int]):
+    def __init__(self, path_and_filename: str, codec: str, frame_per_sec: float,
+                 resolution: Tuple[int, int]) -> None:
         """Open the writer, refusing a frame rate, size or file it cannot use.
 
         An unopened VideoWriter (fps 0 or NaN, an unknown codec, a missing

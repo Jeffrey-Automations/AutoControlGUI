@@ -11,8 +11,11 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.diagnostics_capabilities import CapabilityView
+from je_auto_control.gui.failed_stops_view import FailedStopsView
 from je_auto_control.gui.mcp_discovery_view import MCPDiscoveryView
+from je_auto_control.gui.workspace_details import ExecutionDetails, ExecutionDetailsSource, ExecutionPhase
 from je_auto_control.gui.task_controller import TaskController, TaskHandle, TaskOutcome
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -57,10 +60,14 @@ def _diagnostic_work(runner: Callable[[], DiagnosticsReport], token: Cancellatio
 class DiagnosticsTab(TranslatableMixin, QWidget):
     """Run :func:`run_diagnostics` and render the results."""
 
+    #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
+    REQUIRED_COMMANDS = ("AC_diagnose",)
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
         self._view = _DiagnosticViewState()
+        self.execution_details = ExecutionDetailsSource(self)
         self._task_controller = TaskController(self)
         self._active_task: Optional[TaskHandle] = None
         self._summary_label = QLabel(_t("diag_summary_idle"))
@@ -70,6 +77,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         self._progress_label.setWordWrap(True)
         self._capability_view = CapabilityView()
         self._mcp_discovery = MCPDiscoveryView()
+        self._failed_stops = FailedStopsView()
         self._table = QTableWidget(0, 4)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setSectionResizeMode(
@@ -77,16 +85,19 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         )
         self._build_layout()
         self._apply_table_headers()
+        self._render_summary()
 
     def _build_layout(self) -> None:
         # The run command runs from the Actions menu; the tab keeps only
         # the summary label and the results table.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         root.addWidget(self._capability_view)
-        root.addWidget(self._summary_label)
-        root.addWidget(self._progress_label)
-        root.addWidget(self._table, stretch=1)
-        root.addWidget(self._mcp_discovery)
+        set_role(self._progress_label, "hint")
+        results = Card().add(self._summary_label).add(self._progress_label).add(self._table, stretch=1)
+        root.addWidget(results, stretch=1)
+        root.addWidget(Card().add(self._failed_stops))
+        root.addWidget(Card().add(self._mcp_discovery))
 
     def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
@@ -94,7 +105,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
             ("diag_probe", self._probe_capabilities),
             ("diag_run", self._refresh),
             ("diag_stop", self._stop),
-        ] + self._mcp_discovery.menu_actions()
+        ] + self._failed_stops.menu_actions() + self._mcp_discovery.menu_actions()
 
     def retranslate(self) -> None:
         """Translate idle instructions and headers without starting a diagnostic run."""
@@ -102,6 +113,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         self._apply_table_headers()
         self._capability_view.retranslate()
         self._mcp_discovery.retranslate()
+        self._failed_stops.retranslate()
         self._render_summary()
         if self._view.report is not None:
             self._fill_table(self._view.report)
@@ -186,6 +198,15 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         if self._active_task is not None and self._view.total:
             progress = _t('diag_progress').format(completed=self._view.completed, total=self._view.total)
         self._progress_label.setText(progress)
+        self._progress_label.setVisible(bool(progress))   # an empty line took a row while idle
+        phase: ExecutionPhase
+        if self._view.kind == 'result':
+            phase = 'succeeded' if report is not None and report.ok else 'error'
+        else:
+            phase = self._view.kind
+        self.execution_details.publish(ExecutionDetails(
+            phase, text, self._view.completed, self._view.total if self._active_task is not None else 0,
+        ))
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Abandon this run's display and request cleanup without blocking or closing another owner."""

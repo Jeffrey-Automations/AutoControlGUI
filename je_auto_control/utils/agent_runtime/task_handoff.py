@@ -13,12 +13,13 @@ from je_auto_control.utils.rbac.authorization import current_authorization
 class TaskHandoffContext:
     """Derive bounded source ancestry through injected host ownership/snapshot validators."""
 
-    def __init__(self, runtime: Any, snapshot: Callable, identity: Callable, digest: Callable,
-                 owns: Callable) -> None:
+    def __init__(self, runtime: Any, snapshot: Callable[[Any, dict[str, Any]], dict[str, Any]],
+                 identity: Callable[[Any, Any, dict[str, Any], dict[str, Any], dict[str, Any]], None],
+                 digest: Callable[[Any], str], owns: Callable[[Any, Any], bool]) -> None:
         self.runtime, self.snapshot, self.identity, self.digest, self.owns = runtime, snapshot, identity, digest, owns
 
     def context(self, source_task: str, *, origin_policies: list[str] | None = None,
-                connection: Any = None, identity_only: bool = False) -> dict:
+                connection: Any = None, identity_only: bool = False) -> dict[str, Any]:
         """Bind a real task and any actual accepted request without making a synthetic DAG node."""
         transaction = self.runtime.store.connection() if connection is None else nullcontext(connection)
         with transaction as reading:
@@ -33,7 +34,7 @@ class TaskHandoffContext:
         return {'binding': binding, 'source': source, 'state': source['state'], 'policy': policy,
                 'ancestor_links': len(ancestry) - 1, 'retained_rows': retained}
 
-    def _ancestry(self, connection: Any, source: dict) -> list:
+    def _ancestry(self, connection: Any, source: dict[str, Any]) -> list[dict[str, Any]]:
         result, seen, row = [], set(), source
         for _index in range(17):
             if row['id'] in seen:
@@ -56,7 +57,7 @@ class TaskHandoffContext:
         raise AgentTaskError('handoff source has no bounded real recovery ancestry')
 
     @staticmethod
-    def _non_dag(connection: Any, row: dict) -> None:
+    def _non_dag(connection: Any, row: dict[str, Any]) -> None:
         admitted = connection.execute('SELECT 1 FROM agent_dag_local_tasks WHERE task_id=?',
                                       (row['id'],)).fetchone()
         submitted = connection.execute('SELECT 1 FROM agent_task_submissions WHERE task_id=?',
@@ -64,7 +65,7 @@ class TaskHandoffContext:
         if 'dag_batch' in row['spec']['options'] or admitted is not None or submitted is not None:
             raise AgentTaskError('DAG evidence requires its actual batch and node handoff')
 
-    def _requests(self, connection: Any, row: dict) -> list:
+    def _requests(self, connection: Any, row: dict[str, Any]) -> list[dict[str, Any]]:
         requests = [dict(item) for item in connection.execute(
             'SELECT * FROM agent_request_keys WHERE task_id=? ORDER BY owner_key,key_hash', (row['id'],))]
         owner = json.dumps([row['owner'].get('user_id'), row['owner'].get('store_path')])

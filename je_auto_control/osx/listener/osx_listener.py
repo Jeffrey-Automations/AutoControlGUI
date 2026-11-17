@@ -118,6 +118,13 @@ class OSXInputTap:
         self._thread: Optional[threading.Thread] = None
         self._tap: Any = None   # the CFMachPort from CGEventTapCreate, re-enabled on timeout
 
+    @property
+    def is_recording(self) -> bool:
+        """Report retained capture state without probing native hook health."""
+        thread = self._thread
+        return (thread is not None and thread.is_alive()
+                and self._tap is not None and not self._stop.is_set() and self.error is None)
+
     # -- public ------------------------------------------------------------
     def start(self) -> None:
         """Create the tap and record. Raises if the tap cannot be created."""
@@ -191,7 +198,7 @@ class OSXInputTap:
                 Quartz.CFRunLoopRemoveSource(
                     run_loop, source, kCFRunLoopDefaultMode)
 
-    def _callback(self, proxy, event_type, event, _refcon):
+    def _callback(self, proxy: Any, event_type: int, event: Any, _refcon: Any) -> Any:
         """Called by the window server on the tap thread, for every event."""
         # Anything escaping here tears down the run loop, and the recording
         # then stops without saying so — one unexpected event shape would end

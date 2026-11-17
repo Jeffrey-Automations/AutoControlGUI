@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import functools
 import threading
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, Tuple, Type, TypeVar
 
 from je_auto_control.wrapper.device_context import DeviceUnavailableError
 
@@ -67,7 +67,7 @@ class IOSDevice:
                 ) from error
             try:
                 self._handle = wda.Client(self._url)
-            except (OSError, RuntimeError, ValueError, *_sdk_errors()) as error:
+            except (OSError, RuntimeError, ValueError) + _sdk_errors() as error:
                 raise IOSUnavailableError(
                     f"could not reach WebDriverAgent at {self._url}: {error}",
                 ) from error
@@ -100,9 +100,9 @@ __all__ = [
 _Result = TypeVar("_Result")
 
 
-def _sdk_errors() -> tuple:
+def _sdk_errors() -> Tuple[Type[BaseException], ...]:
     """facebook-wda's base error (an invalid session, a crashed app...), if installed."""
-    errors: tuple = ()
+    errors: Tuple[Type[BaseException], ...] = ()
     try:
         from wda import exceptions as wda_exceptions
     except ImportError:
@@ -121,6 +121,6 @@ def translate_device_errors(function: Callable[..., _Result]) -> Callable[..., _
     def wrapper(*args: Any, **kwargs: Any) -> _Result:
         try:
             return function(*args, **kwargs)
-        except (*_sdk_errors(),) as error:
+        except _sdk_errors() as error:
             raise IOSUnavailableError(f"{function.__name__}: {error}") from error
     return wrapper

@@ -7,9 +7,10 @@ every dialog from one place.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtGui import QCloseEvent, QDragEnterEvent, QDragMoveEvent, QDropEvent, QKeyEvent
 from PySide6.QtWidgets import (
     QAbstractItemView, QDialog, QHBoxLayout,
     QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
@@ -17,12 +18,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from je_auto_control.gui._slow_op import app_stop_queue
+from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
+
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.remote_desktop._helpers import (
     _format_short_time, _iso_to_epoch, _t,
 )
 from je_auto_control.gui.remote_desktop.webrtc_known_hosts import (
     KnownHostsDialog,
 )
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.remote_desktop.audit_log import AuditLog
 
 
 class PendingViewerDialog(QDialog):
@@ -43,7 +52,9 @@ class PendingViewerDialog(QDialog):
         self.setMinimumWidth(400)
         self._result = self.Rejected
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(_t("rd_webrtc_pending_viewer_prompt")))
+        prompt = QLabel(_t("rd_webrtc_pending_viewer_prompt"))
+        prompt.setWordWrap(True)
+        layout.addWidget(prompt)
         if viewer_id:
             id_label = QLabel(f"viewer_id: {viewer_id[:12]}...{viewer_id[-4:]}")
             id_label.setTextInteractionFlags(
@@ -88,7 +99,7 @@ class TrustedViewersList(QListWidget):
         super().__init__(parent)
         self.setSelectionMode(self.SelectionMode.SingleSelection)
 
-    def populate(self, entries: list) -> None:
+    def populate(self, entries: list[dict[str, Any]]) -> None:
         self.clear()
         for entry in entries:
             viewer_id = entry.get("viewer_id", "")
@@ -100,7 +111,7 @@ class TrustedViewersList(QListWidget):
             item.setData(Qt.ItemDataRole.UserRole, viewer_id)
             self.addItem(item)
 
-    def keyPressEvent(self, event) -> None:  # noqa: N802 Qt override
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 Qt override
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
             item = self.currentItem()
             if item is not None:
@@ -111,7 +122,7 @@ class TrustedViewersList(QListWidget):
         super().keyPressEvent(event)
 
 
-def _format_size(value) -> str:
+def _format_size(value: Any) -> str:
     """``1,234`` for a byte count, or the value as the host sent it."""
     try:
         return f"{int(value):,}"
@@ -134,7 +145,7 @@ class AddressBookList(QListWidget):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
 
-    def _on_context_menu(self, position) -> None:
+    def _on_context_menu(self, position: QPoint) -> None:
         entry = self.selected_entry()
         if entry is None:
             return
@@ -157,7 +168,7 @@ class AddressBookList(QListWidget):
         elif chosen_act is delete_action:
             self.deleted.emit(entry)
 
-    def populate(self, entries: list, tag_filter: str = "") -> None:
+    def populate(self, entries: list[dict[str, Any]], tag_filter: str = "") -> None:
         if tag_filter:
             entries = [
                 e for e in entries
@@ -178,7 +189,7 @@ class AddressBookList(QListWidget):
             self.addItem(item)
 
     @staticmethod
-    def _format_entry(entry: dict) -> str:
+    def _format_entry(entry: dict[str, Any]) -> str:
         """Build the one-line display label for an address-book entry."""
         label = entry.get("label", "") or "(unnamed)"
         host_id = entry.get("host_id", "")
@@ -189,19 +200,19 @@ class AddressBookList(QListWidget):
         suffix = f"  ({last_used})" if last_used else ""
         return f"{star}{label} - {host_id}{tag_str}{suffix}"
 
-    def selected_entry(self) -> Optional[dict]:
+    def selected_entry(self) -> Optional[dict[str, Any]]:
         item = self.currentItem()
         if item is None:
             return None
         entry = item.data(Qt.ItemDataRole.UserRole)
         return dict(entry) if isinstance(entry, dict) else None
 
-    def _on_double_click(self, item) -> None:
+    def _on_double_click(self, item: QListWidgetItem) -> None:
         entry = item.data(Qt.ItemDataRole.UserRole)
         if isinstance(entry, dict):
             self.chosen.emit(dict(entry))
 
-    def keyPressEvent(self, event) -> None:  # noqa: N802 Qt override
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 Qt override
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
             entry = self.selected_entry()
             if entry is not None:
@@ -247,15 +258,15 @@ class RemoteFilesTable(QTableWidget):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
-    def selected_names(self) -> list:
-        names = []
+    def selected_names(self) -> list[str]:
+        names: list[str] = []
         for row in sorted({i.row() for i in self.selectedIndexes()}):
             item = self.item(row, 0)
             if item is not None:
                 names.append(item.text())
         return names
 
-    def populate(self, files: list, format_mtime) -> None:
+    def populate(self, files: list[Any], format_mtime: Callable[[Any], str]) -> None:
         """Replace contents. ``format_mtime(value) -> str`` formats the column.
 
         ``files`` comes from the remote host: an entry that is not an object
@@ -273,18 +284,18 @@ class RemoteFilesTable(QTableWidget):
 
     # --- drag-and-drop ------------------------------------------------------
 
-    def _accept_url_drag(self, event) -> None:
+    def _accept_url_drag(self, event: QDragMoveEvent) -> None:
         """Shared drag handler: accept iff the payload carries file URLs."""
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
-    def dragEnterEvent(self, event) -> None:  # noqa: N802 Qt override
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:  # noqa: N802 Qt override
         self._accept_url_drag(event)
 
-    def dragMoveEvent(self, event) -> None:  # noqa: N802 Qt override
+    def dragMoveEvent(self, event: QDragMoveEvent) -> None:  # noqa: N802 Qt override
         self._accept_url_drag(event)
 
-    def dropEvent(self, event) -> None:  # noqa: N802 Qt override
+    def dropEvent(self, event: QDropEvent) -> None:  # noqa: N802 Qt override
         urls = event.mimeData().urls()
         from pathlib import Path as _Path
         paths = [
@@ -298,7 +309,7 @@ class RemoteFilesTable(QTableWidget):
 
     # --- context menu -------------------------------------------------------
 
-    def _show_context_menu(self, position) -> None:
+    def _show_context_menu(self, position: QPoint) -> None:
         names = self.selected_names()
         if not names:
             return
@@ -320,24 +331,21 @@ class RemoteFilesTable(QTableWidget):
 class AuditLogDialog(QDialog):
     """Browse the SQLite audit log with filter on event_type / host_id."""
 
-    def __init__(self, audit_log, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, audit_log: AuditLog, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._log = audit_log
         self.setWindowTitle(_t("rd_webrtc_audit_title"))
         self.setMinimumSize(820, 380)
         layout = QVBoxLayout(self)
-        filter_row = QHBoxLayout()
-        filter_row.addWidget(QLabel(_t("rd_webrtc_audit_filter_type")))
         self._type_edit = QLineEdit()
         self._type_edit.setPlaceholderText(_t("rd_webrtc_audit_filter_type_ph"))
-        filter_row.addWidget(self._type_edit)
-        filter_row.addWidget(QLabel(_t("rd_webrtc_audit_filter_host")))
         self._host_edit = QLineEdit()
-        filter_row.addWidget(self._host_edit)
         refresh_btn = QPushButton(_t("rd_webrtc_audit_refresh"))
         refresh_btn.clicked.connect(self._refresh)
-        filter_row.addWidget(refresh_btn)
-        layout.addLayout(filter_row)
+        layout.addLayout(flow_of(
+            field_pair(QLabel(_t("rd_webrtc_audit_filter_type")), self._type_edit),
+            field_pair(QLabel(_t("rd_webrtc_audit_filter_host")), self._host_edit),
+            refresh_btn))
         self._table = QTableWidget(0, 5)
         self._table.setHorizontalHeaderLabels([
             _t("rd_webrtc_audit_col_ts"),
@@ -396,18 +404,21 @@ class LanBrowseDialog(QDialog):
     """
 
     chosen = Signal(dict)
-    # Emitted from the zeroconf thread; a queued connection marshals the
-    # payload back onto the GUI thread (see _update_services).
-    _services_changed = Signal(dict)
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self._services_changed.connect(self._on_services_changed)
+        # The zeroconf thread reports through this lease: it holds the dialog
+        # weakly, reaches the GUI thread queued, and drops reports once the
+        # dialog has ended -- the browser must not be what keeps it alive.
+        self._view = ViewLifetime(self)
         self.setWindowTitle(_t("rd_webrtc_lan_title"))
         self.setMinimumSize(620, 260)
-        self._services: dict = {}
+        self._services: dict[str, dict[str, Any]] = {}
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(_t("rd_webrtc_lan_help")))
+        help_label = QLabel(_t("rd_webrtc_lan_help"))
+        help_label.setWordWrap(True)
+        set_role(help_label, "hint")
+        layout.addWidget(help_label)
         self._table = QTableWidget(0, 4)
         self._table.setHorizontalHeaderLabels([
             _t("rd_webrtc_lan_col_host"),
@@ -452,18 +463,16 @@ class LanBrowseDialog(QDialog):
         if not is_discovery_available():
             return
         try:
-            self._browser = HostBrowser(on_change=self._update_services)
+            self._browser = HostBrowser(on_change=self._view.callback("_on_services_changed"))
         except (RuntimeError, OSError):
             self._browser = None
 
-    def _update_services(self, services: dict) -> None:
-        # Called from the zeroconf browser thread, which has no Qt event loop:
-        # QTimer.singleShot would create a timer with that thread's affinity and
-        # never fire. Emit a signal instead — Qt queues it onto the GUI thread.
-        self._services_changed.emit(dict(services))
+    def _update_services(self, services: dict[str, dict[str, Any]]) -> None:
+        """Any thread: report the hosts seen; the table is redrawn on the GUI thread."""
+        self._view.post("_on_services_changed", dict(services))
 
-    def _on_services_changed(self, services: dict) -> None:
-        self._services = services
+    def _on_services_changed(self, services: dict[str, dict[str, Any]]) -> None:
+        self._services = dict(services)
         self._refresh()
 
     def _refresh(self) -> None:
@@ -491,12 +500,16 @@ class LanBrowseDialog(QDialog):
                     return
 
     def _stop_browser(self) -> None:
-        if self._browser is not None:
-            try:
-                self._browser.stop()
-            except (RuntimeError, OSError):
-                pass    # reason: the browser is being discarded either way
-            self._browser = None
+        """Let go of the browser now; closing it (which joins zeroconf's thread) runs on a worker.
+
+        It goes to the application's stop queue, not one of the dialog's: the
+        dialog is normally destroyed right after, and a stop that fails is kept
+        by the stop custody with the browser that still owns its socket.
+        """
+        browser, self._browser = self._browser, None
+        self._view.retire()
+        if browser is not None:
+            app_stop_queue().retire(browser.stop)
 
     def done(self, result: int) -> None:  # noqa: D401  # Qt override
         """Stop browsing however the dialog ends.
@@ -508,7 +521,7 @@ class LanBrowseDialog(QDialog):
         self._stop_browser()
         super().done(result)
 
-    def closeEvent(self, event) -> None:  # noqa: N802 Qt override
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 Qt override
         self._stop_browser()
         super().closeEvent(event)
 

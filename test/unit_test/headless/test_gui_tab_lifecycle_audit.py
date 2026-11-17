@@ -24,10 +24,11 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, QObject, Signal  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
-    QApplication, QComboBox, QDialog, QLineEdit, QTabWidget, QTableWidget, QTableWidgetItem,
-    QTextEdit, QWidget,
+    QApplication, QComboBox, QDialog, QTabWidget, QTableWidget, QTableWidgetItem,
+    QWidget,
 )
 
+from headless._qt_settle import settle  # noqa: E402
 from je_auto_control.utils.exception.exceptions import (  # noqa: E402
     AutoControlActionException, AutoControlScreenException, ImageNotFoundException,
 )
@@ -79,11 +80,17 @@ def test_open_script_shows_a_malformed_file(qapp, tmp_path):
     from je_auto_control.gui.main_widget import AutoControlGUIWidget
     bad = tmp_path / "bad.json"
     bad.write_text("[[", encoding="utf-8")
+    from je_auto_control.gui._script_tab import ScriptTab
+    panel = ScriptTab()
+    opened = []
     fake = types.SimpleNamespace(
-        _find_entry=lambda key: None, script_path_input=QLineEdit(),
-        script_editor=QTextEdit(), script_result_text=QTextEdit())
+        activate_tab=lambda key: opened.append(key) or True,
+        _find_entry=lambda key: types.SimpleNamespace(widget=panel))
     AutoControlGUIWidget.open_script_file(fake, str(bad))
-    assert fake.script_result_text.toPlainText().startswith("Error loading")
+    assert opened == ["script"]
+    assert settle(panel._loads, "task")
+    assert panel.script_result_text.toPlainText().startswith("Error loading")
+    panel.deleteLater()
 
 
 def test_image_detection_shows_no_match(qapp, monkeypatch):
@@ -94,12 +101,17 @@ def test_image_detection_shows_no_match(qapp, monkeypatch):
 
     for name in ("locate_image_center", "locate_all_image", "locate_and_click"):
         monkeypatch.setattr(tab, name, not_found)
-    fake = types.SimpleNamespace(_get_detect_params=lambda: ("t.png", 0.8, False),
-                                 detect_result_text=QTextEdit(), mouse_button_combo=QComboBox())
-    for slot in ("_locate_image", "_locate_all", "_locate_click"):
-        fake.detect_result_text.clear()
-        getattr(tab.ImageDetectTabMixin, slot)(fake)
-        assert "not on screen" in fake.detect_result_text.toPlainText()
+    from headless._qt_settle import pump_until
+    page = tab.ImageDetectionTab()
+    page.img_path_input.setText("t.png")
+    try:
+        for slot in ("_locate_image", "_locate_all", "_locate_click"):
+            page.detect_result_text.clear()
+            getattr(page, slot)()
+            assert pump_until(lambda: not page._task.running)
+            assert "not on screen" in page.detect_result_text.toPlainText()
+    finally:
+        page.deleteLater()
 
 
 def test_screenshot_shows_a_bad_region(qapp, monkeypatch):
@@ -109,10 +121,19 @@ def test_screenshot_shows_a_bad_region(qapp, monkeypatch):
         raise AutoControlScreenException("bad region")
 
     monkeypatch.setattr(tab, "screenshot", bad_region)
-    fake = types.SimpleNamespace(ss_path_input=QLineEdit(), ss_region_input=QLineEdit("100,100,50,50"),
-                                 ss_result_text=QTextEdit())
-    tab.ScreenshotTabMixin._take_screenshot(fake)
-    assert "bad region" in fake.ss_result_text.toPlainText()
+    monkeypatch.setattr(tab, "screen_size", lambda: (800, 600))
+    monkeypatch.setattr(tab, "get_pixel", lambda x, y: (0, 0, 0))
+    monkeypatch.setattr(tab, "open_region_selector", lambda parent: None)
+    monkeypatch.setattr(tab.QFileDialog, "getSaveFileName", lambda *args: ("", ""))
+    page = tab.ScreenshotTab()
+    page.ss_region_input.setText("100,100,50,50")
+    try:
+        page._take_screenshot()
+        from headless._qt_settle import pump_until
+        assert pump_until(lambda: not page._task.running)
+        assert "bad region" in page.ss_result_text.toPlainText()
+    finally:
+        page.deleteLater()
 
 
 def test_the_manual_script_shows_an_unknown_command(qapp):
@@ -219,7 +240,8 @@ def test_a_hidden_tab_is_owned_and_stays_hidden(qapp):
     class _Owner(QWidget):
         def __init__(self):
             super().__init__()
-            self._tab_entries = []
+            from je_auto_control.gui.tab_registry import TabRegistry
+            self.tab_registry = TabRegistry([])
             self.tabs = QTabWidget(self)
 
     owner, page = _Owner(), QWidget()

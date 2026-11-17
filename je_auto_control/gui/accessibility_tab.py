@@ -6,11 +6,11 @@ includes this window, which can only answer while its own thread is free. The
 backend gives each thread its own automation object, so the worker is safe.
 """
 import functools
-from typing import List, Optional
+from typing import Any, Callable, List, Optional, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
+    QAbstractItemView, QHeaderView, QLabel, QLineEdit,
     QMessageBox, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget,
 )
@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui._qt_typed import filled_item
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -90,7 +92,7 @@ class AccessibilityTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def _start(self, tag: str, work) -> None:
+    def _start(self, tag: str, work: Callable[[], Any]) -> None:
         """Run ``work`` off the GUI thread as the command ``tag``; say so, or that one is still running."""
         self._task.start(work, tag=tag)     # False while busy: the status below is true either way
         self._status.setText(_t("task_running"))
@@ -113,21 +115,20 @@ class AccessibilityTab(TranslatableMixin, QWidget):
         # Refresh/click commands run from the Actions menu; the tab keeps
         # only the filter inputs, the element table, and the status line.
         root = QVBoxLayout(self)
-        row = QHBoxLayout()
-        row.addWidget(self._tr(QLabel(), "a11y_app_label"))
+        root.setSpacing(12)
         self._app_filter.setPlaceholderText(_t("a11y_app_placeholder"))
-        row.addWidget(self._app_filter, stretch=1)
-        row.addWidget(self._tr(QLabel(), "a11y_window_label"))
         self._window_filter.setPlaceholderText(_t("a11y_window_placeholder"))
-        row.addWidget(self._window_filter, stretch=1)
-        row.addWidget(self._tr(QLabel(), "a11y_name_label"))
         self._name_filter.setPlaceholderText(_t("a11y_name_placeholder"))
-        row.addWidget(self._name_filter, stretch=1)
-        root.addLayout(row)
-        root.addWidget(self._table, stretch=1)
+        filters = flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
+            ("a11y_app_label", self._app_filter), ("a11y_window_label", self._window_filter),
+            ("a11y_name_label", self._name_filter))))
+        root.addWidget(Card().add(filters))
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("a11y_refresh", self._refresh),
@@ -167,7 +168,7 @@ class AccessibilityTab(TranslatableMixin, QWidget):
         elif tag == _CLICK and isinstance(error, AccessibilityNotAvailableError):
             QMessageBox.warning(self, _t("a11y_click_selected"), str(error))
 
-    def _populate(self, elements) -> None:
+    def _populate(self, elements: List[AccessibilityElement]) -> None:
         self._table.setRowCount(len(elements))
         for row, element in enumerate(elements):
             values = (

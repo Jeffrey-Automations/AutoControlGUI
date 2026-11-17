@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 from contextlib import AbstractContextManager, ExitStack, closing, contextmanager, nullcontext
+from types import FrameType
 from typing import Callable, Dict, Iterator, List, Optional, Sequence
 
 from je_auto_control.utils.logging.secret_scope import scrub_secret_text, secret_log_scope
@@ -295,7 +296,7 @@ def cmd_start_rest(args: argparse.Namespace) -> int:
 def _run_until_signal(shutdown: Callable[[], None]) -> None:
     stopping = {"flag": False}
 
-    def _handler(_signum, _frame):
+    def _handler(_signum: int, _frame: Optional[FrameType]) -> None:
         stopping["flag"] = True
 
     signal.signal(signal.SIGINT, _handler)

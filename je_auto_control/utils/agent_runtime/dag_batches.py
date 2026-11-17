@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 import json
+from pathlib import Path
 import time
 import uuid
 from typing import Any
@@ -39,7 +40,7 @@ _FIELDS = {"register": {"definition"}, "get": {"batch_id"}, "list": set(),
 _FIELDS.update(CONTINUATION_FIELDS)
 
 
-def _request(operation: Any, value: Any) -> dict:
+def _request(operation: Any, value: Any) -> dict[str, Any]:
     request = durable_payload(detached({} if value is None else value))
     if operation not in OPERATIONS or not isinstance(request, dict):
         raise AgentTaskError("invalid batch operation or request")
@@ -55,7 +56,7 @@ def _request(operation: Any, value: Any) -> dict:
     return request
 
 
-def _matching_handoff_submission(value: Any, accepted: dict, source: dict, expected: str) -> bool:
+def _matching_handoff_submission(value: Any, accepted: dict[str, Any], source: dict[str, Any], expected: str) -> bool:
     return (value is not None and value['spec_digest'] == expected
             and accepted['spec_hash'] == request_spec_digest(source['spec']))
 
@@ -68,7 +69,7 @@ class DagBatches:
         self.runtime = runtime
 
     @staticmethod
-    def transfer_private_files() -> tuple:
+    def transfer_private_files() -> tuple[Path, ...]:
         """Supply current host-owned credential paths without initializing a console or service."""
         return registered_transfer_private_files()
 
@@ -79,7 +80,7 @@ class DagBatches:
         self.runtime.transfers.source.host.check_open()
         return binding
 
-    def transfer_call(self, host: str, binding: str, path: str, body: dict, timeout: float) -> dict:
+    def transfer_call(self, host: str, binding: str, path: str, body: dict[str, Any], timeout: float) -> dict[str, Any]:
         """Keep registered transfer I/O behind this runtime's existing host-owned adapter boundary."""
         self.runtime.transfers.source.host.check_open()
         result = registered_host_transfer(host, binding, path, body, timeout)
@@ -87,7 +88,7 @@ class DagBatches:
         return result
 
     def handoff_context(self, batch_id: str, node_id: str, *, origin_policies: list[str] | None = None,
-                        connection: Any = None, identity_only: bool = False) -> dict:
+                        connection: Any = None, identity_only: bool = False) -> dict[str, Any]:
         """Derive a local evidence recipient from a real original request and private DAG admission."""
         batch = self._row(batch_id, connection=connection)
         node = bound_node(batch, node_id)
@@ -100,7 +101,7 @@ class DagBatches:
                    'request': request_spec_digest(node['task']), 'admission': admission}
         return {'binding': binding, 'source': source, 'state': batch['state'], 'policy': policy}
 
-    def handoff_policy(self, source: dict, origin_policies: list[str] | None = None) -> TaskPolicy:
+    def handoff_policy(self, source: dict[str, Any], origin_policies: list[str] | None = None) -> TaskPolicy:
         """Preserve original effect policy for grants without a privately reviewed completion renewal."""
         policy_spec = detached(source['spec'])
         if origin_policies is not None:
@@ -109,7 +110,8 @@ class DagBatches:
         # pylint: disable-next=protected-access  # reason: original and issuing-session ceilings cover every actual effect
         return TaskPolicy(self.runtime._validated_spec(policy_spec))
 
-    def _handoff_source(self, batch: dict, node: dict, *, connection: Any = None) -> tuple[dict, dict, str]:
+    def _handoff_source(self, batch: dict[str, Any], node: dict[str, Any], *,
+                        connection: Any = None) -> tuple[dict[str, Any], dict[str, Any], str]:
         owner = batch['owner']
         transaction = self.runtime.store.connection() if connection is None else nullcontext(connection)
         with transaction as active_connection:
@@ -132,7 +134,7 @@ class DagBatches:
             raise AgentTaskError('handoff original source owner differs from its batch')
         return source, dict(found), expected
 
-    def control(self, operation: str, request: Any = None) -> dict:
+    def control(self, operation: str, request: Any = None) -> dict[str, Any]:
         """Operate on a closed batch protocol; inspection/registration never acquire an input target."""
         request = _request(operation, request)
         if current_operation() is not None:
@@ -156,7 +158,7 @@ class DagBatches:
                         return DagLocalTasks(self.runtime, batch, request, DeferredAuthorization.capture()).control()
                     return self._existing(operation, batch, request)
 
-    def _existing(self, operation: str, batch: dict, request: dict) -> dict:
+    def _existing(self, operation: str, batch: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
         if operation == "get":
             return self._describe(batch)
         owner = AuthorizationContext(**batch["owner"]) if batch["owner"] else None
@@ -180,7 +182,8 @@ class DagBatches:
                 return self._begin(batch, request)
             return self._execution(operation, batch, request)
 
-    def _background(self, batch: dict, request: dict, continuation: DagContinuation) -> dict:
+    def _background(self, batch: dict[str, Any], request: dict[str, Any],
+                    continuation: DagContinuation) -> dict[str, Any]:
         jobs = getattr(self.runtime, "background_dags", None)
         if jobs is None:
             raise AgentTaskError("background DAG execution requires an explicitly started service")
@@ -203,7 +206,7 @@ class DagBatches:
             if owns_task(json.loads(row["owner"]), current_authorization()):
                 self.control("pause_batch", {"batch_id": row["id"]})
 
-    def _row(self, identifier: str, *, connection: Any = None) -> dict:
+    def _row(self, identifier: str, *, connection: Any = None) -> dict[str, Any]:
         # pylint: disable-next=protected-access  # reason: closed runtimes cannot accept new coordinator work
         if self.runtime._closed:
             raise AgentTaskError("runtime is closed")
@@ -227,7 +230,7 @@ class DagBatches:
         batch["input_definition"] = json.loads(original[0]) if original is not None else batch["definition"]
         return batch
 
-    def _normalize(self, value: Any) -> tuple[dict, dict]:
+    def _normalize(self, value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         definition = batch_definition(value)
         hosts = {}
         for node in definition["nodes"]:
@@ -242,7 +245,7 @@ class DagBatches:
             hosts[host] = task_host_binding(host)
         return definition, hosts
 
-    def _register(self, request: dict) -> dict:
+    def _register(self, request: dict[str, Any]) -> dict[str, Any]:
         original = batch_definition(request["definition"])
         definition, hosts = self._normalize(request["definition"])
         parallel = request.get("max_parallel", 4)
@@ -262,14 +265,14 @@ class DagBatches:
                                    (identifier, node["id"], "pending", "{}", now))
         return self._describe(self._row(identifier))
 
-    def _list(self) -> dict:
+    def _list(self) -> dict[str, Any]:
         with self.runtime.store.connection() as connection:
             rows = connection.execute("SELECT id,owner FROM agent_dag_batches "
                                       "ORDER BY created DESC LIMIT 200").fetchall()
         return {"batches": [self._describe(self._row(row["id"])) for row in rows
                             if owns_task(json.loads(row["owner"]), current_authorization())]}
 
-    def _describe(self, batch: dict) -> dict:
+    def _describe(self, batch: dict[str, Any]) -> dict[str, Any]:
         with self.runtime.store.connection() as connection:
             rows = connection.execute("SELECT node_id,phase,receipt FROM agent_dag_nodes "
                                       "WHERE batch_id=? ORDER BY node_id", (batch["id"],)).fetchall()
@@ -289,7 +292,7 @@ class DagBatches:
                 "nodes": [{"id": row["node_id"], "phase": row["phase"],
                            "receipt": json.loads(row["receipt"])} for row in rows]}
 
-    def _begin(self, batch: dict, request: dict) -> dict:
+    def _begin(self, batch: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
         definition, hosts = self._normalize(request["definition"])
         if (request_spec_digest(definition) != batch["graph_hash"] or hosts != batch["hosts"]
                 or not isinstance(request["max_parallel"], int) or isinstance(request["max_parallel"], bool)
@@ -304,18 +307,18 @@ class DagBatches:
         return {"batch_id": batch["id"], "attempt": attempt, "hosts": hosts, "max_parallel": batch["max_parallel"],
                 "definition": bind_definition(definition, batch["id"], batch["graph_hash"])}
 
-    def _execution(self, operation: str, batch: dict, request: dict) -> dict:
+    def _execution(self, operation: str, batch: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
         with (self.runtime.transfers.activity() if self._remote_transfer_batch(batch) else nullcontext()):
             return self._execute_attempt(operation, batch, request)
 
-    def _remote_transfer_batch(self, batch: dict) -> bool:
+    def _remote_transfer_batch(self, batch: dict[str, Any]) -> bool:
         with self.runtime.store.connection() as connection:
             rows = connection.execute('SELECT a.details FROM agent_dag_adoptions d '
                 'JOIN agent_dag_approvals a ON a.id=d.approval_id AND a.batch_id=d.batch_id '
                 'WHERE d.batch_id=?', (batch['id'],)).fetchall()
         return any(remote_reports(batch, json.loads(row['details'])['reports']) for row in rows)
 
-    def _execute_attempt(self, operation: str, batch: dict, request: dict) -> dict:
+    def _execute_attempt(self, operation: str, batch: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
         if batch["state"] != "running" or request["attempt"] != batch["attempt"]:
             raise AgentTaskError("batch execution attempt is inactive")
         self._execution_checks(operation, batch, request)
@@ -338,13 +341,13 @@ class DagBatches:
         self._execution_checks(operation, batch, request)
         return self._describe(self._row(batch["id"]))
 
-    def _execution_checks(self, operation: str, batch: dict, request: dict) -> None:
+    def _execution_checks(self, operation: str, batch: dict[str, Any], request: dict[str, Any]) -> None:
         if operation in {'claim', 'record'}:
             self._validate_adopted_dependencies(batch, request)
         if operation == 'finish':
             self._validate_final_remote_adoptions(batch)
 
-    def _validate_final_remote_adoptions(self, batch: dict) -> None:
+    def _validate_final_remote_adoptions(self, batch: dict[str, Any]) -> None:
         with self.runtime.store.connection() as connection:
             rows = connection.execute('SELECT d.node_id,a.details FROM agent_dag_adoptions d '
                 'JOIN agent_dag_approvals a ON a.id=d.approval_id AND a.batch_id=d.batch_id WHERE d.batch_id=?',
@@ -355,7 +358,7 @@ class DagBatches:
             if any(report['decision']['node_id'] == row['node_id'] for report in reports):
                 continuation.validate_node(batch, row['node_id'], batch['attempt'])
 
-    def _validate_adopted_dependencies(self, batch: dict, request: dict) -> None:
+    def _validate_adopted_dependencies(self, batch: dict[str, Any], request: dict[str, Any]) -> None:
         node = bound_node(batch, request["node_id"])
         with self.runtime.store.connection() as connection:
             adopted = {row[0] for row in connection.execute(

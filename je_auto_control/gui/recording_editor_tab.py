@@ -1,14 +1,17 @@
 """Recording Editor tab: trim, filter and rescale recorded action lists."""
 import json
-from typing import Optional
+from typing import Any, Callable, Optional, Union
 
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
+    QFileDialog, QFormLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QMessageBox, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -30,8 +33,8 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
-        self._actions: list = []
-        self._undo_stack: list = []
+        self._actions: list[list[Any]] = []
+        self._undo_stack: list[list[list[Any]]] = []
         self._path_input = QLineEdit()
         self._list = QListWidget()
         self._preview = QTextEdit()
@@ -52,7 +55,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
 
-    def _mutate(self, new_actions: list) -> None:
+    def _mutate(self, new_actions: list[list[Any]]) -> None:
         """Apply an edit, snapshotting the prior state for undo (Ctrl+Z)."""
         self._undo_stack.append(list(self._actions))
         self._actions = new_actions
@@ -69,38 +72,28 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         # Load/save/export and every edit command run from the Actions
         # menu; the tab keeps only inputs, the list, preview, and status.
         root = QVBoxLayout(self)
-        top = QHBoxLayout()
-        top.addWidget(self._tr(QLabel(), "re_file_label"))
-        top.addWidget(self._path_input, stretch=1)
-        root.addLayout(top)
+        root.setSpacing(12)
+        file_row = QFormLayout()
+        file_row.addRow(self._tr(QLabel(), "re_file_label"), self._path_input)
+        root.addWidget(Card().add(file_row))
 
-        root.addWidget(self._list, stretch=1)
+        def pair(key: str, field: QWidget) -> QWidget:
+            return field_pair(self._tr(QLabel(), key), field)
 
-        ops1 = QHBoxLayout()
-        ops1.addWidget(self._tr(QLabel(), "re_trim_start"))
-        ops1.addWidget(self._trim_start)
-        ops1.addWidget(self._tr(QLabel(), "re_trim_end"))
-        ops1.addWidget(self._trim_end)
-        ops1.addStretch()
-        root.addLayout(ops1)
+        edits = Card()
+        edits.add(flow_of(pair("re_trim_start", self._trim_start), pair("re_trim_end", self._trim_end)))
+        edits.add(flow_of(pair("re_delay_x", self._delay_factor), pair("re_floor_ms", self._delay_clamp),
+                          pair("re_scale_x", self._scale_x), pair("re_scale_y", self._scale_y)))
+        root.addWidget(edits)
 
-        ops2 = QHBoxLayout()
-        ops2.addWidget(self._tr(QLabel(), "re_delay_x"))
-        ops2.addWidget(self._delay_factor)
-        ops2.addWidget(self._tr(QLabel(), "re_floor_ms"))
-        ops2.addWidget(self._delay_clamp)
-        ops2.addWidget(self._tr(QLabel(), "re_scale_x"))
-        ops2.addWidget(self._scale_x)
-        ops2.addWidget(self._tr(QLabel(), "re_scale_y"))
-        ops2.addWidget(self._scale_y)
-        ops2.addStretch()
-        root.addLayout(ops2)
-
-        root.addWidget(self._tr(QLabel(), "re_preview"))
-        root.addWidget(self._preview, stretch=1)
+        preview = Card().add(set_role(self._tr(QLabel(), "re_preview"), "sectionTitle"))
+        preview.add(self._preview, stretch=1)
+        root.addWidget(ResponsiveBox(Card().add(self._list, stretch=1), preview, stretches=(2, 3)), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("re_browse", self._browse),
@@ -251,8 +244,8 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
             return
         self._mutate(scale_coordinates(self._actions, fx, fy))
 
-    def _filter_prefix(self, prefix) -> None:
-        def keep(action: list) -> bool:
+    def _filter_prefix(self, prefix: Union[str, tuple[str, ...]]) -> None:
+        def keep(action: list[Any]) -> bool:
             if not (isinstance(action, list) and action):
                 return False
             name = action[0]

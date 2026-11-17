@@ -50,7 +50,7 @@ def draft_agent_workflow(workflow: str, config: Mapping[str, Any]) -> dict[str, 
     return validated.to_dict()
 
 
-def _base(workflow: str, config: dict) -> dict:
+def _base(workflow: str, config: dict[str, Any]) -> dict[str, Any]:
     options = {"workflow": workflow}
     default = "local-files" if workflow == "download_archive" else "local-desktop"
     if config.get("backend") == "browser":
@@ -64,7 +64,7 @@ def _base(workflow: str, config: dict) -> dict:
             "actions": [], "options": options}
 
 
-def _items(config: dict, name: str) -> list[dict]:
+def _items(config: dict[str, Any], name: str) -> list[dict[str, Any]]:
     value = config.get(name)
     if not isinstance(value, list) or not value or len(value) > 500:
         raise AgentTaskError(f"{name} requires between 1 and 500 items")
@@ -73,14 +73,14 @@ def _items(config: dict, name: str) -> list[dict]:
     return value
 
 
-def _action(tool: str, arguments: dict, expected: Any = None) -> dict:
+def _action(tool: str, arguments: dict[str, Any], expected: Any = None) -> dict[str, Any]:
     result = {"tool": tool, "arguments": arguments}
     if expected is not None:
         result["expect_result"] = expected
     return result
 
 
-def _downloads(config: dict, policy: TaskPolicy) -> dict:
+def _downloads(config: dict[str, Any], policy: TaskPolicy) -> dict[str, Any]:
     directory = policy.path(config.get("directory"))
     entries = _items(config, "files")
     from je_auto_control.utils.agent_runtime.workflow_files import _destination
@@ -114,7 +114,7 @@ def url_origin(url: str) -> str:
     return f"{parsed.scheme}://{hostname}:{port}"
 
 
-def _rows(config: dict, policy: TaskPolicy) -> list[dict]:
+def _rows(config: dict[str, Any], policy: TaskPolicy) -> list[dict[str, Any]]:
     source = Path(policy.path(config.get("source")))
     if source.stat().st_size > 8_000_000:
         raise AgentTaskError("workflow table exceeds eight megabytes")
@@ -134,14 +134,14 @@ def _rows(config: dict, policy: TaskPolicy) -> list[dict]:
     return rows
 
 
-def _focus(config: dict) -> dict:
+def _focus(config: dict[str, Any]) -> dict[str, Any]:
     title = config.get("window_title")
     if not isinstance(title, str) or not title:
         raise AgentTaskError("workflow application requires an explicit window_title")
     return _action("AC_focus_window", {"title_substring": title})
 
 
-def _forms(config: dict, policy: TaskPolicy) -> dict:
+def _forms(config: dict[str, Any], policy: TaskPolicy) -> dict[str, Any]:
     rows, fields = _rows(config, policy), _items(config, "fields")
     if len(rows) * (len(fields) * 2 + 2) > 1000:
         raise AgentTaskError("batch form requires at most one thousand actions")
@@ -165,7 +165,7 @@ def _forms(config: dict, policy: TaskPolicy) -> dict:
     return {"actions": actions}
 
 
-def _commit_actions(actions: list[dict], config: dict, row: str) -> None:
+def _commit_actions(actions: list[dict[str, Any]], config: dict[str, Any], row: str) -> None:
     if not config.get("submit_selector") or not config.get("confirmation_selector"):
         raise AgentTaskError("submission requires a button and a read-back confirmation selector")
     if "confirmation_value" not in config:
@@ -181,7 +181,7 @@ def _commit_actions(actions: list[dict], config: dict, row: str) -> None:
     ])
 
 
-def _transfer(config: dict, _policy: TaskPolicy) -> dict:
+def _transfer(config: dict[str, Any], _policy: TaskPolicy) -> dict[str, Any]:
     actions = [_focus(config["source_app"])]
     fields = _items(config, "fields")
     for index, field in enumerate(fields):
@@ -199,7 +199,7 @@ def _transfer(config: dict, _policy: TaskPolicy) -> dict:
     return {"actions": actions}
 
 
-def _workspace(config: dict, policy: TaskPolicy) -> dict:
+def _workspace(config: dict[str, Any], policy: TaskPolicy) -> dict[str, Any]:
     actions = []
     launches = []
     for document in config.get("documents", []):
@@ -217,7 +217,7 @@ def _workspace(config: dict, policy: TaskPolicy) -> dict:
     return {"actions": actions, "options": {"workflow": "workspace", "approved_documents": launches}}
 
 
-def _dirty_document_check(entry: dict) -> list[dict]:
+def _dirty_document_check(entry: dict[str, Any]) -> list[dict[str, Any]]:
     if not entry.get("unsaved_selector"):
         return []
     if "unsaved_value" not in entry:

@@ -58,13 +58,13 @@ class AgentTransfers:
         """Find source or destination retirement left by a prior runtime without dispatching new work."""
         return source_maintenance_pending(store) or import_maintenance_pending(store)
 
-    def control(self, operation: str, request: Mapping[str, Any] | None = None) -> dict:
+    def control(self, operation: str, request: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Apply one finite local management operation without recursively dispatching agents."""
         if self._task_active():
             raise AgentTaskError('active tasks cannot invoke transfer management')
         return self._invoke(operation, {} if request is None else request, peer=False)
 
-    def peer(self, operation: str, request: Mapping[str, Any]) -> dict:
+    def peer(self, operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
         """Serve only closed authenticated source reads, never local management delegation."""
         return self._invoke(operation, request, peer=True)
 
@@ -95,7 +95,7 @@ class AgentTransfers:
                 with self._state:
                     self._life.busy = False
 
-    def _invoke(self, operation: str, request: Mapping[str, Any], *, peer: bool) -> dict:
+    def _invoke(self, operation: str, request: Mapping[str, Any], *, peer: bool) -> dict[str, Any]:
         with self._mutex:
             with self._state:
                 if self._life.closed or self._life.busy:
@@ -116,7 +116,7 @@ class AgentTransfers:
                 with self._state:
                     self._life.busy = False
 
-    def _management(self, operation: str, request: Mapping[str, Any]) -> dict:
+    def _management(self, operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(request, Mapping):
             raise AgentTaskError('transfer request must be an object')
         value = dict(request)
@@ -131,7 +131,7 @@ class AgentTransfers:
             return self._life.evidence.control(operation, value)
         return self.source.control(operation, value)
 
-    def _peer(self, operation: str, request: Mapping[str, Any]) -> dict:
+    def _peer(self, operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
         if operation == 'evidence':
             value = _object(request, {'grant_id', 'binding'})
             return self._life.evidence.resolve(value['grant_id'], value['binding'])

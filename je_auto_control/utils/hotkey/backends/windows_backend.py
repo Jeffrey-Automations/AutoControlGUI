@@ -1,5 +1,5 @@
 """Windows hotkey backend: ``RegisterHotKey`` + a message-pump thread."""
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from je_auto_control.utils.hotkey.backends.base import HotkeyBackend
 from je_auto_control.utils.hotkey.hotkey_daemon import (
@@ -53,7 +53,7 @@ class WindowsHotkeyBackend(HotkeyBackend):
                 user32.UnregisterHotKey(None, reg_id)
             self._registered.clear()
 
-    def _sync(self, user32, bindings: List[HotkeyBinding]) -> None:
+    def _sync(self, user32: Any, bindings: List[HotkeyBinding]) -> None:
         """Add new bindings + drop removed ones vs. ``self._registered``."""
         self._drop_removed(user32, {b.binding_id for b in bindings})
         for binding in bindings:
@@ -69,7 +69,7 @@ class WindowsHotkeyBackend(HotkeyBackend):
                 self._registered.pop(binding.binding_id, None)
             self._try_register(user32, binding)
 
-    def _drop_removed(self, user32, current_ids: set) -> None:
+    def _drop_removed(self, user32: Any, current_ids: Set[str]) -> None:
         """Unregister bindings that are gone and forget their failures."""
         for stale_id in [bid for bid in self._registered if bid not in current_ids]:
             reg_id, _combo = self._registered.pop(stale_id)
@@ -77,7 +77,7 @@ class WindowsHotkeyBackend(HotkeyBackend):
         for stale_id in [bid for bid in self._failed if bid not in current_ids]:
             del self._failed[stale_id]
 
-    def _try_register(self, user32, binding: HotkeyBinding) -> None:
+    def _try_register(self, user32: Any, binding: HotkeyBinding) -> None:
         try:
             modifiers, vk = parse_combo(binding.combo)
         except ValueError as error:

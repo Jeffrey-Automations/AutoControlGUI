@@ -110,7 +110,7 @@ class ActionLinter:
                 for i in self._check_required(idx, name, params)] + self._lint_bodies(idx, name, params, trail)
 
     @staticmethod
-    def _shape_issue(item: Any) -> Optional[tuple]:
+    def _shape_issue(item: Any) -> Optional[tuple[str, str]]:
         """``(code, message)`` when ``item`` is not ``[name]`` / ``[name, params]``."""
         if not isinstance(item, (list, tuple)):
             return "bad-shape", "action item must be a list [command_name, params]"
@@ -170,7 +170,7 @@ class ActionLinter:
     @staticmethod
     def _scan_signature(sig: inspect.Signature,
                          params: Dict[str, Any],
-                         ) -> tuple:
+                         ) -> tuple[List[str], List[str], bool]:
         """Walk a Signature → (accepted_names, missing_required, accepts_kwargs)."""
         accepted: List[str] = []
         missing: List[str] = []

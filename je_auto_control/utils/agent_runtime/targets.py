@@ -46,7 +46,7 @@ class DesktopTarget:
             self._check_foreground()
         return True, ""
 
-    def check_resume(self, spec: AgentTaskSpec, receipts: list[dict]) -> None:
+    def check_resume(self, spec: AgentTaskSpec, receipts: list[dict[str, Any]]) -> None:
         """A retired desktop scope cannot attest that earlier form/window state is still current."""
         require_context_continuity(spec, receipts, self._spec == spec, kind="desktop")
 
@@ -104,7 +104,7 @@ class DesktopTarget:
             raise
 
     @staticmethod
-    def _image(hwnd: int, elements: list[dict]) -> dict[str, Any]:
+    def _image(hwnd: int, elements: list[dict[str, Any]]) -> dict[str, Any]:
         image, origin = _window_frame(hwnd)
         original = image.size
         redacted = _redact_frame(image, elements, origin)
@@ -137,7 +137,7 @@ class DesktopTarget:
         with control_owner_scope(pid, hwnd), driver:
             return run_tool_call(name, arguments)
 
-    def validate_input(self, event: dict) -> None:
+    def validate_input(self, event: dict[str, Any]) -> None:
         """Refuse new input after focus changes or a point leaves the authorized window."""
         if event["kind"] in {"key_release", "key_released", "mouse_release", "mouse_released"}:
             return
@@ -154,7 +154,7 @@ class DesktopTarget:
             from je_auto_control.utils.agent_runtime.native_scope import check_pointer
             check_pointer(hwnd, event)
 
-    def prepare_input(self, event: dict) -> None:
+    def prepare_input(self, event: dict[str, Any]) -> None:
         """Position and confirm the actual pointer before acknowledging an owned button press."""
         from je_auto_control.wrapper.auto_control_mouse import set_mouse_position, get_mouse_position
         point = event["x"], event["y"]
@@ -182,7 +182,7 @@ def _window_frame(hwnd: int) -> tuple[Any, tuple[int, int]]:
     return capture_window(hwnd)
 
 
-def _redact_frame(image: Any, elements: list[dict], origin: tuple[int, int]) -> Any:
+def _redact_frame(image: Any, elements: list[dict[str, Any]], origin: tuple[int, int]) -> Any:
     from je_auto_control.utils.redaction.engine import RedactionEngine
     from je_auto_control.utils.redaction.policies import POLICY_STRICT
     x, y = origin

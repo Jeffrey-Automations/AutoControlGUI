@@ -23,7 +23,7 @@ from je_auto_control.utils.agent_runtime.transfer_import_contract import IMPORT_
 class _ImportState:
     """Unapproved reviews belong only to the current runtime; approved intents will be durable."""
 
-    reviews: dict[str, dict] = field(default_factory=dict)
+    reviews: dict[str, dict[str, Any]] = field(default_factory=dict)
     enabled: bool = False
     jobs: Any = None
 
@@ -50,7 +50,7 @@ class TransferImporter:
         self.remaining = remaining
         self._state = _ImportState()
 
-    def control(self, operation: str, request: Mapping) -> dict:
+    def control(self, operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
         """Review only exact destination management envelopes under actual current local authority."""
         value = dict(_object(request, IMPORT_FIELDS[operation]))
         actor = principal()
@@ -97,11 +97,11 @@ class TransferImporter:
         return self._state.jobs
 
     @staticmethod
-    def _owner(row: dict, actor: dict) -> None:
+    def _owner(row: dict[str, Any], actor: dict[str, Any]) -> None:
         if row['kind'] != 'import' or row['actor'] != actor_key(actor):
             raise AgentTaskError('destination import belongs to another recipient')
 
-    def _local(self, row: dict, *, connection: Any = None) -> dict:
+    def _local(self, row: dict[str, Any], *, connection: Any = None) -> dict[str, Any]:
         with _refresh(row['scope']['issuer']).scope():
             destination = row['scope']['destination']
             current = self.host.destination_context(destination['profile']['name'], destination['directory'],
@@ -110,12 +110,12 @@ class TransferImporter:
             raise AgentTaskError('destination import receipt has expired')
         return current
 
-    def _current(self, row: dict) -> None:
+    def _current(self, row: dict[str, Any]) -> None:
         self._local(row)
         if self.runtime.batches.transfer_binding(row['scope']['source_host']) != row['scope']['binding']:
             raise AgentTaskError('destination source registration changed')
 
-    def _manifest(self, row: dict, timeout: float) -> TransferManifest:
+    def _manifest(self, row: dict[str, Any], timeout: float) -> TransferManifest:
         self._current(row)
         scope = row['scope']
         with _refresh(scope['issuer']).scope():
@@ -126,7 +126,7 @@ class TransferImporter:
             raise AgentTaskError('source export differs from the reviewed manifest')
         return manifest
 
-    def _create(self, request: dict, actor: dict) -> dict:
+    def _create(self, request: dict[str, Any], actor: dict[str, Any]) -> dict[str, Any]:
         _hex(request['review'], 32)
         note_hash = _text(request['note'], 4000, 'approval note')
         key_hash = _text(request['idempotency_key'], 256, 'idempotency key')
@@ -160,14 +160,14 @@ class TransferImporter:
         jobs.wake()
         return reply
 
-    def _public(self, row: dict, connection: Any) -> dict:
+    def _public(self, row: dict[str, Any], connection: Any) -> dict[str, Any]:
         delivery = self._state.jobs.ledger.read(connection, row['id'])
         state = delivery['state'] if row['expires'] > time.time() else 'expired'
         return {'import_id': row['id'], 'state': state, 'expires': row['expires'],
                 'manifest_digest': row['scope']['digest'],
                 'files_directory': delivery['files_directory'] if state == 'published' else None}
 
-    def _run(self, row: dict) -> None:
+    def _run(self, row: dict[str, Any]) -> None:
         jobs = self._state.jobs
         with self.runtime.store.connection() as connection:
             retained = jobs.ledger.read(connection, row['id'])
@@ -189,11 +189,11 @@ class TransferImporter:
         self._current(row)
 
     @staticmethod
-    def _delivery_scope(row: dict, delivery: dict) -> None:
+    def _delivery_scope(row: dict[str, Any], delivery: dict[str, Any]) -> None:
         row['scope']['destination']['origins'] = list(dict.fromkeys([
             *row['scope']['destination']['origins'], *delivery['ceilings']]))
 
-    def deliver(self, import_id: str, generation: int, check: Callable[[], None]) -> dict:
+    def deliver(self, import_id: str, generation: int, check: Callable[[], None]) -> dict[str, Any]:
         """Receive and independently verify real source bytes under the persisted original local issuer."""
         jobs = self._state.jobs
         with self.runtime.store.connection() as connection:
@@ -224,11 +224,11 @@ class TransferImporter:
                 self._local(row, connection=connection)
             return {'import_id': import_id, 'state': 'published'}
 
-    def _receive(self, row: dict, manifest: TransferManifest, generation: int, checkpoint: Callable,
-                 budget: Callable) -> Any:
+    def _receive(self, row: dict[str, Any], manifest: TransferManifest, generation: int,
+                 checkpoint: Callable[[], None], budget: Callable[[], float]) -> Any:
         jobs = self._state.jobs
         cache = PrivateTransferCache(self.runtime.store.path)
-        def read(digest: str) -> dict:
+        def read(digest: str) -> dict[str, Any]:
             scope = row['scope']
             return self.remote.call(scope['source_host'], scope['binding'], 'chunk',
                 {'export_id': manifest.export_id, 'sha256': digest}, budget())
@@ -238,12 +238,12 @@ class TransferImporter:
             self._local(row, connection=connection)
             jobs.ledger.advance(connection, row['id'], generation, 'verified')
             self._local(row, connection=connection)
-        def publication(value: dict) -> None:
+        def publication(value: dict[str, Any]) -> None:
             with self.runtime.store.connection(write=True) as connection:
                 self._local(row, connection=connection)
                 jobs.ledger.advance(connection, row['id'], generation, 'verified', publication=value)
                 self._local(row, connection=connection)
-        def staging_retired(witness: dict) -> None:
+        def staging_retired(witness: dict[str, Any]) -> None:
             with self.runtime.store.connection(write=True) as connection:
                 jobs.ledger.staging_retired(connection, row['id'], witness)
         return publish_import(row, manifest, cache, checkpoint, publication, staging_retired)
@@ -278,7 +278,7 @@ class TransferImporter:
         for identifier in pending:
             self._cleanup_account(identifier)
 
-    def _cleanup_candidate(self, record: dict, delivery: dict) -> bool:
+    def _cleanup_candidate(self, record: dict[str, Any], delivery: dict[str, Any]) -> bool:
         if not record['held']:
             return False
         if record['expires'] <= time.time():
@@ -305,7 +305,7 @@ class TransferImporter:
         with self.runtime.store.connection(write=True) as connection:
             self.records.release(connection, identifier)
 
-    def _review(self, request: dict, actor: dict) -> dict:
+    def _review(self, request: dict[str, Any], actor: dict[str, Any]) -> dict[str, Any]:
         _text(request['idempotency_key'], 256, 'idempotency key')
         destination = self.host.destination_context(request['target'], request['directory'])
         if self.remote is None:

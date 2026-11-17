@@ -181,7 +181,7 @@ class AgentRuntime:
     def _create_task(self, spec: AgentTaskSpec, key: str | None,
                      event: tuple[str, str, str] | None = None,
                      recovery: tuple[str, str, str] | None = None,
-                     authorization: dict | RecoveryBinding | CompletionBinding | None = None,
+                     authorization: dict[str, Any] | RecoveryBinding | CompletionBinding | None = None,
                      submission: str | None = None) -> AgentTaskHandle:
         with DeferredAuthorization.capture().scope():
             payload = durable_payload(spec.to_dict())
@@ -557,7 +557,7 @@ class AgentRuntime:
                 errors.append({"task_id": task_id, "error": type(error).__name__})
         return {"tasks": results, "requested": len(identifiers), "cleanup_errors": errors[:1000]}
 
-    def _stop_snapshots(self, identifiers: List[str]) -> dict[str, dict]:
+    def _stop_snapshots(self, identifiers: List[str]) -> dict[str, dict[str, Any]]:
         if not identifiers:
             return {}
         with self.store.connection() as connection:
@@ -726,7 +726,7 @@ class AgentRuntime:
         from je_auto_control.utils.agent_runtime.retention import prune_tasks
         return prune_tasks(self, keep_days)
 
-    def _retained_source(self, task_id: str) -> dict:
+    def _retained_source(self, task_id: str) -> dict[str, Any]:
         """Validate private custody; exact admitted reader scopes authorize every live read separately."""
         row = self.store.get(task_id)
         spec = AgentTaskSpec.from_dict(row["spec"])

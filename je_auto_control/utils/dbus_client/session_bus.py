@@ -34,7 +34,7 @@ import socket
 import struct
 import time
 import urllib.parse
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 # A direct sibling import avoids the partially initialized facade's import cycle.
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
@@ -371,7 +371,7 @@ def _read_array(reader: _Reader, signature: _SignatureReader) -> Any:
 
 
 def _read_struct(reader: _Reader, signature: _SignatureReader,
-                 code: str) -> tuple:
+                 code: str) -> Tuple[Any, ...]:
     closing = ")" if code == "(" else "}"
     reader.align(8)
     members = []
@@ -679,7 +679,7 @@ class SessionBus:
                 return message.body
 
 
-def body_pairs(signature: str, body: List[Any]):
+def body_pairs(signature: str, body: List[Any]) -> Iterator[Tuple[str, Any]]:
     """Pair each top-level type in a signature with its argument."""
     reader = _SignatureReader(signature)
     for value in body:

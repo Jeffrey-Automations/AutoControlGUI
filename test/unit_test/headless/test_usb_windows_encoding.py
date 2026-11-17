@@ -15,6 +15,7 @@ _WORKER = r'''
 import json, subprocess, sys, threading
 from pathlib import Path
 import je_auto_control
+from je_auto_control.utils import cancellable_process
 from je_auto_control.utils.usb import usb_devices
 
 assert Path(je_auto_control.__file__).resolve().is_relative_to(Path(sys.argv[3]))
@@ -23,11 +24,11 @@ exit_code = int(sys.argv[2])
 query = ("Get-PnpDevice -PresentOnly -Class USB"
          " | Select-Object FriendlyName, InstanceId, Manufacturer, Status"
          " | ConvertTo-Json -Compress")
-real_run = subprocess.run
+real_popen = subprocess.Popen
 errors, observed_flags = [], []
 threading.excepthook = lambda args: errors.append(type(args.exc_value).__name__)
 
-def synthetic_query(argv, **options):
+def synthetic_query(argv, *args, **options):
     assert argv[:4] == ['powershell', '-NoProfile', '-NonInteractive', '-Command']
     assert argv[-1].endswith(query)
     payload = json.dumps(expected, ensure_ascii=False).replace("'", "''")
@@ -41,9 +42,10 @@ def synthetic_query(argv, **options):
     observed_flags.append(flags)
     # The RED control must also stay hidden even before the library supplies the required flag.
     options['creationflags'] = flags | subprocess.CREATE_NO_WINDOW
-    return real_run(command, **options)
+    return real_popen(command, *args, **options)
 
-usb_devices.subprocess.run = synthetic_query
+# The enumeration starts its tool through the cancellable capture helper.
+cancellable_process.subprocess.Popen = synthetic_query
 result = usb_devices._enumerate_windows()
 assert errors == [], ('background stream decoding failed', errors)
 if exit_code:

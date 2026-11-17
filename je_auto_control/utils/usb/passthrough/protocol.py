@@ -100,7 +100,7 @@ def encode_frame(frame: Frame) -> bytes:
 
 
 def fragment_payload(op: "Opcode", claim_id: int, payload: bytes,
-                     *, base_flags: int = 0) -> list:
+                     *, base_flags: int = 0) -> list[Frame]:
     """Split ``payload`` into EOF-terminated frames (open question 2).
 
     A payload that fits in a single frame yields exactly one frame with

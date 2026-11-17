@@ -9,7 +9,7 @@ parameters (never string-interpolated) to avoid SQL injection. Imports no
 """
 from contextlib import closing
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 from je_auto_control.utils.data_source.data_source import (
@@ -52,7 +52,7 @@ def _shape(cursor: "sqlite3.Cursor", fetch: str) -> _FetchResult:
 
 
 def query_sqlite(database: str, query: str,
-                 params: Optional[list | tuple | dict] = None,
+                 params: Optional[List[Any] | Tuple[Any, ...] | Dict[str, Any]] = None,
                  fetch: str = "all") -> _FetchResult:
     """Run a read-only SELECT/WITH against ``database`` and return its result.
 

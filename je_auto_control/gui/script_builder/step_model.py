@@ -186,7 +186,7 @@ def _subject(result: Any, arguments: Any, path: FieldPath) -> str:
     return ""
 
 
-def step_to_action(step: Step) -> list:
+def step_to_action(step: Step) -> List[Any]:
     """Convert a Step to the executor's action list entry."""
     if step.args is not None:
         return [step.command, list(step.args)]
@@ -198,7 +198,7 @@ def step_to_action(step: Step) -> list:
     return [step.command, params]
 
 
-def action_to_step(action: list) -> Step:
+def action_to_step(action: List[Any]) -> Step:
     """Convert a single action entry back to a Step.
 
     Raises ``ValueError`` for anything that is not a ``[command, params?]``
@@ -248,7 +248,7 @@ def actions_to_steps(actions: Any) -> List[Step]:
     return [action_to_step(entry) for entry in _unwrap_action_list(actions)]
 
 
-def _unwrap_action_list(actions: Any) -> list:
+def _unwrap_action_list(actions: Any) -> List[Any]:
     """Return the bare action list, unwrapping the ``auto_control`` mapping."""
     if isinstance(actions, dict):
         wrapped = actions.get("auto_control")
@@ -262,7 +262,7 @@ def _unwrap_action_list(actions: Any) -> list:
     return actions
 
 
-def steps_to_actions(steps: List[Step]) -> list:
+def steps_to_actions(steps: List[Step]) -> List[Any]:
     """Convert a list of Steps back to an AC action list."""
     return [step_to_action(step) for step in steps]
 

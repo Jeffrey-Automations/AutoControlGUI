@@ -96,19 +96,19 @@ def _fake_screen_size() -> Tuple[int, int]:
     return _STATE.screen_size
 
 
-def _fake_write(text: str, *_args, **_kwargs) -> str:
+def _fake_write(text: str, *_args: Any, **_kwargs: Any) -> str:
     with _STATE_LOCK:
         _STATE.typed_text.append(text)
     return text
 
 
-def _fake_type_keyboard(keycode: Any, *_args, **_kwargs) -> str:
+def _fake_type_keyboard(keycode: Any, *_args: Any, **_kwargs: Any) -> str:
     with _STATE_LOCK:
         _STATE.keys_pressed.append(keycode)
     return str(keycode)
 
 
-def _fake_hotkey(keys: List[Any], *_args, **_kwargs) -> Tuple[str, str]:
+def _fake_hotkey(keys: List[Any], *_args: Any, **_kwargs: Any) -> Tuple[str, str]:
     joined = ",".join(str(k) for k in keys)
     with _STATE_LOCK:
         _STATE.keys_pressed.append(("hotkey", joined))

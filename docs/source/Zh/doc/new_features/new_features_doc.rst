@@ -52,8 +52,9 @@ Linux (``xclip`` 或 ``xsel``)。若無可用後端會拋出 ``RuntimeError``。
 
    executor.execute_action(actions, result_callback=seen)
 
-掛鉤只在該次執行、呼叫它的執行緒上有效（執行中啟動的執行緒，例如 ``AC_parallel``
-的分支，不會被跟到）；失敗的指令與 ``dry_run`` 不會回報；callback 丟出例外時只記錄
+掛鉤只在該次執行、呼叫它的執行緒上有效。``AC_parallel`` 的分支會被跟到：分支裡指令的
+路徑是 ``AC_parallel`` 那一步的路徑，再加上以分支序號（從 1 起）為 ``run`` 的一層；兩個
+分支不會同時呼叫 callback。執行中啟動的其他執行緒不會被跟到。失敗的指令與 ``dry_run`` 不會回報；callback 丟出例外時只記錄
 例外型別並忽略。有沒有掛鉤，執行的回傳值與 log 都相同。``result`` 就是紀錄裡的那個
 物件，請勿修改。要觀察多次執行，可用
 ``je_auto_control.utils.executor.result_hook`` 的 ``with observe_results(seen):``。
@@ -301,8 +302,13 @@ VLM（AI）元件定位
 - ``AUTOCONTROL_VLM_BACKEND=anthropic|openai``
 - ``AUTOCONTROL_VLM_MODEL=<model-id>``
 
+在取消範圍內（GUI 背景工作，或任何綁定範圍的呼叫端）兩者都會在送出模型請求前檢查取消，
+``click_by_description`` 在移動滑鼠前會再檢查一次：停止或逾時之後才回來的答案會拋出
+``CancelledError``，不會點擊。
+
 Action-JSON 指令：``AC_vlm_locate``、``AC_vlm_click``。GUI：
-**AI Locator** 分頁。
+**AI Locator** 分頁：一次一個請求、在 GUI 執行緒之外執行，有 **停止執行** 動作與兩分鐘期限
+（「執行逾時，已停止。」）。
 
 
 執行歷史 + 錯誤截圖附件
@@ -621,8 +627,9 @@ LLM 動作規劃器
 
 Action-JSON 指令：``AC_llm_plan``、``AC_llm_run``。
 
-GUI：**LLM Planner** 分頁。描述輸入框、``QThread`` 背景執行的 *Plan*
-按鈕、預覽指令清單、以及 *Run plan* 按鈕 — 長時間呼叫不會卡 UI。
+GUI：**LLM Planner** 分頁。描述輸入框、*Plan* 按鈕、預覽指令清單、以及 *Run plan* 按鈕。
+規劃與執行都在 GUI 執行緒之外；規劃有 200 秒期限，**停止執行** 會停止執行中的腳本，
+沒有腳本在跑時則丟棄仍在等待的規劃。
 
 
 遠端桌面（Host + Viewer）
@@ -724,7 +731,9 @@ on_displaced)``、``owned(slot, owner)``、``release(slot, owner)``、
 ``je_auto_control.utils.remote_desktop.registry.new_owner(label)`` 產生。
 ``stop_host``／``disconnect_viewer``（以及 ``ws`` 那一組）多了可選的
 ``owner=``，只在該 owner 擁有時才動作。``on_displaced(slot, by)``
-在執行取代動作的那個執行緒上被呼叫。
+在執行取代動作的那個執行緒上被呼叫。``detach(slot, by, only_own=False)`` 是把 ``evict``\ （加上
+``only_own`` 時為 ``release``\ ）拆成兩半，給不能阻塞的呼叫端：回傳時 slot 已經空出，並回傳停止原佔用者
+（會 join 它的執行緒）的呼叫或 ``None``，交給 worker 執行；被取代的 owner 在那個呼叫執行時收到通知。
 
 GUI：\ **Remote Desktop**\ 分頁預設打開的是 **快速連線** （AnyDesk
 風格）— 一邊是超大本機 Host ID，另一邊一個輸入框接受
@@ -1522,8 +1531,11 @@ Watcher 在 process 記憶體中追蹤已觸發的 UID,可選擇把訊息標為
 ``AC_email_trigger_add`` 跟 ``${secrets.NAME}`` 搭配使用,
 密碼就不會出現在 JSON 裡。
 
+在取消範圍內呼叫 ``poll_once`` 時，取消會讓它在下一個觸發的伺服器之前停止（``CancelledError``）；
+正在讀取的觸發會完成，因此不會有訊息被標為已讀卻沒有執行腳本。
+
 GUI: **Email Triggers** 分頁 — 註冊 IMAP 觸發、啟動 / 停止 watcher、
-手動觸發一次輪詢、檢視最近錯誤與觸發次數。
+手動觸發一次輪詢、檢視最近錯誤與觸發次數。\ **Stop**\ （或關閉分頁）也會取消仍在執行的手動輪詢。
 
 結構化動作日誌（實驗性）
 ================================

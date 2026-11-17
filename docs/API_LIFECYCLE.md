@@ -1437,3 +1437,21 @@ desktop tasks remain unavailable. This transport is not full Linux application o
 Installed wheel and source distributions include the REST Dashboard and Swagger HTML, CSS and
 JavaScript resources. The same localhost REST routes and authentication rules apply to an
 installed package; serving static pages grants no task or desktop input authority.
+
+### Owned Wayland EI sender
+
+NORMAL's default selector caches an `EiWorkerClient`; its fixed helper entry owns
+raw `LibeiBackend`, portal handles and a pressed-input ledger. The direct/injected
+`LibeiBackend` API remains in-process and outside this isolation boundary.
+Passive diagnostics use cached metadata. A loadability probe starts the helper
+without portal consent; only connect requests consent. Optional absence may use
+CLI; permission, revocation, protocol and uncertain-send failures never do.
+
+Requests have sequence IDs, at most 128 events and 16 KiB frames. Client deadlines
+include its request-lock queue. Lost replies and cancellation retire the owner;
+there is no automatic replay or replacement worker. Explicit reset permits a new
+owner only after successful retirement; failed close retains its handle for retry.
+Graceful close attempts all tracked releases before teardown. An acknowledgement
+means worker emission, not application delivery; process death/reap does not prove
+compositor input release. Synthetic IPC tests cover ownership, while native
+half-open teardown and compositor release acceptance remain unexecuted here.

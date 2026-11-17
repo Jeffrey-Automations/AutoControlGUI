@@ -19,14 +19,16 @@ from je_auto_control.utils.config_sync.blob_models import CHUNK_BYTES
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 
 _PEER_SECONDS = 30  # the longest timeout one peer request may carry
+_Validator = Callable[[dict[str, Any]], dict[str, Any]]  # checks one peer reply, returns its result
 
 @dataclass(frozen=True)
 class TransferPeer:
     """Validate descriptors, chunks and management projections under the host's current registered identity."""
 
-    invoke: Callable[[str, str, str, dict, float], dict]
+    invoke: Callable[[str, str, str, dict[str, Any], float], dict[str, Any]]
 
-    def call(self, host: str, binding: str, operation: str, request: Mapping, timeout: float) -> dict:
+    def call(self, host: str, binding: str, operation: str, request: Mapping[str, Any],
+             timeout: float) -> dict[str, Any]:
         """Read an exact source export or content hash with bounded bytes and a fixed local deadline."""
         value = self._request(host, binding, operation, request, timeout)
         deadline = time.monotonic() + timeout
@@ -34,7 +36,7 @@ class TransferPeer:
         return self._exchange(host, binding, '/agent/transfer/peer', {'operation': operation, 'request': value},
                               deadline, validate)
 
-    def _validator(self, operation: str, value: dict) -> Callable:
+    def _validator(self, operation: str, value: dict[str, Any]) -> _Validator:
         if operation == 'evidence':
             return lambda reply: self._evidence(reply, value)
         if operation == 'export':
@@ -42,7 +44,7 @@ class TransferPeer:
         return lambda reply: self._chunk(reply, value['sha256'])
 
     @staticmethod
-    def _evidence(reply: dict, request: dict) -> dict:
+    def _evidence(reply: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
         result = portable_evidence(reply)
         if result['expires'] <= time.time():
             raise AgentTaskError('portable evidence source retention has expired')
@@ -58,14 +60,16 @@ class TransferPeer:
             raise AgentTaskError('portable evidence reply changed its actual accepted request')
         return result
 
-    def manage(self, host: str, binding: str, operation: str, request: Mapping, timeout: float) -> dict:
+    def manage(self, host: str, binding: str, operation: str, request: Mapping[str, Any],
+               timeout: float) -> dict[str, Any]:
         """Use only closed source management fields and validate the foreign public projection."""
         self._identity(host, binding, timeout)
         value = management_request(operation, request)
         return self._exchange(host, binding, '/agent/transfer', {'operation': operation, 'request': value},
                               time.monotonic() + timeout, lambda reply: management_reply(operation, reply, value))
 
-    def _exchange(self, host: str, binding: str, path: str, body: dict, deadline: float, validate: Callable) -> dict:
+    def _exchange(self, host: str, binding: str, path: str, body: dict[str, Any], deadline: float,
+                  validate: _Validator) -> dict[str, Any]:
         self._checkpoint(deadline)
         try:
             # Capped: on an unchanged clock reading, (t + 30) - t can round just above 30, which the route refuses.
@@ -83,7 +87,7 @@ class TransferPeer:
             raise AgentTaskError('peer transfer is unavailable or its reply is malformed') from error
 
     @staticmethod
-    def _request(host: str, binding: str, operation: str, request: Mapping, timeout: float) -> dict:
+    def _request(host: str, binding: str, operation: str, request: Mapping[str, Any], timeout: float) -> dict[str, Any]:
         TransferPeer._identity(host, binding, timeout)
         fields = {'export': {'export_id'}, 'chunk': {'export_id', 'sha256'}, 'evidence': {'grant_id', 'binding'}}
         if not isinstance(operation, str) or operation not in fields:
@@ -119,14 +123,14 @@ class TransferPeer:
             raise AgentTaskError('peer transfer deadline exhausted')
 
     @staticmethod
-    def _manifest(reply: dict, identifier: str) -> dict:
+    def _manifest(reply: dict[str, Any], identifier: str) -> dict[str, Any]:
         manifest = TransferManifest.from_dict(reply)
         if manifest.export_id != identifier or manifest.expires <= time.time():
             raise AgentTaskError('peer export identity changed or its grant is expired')
         return manifest.to_dict()
 
     @staticmethod
-    def _chunk(reply: dict, digest: str) -> dict:
+    def _chunk(reply: dict[str, Any], digest: str) -> dict[str, Any]:
         value = _object(reply, {'contract', 'sha256', 'data'})
         version = value['contract']
         if isinstance(version, bool) or not isinstance(version, int) or version != 1:

@@ -45,8 +45,8 @@ def default_allowed_roots() -> List[Path]:
     return roots
 
 
-def validate_path(raw: os.PathLike | str, *,
-                  allowed_roots: Optional[Iterable[os.PathLike | str]] = None,
+def validate_path(raw: os.PathLike[str] | str, *,
+                  allowed_roots: Optional[Iterable[os.PathLike[str] | str]] = None,
                   allowed_suffixes: Optional[Sequence[str]] = None,
                   must_exist: bool = False) -> Path:
     """Return ``raw`` canonicalised, or raise :class:`PathNotAllowedError`.
@@ -81,7 +81,7 @@ def _home() -> Path:
         raise PathNotAllowedError(f"no home directory: {error}") from error
 
 
-def _canonical(value: os.PathLike | str) -> Path:
+def _canonical(value: os.PathLike[str] | str) -> Path:
     try:
         return Path(os.path.realpath(Path(value).expanduser()))
     except RuntimeError as error:

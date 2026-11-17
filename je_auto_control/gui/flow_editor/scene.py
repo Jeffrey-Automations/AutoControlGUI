@@ -1,11 +1,11 @@
 """Qt scene that paints a :func:`layout_steps` output as a node graph."""
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QObject, QRectF, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QGraphicsItem, QGraphicsPathItem, QGraphicsRectItem, QGraphicsScene,
-    QGraphicsSimpleTextItem, QStyleOptionGraphicsItem, QWidget,
+    QGraphicsSceneMouseEvent, QGraphicsSimpleTextItem, QStyleOptionGraphicsItem, QWidget,
 )
 
 from je_auto_control.gui.flow_editor.layout import (
@@ -26,7 +26,7 @@ class FlowNodeItem(QGraphicsRectItem):
     """One painted command rectangle. Stores the originating step path."""
 
     def __init__(self, position: FlowNodePosition,
-                 on_clicked: Callable[[Tuple], None]) -> None:
+                 on_clicked: Callable[[Tuple[Any, ...]], None]) -> None:
         super().__init__(QRectF(position.x, position.y,
                                   position.width, position.height))
         self._path = position.path
@@ -38,7 +38,7 @@ class FlowNodeItem(QGraphicsRectItem):
         self._build_label(position)
 
     @property
-    def step_path(self) -> Tuple:
+    def step_path(self) -> Tuple[Any, ...]:
         return self._path
 
     def _set_default_brush(self) -> None:
@@ -61,7 +61,7 @@ class FlowNodeItem(QGraphicsRectItem):
             detail.setBrush(QBrush(_NODE_LABEL))
             detail.setPos(position.x + 8, position.y + 32)
 
-    def mousePressEvent(self, event) -> None:
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(event)
         try:
             self._on_clicked(self._path)
@@ -110,7 +110,7 @@ class FlowGraphScene(QGraphicsScene):
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self.setBackgroundBrush(QBrush(QColor(30, 35, 45)))
-        self._nodes: Dict[Tuple, FlowNodeItem] = {}
+        self._nodes: Dict[Tuple[Any, ...], FlowNodeItem] = {}
 
     def load(self, steps: List[Step]) -> FlowLayout:
         """Replace the scene with a freshly-laid-out ``steps`` tree."""
@@ -137,10 +137,10 @@ class FlowGraphScene(QGraphicsScene):
                                NODE_WIDTH + 40.0, NODE_HEIGHT + 40.0)
         return layout
 
-    def _emit_selected(self, path: Tuple) -> None:
+    def _emit_selected(self, path: Tuple[Any, ...]) -> None:
         self.node_selected.emit(path)
 
-    def node_paths(self) -> List[Tuple]:
+    def node_paths(self) -> List[Tuple[Any, ...]]:
         return list(self._nodes.keys())
 
 

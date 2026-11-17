@@ -47,7 +47,7 @@ def when_press_key(keycode: str) -> None:
     keyword_press_key(keycode)
 
 
-def when_click_image(path: str) -> tuple:
+def when_click_image(path: str) -> tuple[int, int]:
     """``When I click on image "<path>"`` — locate + click."""
     return keyword_click_image(path)
 
@@ -59,12 +59,12 @@ def when_take_screenshot(path: str) -> str:
 
 # === Then ==================================================================
 
-def then_see_image(path: str, timeout: float = 10.0) -> tuple:
+def then_see_image(path: str, timeout: float = 10.0) -> tuple[int, int]:
     """``Then I see image "<path>"`` — waits up to ``timeout`` seconds."""
     return keyword_wait_for_image(path, timeout=timeout)
 
 
-def then_see_text(text: str, timeout: float = 10.0) -> tuple:
+def then_see_text(text: str, timeout: float = 10.0) -> tuple[int, int]:
     """``Then I see text "<text>"`` — OCR wait."""
     return keyword_wait_for_text(text, timeout=timeout)
 

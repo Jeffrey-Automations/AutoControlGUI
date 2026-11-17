@@ -43,7 +43,7 @@ class CriticalExit(Thread):
     - 預設為 F7 鍵
     """
 
-    def __init__(self, default_daemon: bool = True):
+    def __init__(self, default_daemon: bool = True) -> None:
         """
         初始化 CriticalExit
         Initialize CriticalExit

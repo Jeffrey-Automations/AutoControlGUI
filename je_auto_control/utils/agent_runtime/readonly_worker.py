@@ -20,14 +20,14 @@ class ReadOnlyWorker(NativeWorker):
         super().__init__(source, sink, target=target)
         self._configuration: str | None = None
 
-    def _dispatch(self, operation: str, payload: dict) -> Any:
+    def _dispatch(self, operation: str, payload: dict[str, Any]) -> Any:
         if operation == "readonly_capabilities" and payload == {}:
             return {"contract": 1, "input_supported": False}
         if operation not in {"bootstrap", "configure", "observe", "verify_browser", "cleanup"}:
             raise AgentTaskError("read-only helper refuses executable operations")
         return super()._dispatch(operation, payload)
 
-    def _configure_scope(self, payload: dict) -> None:
+    def _configure_scope(self, payload: dict[str, Any]) -> None:
         if set(payload) - {"spec", "owner", "profile"}:
             raise AgentTaskError("read-only helper cannot replace its configured authority")
         configuration = json.dumps(payload, sort_keys=True, allow_nan=False)
@@ -38,7 +38,7 @@ class ReadOnlyWorker(NativeWorker):
         super()._configure_scope(payload)
         self._configuration = configuration
 
-    def _operation(self, operation: str, payload: dict) -> Any:
+    def _operation(self, operation: str, payload: dict[str, Any]) -> Any:
         if operation == "configure":
             if self._profile_kind == "browser":
                 return {"ready": False, "reason": "fresh browser startup is not a read-only observation"}
@@ -49,10 +49,10 @@ class ReadOnlyWorker(NativeWorker):
     def _guard(self, _policy: Any, name: str, _arguments: Any) -> None:
         raise AgentTaskError(f"read-only observation cannot dispatch {name!r}")
 
-    def _input(self, _event: dict) -> None:
+    def _input(self, _event: dict[str, Any]) -> None:
         raise AgentTaskError("read-only helper cannot acknowledge native input")
 
-    def _release_owned(self, payload: dict) -> dict:
+    def _release_owned(self, payload: dict[str, Any]) -> dict[str, Any]:
         if payload != {"keys": [], "buttons": []}:
             raise AgentTaskError("read-only helper cannot inject cleanup input")
         with command_guard(lambda name, arguments: self._guard(None, name, arguments)), input_observer(self._input):

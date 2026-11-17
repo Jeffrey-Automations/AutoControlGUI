@@ -1,6 +1,6 @@
 """Shared dataclasses and exceptions for the accessibility API."""
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
@@ -27,7 +27,7 @@ class AccessibilityElement:
         left, top, width, height = self.bounds
         return (left + width // 2, top + height // 2)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "name": self.name, "role": self.role,
             "bounds": list(self.bounds),
@@ -133,7 +133,7 @@ def rank_by_name(elements: List[AccessibilityElement],
     """
     needle = (name or "").strip().lower()
 
-    def _key(element: AccessibilityElement):
+    def _key(element: AccessibilityElement) -> Tuple[bool, bool, int, int]:
         left, top, _width, _height = element.bounds
         # Nothing to click first: an empty rectangle sorted ahead of every
         # visible match on (top, left) = (0, 0).

@@ -5,6 +5,7 @@ import socket
 import ssl
 import threading
 import time as _time_module
+from types import TracebackType
 from typing import Any, Callable, Deque, Dict, Mapping, Optional, Tuple
 
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
@@ -15,7 +16,7 @@ from je_auto_control.utils.remote_desktop.clipboard_sync import (
     encode_text,
 )
 from je_auto_control.utils.remote_desktop.file_transfer import (
-    FileReceiver, FileTransferError, default_download_dir, send_file,
+    FileReceiver, FileSendResult, FileTransferError, ProgressCallback, default_download_dir, send_file,
 )
 from je_auto_control.utils.remote_desktop.host_id import validate_host_id
 from je_auto_control.utils.remote_desktop.input_send_queue import (
@@ -398,16 +399,19 @@ class RemoteDesktopViewer:
         return self._file_receiver
 
     def send_file(self, source_path: str, dest_path: str,
-                  on_progress=None):
+                  on_progress: Optional[ProgressCallback] = None, *,
+                  cancelled: Optional[Callable[[], bool]] = None) -> FileSendResult:
         """Stream ``source_path`` to ``dest_path`` on the host.
 
         Returns the :class:`FileSendResult`. Synchronous: callers wanting
-        a non-blocking upload should run this in a worker thread.
+        a non-blocking upload should run this in a worker thread. It stops at
+        the next chunk once ``cancelled()`` is true, or once the calling
+        thread's cancellation scope is cancelled (see :func:`send_file`).
         """
         if not self._connected or self._channel is None:
             raise ConnectionError(_NOT_CONNECTED_MESSAGE)
         return send_file(self._channel, source_path, dest_path,
-                         on_progress=on_progress)
+                         on_progress=on_progress, cancelled=cancelled)
 
     def _handle_file_payload(self, msg_type: MessageType,
                              payload: bytes) -> None:
@@ -453,7 +457,8 @@ class RemoteDesktopViewer:
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(self, exc_type: Optional[type[BaseException]], exc: Optional[BaseException],
+                 tb: Optional[TracebackType]) -> None:
         self.disconnect()
 
     # internals ----------------------------------------------------------

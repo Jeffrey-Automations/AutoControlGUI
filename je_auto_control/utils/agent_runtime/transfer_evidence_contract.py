@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from hashlib import sha256
-from typing import Mapping
+from typing import Any, Mapping
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.transfer_models import MAX_MANIFEST_BYTES, _canonical, _deadline, _hex, _object
@@ -18,7 +18,7 @@ _BINDING = {'source_task', 'request_key_hash', 'submitted_spec_digest'}
 _NODE = {'batch_id', 'graph_hash', 'node_id'}
 
 
-def evidence_binding(value: Mapping) -> dict:
+def evidence_binding(value: Mapping[str, Any]) -> dict[str, Any]:
     """Require the exact original accepted key/spec and optional actual DAG identity."""
     if not isinstance(value, Mapping):
         raise AgentTaskError('portable evidence binding must be an object')
@@ -31,7 +31,7 @@ def evidence_binding(value: Mapping) -> dict:
     return result
 
 
-def _node(value: Mapping, *, projection: bool) -> None:
+def _node(value: Mapping[str, Any], *, projection: bool) -> None:
     _hex(value['batch_id'], 32)
     _hex(value['graph_hash'], 64)
     _text(value['node_id'], 256, 'node identity')
@@ -39,13 +39,13 @@ def _node(value: Mapping, *, projection: bool) -> None:
         _hex(value['request_digest'], 64)
 
 
-def request_digest(binding: Mapping) -> str:
+def request_digest(binding: Mapping[str, Any]) -> str:
     """Hash only the key and accepted specification actually received by the source."""
     return sha256(_canonical({'key_hash': binding['request_key_hash'],
                               'submitted_spec_digest': binding['submitted_spec_digest']})).hexdigest()
 
 
-def portable_evidence(value: Mapping, *, resolved: bool = True) -> dict:
+def portable_evidence(value: Mapping[str, Any], *, resolved: bool = True) -> dict[str, Any]:
     """Validate a bounded redacted proof; a validated DTO alone supplies no current source authority."""
     if not isinstance(value, Mapping):
         raise AgentTaskError('portable evidence must be an object')
@@ -66,14 +66,14 @@ def portable_evidence(value: Mapping, *, resolved: bool = True) -> dict:
     return deepcopy(result)
 
 
-def _flags(value: dict) -> None:
+def _flags(value: dict[str, Any]) -> None:
     contract = value['contract']
     if (not isinstance(contract, int) or isinstance(contract, bool) or contract != 1 or
             value['evidence_only'] is not True or value['input_authorized'] is not False):
         raise AgentTaskError('portable evidence requires the exact evidence-only contract')
 
 
-def _reports(reports: list) -> None:
+def _reports(reports: list[Any]) -> None:
     if not isinstance(reports, list) or not reports:
         raise AgentTaskError('portable evidence requires independent finite verification')
     for report in reports:
@@ -83,7 +83,7 @@ def _reports(reports: list) -> None:
             raise AgentTaskError('portable evidence contains an unconfirmed criterion')
 
 
-def _chain(value: dict) -> None:
+def _chain(value: dict[str, Any]) -> None:
     chain = value['chain']
     if not isinstance(chain, list) or not 1 <= len(chain) <= 16:
         raise AgentTaskError('portable evidence requires one to sixteen real recovery links')
@@ -100,7 +100,7 @@ def _chain(value: dict) -> None:
         raise AgentTaskError('portable evidence chain changed its final completion witness')
 
 
-def _link(value: Mapping) -> None:
+def _link(value: Mapping[str, Any]) -> None:
     _object(value, {'source_task', 'task_id', 'source_snapshot', 'snapshot', 'completion_snapshot'})
     for name in ('source_task', 'task_id'):
         _hex(value[name], 32)

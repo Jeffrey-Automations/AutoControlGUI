@@ -78,6 +78,6 @@ class WindowsConsoleSession:
             self._state = 'unavailable'
             raise AgentTaskError('physical-console session support could not be established') from error
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         """Report only the last coarse classification; passive metadata never authorizes input."""
         return {'state': self._state, 'native_evidence': 'not_recorded'}

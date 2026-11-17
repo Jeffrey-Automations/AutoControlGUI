@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import asyncio
 
+from je_auto_control.utils.remote_desktop.webrtc_retirement import PeerStopFailed
+
 import pytest
 
 from headless._webrtc_doubles import (
@@ -456,14 +458,17 @@ def test_a_teardown_failure_does_not_abort_the_rest_of_the_teardown():
     rest = Stoppable()
     viewer._host_voice_receiver = failing
     viewer._opus_audio_track = rest
-    asyncio.run(viewer._async_stop())
+    with pytest.raises(PeerStopFailed, match="host voice"):
+        asyncio.run(viewer._async_stop())
+    assert viewer._host_voice_receiver is failing
     assert rest.stopped
 
 
-def test_a_stop_that_times_out_is_reported_rather_than_raised(monkeypatch):
+def test_a_completed_stop_with_timeout_error_is_reported_as_failure(monkeypatch):
     monkeypatch.setattr(viewer_module, "get_bridge", HangingBridge)
     viewer = _viewer()
     viewer._pc = object()
-    viewer.stop()
+    with pytest.raises(PeerStopFailed):
+        viewer.stop()
 
 

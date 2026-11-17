@@ -5,9 +5,12 @@ import ssl
 import threading
 import time
 from functools import partial
-from typing import Any, Callable, List, Mapping, Optional, Sequence
+from types import TracebackType
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Tuple
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.remote_desktop.media_retirement import MediaRetirementError
+from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
 from je_auto_control.utils.remote_desktop.audio import (
     AudioCapture, AudioCaptureConfig,
 )
@@ -19,7 +22,7 @@ from je_auto_control.utils.remote_desktop.clipboard_sync import (
     encode_image, encode_text,
 )
 from je_auto_control.utils.remote_desktop.file_transfer import (
-    FileReceiver, FileTransferError, send_file,
+    FileReceiver, FileTransferError, ProgressCallback, send_file,
 )
 from je_auto_control.utils.remote_desktop.host_id import (
     load_or_create_host_id, validate_host_id,
@@ -281,9 +284,14 @@ class RemoteDesktopHost(FrameProductionMixin):
 
     def _stop_locked(self, timeout: float) -> None:
         if self._listen_sock is None:
+            self._stop_audio_capture()
             return
         self._shutdown.set()
-        self._stop_audio_capture()
+        audio_error = None
+        try:
+            self._stop_audio_capture()
+        except BaseException as error:  # reason: finish independent host cleanup before preserving the audio failure
+            audio_error = error
         try:
             self._listen_sock.close()
         except OSError:
@@ -310,9 +318,14 @@ class RemoteDesktopHost(FrameProductionMixin):
         self._accept_thread = None
         self._capture_thread = None
         self._cursor_thread = None
+        if audio_error is not None:
+            raise_caused_run_interruption(audio_error)
+            raise audio_error
 
     def _start_audio_capture(self) -> None:
         """Open the audio input stream when audio capture is enabled."""
+        if self._audio_capture is not None:
+            self._stop_audio_capture()
         config = self._audio_config
         if not config.enabled:
             return
@@ -321,10 +334,12 @@ class RemoteDesktopHost(FrameProductionMixin):
             try:
                 self._audio_capture.start()
             except (OSError, RuntimeError) as error:
+                raise_caused_run_interruption(error)
                 autocontrol_logger.warning(
                     "remote_desktop audio capture failed to start: %r", error,
                 )
-                self._audio_capture = None
+                if not isinstance(error, MediaRetirementError):
+                    self._audio_capture = None
             return
         try:
             capture = AudioCapture(
@@ -334,12 +349,15 @@ class RemoteDesktopHost(FrameProductionMixin):
                 channels=config.channels,
                 block_frames=config.block_frames,
             )
+            self._audio_capture = capture
             capture.start()
         except (OSError, RuntimeError) as error:
+            raise_caused_run_interruption(error)
             autocontrol_logger.warning(
                 "remote_desktop audio capture disabled: %r", error,
             )
-            self._audio_capture = None
+            if not isinstance(error, MediaRetirementError):
+                self._audio_capture = None
             return
         self._audio_capture = capture
 
@@ -347,10 +365,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         capture = self._audio_capture
         if capture is None:
             return
-        try:
-            capture.stop()
-        except (OSError, RuntimeError):
-            pass
+        capture.stop()
         self._audio_capture = None
 
     def _broadcast_audio(self, chunk: bytes) -> None:
@@ -413,7 +428,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         return self._file_receiver
 
     def send_file_to_viewers(self, source_path: str, dest_path: str,
-                             on_progress=None) -> int:
+                             on_progress: Optional[ProgressCallback] = None) -> int:
         """Stream ``source_path`` to every authenticated viewer.
 
         ``dest_path`` is relative to each viewer's download directory: a
@@ -533,7 +548,7 @@ class RemoteDesktopHost(FrameProductionMixin):
                 )
         return sent
 
-    def _ip_allowed(self, address) -> bool:
+    def _ip_allowed(self, address: Tuple[Any, ...]) -> bool:
         """Apply the Phase 4.3 allowlist; log + reject silently otherwise."""
         peer_ip = address[0] if address else ""
         if _ip_in_allowlist(self._ip_allowlist, peer_ip):
@@ -544,7 +559,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         return False
 
     def _open_channel(self, client_sock: socket.socket,
-                      address) -> Optional[MessageChannel]:
+                      address: Tuple[Any, ...]) -> Optional[MessageChannel]:
         """TLS-wrap + WS/TCP handshake. Closes the socket on failure."""
         wrapped = self._maybe_wrap_tls(client_sock, address)
         if wrapped is None:
@@ -596,7 +611,7 @@ class RemoteDesktopHost(FrameProductionMixin):
                 name="rd-handshake", daemon=True,
             ).start()
 
-    def _handshake(self, client_sock: socket.socket, address,
+    def _handshake(self, client_sock: socket.socket, address: Tuple[Any, ...],
                    stop: threading.Event) -> None:
         """Open the channel, register the client, then authenticate it."""
         try:
@@ -609,7 +624,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         finally:
             self._handshake_slots.release()
 
-    def _register_client(self, handler: "_ClientHandler", address,
+    def _register_client(self, handler: "_ClientHandler", address: Tuple[Any, ...],
                          stop: threading.Event) -> bool:
         """Add ``handler`` to the client table unless stopped or full."""
         # Prune handlers whose viewer already disconnected *before* the
@@ -639,7 +654,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         return True
 
     def _build_channel(self, sock: socket.socket,
-                       address) -> MessageChannel:
+                       address: Tuple[Any, ...]) -> MessageChannel:
         """Hook for transports: TCP wraps directly, WS overrides this."""
         del address
         return TcpMessageChannel(sock)
@@ -649,7 +664,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         return "tcp"
 
     def _maybe_wrap_tls(self, client_sock: socket.socket,
-                        address) -> Optional[socket.socket]:
+                        address: Tuple[Any, ...]) -> Optional[socket.socket]:
         """Return a TLS-wrapped socket when an ssl_context is configured."""
         if self._ssl_context is None:
             return client_sock
@@ -682,5 +697,6 @@ class RemoteDesktopHost(FrameProductionMixin):
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(self, exc_type: Optional[type[BaseException]], exc: Optional[BaseException],
+                 tb: Optional[TracebackType]) -> None:
         self.stop()

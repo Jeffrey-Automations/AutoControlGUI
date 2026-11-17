@@ -155,12 +155,12 @@ def _delete(parent: Any, ref: str) -> None:
 
 # --- equality (bool stays distinct from int) -------------------------------
 
-def _dict_equal(left: Dict, right: Dict) -> bool:
+def _dict_equal(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
     return left.keys() == right.keys() and all(
         _json_equal(left[key], right[key]) for key in left)
 
 
-def _list_equal(left: List, right: List) -> bool:
+def _list_equal(left: List[Any], right: List[Any]) -> bool:
     return len(left) == len(right) and all(
         _json_equal(a, b) for a, b in zip(left, right))
 
@@ -274,7 +274,7 @@ def apply_patch(doc: Any, patch: List[Dict[str, Any]]) -> Any:
     return result
 
 
-def _diff_dict(old: Dict, new: Dict, path: str) -> List[Dict[str, Any]]:
+def _diff_dict(old: Dict[str, Any], new: Dict[str, Any], path: str) -> List[Dict[str, Any]]:
     ops: List[Dict[str, Any]] = []
     for key in old:
         if key not in new:
@@ -288,7 +288,7 @@ def _diff_dict(old: Dict, new: Dict, path: str) -> List[Dict[str, Any]]:
     return ops
 
 
-def _diff_list(old: List, new: List, path: str) -> List[Dict[str, Any]]:
+def _diff_list(old: List[Any], new: List[Any], path: str) -> List[Dict[str, Any]]:
     ops: List[Dict[str, Any]] = []
     for index in range(min(len(old), len(new))):
         ops.extend(make_patch(old[index], new[index], f"{path}/{index}"))

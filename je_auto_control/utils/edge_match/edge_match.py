@@ -16,21 +16,23 @@ imported lazily. Imports no ``PySide6``.
 """
 from typing import Any, List, Optional, Sequence, Tuple
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.visual_match.visual_match import (
     Match, _contain_cv2_error, _haystack_gray, _haystack_gray_with_origin, _nms,
     _resize, _to_gray, _to_screen,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 _DEFAULT_CANNY = (50, 150)
 
 
-def _edges(gray, canny: Sequence[int]):
+def _edges(gray: Any, canny: Sequence[int]) -> Any:
     import cv2
     return cv2.Canny(gray, int(canny[0]), int(canny[1]))
 
 
-def _chamfer_score_map(template_gray, scene_gray, canny: Sequence[int]):
+def _chamfer_score_map(template_gray: Any, scene_gray: Any,
+                       canny: Sequence[int]) -> Tuple[Any, Tuple[int, int]]:
     """Return ``(score_map, (w, h))`` where higher = better edge alignment, or ``(None, _)``."""
     import cv2
     import numpy as np
@@ -43,12 +45,12 @@ def _chamfer_score_map(template_gray, scene_gray, canny: Sequence[int]):
     distance = cv2.distanceTransform(cv2.bitwise_not(scene_edges),
                                      cv2.DIST_L2, 3).astype(np.float32)
     mask = (template_edges > 0).astype(np.float32)
-    total = cv2.matchTemplate(distance, mask, cv2.TM_CCORR)
+    total = stoppable_call(cv2.matchTemplate, distance, mask, cv2.TM_CCORR)
     score_map = 1.0 / (1.0 + total / edge_count)
     return score_map, (template_edges.shape[1], template_edges.shape[0])
 
 
-def _best(score_map, size: Tuple[int, int], scale: float, min_score: float,
+def _best(score_map: Any, size: Tuple[int, int], scale: float, min_score: float,
           current: Optional[Match]) -> Optional[Match]:
     import cv2
     _, max_val, _, max_loc = cv2.minMaxLoc(score_map)

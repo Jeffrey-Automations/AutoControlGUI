@@ -9,12 +9,14 @@ outlast its panel or the whole application, and destroying a running
 """
 from __future__ import annotations
 
+from concurrent.futures import CancelledError
 import secrets
 from typing import Optional, Set
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QObject, Signal
 
 from je_auto_control.gui._daemon_thread import DaemonThread
+from je_auto_control.gui.remote_desktop._webrtc_types import MultiViewerHostT
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop import signaling_client
@@ -33,7 +35,7 @@ class HostSignalingWorker(DaemonThread):
 
     def __init__(self, *, server_url: str, host_id: str, secret: Optional[str],
                  offer_sdp: str, timeout_s: float = 60.0,
-                 parent=None) -> None:
+                 parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._server_url = server_url
         self._host_id = host_id
@@ -50,7 +52,10 @@ class HostSignalingWorker(DaemonThread):
             answer = signaling_client.wait_for_answer(
                 self._server_url, self._host_id,
                 secret=self._secret, timeout_s=self._timeout_s,
+                cancelled=self.isInterruptionRequested,
             )
+        except CancelledError:
+            return                          # stopped: nobody is waiting for the answer
         except signaling_client.SignalingError as error:
             autocontrol_logger.warning("host signaling: %r", error)
             self.failed.emit(str(error))
@@ -65,7 +70,7 @@ class ViewerSignalingWorker(DaemonThread):
     failed = Signal(str)
 
     def __init__(self, *, server_url: str, host_id: str, secret: Optional[str],
-                 timeout_s: float = 60.0, parent=None) -> None:
+                 timeout_s: float = 60.0, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._server_url = server_url
         self._host_id = host_id
@@ -77,7 +82,10 @@ class ViewerSignalingWorker(DaemonThread):
             offer = signaling_client.wait_for_offer(
                 self._server_url, self._host_id,
                 secret=self._secret, timeout_s=self._timeout_s,
+                cancelled=self.isInterruptionRequested,
             )
+        except CancelledError:
+            return                          # stopped: nobody is waiting for the offer
         except signaling_client.SignalingError as error:
             autocontrol_logger.warning("viewer signaling: %r", error)
             self.failed.emit(str(error))
@@ -92,7 +100,7 @@ class ViewerAnswerPushWorker(DaemonThread):
     failed = Signal(str)
 
     def __init__(self, *, server_url: str, host_id: str, secret: Optional[str],
-                 answer_sdp: str, parent=None) -> None:
+                 answer_sdp: str, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._server_url = server_url
         self._host_id = host_id
@@ -128,11 +136,11 @@ class HostPublishLoopWorker(DaemonThread):
     session_connected = Signal(str)      # session_id (after accept_answer)
     failed = Signal(str)
 
-    def __init__(self, *, multi_host, server_url: str, host_id: str,
+    def __init__(self, *, multi_host: MultiViewerHostT, server_url: str, host_id: str,
                  secret: Optional[str],
                  wait_timeout_s: float = 600.0,
                  retry_delay_s: float = 2.0,
-                 parent=None) -> None:
+                 parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._multi_host = multi_host
         self._server_url = server_url
@@ -156,13 +164,19 @@ class HostPublishLoopWorker(DaemonThread):
                 secret=self._secret,
             )
             self.offer_published.emit(session_id)
+            # Stopping the host interrupts the thread: the wait (up to ten
+            # minutes) used to run out first, and only then saw the stop.
             answer = signaling_client.wait_for_answer(
                 self._server_url, self._host_id,
                 secret=self._secret, timeout_s=self._wait_timeout_s,
+                cancelled=self.isInterruptionRequested,
             )
             self._multi_host.accept_session_answer(session_id, answer)
             self.session_connected.emit(session_id)
             return True
+        except CancelledError:
+            self._safe_stop_session_if(session_id)       # stopped while waiting: nobody will answer it
+            return False
         except signaling_client.SignalingError as error:
             return self._handle_signaling_error(session_id, error)
         except (ValueError, RuntimeError, OSError) as error:
@@ -171,7 +185,8 @@ class HostPublishLoopWorker(DaemonThread):
             self._safe_stop_session_if(session_id)
             return False
 
-    def _handle_signaling_error(self, session_id, error) -> bool:
+    def _handle_signaling_error(self, session_id: Optional[str],
+                                error: signaling_client.SignalingError) -> bool:
         # Timeout waiting for answer is expected when no one connects.
         if "no answer" in str(error):
             self._safe_stop_session_if(session_id)
@@ -180,7 +195,7 @@ class HostPublishLoopWorker(DaemonThread):
         self._safe_stop_session_if(session_id)
         return False
 
-    def _safe_stop_session_if(self, session_id) -> None:
+    def _safe_stop_session_if(self, session_id: Optional[str]) -> None:
         if session_id is not None:
             self._safe_stop_session(session_id)
 
@@ -212,7 +227,8 @@ def retire_worker(worker: Optional[DaemonThread]) -> None:
     """Stop ``worker`` without destroying it while its thread still runs.
 
     A stopped worker is usually blocked in a signaling long-poll (up to ten
-    minutes), which ``requestInterruption`` cannot cut short. Dropping the last
+    minutes); ``requestInterruption`` now ends that wait within about 0.1 s,
+    but a request already out still runs to its timeout. Dropping the last
     reference to it there aborted the whole process with "QThread: Destroyed
     while thread is still running", from the Stop button, a second Publish or
     Connect click, or an auto-reconnect. The worker is kept here, cut off from

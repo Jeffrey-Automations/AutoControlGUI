@@ -13,9 +13,9 @@ from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
 class TaskAdmission:
     """Trusted store envelope keeps request identity in the same transaction as task acceptance."""
 
-    spec: dict
+    spec: dict[str, Any]
     submitted_digest: str
-    dag: dict | None = None
+    dag: dict[str, Any] | None = None
 
 
 def submitted_digest(value: AgentTaskSpec | Mapping[str, Any]) -> str:
@@ -24,7 +24,7 @@ def submitted_digest(value: AgentTaskSpec | Mapping[str, Any]) -> str:
     return hashlib.sha256(json.dumps(spec.to_dict(), sort_keys=True).encode()).hexdigest()
 
 
-def submission_metadata(store: Any, identifier: str) -> dict:
+def submission_metadata(store: Any, identifier: str) -> dict[str, Any]:
     """Expose historical request identity only; absence never invents a witness for a legacy task."""
     with store.connection() as connection:
         row = connection.execute("SELECT s.spec_digest,a.batch_id,a.node_id,a.actor FROM agent_task_submissions s "

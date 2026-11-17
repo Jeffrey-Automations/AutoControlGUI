@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import queue
+import sys
 import threading
 import time
 from typing import Any, Callable
@@ -12,11 +13,11 @@ from je_auto_control.utils.agent_runtime.presence_frames import (
     decode_frame, encode_frame, presence_body, validate_response,
 )
 from je_auto_control.utils.agent_runtime.presence_handshake import client_handshake
-from je_auto_control.utils.agent_runtime.presence_pipe_windows import WindowsPresencePipe
-from je_auto_control.utils.agent_runtime.presence_security_windows import WindowsPresenceSecurity
+from je_auto_control.utils.agent_runtime.presence_platform import default_presence_pipe, default_presence_security
+from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
 
 
-@dataclass
+@dataclass(eq=False)  # tracked by identity while it waits
 class _Probe:
     deadline: float
     done: threading.Event = field(default_factory=threading.Event)
@@ -47,16 +48,26 @@ class _Lifetime:
 class PresenceReader:
     """One permanent lease binding; only its private I/O owner touches blocking native resources."""
 
-    def __init__(self, binding: dict, takeover: Callable[[], None], *, pipe: Any = None,
-                 security: Any = None) -> None:
+    def __init__(self, binding: dict[str, Any], takeover: Callable[[], None], *, pipe: Any = None,
+                 security: Any = None, endpoint: dict[str, Any] | None = None) -> None:
         self._binding = presence_body('check', binding)
         self._takeover = takeover
-        security = security if security is not None else WindowsPresenceSecurity()
-        self._wire = _Transport(pipe if pipe is not None else WindowsPresencePipe(security), security)
+        if pipe is None:
+            if sys.platform.startswith('linux'):
+                if endpoint is None:
+                    raise AgentTaskError('Linux presence reader requires an owned launch endpoint')
+            elif sys.platform != 'win32' or endpoint is not None:
+                raise AgentTaskError('presence reader transport is unsupported on this platform')
+            pipe = default_presence_pipe()
+        if endpoint is not None:
+            pipe.use(endpoint_to_wire(endpoint_from_wire(endpoint)))
+        security = security if security is not None else default_presence_security()
+        self._wire = _Transport(pipe, security)
         self._state = _Lifetime()
         self._state.retired.set()
         self._mutex = threading.RLock()
         self._probes: queue.Queue[_Probe] = queue.Queue(maxsize=16)
+        self._waiting: set[_Probe] = set()
 
     @property
     def retired(self) -> bool:
@@ -115,12 +126,24 @@ class PresenceReader:
         self._require()
         deadline = min(time.monotonic() + 0.25, deadline) if deadline is not None else time.monotonic() + 0.25
         probe = _Probe(deadline)
+        with self._mutex:
+            self._waiting.add(probe)
+        try:
+            self._await(probe, deadline)
+        finally:
+            with self._mutex:
+                self._waiting.discard(probe)
+
+    def _await(self, probe: _Probe, deadline: float) -> None:
         try:
             self._probes.put_nowait(probe)
         except queue.Full as error:
             self._fail(error)
             raise AgentTaskError('physical presence reader capacity is busy') from error
-        if not probe.done.wait(max(0.0, deadline - time.monotonic())) or time.monotonic() >= deadline:
+        woken = probe.done.wait(max(0.0, deadline - time.monotonic()))
+        if self._state.closed:
+            self._require()  # close() woke this probe: a closed reader answers unavailable, never ready
+        if not woken or time.monotonic() >= deadline:
             expired = AgentTaskError('physical presence reader deadline exhausted')
             self._fail(expired)
             raise expired
@@ -209,6 +232,10 @@ class PresenceReader:
         with self._mutex:
             self._state.closed = True
             self._state.stop.set()
+            # A probe waits up to its own 0.25 s deadline; without this wake the watch thread could
+            # still be parked in one when the join below runs out of the same 0.25 s budget.
+            for waiting in self._waiting:
+                waiting.done.set()
             if (not any(thread.is_alive() for thread in self._state.threads) and not self.retired
                     and (self._wire.peer is not None or self._wire.connection is not None)):
                 self._launch(self._retire, 'PresenceReaderRetire')

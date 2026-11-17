@@ -12,6 +12,9 @@ from typing import Any, Callable, Optional
 from je_auto_control.utils.path_guard.policy import PathPolicy
 from je_auto_control.utils.exception.control_signals import OperationCancelledError as OperationCancelledError
 
+#: The stop reason a run records when the MCP client cancelled its call.
+CLIENT_CANCEL_REASON = "cancelled by the MCP client"
+
 
 @dataclass
 class ToolCallContext:
@@ -33,6 +36,15 @@ class ToolCallContext:
     path_policy: Optional[PathPolicy] = field(default=None, repr=False)
     session_id: str = ""
     tool_catalog: Optional[Callable[[], Any]] = field(default=None, repr=False)
+    #: The executor ``StopToken`` of the run this call executes as, while it runs.
+    stop_token: Optional[Any] = field(default=None, repr=False, compare=False)
+
+    def cancel(self) -> None:
+        """Mark the call cancelled and stop the executor run it executes as."""
+        self.cancelled_event.set()
+        token = self.stop_token
+        if token is not None:
+            token.stop(CLIENT_CANCEL_REASON)
 
     @property
     def cancelled(self) -> bool:
@@ -66,4 +78,4 @@ class ToolCallContext:
         self.notifier("notifications/progress", params)
 
 
-__all__ = ["OperationCancelledError", "ToolCallContext"]
+__all__ = ["CLIENT_CANCEL_REASON", "OperationCancelledError", "ToolCallContext"]

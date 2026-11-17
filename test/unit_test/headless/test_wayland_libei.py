@@ -12,6 +12,8 @@ them. What the tests *can* guarantee is the fail-closed property — every path
 that does not reach a live device raises ``LibeiUnavailable``, which the
 keyboard and mouse modules turn into "use the ydotool CLI".
 """
+from je_auto_control.linux_wayland import ei_default
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -736,7 +738,7 @@ def test_a_failed_probe_is_not_retried_on_every_keystroke():
             raise LibeiUnavailable("no portal here")
 
     try:
-        with patch.object(libei_mod, "LibeiBackend", _Failing):
+        with patch.object(ei_default, "_new_default_backend", _Failing):
             assert libei_mod.connected_backend() is None
             assert libei_mod.connected_backend() is None
             assert libei_mod.connected_backend() is None

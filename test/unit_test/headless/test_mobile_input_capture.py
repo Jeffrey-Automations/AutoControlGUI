@@ -174,6 +174,34 @@ def test_ios_gestures():
     ]
 
 
+def test_ios_swipe_sends_no_hold():
+    # facebook-wda's swipe duration is the press held before moving, so a
+    # travel time handed over as a hold made every swipe start as a drag.
+    handle = FakeWda()
+    _ios(handle).perform(Swipe(1, 2, 3, 4, duration_s=0.5))
+    assert handle.input_calls == [
+        {"op": "swipe", "x1": 1, "y1": 2, "x2": 3, "y2": 4, "duration": 0}]
+
+
+def test_ios_swipe_rejects_a_negative_or_nan_duration():
+    from je_auto_control.ios import input as ios_input
+    handle = FakeWda()
+    device = IOSDevice(url="http://wda.test:8100", handle=handle)
+    for bad in (-1.0, float("nan")):
+        with pytest.raises(ValueError):
+            ios_input.swipe(1, 2, 3, 4, bad, device=device)
+    assert handle.input_calls == []
+
+
+def test_android_pinch_past_the_left_edge_is_refused_before_uiautomator2(adb_host):
+    # uiautomator2 3.7.1's pos_rel2abs asserts x >= 0: a bare AssertionError otherwise.
+    handle = FakeU2()
+    session = _android(adb_host, ui_device=UIAutomatorDevice(handle=handle))
+    with pytest.raises(DeviceError, match="left edge"):
+        session.perform(Pinch(50, 800, scale=2.0, span=400))
+    assert handle.calls == []
+
+
 def test_invalid_gestures_are_rejected():
     with pytest.raises(DeviceError):
         Pinch(1, 2, scale=1)

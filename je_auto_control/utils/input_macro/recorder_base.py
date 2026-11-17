@@ -24,7 +24,7 @@ copies of the queue shaping drift without anything going red.
 must treat the result as sensitive.
 """
 from queue import Queue
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 #: A hook left installed grows its event list forever. Recording is bounded so
 #: a forgotten session cannot consume the process.
@@ -42,6 +42,9 @@ LEGACY_MOUSE_COMMAND = {"left": "AC_mouse_left", "right": "AC_mouse_right",
 
 #: Both capture kinds, which is what a plain ``record()`` asks for.
 ALL_KINDS: Tuple[str, ...] = ("keyboard", "mouse")
+
+#: One legacy queue entry: ``("AC_type_keyboard", vk)`` or ``(mouse_command, x, y)``.
+_LegacyAction = Union[Tuple[str, int], Tuple[str, int, int]]
 
 
 def event_kind(event: Dict[str, Any]) -> str:
@@ -70,9 +73,9 @@ def timeline(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
-def legacy_action_queue(events: List[Dict[str, Any]]) -> Queue:
+def legacy_action_queue(events: List[Dict[str, Any]]) -> Queue[_LegacyAction]:
     """The historical shape: one executor command per press, no releases."""
-    queue: Queue = Queue()
+    queue: Queue[_LegacyAction] = Queue()
     for event in events:
         operation = event.get("op")
         if operation == "key_down":
@@ -95,9 +98,17 @@ class InputRecorder:
 
     def __init__(self) -> None:
         self.hook: Any = None
-        self.record_queue: Optional[Queue] = None
-        self.result_queue: Optional[Queue] = None
+        self.record_queue: Optional[Queue[_LegacyAction]] = None
+        self.result_queue: Optional[Queue[_LegacyAction]] = None
         self._kinds: Tuple[str, ...] = ALL_KINDS
+
+    @property
+    def is_recording(self) -> Optional[bool]:
+        """Cached hook state, or unknown for a custom hook without status support."""
+        if self.hook is None:
+            return False
+        state = getattr(self.hook, "is_recording", None)
+        return state if isinstance(state, bool) else None
 
     def new_hook(self) -> Any:
         """Return a fresh, unstarted platform hook. Backends override this."""
@@ -122,7 +133,7 @@ class InputRecorder:
         self.hook = None
         return events
 
-    def _as_queue(self, events: List[Dict[str, Any]]) -> Queue:
+    def _as_queue(self, events: List[Dict[str, Any]]) -> Queue[_LegacyAction]:
         queue = legacy_action_queue(events)
         self.record_queue = None
         self.result_queue = queue
@@ -136,7 +147,7 @@ class InputRecorder:
         """
         self._start(ALL_KINDS)
 
-    def stop_record(self) -> Queue:
+    def stop_record(self) -> Queue[_LegacyAction]:
         """
         停止錄製並回傳事件
         Stop recording and return recorded events
@@ -159,7 +170,7 @@ class InputRecorder:
         """
         self._start(("mouse",))
 
-    def stop_record_mouse(self) -> Queue:
+    def stop_record_mouse(self) -> Queue[_LegacyAction]:
         """
         停止錄製滑鼠事件並回傳結果
         Stop recording mouse events and return results
@@ -173,7 +184,7 @@ class InputRecorder:
         """
         self._start(("keyboard",))
 
-    def stop_record_keyboard(self) -> Queue:
+    def stop_record_keyboard(self) -> Queue[_LegacyAction]:
         """
         停止錄製鍵盤事件並回傳結果
         Stop recording keyboard events and return results

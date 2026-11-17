@@ -33,6 +33,10 @@ Maker-Checker 審批閘門
 ``status(token)`` 回傳 ``pending`` / ``approved`` / ``rejected``(未知 token 為
 ``None``),``get(token)`` 回傳完整紀錄,``pending()`` 則列出所有仍待決議的請求。
 
+開啟 RBAC(``JE_AUTOCONTROL_RBAC_USERS``)時,maker 與 checker 是已驗證的使用者，而不是傳入的名字：
+``requester`` 或 ``approver`` 寫成別人會丟出 ``AuthorizationError``,留空則代表該使用者。
+因此同一個 operator 無法提出請求後再換個名字核准。沒開 RBAC 時照上面的方式使用傳入的名字。
+
 執行器指令
 ----------
 

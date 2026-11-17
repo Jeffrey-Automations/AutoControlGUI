@@ -5,7 +5,7 @@ import hashlib
 import json
 import time
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.input_journal import InputJournal
@@ -45,7 +45,7 @@ class RemoteInputJournal(InputJournal):
         super().__init__(resource)
         self.device = device_identity(**device)
 
-    def _validate_witness(self, data: dict) -> None:
+    def _validate_witness(self, data: dict[str, Any]) -> None:
         self._validate_header(data)
         if not _integer(data["next_sequence"], 1, 2**53):
             raise AgentTaskError("remote input witness has an invalid sequence")
@@ -62,14 +62,14 @@ class RemoteInputJournal(InputJournal):
                 raise AgentTaskError("remote effect witness has no matching perform operation")
             self._validate_event(data["remote_effect"], "remote_begin", data)
 
-    def _validate_header(self, data: dict) -> None:
+    def _validate_header(self, data: dict[str, Any]) -> None:
         required = {"version", "remote_protocol", "remote_device", "owner", "held", "in_flight",
                     "review", "remote_effect", "next_sequence", "recovery_epoch"}
         if (set(data) != required or not _integer(data["version"], 1, 1)
                 or not _integer(data["remote_protocol"], 1, 1) or data["remote_device"] != self.device):
             raise AgentTaskError("remote input witness is incompatible with this device")
 
-    def _fresh(self, review: dict | None = None) -> dict:
+    def _fresh(self, review: dict[str, Any] | None = None) -> dict[str, Any]:
         return {"version": 1, "remote_protocol": 1, "remote_device": detached(self.device),
                 "owner": None, "held": {}, "in_flight": None, "review": review,
                 "remote_effect": None, "next_sequence": 1, "recovery_epoch": None}
@@ -93,7 +93,7 @@ class RemoteInputJournal(InputJournal):
         self._data["owner"] = self.owner
         self._write()
 
-    def update(self, held: dict, operation: str | None = None) -> None:
+    def update(self, held: dict[str, Any], operation: str | None = None) -> None:
         """Keep the remote marker intact; desktop release data is never valid here."""
         if held or operation not in (None, "configure", "observe", "perform"):
             raise AgentTaskError("remote guard cannot record desktop input or an unknown operation")
@@ -102,7 +102,7 @@ class RemoteInputJournal(InputJournal):
         self._data["in_flight"] = operation
         self._write()
 
-    def _validate_event(self, event: dict, kind: str, state: dict) -> None:
+    def _validate_event(self, event: dict[str, Any], kind: str, state: dict[str, Any]) -> None:
         if (not isinstance(event, dict)
                 or set(event) != {"kind", "controller", "device", "sequence", "epoch"}
                 or event["kind"] != kind):
@@ -113,7 +113,7 @@ class RemoteInputJournal(InputJournal):
             raise AgentTaskError("remote effect event does not match its controller, device or sequence")
         _token(event["epoch"], "effect epoch")
 
-    def consume(self, event: dict) -> None:
+    def consume(self, event: dict[str, Any]) -> None:
         """Persist a matched begin/end before returning permission to acknowledge it."""
         kind = event.get("kind")
         if kind not in ("remote_begin", "remote_end") or self._data.get("in_flight") != "perform":
@@ -137,7 +137,7 @@ class RemoteInputJournal(InputJournal):
         self._data.update(owner=None, in_flight=None)
         self._write()
 
-    def recover(self, note: str, probe: Callable[[], object], actor: str) -> dict:
+    def recover(self, note: str, probe: Callable[[], object], actor: str) -> dict[str, Any]:
         """Require a trusted post-retirement epoch change invalidating all old commands.
 
         The host probe must certify this physical device, all old writers retired,

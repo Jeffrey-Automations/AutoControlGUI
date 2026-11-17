@@ -1,9 +1,10 @@
 """Triggers tab: image / window / pixel / file event watchers."""
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, TypedDict
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+    QCheckBox, QComboBox, QFileDialog, QLabel, QLineEdit,
     QMessageBox, QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget,
 )
@@ -11,13 +12,15 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
 from je_auto_control.utils.triggers.trigger_engine import (
     AllOfTrigger, AnyOfTrigger, CronTrigger, FilePathTrigger,
     ImageAppearsTrigger, PixelColorTrigger, SequenceTrigger,
-    WindowAppearsTrigger, default_trigger_engine,
+    WindowAppearsTrigger, _TriggerBase, default_trigger_engine,
 )
 
 
@@ -35,6 +38,12 @@ _TYPE_KEYS = (
 COMPOSITE_BY_MODE: Dict[str, type] = {
     "all": AllOfTrigger, "any": AnyOfTrigger, "sequence": SequenceTrigger,
 }
+
+
+class _TriggerOptions(TypedDict):
+    trigger_id: str
+    script_path: str
+    repeat: bool
 
 
 def children_to_combine(ids: Sequence[str],
@@ -109,7 +118,7 @@ class TriggersTab(TranslatableMixin, QWidget):
             self._timer.stop()
         self._apply_status()
 
-    def showEvent(self, event) -> None:  # noqa: N802  # reason: Qt override
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802  # reason: Qt override
         """Catch up with an engine started or stopped elsewhere while hidden."""
         super().showEvent(event)
         self.sync_with_engine()
@@ -139,18 +148,37 @@ class TriggersTab(TranslatableMixin, QWidget):
         # Browse/add/remove/combine/start/stop commands run from the Actions
         # menu; the tab keeps only the inputs, the table, and the status.
         root = QVBoxLayout(self)
-        form_top = QHBoxLayout()
-        form_top.addWidget(self._tr(QLabel(), "tr_script_label"))
-        form_top.addWidget(self._script_input, stretch=1)
-        form_top.addWidget(self._repeat_check)
-        form_top.addWidget(self._tr(QLabel(), "tr_type_label"))
-        form_top.addWidget(self._type_combo)
-        root.addLayout(form_top)
-        root.addWidget(self._stack)
-        root.addWidget(self._table, stretch=1)
+        root.setSpacing(12)
+        self._stack.setProperty("role", "bare")
+        options = flow_of(self._repeat_check,
+                          field_pair(self._tr(QLabel(), "tr_type_label"), self._type_combo))
+        inputs = Card().add(self._field_row("tr_script_label", self._script_input))
+        root.addWidget(inputs.add(options).add(self._stack))
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
 
-    def menu_actions(self) -> list:
+    def _field_row(self, label_key: str, field: QWidget,
+                   button: Optional[QWidget] = None) -> QWidget:
+        """A label, a field taking the rest of the line, and an optional button after it."""
+        row = field_pair(self._tr(QLabel(), label_key), field)
+        layout = row.layout()
+        if button is not None and layout is not None:
+            layout.addWidget(button)
+        return row
+
+    def _add_page(self, *rows: QWidget) -> None:
+        """Stack one trigger type's inputs, one row under another, as a page of the type stack."""
+        page = QWidget()
+        page.setProperty("role", "bare")
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        for row in rows:
+            layout.addWidget(row)
+        self._stack.addWidget(page)
+
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("browse", self._browse_script),
@@ -163,59 +191,61 @@ class TriggersTab(TranslatableMixin, QWidget):
             ("tr_stop_engine", self._on_stop),
         ]
 
-    def _build_image_form(self) -> dict:
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
+    def _build_image_form(self) -> Dict[str, QLineEdit]:
         path_input = QLineEdit()
         threshold_input = QLineEdit("0.8")
         browse = self._tr(QPushButton(), "browse")
-        browse.clicked.connect(lambda: self._browse_image(path_input))
-        layout.addWidget(self._tr(QLabel(), "tr_image_label"))
-        layout.addWidget(path_input, stretch=1)
-        layout.addWidget(browse)
-        layout.addWidget(self._tr(QLabel(), "tr_threshold_label"))
-        layout.addWidget(threshold_input)
-        self._stack.addWidget(widget)
+        browse.setProperty("line_edit", path_input)
+        browse.clicked.connect(self._on_browse_image)     # a method: a lambda over self kept the tab alive
+        threshold = QWidget()
+        threshold.setProperty("role", "bare")
+        threshold.setLayout(flow_of(field_pair(self._tr(QLabel(), "tr_threshold_label"), threshold_input)))
+        self._add_page(self._field_row("tr_image_label", path_input, browse), threshold)
         return {"path": path_input, "threshold": threshold_input}
 
-    def _build_window_form(self) -> dict:
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
+    def _build_window_form(self) -> Dict[str, QLineEdit]:
         title_input = QLineEdit()
-        layout.addWidget(self._tr(QLabel(), "tr_title_contains_label"))
-        layout.addWidget(title_input, stretch=1)
-        self._stack.addWidget(widget)
+        self._add_page(self._field_row("tr_title_contains_label", title_input))
         return {"title": title_input}
 
-    def _build_pixel_form(self) -> dict:
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
+    def _build_pixel_form(self) -> Dict[str, QLineEdit]:
         x_input = QLineEdit("0")
         y_input = QLineEdit("0")
         r_input = QLineEdit("0")
         g_input = QLineEdit("0")
         b_input = QLineEdit("0")
         tol_input = QLineEdit("8")
-        for label, field in (("X:", x_input), ("Y:", y_input),
-                             ("R:", r_input), ("G:", g_input), ("B:", b_input),
-                             ("\u00b1:", tol_input)):
-            layout.addWidget(QLabel(label))
-            layout.addWidget(field)
-        self._stack.addWidget(widget)
+        channels = QWidget()
+        channels.setProperty("role", "bare")
+        channels.setLayout(flow_of(*(field_pair(QLabel(label), field) for label, field in (
+            ("X:", x_input), ("Y:", y_input), ("R:", r_input), ("G:", g_input),
+            ("B:", b_input), ("\u00b1:", tol_input)))))
+        self._add_page(channels)
         return {"x": x_input, "y": y_input, "r": r_input,
                 "g": g_input, "b": b_input, "tol": tol_input}
 
-    def _build_file_form(self) -> dict:
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
+    def _build_file_form(self) -> Dict[str, QLineEdit]:
         path_input = QLineEdit()
         browse = self._tr(QPushButton(), "browse")
-        browse.clicked.connect(lambda: self._browse_watch(path_input))
-        layout.addWidget(self._tr(QLabel(), "tr_watch_label"))
-        layout.addWidget(path_input, stretch=1)
-        layout.addWidget(browse)
-        self._stack.addWidget(widget)
+        browse.setProperty("line_edit", path_input)
+        browse.clicked.connect(self._on_browse_watch)
+        self._add_page(self._field_row("tr_watch_label", path_input, browse))
         return {"path": path_input}
+
+    def _browse_target(self) -> Optional[QLineEdit]:
+        button = self.sender()
+        line = button.property("line_edit") if button is not None else None
+        return line if isinstance(line, QLineEdit) else None
+
+    def _on_browse_image(self) -> None:
+        line = self._browse_target()
+        if line is not None:
+            self._browse_image(line)
+
+    def _on_browse_watch(self) -> None:
+        line = self._browse_target()
+        if line is not None:
+            self._browse_watch(line)
 
     def _browse_script(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -249,10 +279,10 @@ class TriggersTab(TranslatableMixin, QWidget):
         default_trigger_engine.add(trigger)
         self._refresh()
 
-    def _build_trigger(self, script: str):
+    def _build_trigger(self, script: str) -> _TriggerBase:
         idx = self._type_combo.currentIndex()
-        common = {"trigger_id": "", "script_path": script,
-                  "repeat": self._repeat_check.isChecked()}
+        common: _TriggerOptions = {"trigger_id": "", "script_path": script,
+                                   "repeat": self._repeat_check.isChecked()}
         if idx == 0:
             return ImageAppearsTrigger(
                 image_path=self._image_widgets["path"].text().strip(),
@@ -276,16 +306,12 @@ class TriggersTab(TranslatableMixin, QWidget):
             **common,
         )
 
-    def _build_cron_form(self) -> dict:
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
+    def _build_cron_form(self) -> Dict[str, QLineEdit]:
         cron_input = QLineEdit("* * * * *")
-        layout.addWidget(self._tr(QLabel(), "tr_cron_label"))
-        layout.addWidget(cron_input, stretch=1)
-        self._stack.addWidget(widget)
+        self._add_page(self._field_row("tr_cron_label", cron_input))
         return {"cron": cron_input}
 
-    def _build_pixel_trigger(self, common: dict):
+    def _build_pixel_trigger(self, common: _TriggerOptions) -> PixelColorTrigger:
         w = self._pixel_widgets
         return PixelColorTrigger(
             x=int(w["x"].text() or "0"), y=int(w["y"].text() or "0"),
@@ -300,15 +326,17 @@ class TriggersTab(TranslatableMixin, QWidget):
         row = self._table.currentRow()
         if row < 0:
             return
-        tid = self._table.item(row, 0).text()
-        default_trigger_engine.remove(tid)
+        item = self._table.item(row, 0)
+        if item is None:
+            return
+        default_trigger_engine.remove(item.text())
         self._refresh()
 
     def _selected_ids(self) -> List[str]:
         """Trigger ids of the selected rows, in row order, without duplicates."""
         rows = sorted({idx.row() for idx in self._table.selectedIndexes()})
-        return [self._table.item(row, 0).text() for row in rows
-                if self._table.item(row, 0) is not None]
+        return [item.text() for row in rows
+                if (item := self._table.item(row, 0)) is not None]
 
     def _on_combine(self, mode: str) -> None:
         ids = self._selected_ids()
@@ -341,7 +369,7 @@ class TriggersTab(TranslatableMixin, QWidget):
         # stop() joins the engine thread, which used to hold the GUI thread
         # for up to 2 s; a second Stop while it is out is ignored.
         if self._engine_op.run(default_trigger_engine.stop, on_done=self._on_engine_stopped,
-                               on_error=self._on_engine_stopped):
+                               on_error=self._on_engine_stopped, retain_failure=True):
             self.sync_with_engine()
 
     def _on_engine_stopped(self, _outcome: object = None) -> None:
@@ -362,7 +390,7 @@ class TriggersTab(TranslatableMixin, QWidget):
                 self._table.setItem(row, col, QTableWidgetItem(value))
 
 
-def _describe(trigger) -> str:
+def _describe(trigger: _TriggerBase) -> str:
     if isinstance(trigger, ImageAppearsTrigger):
         return f"img={trigger.image_path} th={trigger.threshold}"
     if isinstance(trigger, WindowAppearsTrigger):

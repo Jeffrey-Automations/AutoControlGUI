@@ -19,12 +19,12 @@ class HandoffPolicy:
 class HandoffAccess:
     """A private validated projection; caller JSON cannot create task-read authority."""
 
-    projection: dict
-    rows: dict[str, dict]
-    links: list[tuple[dict, dict, dict]]
+    projection: dict[str, Any]
+    rows: dict[str, dict[str, Any]]
+    links: list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]]
     authority: HandoffPolicy
-    witness: Callable
-    grant: dict
+    witness: Callable[..., dict[str, Any]]
+    grant: dict[str, Any]
 
     @property
     def policy(self) -> Any:
@@ -36,19 +36,20 @@ class HandoffAccess:
         """Whether the actual leaf has privately reviewed renewal evidence."""
         return self.authority.renewed
 
-    def read(self, identifier: str) -> dict:
+    def read(self, identifier: str) -> dict[str, Any]:
         """Read only a real task already included in this explicitly validated grant."""
         if identifier not in self.rows:
             raise AgentTaskError('task is outside the explicit evidence handoff')
         return self.rows[identifier]
 
-    def reply(self, identifier: str) -> dict:
+    def reply(self, identifier: str) -> dict[str, Any]:
         """Supply only the exact independently verified final completion projection."""
         if identifier != self.projection['task_id']:
             raise AgentTaskError('handoff does not select this completion task')
         return self.projection
 
-    def __call__(self, connection: Any, source: dict, child: dict, link: dict) -> dict:
+    def __call__(self, connection: Any, source: dict[str, Any], child: dict[str, Any],
+                 link: dict[str, Any]) -> dict[str, Any]:
         """Recheck only an actual granted source/child pair through the injected host witness."""
         actual = next((item for item in self.links
                        if (item[0]['id'], item[1]['id']) == (source['id'], child['id'])), None)
@@ -78,7 +79,7 @@ class HandoffRecords:
         return connection.execute(self._sql("SELECT * FROM @records WHERE review=? AND state='active'"),
                                   (review,)).fetchone()
 
-    def insert(self, connection: Any, row: dict) -> None:
+    def insert(self, connection: Any, row: dict[str, Any]) -> None:
         """Persist one family-shaped grant without inventing an unrelated DAG binding."""
         fields = ('id', *(() if self.standalone else ('batch_id', 'node_id')), 'source_task',
                   'task_id', 'review', 'details', 'note', 'state', 'created', 'expires')
@@ -86,7 +87,7 @@ class HandoffRecords:
         statement = self._sql('INSERT INTO @records VALUES (@values)').replace('@values', placeholders)
         connection.execute(statement, tuple(row[field] for field in fields))
 
-    def list(self, connection: Any, binding: dict) -> list:
+    def list(self, connection: Any, binding: dict[str, Any]) -> list[Any]:
         """List bounded history for this exact real source or DAG node."""
         filters = ' AND '.join(field + '=?' for field in self.binding_fields)
         statement = self._sql('SELECT * FROM @records WHERE @filter ORDER BY created DESC LIMIT 200')

@@ -61,8 +61,10 @@ with ``curl /health``.
 The dev/main headless jobs also retain ``native-<os>-<python>`` artifacts for
 seven days, even when tests fail. ``process.log`` combines stdout/stderr;
 ``runtime.json`` records package/runtime versions and the child exit status.
-Linux runs under GDB and retains all-thread native backtraces. Other systems
-retain Python faulthandler output. Neither ordinary failure nor native abort
+Linux runs under GDB and retains all-thread native backtraces. On Windows the
+job first sets Windows Error Reporting's ``LocalDumps`` for ``python.exe`` to
+``dumps/`` inside the artifact, so a native crash leaves a minidump with every
+thread's native stack. macOS retains Python faulthandler output. Neither ordinary failure nor native abort
 is converted into a passing job. Native root-cause acceptance remains separate
 from collecting the evidence.
 

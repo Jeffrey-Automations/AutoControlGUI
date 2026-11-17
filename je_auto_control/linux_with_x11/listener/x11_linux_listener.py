@@ -34,7 +34,7 @@ class KeypressHandler:
     ``record_enable_context`` callback, never started as their own thread.
     """
 
-    def __init__(self, default_daemon: bool = True, display: Any = None):
+    def __init__(self, default_daemon: bool = True, display: Any = None) -> None:
         """
         :param default_daemon: kept for backwards compatibility; the handler
             is no longer a Thread, so this flag is informational only.
@@ -43,7 +43,7 @@ class KeypressHandler:
         self.daemon = default_daemon
         self.still_listener = True
         self.record_flag = False
-        self.record_queue: Optional[Queue] = None
+        self.record_queue: Optional[Queue[tuple[int, int, int, int]]] = None
         self.event_keycode = 0
         self.event_position = (0, 0)
 
@@ -57,7 +57,7 @@ class KeypressHandler:
             return True
         return False
 
-    def handle_reply(self, reply) -> None:
+    def handle_reply(self, reply: Any) -> None:
         """
         處理 X11 回傳的事件資料
         Handle X11 reply data and parse events
@@ -80,7 +80,7 @@ class KeypressHandler:
         except (OSError, RuntimeError, AttributeError, TypeError, ValueError) as error:
             raise AutoControlException(f"{listener_error_message}: {error}") from error
 
-    def record(self, record_queue: Queue) -> None:
+    def record(self, record_queue: Queue[tuple[int, int, int, int]]) -> None:
         """
         開始記錄事件
         Start recording events into the given queue
@@ -88,7 +88,7 @@ class KeypressHandler:
         self.record_flag = True
         self.record_queue = record_queue
 
-    def stop_record(self) -> Queue:
+    def stop_record(self) -> Queue[tuple[int, int, int, int]]:
         """
         停止記錄事件並回傳 Queue
         Stop recording and return the recorded queue
@@ -114,7 +114,7 @@ class XWindowsKeypressListener(Thread):
     - 啟動 KeypressHandler
     """
 
-    def __init__(self, default_daemon: bool = True):
+    def __init__(self, default_daemon: bool = True) -> None:
         super().__init__(daemon=default_daemon)
         self.still_listener = True
         self._record_lock = Lock()
@@ -182,7 +182,7 @@ class XWindowsKeypressListener(Thread):
         finally:
             self.handler.still_listener = False
 
-    def record(self, record_queue: Queue) -> None:
+    def record(self, record_queue: Queue[tuple[int, int, int, int]]) -> None:
         """
         開始記錄事件
         Start recording events
@@ -192,7 +192,7 @@ class XWindowsKeypressListener(Thread):
                 raise AutoControlException("X11 listener is retiring; recording was not started")
             self.handler.record(record_queue)
 
-    def stop_record(self) -> Queue:
+    def stop_record(self) -> Queue[tuple[int, int, int, int]]:
         """
         停止記錄事件
         Stop recording events
@@ -204,7 +204,7 @@ _LISTENER: XWindowsKeypressListener | None = None
 _listener_lock = Lock()
 
 
-def _get_listener(record_queue: Queue | None = None) -> XWindowsKeypressListener:
+def _get_listener(record_queue: Queue[tuple[int, int, int, int]] | None = None) -> XWindowsKeypressListener:
     global _LISTENER  # pylint: disable=global-statement  # reason: one module owns this lazy cache
     with _listener_lock:
         if _LISTENER is not None and not _LISTENER.closed.is_set() and _LISTENER.failure is not None:
@@ -232,12 +232,19 @@ def check_key_is_press(keycode: int) -> bool:
     return _get_listener().check_is_press(keycode)
 
 
-def x11_linux_record(record_queue: Queue) -> None:
+def x11_linux_record(record_queue: Queue[tuple[int, int, int, int]]) -> None:
     """Arm the queue before starting a newly acquired RECORD listener."""
     _get_listener(record_queue)
 
 
-def x11_linux_stop_record() -> Queue:
+def x11_linux_stop_record() -> Queue[tuple[int, int, int, int]]:
     """Stop queue insertion; stopping before first use acquires no resources."""
     with _listener_lock:
         return Queue() if _LISTENER is None else _LISTENER.stop_record()
+
+
+def x11_linux_is_recording() -> bool:
+    """Inspect existing listener state without starting a listener or native query."""
+    listener = _LISTENER
+    return (listener is not None and not listener.closed.is_set()
+            and listener.failure is None and listener.handler.record_flag)

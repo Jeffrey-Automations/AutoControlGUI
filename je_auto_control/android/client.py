@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import functools
 import threading
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, List, Optional, Tuple, Type, TypeVar
 
 from je_auto_control.wrapper.device_context import DeviceUnavailableError
 
@@ -63,7 +63,7 @@ class UIAutomatorDevice:
                 ) from error
             try:
                 self._handle = u2.connect(self._serial)
-            except (OSError, RuntimeError, ValueError, *_sdk_errors()) as error:
+            except (OSError, RuntimeError, ValueError) + _sdk_errors() as error:
                 raise UIAutomatorUnavailableError(
                     f"could not connect to Android device "
                     f"{self._serial or '(default)'}: {error}",
@@ -97,10 +97,10 @@ __all__ = [
 _Result = TypeVar("_Result")
 
 
-def _sdk_errors() -> tuple:
+def _sdk_errors() -> Tuple[Type[BaseException], ...]:
     """``adbutils.AdbError`` (no device, or several without a serial) and
     uiautomator2's base error, whichever are installed."""
-    errors = []
+    errors: List[Type[BaseException]] = []
     try:
         import adbutils
         errors.append(adbutils.AdbError)
@@ -124,6 +124,6 @@ def translate_device_errors(function: Callable[..., _Result]) -> Callable[..., _
     def wrapper(*args: Any, **kwargs: Any) -> _Result:
         try:
             return function(*args, **kwargs)
-        except (*_sdk_errors(),) as error:
+        except _sdk_errors() as error:
             raise UIAutomatorUnavailableError(f"{function.__name__}: {error}") from error
     return wrapper

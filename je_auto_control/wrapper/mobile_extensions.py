@@ -56,8 +56,12 @@ class MobileExtension(Protocol):
     def pull_file(self, remote_path: str, local_path: str) -> str:
         """Copy a device file to the host."""
 
-    def get_clipboard(self) -> str:
-        """The device clipboard's text."""
+    def get_clipboard(self, *, allow_app_switch: bool = False) -> str:
+        """The device clipboard's text.
+
+        ``allow_app_switch`` lets a backend that must bring another app to the
+        front to read it (iOS through WebDriverAgent) do so; others ignore it.
+        """
 
     def set_clipboard(self, text: str) -> None:
         """Put ``text`` on the device clipboard."""

@@ -7,7 +7,7 @@ returned when nothing is configured so callers can detect the situation
 through :class:`LLMNotAvailableError` rather than ``ImportError``.
 """
 import os
-from typing import Optional
+from typing import Optional, Tuple
 
 from je_auto_control.utils.llm.backends.base import (
     LLMBackend, LLMNotAvailableError,
@@ -44,7 +44,7 @@ def _build_backend() -> LLMBackend:
     )
 
 
-def _preference_order(preferred: str):
+def _preference_order(preferred: str) -> Tuple[str, ...]:
     if preferred == "anthropic":
         return ("anthropic",)
     if os.environ.get("ANTHROPIC_API_KEY"):

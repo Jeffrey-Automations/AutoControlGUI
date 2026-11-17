@@ -41,14 +41,14 @@ def _validate_clause(kind: str, clause: Mapping[str, Any]) -> None:
 
 def verify(policy: TaskPolicy, receipts: Sequence[Mapping[str, Any]],
            observation: Mapping[str, Any], *,
-           browser_read: Callable[[Mapping], Any] | None = None) -> list[dict[str, Any]]:
+           browser_read: Callable[[Mapping[str, Any]], Any] | None = None) -> list[dict[str, Any]]:
     """Evaluate all clauses against confirmed results and fresh target observations."""
     return verify_clauses(policy.spec.success_criteria, policy, receipts, observation, browser_read=browser_read)
 
 
 def verify_clauses(clauses: Sequence[Mapping[str, Any]], policy: TaskPolicy, receipts: Sequence[Mapping[str, Any]],
                    observation: Mapping[str, Any], *,
-                   browser_read: Callable[[Mapping], Any] | None = None) -> list[dict[str, Any]]:
+                   browser_read: Callable[[Mapping[str, Any]], Any] | None = None) -> list[dict[str, Any]]:
     """Evaluate the given clauses; a failure to decide one is ``unknown``, never ``passed``."""
     reports = []
     for clause in clauses:
@@ -67,7 +67,7 @@ def verify_clauses(clauses: Sequence[Mapping[str, Any]], policy: TaskPolicy, rec
 
 
 def _evaluate(clause: Mapping[str, Any], policy: TaskPolicy, receipts: Sequence[Mapping[str, Any]],
-              observation: Mapping[str, Any], browser_read: Callable[[Mapping], Any] | None) -> bool | None:
+              observation: Mapping[str, Any], browser_read: Callable[[Mapping[str, Any]], Any] | None) -> bool | None:
     kind = clause["kind"]
     if kind == "browser":
         value = browser_read(clause) if browser_read is not None else None
@@ -85,7 +85,7 @@ def _evaluate(clause: Mapping[str, Any], policy: TaskPolicy, receipts: Sequence[
     return _file_evidence(clause, policy)
 
 
-def _screen_evidence(observation: Mapping, spec: dict) -> bool | None:
+def _screen_evidence(observation: Mapping[str, Any], spec: dict[str, Any]) -> bool | None:
     elements = observation.get("elements")
     if not isinstance(elements, (list, tuple)) or observation.get("semantic_observation", True) is not True:
         return None
@@ -98,7 +98,7 @@ def _screen_evidence(observation: Mapping, spec: dict) -> bool | None:
     return _partial_screen_evidence(elements, spec)
 
 
-def _partial_screen_evidence(elements: Sequence[Mapping], spec: dict) -> bool | None:
+def _partial_screen_evidence(elements: Sequence[Mapping[str, Any]], spec: dict[str, Any]) -> bool | None:
     reviewed = [{"name": _reviewed_label(item)} for item in elements]
     results = [_partial_text_evidence(reviewed, key, value) for key, value in spec.items()]
     if False in results:
@@ -106,7 +106,7 @@ def _partial_screen_evidence(elements: Sequence[Mapping], spec: dict) -> bool | 
     return True if results and all(value is True for value in results) else None
 
 
-def _reviewed_label(element: Mapping) -> str:
+def _reviewed_label(element: Mapping[str, Any]) -> str:
     if element.get("visible", True) is not True:
         return ""
     if any(element.get(key, False) is not False for key in ("is_password", "sensitive", "text_redacted")):
@@ -118,7 +118,7 @@ def _reviewed_label(element: Mapping) -> str:
     return ""
 
 
-def _partial_text_evidence(elements: list[dict], key: str, value: Any) -> bool | None:
+def _partial_text_evidence(elements: list[dict[str, Any]], key: str, value: Any) -> bool | None:
     if key not in {"text_present", "text_absent"} or not isinstance(value, str) or not value:
         return None
     passed = check_postcondition(elements, {key: value}).ok
@@ -127,7 +127,7 @@ def _partial_text_evidence(elements: list[dict], key: str, value: Any) -> bool |
     return None if passed else False
 
 
-def _last_result(clause: Mapping, receipts: Sequence[Mapping[str, Any]]) -> bool | None:
+def _last_result(clause: Mapping[str, Any], receipts: Sequence[Mapping[str, Any]]) -> bool | None:
     confirmed = [row for row in receipts if row["status"] == "confirmed"]
     if not confirmed:
         return None

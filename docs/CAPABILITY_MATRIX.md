@@ -499,7 +499,12 @@ shown up came out of it, and both were wrong in the first implementation:
 `post_key_to_window` and `post_click_to_window` work on X11 and are asserted
 to arrive *flagged synthetic*, because that is what they are: `XSendEvent`
 traffic, which GTK and Qt discard by design. They are the X11 counterpart of
-Win32's `PostMessage`, which carries the same best-effort caveat. macOS has no
+Win32's `PostMessage`, which carries the same best-effort caveat. A
+one-character key is sent as text: on Windows as `WM_CHAR` (any printable
+character, including ones the key table has no entry for, such as `%`), on X11
+as the key the server's keymap binds the character to, with Shift in the
+event's state when it is on the shifted level; a character the keymap does not
+bind is not sent and the call answers `False`. macOS has no
 equivalent at all — an event goes to whatever has focus — so the backend
 refuses rather than reporting a success that went somewhere else.
 

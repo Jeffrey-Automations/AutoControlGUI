@@ -135,11 +135,28 @@ def test_unknown_key_does_not_build_any_registered_page(workspace):
 
 
 @pytest.mark.parametrize("key", ["record", "remote_desktop"])
-def test_legacy_form_and_remote_session_owner_are_retained_on_close(workspace, key):
+def test_owned_core_pages_release_on_close_and_reopen_fresh(workspace, qapp, key):
+    from shiboken6 import isValid
     entry = workspace._find_entry(key)
     first = entry.widget
     workspace.close_tab(key)
-    assert entry.built
+    assert not entry.built
     assert workspace.tabs.indexOf(first) == -1
+    _flush(qapp)
+    assert not isValid(first)
     workspace.show_tab(key)
-    assert entry.widget is first
+    assert entry.widget is not first
+    assert isValid(entry.widget)
+
+
+def test_embedder_supplied_widget_keeps_its_close_contract(workspace, qapp):
+    from PySide6.QtWidgets import QWidget
+    from shiboken6 import isValid
+    supplied = QWidget()
+    workspace._add_tab("embedded", "embedded", supplied)
+    workspace.show_tab("embedded")
+    workspace.close_tab("embedded")
+    _flush(qapp)
+    assert isValid(supplied)
+    workspace.show_tab("embedded")
+    assert workspace._find_entry("embedded").widget is supplied

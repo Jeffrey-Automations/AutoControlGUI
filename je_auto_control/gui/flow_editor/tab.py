@@ -6,7 +6,7 @@ still the place to edit complex nested branches; this tab is a clear
 visual map of what the script will do.
 """
 import json
-from typing import List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.flow_editor.scene import FlowGraphScene
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
@@ -41,7 +42,7 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         self._view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         self._steps: List[Step] = []
         # The other keys of a wrapped file, written back by Save.
-        self._file_extras: Optional[dict] = None
+        self._file_extras: Optional[Dict[str, Any]] = None
         self._inspector = QTextEdit()
         self._inspector.setReadOnly(True)
         self._status = QLabel()
@@ -56,16 +57,21 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         # Open/save/zoom/fit commands run from the Actions menu; the tab
         # keeps only the graph view, the inspector, and the status line.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self._view)
         splitter.addWidget(self._inspector)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 1)
-        root.addWidget(splitter, stretch=1)
+        # Start at the same 3:1 split; from the size hints the empty graph got a sliver.
+        splitter.setSizes([600, 200])
+        root.addWidget(Card().add(splitter, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
         self._apply_translations()
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("flow_open_btn", self._on_open),
@@ -140,7 +146,7 @@ class FlowEditorTab(TranslatableMixin, QWidget):
             return
         self._view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
-    def _on_node_selected(self, path: Tuple) -> None:
+    def _on_node_selected(self, path: Tuple[object, ...]) -> None:
         step = _resolve_step(self._steps, path)
         if step is None:
             return
@@ -153,7 +159,7 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         )
 
 
-def _resolve_step(roots: List[Step], path: Tuple) -> Optional[Step]:
+def _resolve_step(roots: List[Step], path: Tuple[object, ...]) -> Optional[Step]:
     if not path:
         return None
     head, *tail = path

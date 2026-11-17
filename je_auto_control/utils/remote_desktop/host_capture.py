@@ -12,7 +12,7 @@ import threading
 import time
 from io import BytesIO
 from typing import (
-    TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple,
+    TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple,
 )
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -188,6 +188,7 @@ class FrameProductionMixin:
         _cursor_provider: Optional[CursorProvider]
         _cursor_lock: threading.Lock
         _latest_cursor_payload: Optional[bytes]
+        _latest_frame: Optional[bytes]
         _codec_provider: CodecProvider
         _latest_seq: int
         _period: float
@@ -305,7 +306,7 @@ class FrameProductionMixin:
                 next_tick = time.monotonic()
             stop.wait(sleep_for)
 
-    def _encode_for_wire(self, jpeg_bytes: bytes):
+    def _encode_for_wire(self, jpeg_bytes: bytes) -> Iterator[bytes]:
         """Wrap codec output with a 1-byte tag (skipped for JPEG)."""
         provider = self._codec_provider
         if provider.name == CODEC_JPEG:

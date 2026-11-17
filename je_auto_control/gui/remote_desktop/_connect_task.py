@@ -8,13 +8,15 @@ through here instead: the viewer is built on the GUI thread, connected on a
 task-controller worker, and handed back on the GUI thread.
 """
 import functools
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QObject
 
+from je_auto_control.gui._slow_op import hold_failed_stop
 from je_auto_control.gui._weak_call import weak_slot
 from je_auto_control.gui.tab_task_controller import CancellationToken, TaskHandle, task_controller
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
 #: Seconds the backend gets for each step of the connect.
 CONNECT_TIMEOUT_S = 5.0
@@ -28,8 +30,17 @@ def _disconnect_quietly(viewer: Any) -> None:
         autocontrol_logger.debug("dropping an unused viewer: %r", error)
 
 
-def _connect(viewer: Any, timeout_s: float, token: CancellationToken) -> Any:
-    """Worker thread: connect ``viewer`` and return it."""
+def _connect(viewer: Any, timeout_s: float, before: Optional[Callable[[], Any]],
+             authority: DeferredAuthorization, token: CancellationToken) -> Any:
+    """Worker thread: run ``before`` (always), then connect ``viewer`` and return it."""
+    if before is not None:
+        # The previous session's shutdown: it lets go of its seat before this
+        # one connects, and it runs even when the connect was cancelled.
+        try:
+            before()
+        except (OSError, RuntimeError) as error:
+            # Kept for a retry from Diagnostics: the old session may still hold its socket.
+            hold_failed_stop(before, error, authority)
     # connect() takes a timeout but no cancel signal: a cancelled attempt
     # runs out its timeout, and the viewer it produced is disconnected by
     # the task's ``discard``.
@@ -41,16 +52,20 @@ def _connect(viewer: Any, timeout_s: float, token: CancellationToken) -> Any:
 def connect_viewer(owner: QObject, viewer: Any, *,
                    on_connected: Callable[[Any], None],
                    on_failed: Callable[[Exception], None],
-                   timeout_s: float = CONNECT_TIMEOUT_S) -> TaskHandle:
+                   timeout_s: float = CONNECT_TIMEOUT_S,
+                   before: Optional[Callable[[], Any]] = None) -> TaskHandle:
     """Run ``viewer.connect`` off the GUI thread for ``owner``; return the task.
 
     ``on_connected(viewer)`` or ``on_failed(error)`` runs on the GUI thread,
     and only while ``owner`` exists; both are held weakly, so pass methods of
     the panel (or a ``functools.partial`` of one), never a closure over it.
     Cancelling the task, or destroying ``owner``, disconnects a viewer that
-    connects anyway.
+    connects anyway. ``before`` -- typically the shutdown of the session this
+    one replaces, from ``registry.detach``
+    -- runs on the same worker first, so it does not hold the GUI thread.
     """
-    handle = task_controller().submit(functools.partial(_connect, viewer, timeout_s),
+    handle = task_controller().submit(functools.partial(_connect, viewer, timeout_s, before,
+                                                        DeferredAuthorization.capture()),
                                       owner=owner, discard=_disconnect_quietly)
     handle.result.connect(weak_slot(on_connected))
     handle.error.connect(weak_slot(on_failed))

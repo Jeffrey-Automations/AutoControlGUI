@@ -41,7 +41,7 @@ def _json_equal(left: Any, right: Any) -> bool:
     return left == right
 
 
-def _diff_dict(actual: Dict, expected: Dict, path: str,
+def _diff_dict(actual: Dict[Any, Any], expected: Dict[Any, Any], path: str,
                diffs: List[Dict[str, Any]]) -> None:
     for key, value in expected.items():
         child = f"{path}.{key}"
@@ -55,7 +55,7 @@ def _diff_dict(actual: Dict, expected: Dict, path: str,
                           "actual": value})
 
 
-def _diff_list(actual: List, expected: List, path: str,
+def _diff_list(actual: List[Any], expected: List[Any], path: str,
                diffs: List[Dict[str, Any]]) -> None:
     common = min(len(actual), len(expected))
     for index in range(common):
@@ -92,7 +92,7 @@ def _type_match(left: Any, right: Any) -> bool:
     return type(left) is type(right)
 
 
-def _is_ignored(path: str, ignored: set) -> bool:
+def _is_ignored(path: str, ignored: set[str]) -> bool:
     """Whether ``path`` is an ignored path or lies under one.
 
     Only exact paths were ignored, so ``ignore=["$.ts"]`` did not cover a
@@ -121,7 +121,7 @@ def match_json(actual: Any, expected: Any, *, ignore: Iterable[str] = (),
     return MatchReport(ok=not kept, mismatches=kept)
 
 
-def _normalize(value: Any, drop: set) -> Any:
+def _normalize(value: Any, drop: set[str]) -> Any:
     if isinstance(value, dict):
         return {key: _normalize(val, drop)
                 for key, val in sorted(value.items()) if key not in drop}

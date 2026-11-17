@@ -63,7 +63,8 @@ class FakeAgentBackend(AgentBackend):
         self._decisions = list(decisions)
         self._cursor = 0
 
-    def decide_next_action(self, goal, screenshot, history):  # noqa: D401
+    def decide_next_action(self, goal: str, screenshot: Optional[bytes],  # noqa: D401
+                           history: Sequence[AgentStep]) -> Dict[str, Any]:
         if self._cursor >= len(self._decisions):
             return {"stop": True, "message": "fake backend exhausted"}
         decision = self._decisions[self._cursor]
@@ -122,7 +123,7 @@ class AgentLoop:
         return result
 
     def _run_loop(self, goal: str, started_at: float,
-                  result: AgentResult, metrics) -> None:
+                  result: AgentResult, metrics: Optional[Dict[str, Any]]) -> None:
         for index in range(self._budget.max_steps):
             if self._stop_event is not None and self._stop_event.is_set():
                 result.final_message = "stopped"
@@ -135,7 +136,7 @@ class AgentLoop:
         result.final_message = "max_steps budget exhausted"
 
     def _take_one_step(self, goal: str, index: int,
-                       result: AgentResult, metrics) -> bool:
+                       result: AgentResult, metrics: Optional[Dict[str, Any]]) -> bool:
         """Run one observe→decide→act cycle. Returns True when the loop should stop."""
         decision = self._backend.decide_next_action(
             goal, self._screenshot_fn(), result.steps,
@@ -202,7 +203,7 @@ def _default_tool_runner(name: str, args: Dict[str, Any]) -> Any:
 _AGENT_METRIC_CACHE: Dict[str, Any] = {}
 
 
-def _agent_metrics():
+def _agent_metrics() -> Optional[Dict[str, Any]]:
     """Lazy-register agent-loop metrics into the default Prometheus registry."""
     if "runs" in _AGENT_METRIC_CACHE:
         return _AGENT_METRIC_CACHE
@@ -230,7 +231,7 @@ def _agent_metrics():
     return _AGENT_METRIC_CACHE
 
 
-def run_agent(goal: str, backend: AgentBackend, **kwargs) -> AgentResult:
+def run_agent(goal: str, backend: AgentBackend, **kwargs: Any) -> AgentResult:
     """Convenience wrapper: ``AgentLoop(backend, **kwargs).run(goal)``."""
     return AgentLoop(backend, **kwargs).run(goal)
 

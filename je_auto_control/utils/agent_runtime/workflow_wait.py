@@ -9,7 +9,7 @@ from je_auto_control.utils.agent_runtime.models import detached, positive
 from je_auto_control.utils.agent_runtime.workflow_files import task_policy
 
 
-def workflow_wait(selector: dict, expected: Any, state: bool = False, timeout_seconds: float = 5) -> Any:
+def workflow_wait(selector: dict[str, Any], expected: Any, state: bool = False, timeout_seconds: float = 5) -> Any:
     """Wait for one scoped control's exact value/state without replaying set, invoke or submit."""
     from je_auto_control.utils.agent_runtime.workflow_desktop import workflow_control
     policy = task_policy()

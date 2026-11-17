@@ -68,7 +68,8 @@ class AgentTriggers:
             self._insert(identifier, value, spec, config, metadata, now)
         return {"trigger_id": identifier, "enabled": True, "kind": value["kind"]}
 
-    def _insert(self, identifier: str, value: dict, spec: AgentTaskSpec, config: dict, owner: dict, now: float) -> None:
+    def _insert(self, identifier: str, value: dict[str, Any], spec: AgentTaskSpec, config: dict[str, Any],
+                owner: dict[str, Any], now: float) -> None:
         with self.runtime.store.connection(write=True) as connection:
             insert_registration(connection, identifier, value, spec, config, owner, now)
 
@@ -104,7 +105,7 @@ class AgentTriggers:
             return self.list()
         return self._control_existing(operation, value)
 
-    def _control_existing(self, operation: str, value: dict) -> dict:
+    def _control_existing(self, operation: str, value: dict[str, Any]) -> dict[str, Any]:
         _existing_fields(operation, value)
         row = self._row(value["trigger_id"])
         if operation == "fire":
@@ -121,7 +122,7 @@ class AgentTriggers:
                 return self._remove(row)
         raise AgentTaskError("unknown trigger operation")
 
-    def _enabled(self, row: dict, enabled: bool) -> dict:
+    def _enabled(self, row: dict[str, Any], enabled: bool) -> dict[str, Any]:
         owner = AuthorizationContext(**row["owner"]) if row["owner"] else None
         if enabled:
             with self.runtime.store.connection() as connection:
@@ -130,7 +131,7 @@ class AgentTriggers:
                 return self._set_enabled(row, True)
         return self._set_enabled(row, False)
 
-    def _set_enabled(self, row: dict, enabled: bool) -> dict:
+    def _set_enabled(self, row: dict[str, Any], enabled: bool) -> dict[str, Any]:
         if enabled:
             spec = self.runtime._validated_spec(row["spec"])
             validate_config(row["kind"], row["config"], TaskPolicy(spec))
@@ -141,7 +142,7 @@ class AgentTriggers:
                                (int(enabled), next_due(row["kind"], row["config"], time.time()), row["id"]))
         return {"trigger_id": row["id"], "enabled": enabled}
 
-    def _remove(self, row: dict) -> dict:
+    def _remove(self, row: dict[str, Any]) -> dict[str, Any]:
         with self.runtime.store.connection(write=True) as connection:
             connection.execute("DELETE FROM agent_trigger_events WHERE trigger_id=?", (row["id"],))
             connection.execute("DELETE FROM agent_triggers WHERE id=?", (row["id"],))
@@ -149,7 +150,7 @@ class AgentTriggers:
         self._stable.pop(row["id"], None)
         return {"trigger_id": row["id"], "removed": True}
 
-    def fire(self, row: dict, event_key: str, payload: Any = None) -> dict[str, Any]:
+    def fire(self, row: dict[str, Any], event_key: str, payload: Any = None) -> dict[str, Any]:
         """Deduplicate an event and queue a fresh task within its preauthorized template only."""
         if not row["enabled"] or not isinstance(event_key, str) or not event_key or len(event_key) > 256:
             raise AgentTaskError("trigger is disabled or event_key is invalid")
@@ -161,7 +162,7 @@ class AgentTriggers:
         with DeferredAuthorization(owner).scope(), self.runtime._lock(_TRIGGER_PREFIX + row["id"]):
             return self._fire_owned(row, digest, payload)
 
-    def _fire_owned(self, row: dict, digest: str, payload: Any) -> dict:
+    def _fire_owned(self, row: dict[str, Any], digest: str, payload: Any) -> dict[str, Any]:
         with self.runtime.store.connection() as connection:
             live = connection.execute("SELECT enabled FROM agent_triggers WHERE id=?", (row["id"],)).fetchone()
             if live is None or not live["enabled"]:
@@ -180,7 +181,7 @@ class AgentTriggers:
             return {"deferred": True, "reason": "trigger pending-task limit reached"}
         return self._queue(row, digest, payload)
 
-    def _queue(self, row: dict, digest: str, payload: Any) -> dict:
+    def _queue(self, row: dict[str, Any], digest: str, payload: Any) -> dict[str, Any]:
         spec = detached(row["spec"])
         spec["inputs"] = {**spec.get("inputs", {}), "event": {"key": digest, "payload": payload}}
         spec["options"] = {**spec.get("options", {}), "trigger": {"id": row["id"], "event": digest}}
@@ -191,7 +192,7 @@ class AgentTriggers:
             self.runtime.background.start(task.task_id)
         return self._event_result(task.task_id, duplicate=False)
 
-    def _event_result(self, task_id: str, *, duplicate: bool) -> dict:
+    def _event_result(self, task_id: str, *, duplicate: bool) -> dict[str, Any]:
         with self.runtime.store.connection() as connection:
             row = connection.execute("SELECT state FROM agent_tasks WHERE id=?", (task_id,)).fetchone()
         return {"task_id": task_id, "duplicate": duplicate, "state": row[0] if row else "expired"}
@@ -212,7 +213,7 @@ class AgentTriggers:
             except (AutoControlException, OSError, ValueError, TypeError) as error:
                 self._fault(row["id"], f"trigger needs review: {type(error).__name__}")
 
-    def _poll_one(self, row: dict) -> None:
+    def _poll_one(self, row: dict[str, Any]) -> None:
         if row["kind"] == "event":
             return
         if row["kind"] == "file":
@@ -227,7 +228,7 @@ class AgentTriggers:
                 connection.execute("UPDATE agent_triggers SET next_run=? WHERE id=?",
                                    (next_due(row["kind"], row["config"], now), row["id"]))
 
-    def _poll_file(self, row: dict) -> None:
+    def _poll_file(self, row: dict[str, Any]) -> None:
         spec = AgentTaskSpec.from_dict(row["spec"])
         path = Path(TaskPolicy(spec).path(row["config"]["path"]))
         if not path.is_file():
@@ -264,7 +265,7 @@ def _register_fields(value: Any) -> None:
         raise AgentTaskError("trigger name must be nonempty text of at most two hundred characters")
 
 
-def _existing_fields(operation: str, value: dict) -> None:
+def _existing_fields(operation: str, value: dict[str, Any]) -> None:
     required = {"trigger_id", "event_key"} if operation == "fire" else {"trigger_id"}
     optional = {"payload"} if operation == "fire" else set()
     if not required <= set(value) or set(value) - required - optional:

@@ -13,7 +13,7 @@ so it is fully deterministic in CI.
 """
 from dataclasses import dataclass
 import json
-from typing import Any, Dict, FrozenSet, List, Mapping
+from typing import Any, Dict, FrozenSet, List, Mapping, Set
 
 _BACKWARD = frozenset({"backward"})
 _FORWARD = frozenset({"forward"})
@@ -38,7 +38,7 @@ def _properties(schema: Mapping[str, Any]) -> Dict[str, Any]:
     return schema.get("properties", {}) or {}
 
 
-def _required(schema: Mapping[str, Any]) -> set:
+def _required(schema: Mapping[str, Any]) -> Set[str]:
     return set(schema.get("required", []) or [])
 
 
@@ -60,8 +60,8 @@ def _is_subset(narrow: FrozenSet[str], wide: FrozenSet[str]) -> bool:
                for kind in narrow)
 
 
-def _diff_requiredness(name: str, old_req: set,
-                       new_req: set) -> List[SchemaChange]:
+def _diff_requiredness(name: str, old_req: Set[str],
+                       new_req: Set[str]) -> List[SchemaChange]:
     if name in new_req and name not in old_req:
         return [SchemaChange(name, "field_made_required", _BACKWARD)]
     if name in old_req and name not in new_req:
@@ -99,14 +99,14 @@ def _diff_enum(name: str, old_prop: Mapping[str, Any],
     return changes
 
 
-def _enum_keys(values: Any) -> set:
+def _enum_keys(values: Any) -> Set[str]:
     """Enum members as canonical JSON: objects and arrays are hashable, and true is not 1."""
     return {json.dumps(value, sort_keys=True) for value in values}
 
 
 def _diff_property(name: str, old_prop: Mapping[str, Any],
-                   new_prop: Mapping[str, Any], old_req: set,
-                   new_req: set) -> List[SchemaChange]:
+                   new_prop: Mapping[str, Any], old_req: Set[str],
+                   new_req: Set[str]) -> List[SchemaChange]:
     changes = _diff_requiredness(name, old_req, new_req)
     changes.extend(_diff_type(name, old_prop, new_prop))
     changes.extend(_diff_enum(name, old_prop, new_prop))

@@ -30,10 +30,10 @@ class _FakeStream:
     def start(self) -> None:
         self.started = True
 
-    def stop(self) -> None:
+    def stop(self, ignore_errors=True) -> None:
         self.started = False
 
-    def close(self) -> None:
+    def close(self, ignore_errors=True) -> None:
         self.closed = True
 
 
@@ -135,7 +135,7 @@ class _ManualCapture:
     def start(self) -> None:
         self.started = True
 
-    def stop(self) -> None:
+    def stop(self, ignore_errors=True) -> None:
         self.stopped = True
 
 

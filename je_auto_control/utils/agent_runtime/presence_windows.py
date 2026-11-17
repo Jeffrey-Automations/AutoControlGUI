@@ -24,12 +24,13 @@ _DEADLINE_EXHAUSTED = 'physical presence request deadline exhausted'
 @dataclass
 class _Ticket:
     operation: str
-    body: dict
+    body: dict[str, Any]
     deadline: float
-    reply: queue.Queue = field(default_factory=lambda: queue.Queue(maxsize=1), init=False)
+    reply: queue.Queue[dict[str, Any] | AgentTaskError] = field(
+        default_factory=lambda: queue.Queue(maxsize=1), init=False)
     abandoned: threading.Event = field(default_factory=threading.Event, init=False)
     accepted: threading.Event = field(default_factory=threading.Event, init=False)
-    lease: dict | None = field(default=None, init=False)
+    lease: dict[str, Any] | None = field(default=None, init=False)
 
 
 @dataclass
@@ -127,7 +128,7 @@ class WindowsPresenceSource:
                 return
             ticket.reply.put_nowait(error)
 
-    def _dispatch(self, ticket: _Ticket) -> dict:
+    def _dispatch(self, ticket: _Ticket) -> dict[str, Any]:
         if ticket.operation == 'inspect':
             return self._state.inspect()
         if ticket.operation == 'acquire':
@@ -197,7 +198,7 @@ class WindowsPresenceSource:
         finally:
             self._mutex.release()
 
-    def _enqueue(self, operation: str, body: dict, deadline: float) -> _Ticket:
+    def _enqueue(self, operation: str, body: dict[str, Any], deadline: float) -> _Ticket:
         with self._locked(deadline):
             if self._lifecycle.closed or self._thread is None or not self._thread.is_alive():
                 raise AgentTaskError('physical presence source is unavailable')
@@ -208,7 +209,7 @@ class WindowsPresenceSource:
                 raise AgentControlBusy('physical presence request capacity is busy') from error
             return ticket
 
-    def request(self, operation: str, body: dict, timeout: float = 0.25) -> dict:
+    def request(self, operation: str, body: dict[str, Any], timeout: float = 0.25) -> dict[str, Any]:
         """Apply one closed request after a fresh native poll, never a cached heartbeat alone."""
         positive(timeout, 'physical presence request deadline', 0.25)
         deadline = time.monotonic() + timeout
@@ -231,7 +232,7 @@ class WindowsPresenceSource:
         ticket.accepted.set()
         return result
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         """Read passive availability only; this cannot authorize input or start native monitoring."""
         return self._state.inspect()
 

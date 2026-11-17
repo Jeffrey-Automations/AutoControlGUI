@@ -19,9 +19,6 @@ keyboard_keys_table: Dict[str, int]
 #: Alias -> canonical name for entries of ``keyboard_keys_table`` that are
 #: aliases (``esc`` for ``escape``); reverse lookups skip them.
 keyboard_key_aliases: Dict[str, str]
-#: Values are platform-specific button codes: a plain int on X11, Wayland and
-#: macOS, a tuple of three Win32 event flags on Windows.
-mouse_keys_table: Dict[str, MouseKeycode]
 #: X11 and Wayland name their scroll axes here; Windows and macOS have a single
 #: wheel axis and publish ``None``.
 special_mouse_keys_table: Optional[Dict[str, int]]
@@ -42,17 +39,18 @@ recorder: RecorderBackend
 # one, so a backend missing one is still an ImportError here.
 _keyboard: Any
 _mouse: Any
+_mouse_keys_table: Any
 
 if is_windows():
     from je_auto_control.wrapper._platform_windows import (  # noqa: F401  # reason: facade re-export
         keyboard as _keyboard, keyboard_check, keyboard_key_aliases, keyboard_keys_table,
-        mouse as _mouse, mouse_keys_table, special_mouse_keys_table,
+        mouse as _mouse, mouse_keys_table as _mouse_keys_table, special_mouse_keys_table,
         screen, recorder,
     )
 elif is_macos():
     from je_auto_control.wrapper._platform_osx import (  # noqa: F401  # reason: facade re-export
         keyboard as _keyboard, keyboard_check, keyboard_key_aliases, keyboard_keys_table,
-        mouse as _mouse, mouse_keys_table, special_mouse_keys_table,
+        mouse as _mouse, mouse_keys_table as _mouse_keys_table, special_mouse_keys_table,
         screen, recorder,
     )
 elif sys.platform.startswith("linux"):
@@ -65,7 +63,7 @@ elif sys.platform.startswith("linux"):
         try:
             from je_auto_control.wrapper._platform_wayland import (  # noqa: F401  # reason: facade re-export
                 keyboard as _keyboard, keyboard_check, keyboard_key_aliases, keyboard_keys_table,
-                mouse as _mouse, mouse_keys_table, special_mouse_keys_table,
+                mouse as _mouse, mouse_keys_table as _mouse_keys_table, special_mouse_keys_table,
                 screen, recorder,
             )
         except (ImportError, AutoControlException) as _wayland_error:
@@ -78,14 +76,14 @@ elif sys.platform.startswith("linux"):
             from je_auto_control.wrapper._platform_linux import (  # noqa: F401  # reason: facade re-export
                 keyboard as _keyboard, keyboard_check, keyboard_key_aliases,
                 get_keyboard_keys_table as _get_x11_key_table,
-                mouse as _mouse, mouse_keys_table, special_mouse_keys_table,
+                mouse as _mouse, mouse_keys_table as _mouse_keys_table, special_mouse_keys_table,
                 screen, recorder,
             )
     else:
         from je_auto_control.wrapper._platform_linux import (  # noqa: F401  # reason: facade re-export
             keyboard as _keyboard, keyboard_check, keyboard_key_aliases,
             get_keyboard_keys_table as _get_x11_key_table,
-            mouse as _mouse, mouse_keys_table, special_mouse_keys_table,
+            mouse as _mouse, mouse_keys_table as _mouse_keys_table, special_mouse_keys_table,
             screen, recorder,
         )
 elif is_bsd():
@@ -97,7 +95,7 @@ elif is_bsd():
     from je_auto_control.wrapper._platform_linux import (  # noqa: F401  # reason: facade re-export
         keyboard as _keyboard, keyboard_check, keyboard_key_aliases,
         get_keyboard_keys_table as _get_x11_key_table,
-        mouse as _mouse, mouse_keys_table, special_mouse_keys_table,
+        mouse as _mouse, mouse_keys_table as _mouse_keys_table, special_mouse_keys_table,
         screen, recorder,
     )
 else:
@@ -111,6 +109,9 @@ else:
 #: caller is inside it by default rather than when someone remembers.
 keyboard: KeyboardBackend = _keyboard
 mouse: MouseBackend = _mouse
+#: Values are this platform's button codes (:data:`MouseKeycode`): an int on
+#: X11 and Wayland, a string on macOS, a tuple of three Win32 event flags on Windows.
+mouse_keys_table: Dict[str, MouseKeycode] = _mouse_keys_table
 
 if None in [mouse_keys_table, keyboard, mouse, screen]:
     raise AutoControlException("Can't init auto control")

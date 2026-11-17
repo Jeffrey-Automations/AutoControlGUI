@@ -8,7 +8,7 @@ that stays in :mod:`windows_backend`.
 
 Imports no ``PySide6``.
 """
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar
 
 from je_auto_control.utils.accessibility.backends.windows_query import UIA_ERRORS
 
@@ -17,9 +17,10 @@ from je_auto_control.utils.accessibility.backends.windows_query import UIA_ERROR
 #: several of these reads coerce whatever the provider returned.
 UIA_READ_ERRORS: Tuple[Type[BaseException], ...] = UIA_ERRORS + (TypeError,)
 _UIA_ERRORS = UIA_READ_ERRORS
+_T = TypeVar("_T")
 
 
-def _view_name(pattern, view_id) -> str:
+def _view_name(pattern: Any, view_id: Any) -> str:
     """Return a MultipleViewPattern view's name, or '' on failure."""
     try:
         return str(pattern.GetViewName(int(view_id)) or "")
@@ -27,7 +28,7 @@ def _view_name(pattern, view_id) -> str:
         return ""
 
 
-def _header_names(array) -> List[str]:
+def _header_names(array: Any) -> List[str]:
     """Read an IUIAutomationElementArray of header elements into name strings."""
     names: List[str] = []
     try:
@@ -42,7 +43,7 @@ def _header_names(array) -> List[str]:
     return names
 
 
-def _read_cell(item_pattern, cell, row: int, column: int) -> Dict[str, Any]:
+def _read_cell(item_pattern: Any, cell: Any, row: int, column: int) -> Dict[str, Any]:
     """Build a cell record, enriching with GridItemPattern row/col/span if present."""
     info: Dict[str, Any] = {
         "value": _safe_name(cell), "row": row, "column": column,
@@ -59,14 +60,14 @@ def _read_cell(item_pattern, cell, row: int, column: int) -> Dict[str, Any]:
     return info
 
 
-def _safe_name(raw) -> str:
+def _safe_name(raw: Any) -> str:
     try:
         return str(raw.CurrentName or "")
     except _UIA_ERRORS:
         return ""
 
 
-def _as_text(value) -> str:
+def _as_text(value: object) -> str:
     return str(value or "")
 
 
@@ -78,7 +79,7 @@ _TEXT_ATTR_FOREGROUND = 40008
 _TEXT_ATTR_IS_ITALIC = 40014
 
 
-def _attr(text_range, attribute_id, cast):
+def _attr(text_range: Any, attribute_id: int, cast: Callable[[Any], _T]) -> Optional[_T]:
     """One text attribute, or ``None`` when unreadable, mixed or unsupported.
 
     For a range with mixed formatting UIA returns a sentinel object, not a
@@ -93,7 +94,7 @@ def _attr(text_range, attribute_id, cast):
     return cast(value)
 
 
-def _read_text_attributes(text_range) -> Dict[str, Any]:
+def _read_text_attributes(text_range: Any) -> Dict[str, Any]:
     """Read font / colour formatting of a TextRange into a plain dict."""
     weight = _attr(text_range, _TEXT_ATTR_FONT_WEIGHT, int)
     return {
@@ -116,7 +117,7 @@ _LEGACY_READS = (
 )
 
 
-def _read_legacy(pattern) -> Dict[str, Any]:
+def _read_legacy(pattern: Any) -> Dict[str, Any]:
     """Read a LegacyIAccessiblePattern's MSAA fields into a plain dict."""
     info: Dict[str, Any] = {}
     for key, attribute, cast in _LEGACY_READS:
@@ -139,7 +140,7 @@ _PROPERTY_READS = (
 )
 
 
-def _read_properties(raw) -> Dict[str, Any]:
+def _read_properties(raw: Any) -> Dict[str, Any]:
     """Read the rich UIA properties of a raw element into a plain dict."""
     properties: Dict[str, Any] = {}
     for key, attribute, cast in _PROPERTY_READS:

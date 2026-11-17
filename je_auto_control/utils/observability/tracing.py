@@ -15,7 +15,7 @@ class NoOpSpan:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self.attributes: dict = {}
+        self.attributes: dict[str, Any] = {}
         self.start_ns = time.monotonic_ns()
         self.end_ns: Optional[int] = None
 
@@ -50,7 +50,7 @@ class NoOpTracer:
     @contextmanager
     def start_as_current_span(self,
                               name: str,
-                              attributes: Optional[dict] = None,
+                              attributes: Optional[dict[str, Any]] = None,
                               ) -> Iterator[Span]:
         span = NoOpSpan(name)
         if attributes:
@@ -76,7 +76,7 @@ class _OtelTracerAdapter:
     @contextmanager
     def start_as_current_span(self,
                               name: str,
-                              attributes: Optional[dict] = None,
+                              attributes: Optional[dict[str, Any]] = None,
                               ) -> Iterator[Any]:
         with self._tracer.start_as_current_span(
                 name, attributes=attributes or None,
@@ -109,7 +109,7 @@ class Tracer:
 
     @contextmanager
     def start_as_current_span(self, name: str,
-                              attributes: Optional[dict] = None,
+                              attributes: Optional[dict[str, Any]] = None,
                               ) -> Iterator[Any]:
         inner = self._resolve_inner()
         with inner.start_as_current_span(name, attributes) as span:
@@ -158,7 +158,7 @@ def traced(span_name: Optional[str] = None,
         name = str(span_name or getattr(fn, "__qualname__", fn.__name__))
 
         @wraps(fn)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             real_tracer = tracer or default_tracer()
             attrs = None
             if record_args:

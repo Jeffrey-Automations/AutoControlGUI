@@ -21,7 +21,7 @@ class InputJournal:
         self.owner = uuid.uuid4().hex
         self._data: dict[str, Any] = {}
 
-    def read(self) -> dict:
+    def read(self) -> dict[str, Any]:
         """Return a bounded witness, treating corrupt or redirected state as requiring review."""
         if self.path.is_symlink():
             raise AgentTaskError("input recovery witness cannot be a symlink")
@@ -40,7 +40,7 @@ class InputJournal:
         except (OSError, ValueError) as error:
             raise AgentTaskError("input recovery witness requires operator review") from error
 
-    def _validate_witness(self, data: dict) -> None:
+    def _validate_witness(self, data: dict[str, Any]) -> None:
         if {"remote_protocol", "remote_effect", "remote_device", "recovery_epoch"} & data.keys():
             raise AgentTaskError("remote input witness requires its device-specific recovery protocol")
 
@@ -53,7 +53,7 @@ class InputJournal:
                       "review": previous.get("review")}
         self._write()
 
-    def update(self, held: dict, operation: str | None = None) -> None:
+    def update(self, held: dict[str, Any], operation: str | None = None) -> None:
         """Persist only owned release data and the outstanding operation marker."""
         self._data.update(held={} if not any(held.values()) else detached(held), in_flight=operation)
         self._write()
@@ -63,7 +63,7 @@ class InputJournal:
         self._data.update(owner=None, held={}, in_flight=None)
         self._write()
 
-    def recover(self, note: str, probe: Callable[[], None], actor: str) -> dict:
+    def recover(self, note: str, probe: Callable[[], None], actor: str) -> dict[str, Any]:
         """Clear stale input only after explicit review and a trusted no-held-input probe."""
         if not isinstance(note, str) or not note.strip() or len(note) > 2000:
             raise AgentTaskError("crash recovery requires an operator review note (1-2000 characters)")

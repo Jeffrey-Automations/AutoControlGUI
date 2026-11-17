@@ -52,12 +52,12 @@ def _command_names(actions: Sequence[Any]) -> List[str]:
     return [_command_name(action) for action in actions]
 
 
-def _non_overlapping_counts(names: List[str], length: int) -> Counter:
+def _non_overlapping_counts(names: List[str], length: int) -> Counter[Tuple[str, ...]]:
     """How often each n-gram repeats without overlapping itself.
 
     Counting every window made "A A A A" three repetitions of "A A".
     """
-    counter: Counter = Counter()
+    counter: Counter[Tuple[str, ...]] = Counter()
     next_free: Dict[Tuple[str, ...], int] = {}
     for start in range(len(names) - length + 1):
         gram = tuple(names[start:start + length])
@@ -95,7 +95,7 @@ def find_repeated_sequences(actions: Sequence[Any], *, min_len: int = 2,
 def directly_follows(actions: Sequence[Any]) -> Dict[Tuple[str, str], int]:
     """Return the directly-follows edge counts of the command flow."""
     names = _command_names(actions)
-    edges: Counter = Counter(
+    edges: Counter[Tuple[str, str]] = Counter(
         (names[i], names[i + 1]) for i in range(len(names) - 1))
     return dict(edges)
 

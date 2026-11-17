@@ -7,16 +7,18 @@ display + navigation; the real timeline logic lives in
 :class:`TraceReplayController` so it can be unit-tested without Qt.
 """
 import json
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFileDialog, QLabel, QMessageBox, QSlider,
-    QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.responsive import ResponsiveSplitter, fit_columns
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -62,17 +64,17 @@ class TraceReplayTab(TranslatableMixin, QWidget):
         # Open/first/prev/next/last commands run from the Actions menu;
         # the tab keeps only the slider, frame, table, and status.
         root = QVBoxLayout(self)
-        root.addWidget(self._slider)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self._frame_label)
-        splitter.addWidget(self._actions_table)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 1)
-        root.addWidget(splitter, stretch=1)
+        root.setSpacing(12)
+        root.addWidget(Card().add(self._slider))
+        frame = Card().add(self._frame_label, stretch=1)
+        actions = Card().add(self._actions_table, stretch=1)
+        root.addWidget(ResponsiveSplitter(frame, actions, stretches=(3, 2)), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
         self._apply_translations()
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("trace_open_btn", self._on_open),
@@ -186,7 +188,7 @@ class TraceReplayTab(TranslatableMixin, QWidget):
                 item = QTableWidgetItem(text)
                 item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                 self._actions_table.setItem(row, col, item)
-        self._actions_table.resizeColumnsToContents()
+        fit_columns(self._actions_table)
 
 
 __all__ = ["TraceReplayTab"]

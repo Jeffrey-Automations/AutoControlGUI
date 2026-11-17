@@ -53,7 +53,7 @@ class NativeControl:
             with self._mutex:
                 self._error = type(error).__name__
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         """Expose only a coarse error class; a notification never proves successful input cleanup."""
         with self._mutex:
             return {'notice': 'requested' if self._sent else 'not_requested', 'cleanup_error': self._error}

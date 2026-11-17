@@ -24,7 +24,7 @@ def _overlap_1d(a0: int, a1: int, b0: int, b1: int) -> int:
     return max(0, min(a1, b1) - max(a0, b0))
 
 
-def _right_value(label: Box, values: Sequence[Box], max_gap: int):
+def _right_value(label: Box, values: Sequence[Box], max_gap: int) -> Optional[Tuple[Box, int]]:
     """Nearest value to the right of ``label`` that shares a row, or ``None``."""
     _, top, right, bottom = _box_bounds(label)
     best: Optional[Tuple[Box, int]] = None
@@ -37,7 +37,7 @@ def _right_value(label: Box, values: Sequence[Box], max_gap: int):
     return best
 
 
-def _below_value(label: Box, values: Sequence[Box], max_gap: int):
+def _below_value(label: Box, values: Sequence[Box], max_gap: int) -> Optional[Tuple[Box, int]]:
     """Nearest value below ``label`` that shares a column, or ``None``."""
     left, _, right, bottom = _box_bounds(label)
     best: Optional[Tuple[Box, int]] = None
@@ -59,7 +59,7 @@ def _clean_label(box: Box) -> str:
 
 
 def _best_value(label: Box, values: Sequence[Box], directions: Sequence[str],
-                max_gap: int):
+                max_gap: int) -> Optional[Tuple[Box, int, str]]:
     """Pick the nearest value across the requested directions, or ``None``."""
     best = None
     for direction in directions:

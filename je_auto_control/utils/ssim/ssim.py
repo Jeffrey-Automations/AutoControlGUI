@@ -12,9 +12,9 @@ dependency) over an injectable image pair, so it is unit-testable on synthetic
 arrays without a real screen. OpenCV + NumPy come in via ``je_open_cv`` and are
 imported lazily. Imports no ``PySide6``.
 """
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 IgnoreBoxes = Optional[Sequence[Sequence[int]]]
 _WINDOW = (11, 11)
 _SIGMA = 1.5
@@ -29,7 +29,7 @@ def _gray_code(channels: int, is_bgr: bool) -> int:
     return cv2.COLOR_BGR2GRAY if is_bgr else cv2.COLOR_RGB2GRAY
 
 
-def _data_range(array) -> float:
+def _data_range(array: Any) -> float:
     """The dynamic range L of an image (Wang et al. 2004): 255 for 8-bit, 1 for 0..1 floats."""
     import numpy as np
     if np.issubdtype(array.dtype, np.integer):
@@ -39,7 +39,7 @@ def _data_range(array) -> float:
     return 1.0 if array.size and float(np.nanmax(array)) <= 1.0 else 255.0
 
 
-def _to_gray_f(source: ImageSource):
+def _to_gray_f(source: ImageSource) -> Tuple[Any, float]:
     """Load a path / ndarray / PIL image as ``(2-D float64 grayscale, dynamic range)``.
 
     Channel order is tracked so luminance weights stay correct: ``cv2.imread``
@@ -71,13 +71,13 @@ def _to_gray_f(source: ImageSource):
     return array.astype(np.float64), data_range
 
 
-def _grab_gray_f(region: Optional[Sequence[int]]):
+def _grab_gray_f(region: Optional[Sequence[int]]) -> Tuple[Any, float]:
     from je_auto_control.utils.cv2_utils.region_capture import grab_screen_region
     return _to_gray_f(grab_screen_region(region))
 
 
 def _resolve_pair(reference: ImageSource, current: Optional[ImageSource],
-                  region: Optional[Sequence[int]]):
+                  region: Optional[Sequence[int]]) -> Tuple[Any, Any, float]:
     reference_gray, reference_range = _to_gray_f(reference)
     current_gray, current_range = (_to_gray_f(current) if current is not None
                                    else _grab_gray_f(region))
@@ -87,7 +87,7 @@ def _resolve_pair(reference: ImageSource, current: Optional[ImageSource],
     return reference_gray, current_gray, max(reference_range, current_range)
 
 
-def _ssim_map(reference, current, data_range: float):
+def _ssim_map(reference: Any, current: Any, data_range: float) -> Any:
     """Per-pixel SSIM map via an 11x11 Gaussian window (sigma 1.5).
 
     C1 and C2 scale with the images' dynamic range: fixed at 255, two 0..1
@@ -106,7 +106,7 @@ def _ssim_map(reference, current, data_range: float):
     return numerator / denominator
 
 
-def _keep_mask(shape, ignore: IgnoreBoxes):
+def _keep_mask(shape: Tuple[int, ...], ignore: IgnoreBoxes) -> Any:
     """Boolean keep-mask (True = counted); ``ignore`` boxes [x,y,w,h] set False."""
     import numpy as np
     keep = np.ones(shape, dtype=bool)

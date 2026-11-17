@@ -14,13 +14,12 @@ injectable (ndarray / path / PIL); the search is unit-testable on synthetic arra
 NumPy are imported lazily. Imports no ``PySide6``.
 """
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from je_auto_control.utils.visual_match.visual_match import (
     _contain_cv2_error, _score_map_with_origin,
 )
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 @dataclass(frozen=True)
@@ -56,7 +55,8 @@ def _safe_psr(value: float) -> Optional[float]:
     return round(value, 4) if math.isfinite(value) else None
 
 
-def _peak_stats(score_map, exclude_radius: int, rebase: bool = False):
+def _peak_stats(score_map: Any, exclude_radius: int, rebase: bool = False,
+                ) -> Tuple[Tuple[int, int], float, float, float, float]:
     """Return ``(loc, best, second, peak_ratio, psr)`` for one correlation surface.
 
     With ``rebase`` (``ccorr_normed``) the ratio is taken above the surface's
@@ -89,7 +89,7 @@ def _is_ccorr(method: str) -> bool:
     return str(method).lower().startswith("ccorr")
 
 
-def _default_radius(template_shape, exclude_radius: Optional[int]) -> int:
+def _default_radius(template_shape: Sequence[int], exclude_radius: Optional[int]) -> int:
     """Pick the peak-exclusion radius: caller value, or a quarter of the smaller side."""
     if exclude_radius:
         return int(exclude_radius)

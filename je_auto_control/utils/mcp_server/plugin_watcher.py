@@ -8,7 +8,7 @@ sees the updated catalogue without a server restart.
 """
 import os
 import threading
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.mcp_server.tools.plugin_tools import (
@@ -27,7 +27,7 @@ class PluginWatcher:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         # path → (mtime, [tool_names])
-        self._known: Dict[str, tuple] = {}
+        self._known: Dict[str, Tuple[float, List[str]]] = {}
         # path -> {tool name: tool} for every file that built successfully.
         self._defined: Dict[str, Dict[str, Any]] = {}
 
@@ -115,7 +115,7 @@ class PluginWatcher:
             len(registered),
         )
 
-    def _build_tools(self, path: str, previous: Optional[tuple],
+    def _build_tools(self, path: str, previous: Optional[Tuple[float, List[str]]],
                      mtime: float) -> Optional[List[Any]]:
         """Load ``path`` and build its tools, or ``None`` on any failure.
 
@@ -139,7 +139,7 @@ class PluginWatcher:
             self._known[path] = (mtime, previous[1] if previous else [])
             return None
 
-    def _release(self, path: str, names) -> None:
+    def _release(self, path: str, names: Iterable[str]) -> None:
         """Drop ``path``'s claim on ``names``.
 
         A tool another watched file still defines is handed to that file's

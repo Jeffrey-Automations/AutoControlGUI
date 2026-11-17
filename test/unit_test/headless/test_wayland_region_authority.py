@@ -1,4 +1,6 @@
 """A refused native coordinate cannot change input origin or allow a subsequent click to escape its region."""
+from je_auto_control.linux_wayland import ei_default
+
 import asyncio
 from concurrent.futures import CancelledError
 from types import SimpleNamespace
@@ -20,9 +22,9 @@ def sender(monkeypatch):
     native = FakeLibei(regions={POINTER_DEVICE: [(0, 0, 100, 100)]})
     backend, _ = _connected(native)
     native.calls.clear()
-    monkeypatch.setattr(libei, '_DEFAULT_BACKEND', backend)
-    monkeypatch.setattr(libei, '_BLOCKED_PROBE', None)
-    monkeypatch.setattr(libei, '_PROBE_FAILED', False)
+    monkeypatch.setattr(ei_default, '_DEFAULT_BACKEND', backend)
+    monkeypatch.setattr(ei_default, '_BLOCKED_PROBE', None)
+    monkeypatch.setattr(ei_default, '_PROBE_FAILED', False)
     monkeypatch.setattr(libei, 'layout_origin', lambda: (0, 0))
     monkeypatch.setattr(mouse, 'layout_origin', lambda: (0, 0))
     commands = []

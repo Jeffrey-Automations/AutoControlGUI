@@ -11,8 +11,8 @@ from je_auto_control.utils.agent_runtime.transfer_evidence import resolve_remote
 from je_auto_control.utils.agent_runtime.transfer_models import _canonical
 
 
-def remote_successor(runtime: Any, batch: dict, node: dict, grant_id: str,
-                     binding: dict, deadline: float, owner: Any) -> tuple[dict, list]:
+def remote_successor(runtime: Any, batch: dict[str, Any], node: dict[str, Any], grant_id: str,
+                     binding: dict[str, Any], deadline: float, owner: Any) -> tuple[dict[str, Any], list[Any]]:
     """Resolve the original coordinator request using its own current registered source account."""
     remaining = deadline - time.monotonic()
     if runtime is None or remaining <= 0:

@@ -26,9 +26,10 @@ from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
 _STOPPED = frozenset({"paused", "waiting_user", "recovering", "cancelled", "timed_out", "failed"})
 _INDEPENDENT = frozenset({"file_exists", "file_text", "file_sha256", "file_manifest", "screen", "browser"})
+_Link = tuple[dict[str, Any], dict[str, Any], dict[str, Any]]
 
 
-def retainable_browser(target: Any, row: dict, receipts: Callable[[], list[dict]]) -> bool:
+def retainable_browser(target: Any, row: dict[str, Any], receipts: Callable[[], list[dict[str, Any]]]) -> bool:
     """Admit only the real built-in browser with confirmed effects and independent browser criteria."""
     # pylint: disable-next=unidiomatic-typecheck  # reason: custom flags cannot opt into private helper ownership
     if type(target) is not NativeDesktopTarget or not target.has_browser_context:
@@ -46,7 +47,7 @@ def _connection(store: Any, connection: Any) -> Any:
     return store.connection() if connection is None else nullcontext(connection)
 
 
-def completion_details(store: Any, task_id: str, *, connection: Any = None) -> dict | None:
+def completion_details(store: Any, task_id: str, *, connection: Any = None) -> dict[str, Any] | None:
     """Read private host admission; user specification options never grant this authority."""
     with _connection(store, connection) as reading:
         row = reading.execute("SELECT details FROM agent_readonly_completions WHERE task_id=?", (task_id,)).fetchone()
@@ -65,7 +66,7 @@ def _missing_marker(connection: Any, task_id: str) -> None:
         raise AgentTaskError('private read-only completion marker is missing')
 
 
-def _snapshot(runtime: Any, row: dict, *, connection: Any = None) -> str:
+def _snapshot(runtime: Any, row: dict[str, Any], *, connection: Any = None) -> str:
     # pylint: disable-next=import-outside-toplevel  # reason: share the exact existing receipt/review snapshot contract
     from je_auto_control.utils.agent_runtime.task_recovery import _snapshot as source_snapshot
     with _connection(runtime.store, connection) as reading:
@@ -75,7 +76,7 @@ def _snapshot(runtime: Any, row: dict, *, connection: Any = None) -> str:
     return source_snapshot(row, actions, reviews)
 
 
-def _stopped(runtime: Any, row: dict, *, allow_verified: bool = False, connection: Any = None) -> None:
+def _stopped(runtime: Any, row: dict[str, Any], *, allow_verified: bool = False, connection: Any = None) -> None:
     # pylint: disable-next=protected-access  # reason: completion cannot borrow live input or an unwinding operation
     if row['state'] not in _STOPPED and not (allow_verified and _retired_reader(runtime, row, connection)):
         raise AgentTaskError('completion review requires stopped, retired source input')
@@ -84,7 +85,7 @@ def _stopped(runtime: Any, row: dict, *, allow_verified: bool = False, connectio
         raise AgentTaskError("completion review requires stopped, retired source input")
 
 
-def _retired_reader(runtime: Any, row: dict, connection: Any) -> bool:
+def _retired_reader(runtime: Any, row: dict[str, Any], connection: Any) -> bool:
     if row['state'] != 'succeeded':
         return False
     with _connection(runtime.store, connection) as reading:
@@ -93,7 +94,7 @@ def _retired_reader(runtime: Any, row: dict, connection: Any) -> bool:
                 and completion_details(runtime.store, row['id'], connection=reading) is not None)
 
 
-def _principals(details: dict) -> None:
+def _principals(details: dict[str, Any]) -> None:
     reviewer = details["reviewer"]
     for owner in (details["source_owner"], details["effect_owner"]):
         with DeferredAuthorization(AuthorizationContext(**reviewer) if reviewer else None).scope():
@@ -104,7 +105,7 @@ def _principals(details: dict) -> None:
             pass
 
 
-def check_completion_authority(runtime: Any, task_id: str, *, connection: Any = None) -> dict | None:
+def check_completion_authority(runtime: Any, task_id: str, *, connection: Any = None) -> dict[str, Any] | None:
     """Keep source/effect snapshots and both real principals live through reads and success publication."""
     details = completion_details(runtime.store, task_id, connection=connection)
     if details is None:
@@ -126,12 +127,12 @@ def check_completion_authority(runtime: Any, task_id: str, *, connection: Any = 
     return None
 
 
-def completion_metadata(store: Any, task_id: str, *, runtime: Any = None) -> dict:
+def completion_metadata(store: Any, task_id: str, *, runtime: Any = None) -> dict[str, Any]:
     """Expose bounded public provenance without private principal stores or authority-bearing fields."""
     details = completion_details(store, task_id)
     if details is None:
         return {}
-    result: dict = {"completion_review": {"contract": 1, "source_task": details["source_task"],
+    result: dict[str, Any] = {"completion_review": {"contract": 1, "source_task": details["source_task"],
                                           "effect_task": details["effect_task"],
                                           "snapshot": details["source_snapshot"]}}
     with store.connection() as reading:
@@ -145,7 +146,7 @@ def completion_metadata(store: Any, task_id: str, *, runtime: Any = None) -> dic
     return result
 
 
-def completion_target(runtime: Any, row: Mapping, original: Any, operation: Callable[[], Any]) -> Any:
+def completion_target(runtime: Any, row: Mapping[str, Any], original: Any, operation: Callable[[], Any]) -> Any:
     """Select a separately owned read-only proxy from private admission, never from model-authored options."""
     details = completion_details(runtime.store, row["id"])
     if details is None:
@@ -170,7 +171,7 @@ def completion_target(runtime: Any, row: Mapping, original: Any, operation: Call
         return cached
 
 
-def completion_evidence(runtime: Any, row: dict) -> tuple[TaskPolicy, list[dict]]:
+def completion_evidence(runtime: Any, row: dict[str, Any]) -> tuple[TaskPolicy, list[dict[str, Any]]]:
     """Verify original pinned action evidence, while the task's target supplies a fresh independent observation."""
     details = completion_details(runtime.store, row["id"])
     effect = runtime.store.get(details["effect_task"]) if details is not None else row
@@ -192,7 +193,7 @@ def _require_target(adapter: Any) -> None:
         raise AgentTaskError("target has no supported permanent read-only completion helper")
 
 
-def _effect(runtime: Any, row: dict, *, connection: Any = None) -> dict:
+def _effect(runtime: Any, row: dict[str, Any], *, connection: Any = None) -> dict[str, Any]:
     details = completion_details(runtime.store, row["id"], connection=connection)
     with _connection(runtime.store, connection) as reading:
         effect = runtime.store.read_task(reading, details['effect_task']) if details is not None else row
@@ -210,13 +211,13 @@ def _effect(runtime: Any, row: dict, *, connection: Any = None) -> dict:
     return effect
 
 
-def completion_spec(runtime: Any, effect: dict) -> AgentTaskSpec:
+def completion_spec(runtime: Any, effect: dict[str, Any]) -> AgentTaskSpec:
     """Derive the exact no-action verification scope shared by admission and evidence consumers."""
     # pylint: disable-next=protected-access  # reason: retain current host profile, scope and criteria validation
     return runtime._validated_spec(_verification_template(effect['spec']))
 
 
-def _verification_template(value: dict) -> dict:
+def _verification_template(value: dict[str, Any]) -> dict[str, Any]:
     spec = detached(value)
     spec.update(goal="Reviewed completion: " + spec["goal"][:15940], mode="external", actions=[])
     for key in ("dag_batch", "skill_pin"):
@@ -224,7 +225,8 @@ def _verification_template(value: dict) -> dict:
     return spec
 
 
-def _details(runtime: Any, source: dict, effect: dict, ownership: dict | None, *, connection: Any = None) -> dict:
+def _details(runtime: Any, source: dict[str, Any], effect: dict[str, Any], ownership: dict[str, Any] | None, *,
+             connection: Any = None) -> dict[str, Any]:
     actor = current_authorization()
     if ownership is not None:
         reviewer = ownership["actor"]
@@ -238,7 +240,7 @@ def _details(runtime: Any, source: dict, effect: dict, ownership: dict | None, *
     return details
 
 
-def _review_mode(runtime: Any, row: dict, operation: str) -> bool:
+def _review_mode(runtime: Any, row: dict[str, Any], operation: str) -> bool:
     renewal = operation in {'review_completion_authorization', 'create_authorized_completion'}
     _stopped(runtime, row, allow_verified=renewal)
     if (not renewal and completion_details(runtime.store, row['id']) is not None
@@ -247,7 +249,8 @@ def _review_mode(runtime: Any, row: dict, operation: str) -> bool:
     return renewal
 
 
-def control_completion(recovery: Any, operation: str, row: dict, request: dict, ownership: dict | None) -> dict:
+def control_completion(recovery: Any, operation: str, row: dict[str, Any], request: dict[str, Any],
+                       ownership: dict[str, Any] | None) -> dict[str, Any]:
     """Review a deterministic read-only successor or atomically admit its exact source snapshot once."""
     runtime = recovery.runtime
     renewal = _review_mode(runtime, row, operation)
@@ -277,8 +280,8 @@ def control_completion(recovery: Any, operation: str, row: dict, request: dict, 
     return _create(recovery, row, request, spec, details, owned, authorization)
 
 
-def _create(recovery: Any, row: dict, request: dict, spec: AgentTaskSpec, details: dict, owned: dict | None,
-            authorization: dict | None = None) -> dict:
+def _create(recovery: Any, row: dict[str, Any], request: dict[str, Any], spec: AgentTaskSpec, details: dict[str, Any],
+            owned: dict[str, Any] | None, authorization: dict[str, Any] | None = None) -> dict[str, Any]:
     # pylint: disable-next=import-outside-toplevel  # reason: reuse bounded human review and provenance projection
     from je_auto_control.utils.agent_runtime.task_recovery import _review_note, recovery_link
     note = _review_note(request["note"])
@@ -297,7 +300,8 @@ def _create(recovery: Any, row: dict, request: dict, spec: AgentTaskSpec, detail
         current = runtime.store.read_task(connection, row['id'])
         with DeferredAuthorization.capture().scope():
             if authorization is not None:
-                actual = _renewal(runtime, current, owned, connection=connection)
+                actual: tuple[AgentTaskSpec, dict[str, Any], dict[str, Any] | None] = _renewal(
+                    runtime, current, owned, connection=connection)
             else:
                 effect = _effect(runtime, current, connection=connection)
                 actual = (completion_spec(runtime, effect),
@@ -310,7 +314,7 @@ def _create(recovery: Any, row: dict, request: dict, spec: AgentTaskSpec, detail
     return {"task_id": task.task_id, "state": task.state, "recovery": recovery_link(runtime.store, task.task_id)}
 
 
-def _require_browser_context(runtime: Any, effect: dict) -> None:
+def _require_browser_context(runtime: Any, effect: dict[str, Any]) -> None:
     # pylint: disable-next=protected-access  # reason: the built-in target was checked before private completion admission
     if not runtime._targets[effect["spec"]["target"]].is_managed_browser:
         return
@@ -319,7 +323,8 @@ def _require_browser_context(runtime: Any, effect: dict) -> None:
     require_source(runtime, effect)
 
 
-def _renewal_base(runtime: Any, source: dict, effect: dict, *, connection: Any = None, depth: int = 0) -> dict:
+def _renewal_base(runtime: Any, source: dict[str, Any], effect: dict[str, Any], *, connection: Any = None,
+                  depth: int = 0) -> dict[str, Any]:
     base = detached(effect['spec'])
     details = completion_details(runtime.store, source['id'], connection=connection)
     if details is not None:
@@ -330,13 +335,14 @@ def _renewal_base(runtime: Any, source: dict, effect: dict, *, connection: Any =
     return base
 
 
-def _authorized_effect(base: dict, authorization: dict) -> dict:
+def _authorized_effect(base: dict[str, Any], authorization: dict[str, Any]) -> dict[str, Any]:
     approved = authorized_template(base, authorization)
     approved.update(actions=base['actions'], mode=base['mode'])
     return approved
 
 
-def _renewal(runtime: Any, source: dict, ownership: dict | None, *, connection: Any = None) -> tuple:
+def _renewal(runtime: Any, source: dict[str, Any], ownership: dict[str, Any] | None, *,
+             connection: Any = None) -> tuple[AgentTaskSpec, dict[str, Any], dict[str, Any]]:
     _stopped(runtime, source, allow_verified=True, connection=connection)
     effect = _effect(runtime, source, connection=connection)
     details = _details(runtime, source, effect, ownership, connection=connection)
@@ -347,7 +353,7 @@ def _renewal(runtime: Any, source: dict, ownership: dict | None, *, connection: 
     return spec, details, authorization
 
 
-def _authorization(store: Any, task_id: str, *, connection: Any = None) -> dict | None:
+def _authorization(store: Any, task_id: str, *, connection: Any = None) -> dict[str, Any] | None:
     with _connection(store, connection) as reading:
         row = reading.execute('SELECT details FROM agent_task_authorizations WHERE task_id=?', (task_id,)).fetchone()
     if row is None:
@@ -373,12 +379,12 @@ def _string_list(value: Any) -> bool:
     return isinstance(value, list) and all(isinstance(item, str) for item in value)
 
 
-def _approval_shape(value: dict) -> bool:
+def _approval_shape(value: dict[str, Any]) -> bool:
     return (_string_list(value['approved_roots'])
             and all(isinstance(value[key], str) for key in ('review', 'binding', 'actor')))
 
 
-def _context_lists(context: dict) -> bool:
+def _context_lists(context: dict[str, Any]) -> bool:
     version = context['contract']
     if not isinstance(version, int) or isinstance(version, bool) or version != 1:
         return False
@@ -394,7 +400,7 @@ def _policy_shape(value: Any) -> bool:
             and isinstance(value['id'], str) and _string_list(value['roots']))
 
 
-def _effect_spec(runtime: Any, child: dict, details: dict, *, connection: Any = None,
+def _effect_spec(runtime: Any, child: dict[str, Any], details: dict[str, Any], *, connection: Any = None,
                  historical: bool = False, depth: int = 0) -> AgentTaskSpec:
     with _connection(runtime.store, connection) as reading:
         effect = runtime.store.read_task(reading, details['effect_task'])
@@ -415,7 +421,7 @@ def _effect_spec(runtime: Any, child: dict, details: dict, *, connection: Any = 
     return runtime._validated_spec(approved)
 
 
-def _renewal_contract(authorization: dict, base: dict, binding: str) -> dict:
+def _renewal_contract(authorization: dict[str, Any], base: dict[str, Any], binding: str) -> dict[str, Any]:
     context = authorization['context']
     if (authorization['binding'] != binding or context['source_snapshot'] != binding
             or authorization['review'] != request_spec_digest(context)
@@ -428,7 +434,7 @@ def _renewal_contract(authorization: dict, base: dict, binding: str) -> dict:
     return approved
 
 
-def _renewal_binding(runtime: Any, details: dict, *, connection: Any = None) -> str:
+def _renewal_binding(runtime: Any, details: dict[str, Any], *, connection: Any = None) -> str:
     admissions = []
     with _connection(runtime.store, connection) as reading:
         for identifier in dict.fromkeys((details['source_task'], details['effect_task'])):
@@ -445,7 +451,8 @@ def _renewal_binding(runtime: Any, details: dict, *, connection: Any = None) -> 
     return request_spec_digest({'completion': details, 'admissions': admissions})
 
 
-def _completion_dag_context(runtime: Any, connection: Any, row: dict, admission: dict) -> dict:
+def _completion_dag_context(runtime: Any, connection: Any, row: dict[str, Any],
+                            admission: dict[str, Any]) -> dict[str, Any]:
     context = runtime.batches.handoff_context(admission['batch_id'], admission['node_id'],
                                              connection=connection, identity_only=True)
     if context['source']['id'] != row['id']:
@@ -453,10 +460,10 @@ def _completion_dag_context(runtime: Any, connection: Any, row: dict, admission:
     return context
 
 
-def _inherited_dag_binding(runtime: Any, connection: Any, effect: dict, source_id: str) -> dict:
+def _inherited_dag_binding(runtime: Any, connection: Any, effect: dict[str, Any], source_id: str) -> dict[str, Any]:
     tag = _inherited_tag(effect['spec']['options']['dag_batch'])
     row = runtime.store.read_task(connection, source_id)
-    lineage: list[dict] = []
+    lineage: list[dict[str, Any]] = []
     seen: set[str] = set()
     for _index in range(16):
         if row['id'] in seen:
@@ -473,22 +480,23 @@ def _inherited_dag_binding(runtime: Any, connection: Any, effect: dict, source_i
     raise AgentHumanReview('completion original DAG admission has no bounded real recovery chain')
 
 
-def _inherited_tag(value: Any) -> dict:
+def _inherited_tag(value: Any) -> dict[str, Any]:
     if (not isinstance(value, dict) or set(value) != {'batch_id', 'node_id', 'graph_hash'}
             or not all(isinstance(item, str) for item in value.values())):
         raise AgentHumanReview('completion inherited DAG identity is invalid')
     return value
 
 
-def _inherited_origin(context: dict, tag: dict, effect_id: str, seen: set,
-                        lineage: list, admitted: dict) -> dict:
+def _inherited_origin(context: dict[str, Any], tag: dict[str, Any], effect_id: str, seen: set[str],
+                        lineage: list[dict[str, Any]], admitted: dict[str, Any]) -> dict[str, Any]:
     if (effect_id not in seen or context['binding']['graph_hash'] != tag['graph_hash']
             or (admitted['batch_id'], admitted['node_id']) != (tag['batch_id'], tag['node_id'])):
         raise AgentHumanReview('completion inherited DAG source identity changed')
     return {'kind': 'inherited_local_dag', 'binding': context['binding'], 'lineage': lineage}
 
 
-def _inherited_parent(runtime: Any, connection: Any, row: dict, tag: dict) -> tuple[dict, dict]:
+def _inherited_parent(runtime: Any, connection: Any, row: dict[str, Any],
+                      tag: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     actual = row['spec']['options'].get('dag_batch')
     if actual != tag:
         if actual is not None or completion_details(runtime.store, row['id'], connection=connection) is None:
@@ -504,7 +512,8 @@ def _inherited_parent(runtime: Any, connection: Any, row: dict, tag: dict) -> tu
     return parent, link
 
 
-def _historical_reader(runtime: Any, reader: dict, details: dict, effect: dict, connection: Any, depth: int) -> None:
+def _historical_reader(runtime: Any, reader: dict[str, Any], details: dict[str, Any], effect: dict[str, Any],
+                       connection: Any, depth: int) -> None:
     if depth >= 15:
         raise AgentTaskError('completion authorization exceeds sixteen real recovery links')
     _principals(details)
@@ -526,7 +535,8 @@ def _historical_reader(runtime: Any, reader: dict, details: dict, effect: dict, 
         raise AgentHumanReview('completion historical verification scope changed')
 
 
-def _historical_link(runtime: Any, connection: Any, reader: dict, details: dict, effect: dict) -> None:
+def _historical_link(runtime: Any, connection: Any, reader: dict[str, Any], details: dict[str, Any],
+                     effect: dict[str, Any]) -> None:
     link = connection.execute('SELECT source_task,snapshot FROM agent_task_recoveries WHERE task_id=?',
                                (reader['id'],)).fetchone()
     if (link is None or link['source_task'] != details['source_task']
@@ -539,7 +549,7 @@ def _historical_link(runtime: Any, connection: Any, reader: dict, details: dict,
             raise AgentHumanReview('completion historical source snapshot changed')
 
 
-def historical_handoff_reader(runtime: Any, connection: Any, row: dict) -> bool:
+def historical_handoff_reader(runtime: Any, connection: Any, row: dict[str, Any]) -> bool:
     """Prove actual private historical reader scope without renewing an unavailable old origin."""
     details = completion_details(runtime.store, row['id'], connection=connection)
     if details is None:
@@ -550,8 +560,9 @@ def historical_handoff_reader(runtime: Any, connection: Any, row: dict) -> bool:
     return True
 
 
-def handoff_completion_scope(runtime: Any, connection: Any, context: dict, links: list, *,
-                              authorization: dict | None = None, issuing: bool = False) -> dict | None:
+def handoff_completion_scope(runtime: Any, connection: Any, context: dict[str, Any], links: list[_Link], *,
+                             authorization: dict[str, Any] | None = None,
+                             issuing: bool = False) -> dict[str, Any] | None:
     """Review only already verified renewed readers under every original real recovery ceiling."""
     rows = _handoff_rows(links)
     leaf = rows[-1]
@@ -578,8 +589,8 @@ def handoff_completion_scope(runtime: Any, connection: Any, context: dict, links
         'completion_task': leaf['id'], 'completion_review': renewal['review'], 'segments': segments}}
 
 
-def _handoff_approvals(rows: list[dict], roots: list, binding: str, issuer: dict,
-                        authorization: dict | None) -> tuple[list, list]:
+def _handoff_approvals(rows: list[dict[str, Any]], roots: list[str], binding: str, issuer: dict[str, Any],
+                       authorization: dict[str, Any] | None) -> tuple[list[dict[str, Any]], list[str]]:
     segments, origins = [], []
     for index, row in enumerate(rows):
         previous = None if authorization is None else authorization['segments'][index]['authorization']
@@ -590,7 +601,7 @@ def _handoff_approvals(rows: list[dict], roots: list, binding: str, issuer: dict
     return segments, origins
 
 
-def _handoff_rows(links: list) -> list[dict]:
+def _handoff_rows(links: list[_Link]) -> list[dict[str, Any]]:
     if not links or len(links) > 16:
         raise AgentTaskError('handoff requires at most sixteen real recovery links')
     rows = [links[0][0], *(child for _source, child, _link in links)]
@@ -599,7 +610,8 @@ def _handoff_rows(links: list) -> list[dict]:
     return rows
 
 
-def _handoff_binding(runtime: Any, connection: Any, context: dict, rows: list[dict], review: str) -> str:
+def _handoff_binding(runtime: Any, connection: Any, context: dict[str, Any], rows: list[dict[str, Any]],
+                     review: str) -> str:
     snapshots = []
     for row in rows:
         check_historical_admission(connection, row)
@@ -618,7 +630,7 @@ def _handoff_bundle_header(value: Any) -> bool:
             and value['contract'] == 1 and value['kind'] == 'readonly_completion_handoff')
 
 
-def _handoff_bundle(value: Any, rows: list[dict], binding: str, review: str) -> dict:
+def _handoff_bundle(value: Any, rows: list[dict[str, Any]], binding: str, review: str) -> dict[str, Any]:
     if (not _handoff_bundle_header(value) or value['binding'] != binding
             or value['completion_task'] != rows[-1]['id'] or value['completion_review'] != review):
         raise AgentTaskError('handoff completion authorization changed')
@@ -626,7 +638,7 @@ def _handoff_bundle(value: Any, rows: list[dict], binding: str, review: str) -> 
     return value
 
 
-def _handoff_segments(segments: Any, rows: list[dict]) -> None:
+def _handoff_segments(segments: Any, rows: list[dict[str, Any]]) -> None:
     if not isinstance(segments, list) or len(segments) != len(rows):
         raise AgentTaskError('handoff completion authorization segments changed')
     for segment, row in zip(segments, rows):
@@ -634,14 +646,14 @@ def _handoff_segments(segments: Any, rows: list[dict]) -> None:
             raise AgentTaskError('invalid private handoff completion authorization')
 
 
-def _handoff_segment(value: Any, row: dict) -> bool:
+def _handoff_segment(value: Any, row: dict[str, Any]) -> bool:
     return (isinstance(value, dict) and set(value) == {'task_id', 'authorization'}
             and value['task_id'] == row['id']
             and _authorization_shape(value['authorization'], 'readonly_completion_handoff'))
 
 
-def _handoff_authorization(row: dict, roots: list, binding: str, issuer: dict,
-                            previous: dict | None) -> tuple[dict, dict]:
+def _handoff_authorization(row: dict[str, Any], roots: list[str], binding: str, issuer: dict[str, Any],
+                            previous: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]]:
     validate_root_snapshot(row['spec']['roots'])
     if any(not any(Path(root).is_relative_to(Path(parent)) for parent in row['spec']['roots']) for root in roots):
         raise AgentTaskError('handoff reader roots exceed a historical task ceiling')

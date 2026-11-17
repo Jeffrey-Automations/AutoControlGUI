@@ -17,3 +17,4 @@ Start with the [project README](../README.md) for installation and a first Pytho
 - [Examples](../examples/README.md)
 - [Development updates](updates/README.md)
 - [Current progress](../Progress.md)
+- [Internal process-memory observation contract](process_memory_contract.md)

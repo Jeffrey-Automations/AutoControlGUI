@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from je_auto_control.utils.cv2_utils.optional import require_cv2
 from je_auto_control.utils.cv2_utils.screenshot import pil_screenshot
@@ -31,7 +31,7 @@ def screen_size() -> Tuple[int, int]:
 
 
 def screenshot(file_path: Optional[str] = None,
-               screen_region: Optional[list] = None) -> Any:
+               screen_region: Optional[List[int]] = None) -> Any:
     """
     use to capture current screen
     擷取當前螢幕畫面
@@ -78,7 +78,7 @@ def screenshot(file_path: Optional[str] = None,
         raise
 
 
-def get_pixel(x: int, y: int, hwnd=None):
+def get_pixel(x: int, y: int, hwnd: Optional[int] = None) -> Tuple[int, int, int]:
     """
     取得指定座標的像素顏色
     Get pixel color at given coordinates

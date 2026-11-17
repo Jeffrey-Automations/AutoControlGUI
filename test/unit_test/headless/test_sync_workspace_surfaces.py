@@ -26,6 +26,11 @@ def tool():
 @pytest.mark.parametrize('entry_id', ['login.json', 'flows/login.json', 'x' * 64 + '/' + 'y' * 64 + '.json'])
 def test_workspace_command_mcp_builder_capture_review_and_materialize(tmp_path, monkeypatch, entry_id):
     from je_auto_control.gui.script_builder.step_model import action_to_step, step_to_action
+    from je_auto_control.utils.config_sync import assets
+    limit = assets._path_limit()
+    published = tmp_path / 'cache' / ('generation-' + '0' * 64) / 'files' / 'scripts' / entry_id
+    if limit is not None and len(str(published)) > limit:
+        pytest.skip(f'this host creates paths up to {limit} characters; the cache would need {len(str(published))}')
     monkeypatch.setenv('AUTOCONTROL_ALLOWED_PATH_ROOTS', str(tmp_path))
     config = configuration(tmp_path, entry_id)
     arguments = {'configuration': config, 'operation': 'capture'}

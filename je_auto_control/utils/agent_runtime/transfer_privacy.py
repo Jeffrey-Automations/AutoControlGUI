@@ -9,7 +9,7 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.transfer_cache import private_cache_path
 
 
-def _private_files(runtime: Any, actors: tuple[dict, ...]) -> tuple[Path, ...]:
+def _private_files(runtime: Any, actors: tuple[dict[str, Any], ...]) -> tuple[Path, ...]:
     databases = (Path(runtime.store.path), private_cache_path(runtime.store.path))
     files = [path for database in databases for path in
              (database, *(database.with_name(database.name + suffix) for suffix in ('-wal', '-shm', '-journal')))]
@@ -33,7 +33,7 @@ class SourceFilePolicy:
 
     policy: Any
     runtime: Any
-    actors: tuple[dict, ...]
+    actors: tuple[dict[str, Any], ...]
     historical: tuple[Any, ...] = ()
 
     @property

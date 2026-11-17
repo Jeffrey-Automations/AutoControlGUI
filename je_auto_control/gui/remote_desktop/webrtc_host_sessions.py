@@ -5,14 +5,17 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
+
 import functools
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Mapping, Optional
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from je_auto_control.gui._slow_op import hold_failed_stop
 from je_auto_control.gui.remote_desktop._webrtc_types import MultiViewerHostT
 from je_auto_control.gui.remote_desktop._helpers import (
     _t,
@@ -24,18 +27,19 @@ from je_auto_control.utils.remote_desktop.webrtc_inspector import (
 from je_auto_control.utils.remote_desktop.webrtc_stats import (
     StatsPoller, StatsSnapshot,
 )
-from je_auto_control.gui.remote_desktop.webrtc_panel_common import _PanelPart
 
 
-def _stop_session(host: MultiViewerHostT, sid: str) -> None:
-    """Worker thread: close one session; one that is already gone is not an error."""
+def _stop_session(retirement: Any) -> None:
+    """Worker thread: close the session ``retirement`` captured; one that is already gone is not an error."""
     try:
-        host.stop_session(sid)
-    except (KeyError, RuntimeError, OSError) as error:
-        autocontrol_logger.warning("disconnect session: %r", error)
+        retirement.stop()
+    except (RuntimeError, OSError) as error:
+        hold_failed_stop(retirement.stop, error)    # its peer may still be open: retry from Diagnostics
+    except KeyError as error:
+        autocontrol_logger.debug("disconnect session: already gone: %r", error)
 
 
-class _HostSessionsMixin(_PanelPart):
+class _HostSessionsMixin(_HostPanelPart):
     """Methods of ``_WebRTCHostPanel``; the module docstring says which group."""
 
     def _on_session_count(self, count: int) -> None:
@@ -98,17 +102,14 @@ class _HostSessionsMixin(_PanelPart):
 
     def _make_session_stats_handler(self, session_id: str) -> Callable[[StatsSnapshot], None]:
         """Closure capturing session_id for the per-session poller."""
-        def _handle(snapshot: StatsSnapshot) -> None:
-            default_webrtc_inspector().record(snapshot)
-            color = self._quality_color(snapshot)
-            self._session_cache.set(
-                session_id, color=color, snapshot=snapshot,
-            )
-            # Re-paint just the dot cell for this session_id (avoid full reflow).
-            # One read: the GUI thread can clear it between a check and a call.
-            host = self._multi_host
-            self._signals.session_count.emit(host.session_count() if host else 0)
-        return _handle
+        return functools.partial(self._view.post, "_store_session_stats", session_id)
+
+    def _store_session_stats(self, session_id: str, snapshot: StatsSnapshot) -> None:
+        default_webrtc_inspector().record(snapshot)
+        color = self._quality_color(snapshot)
+        self._session_cache.set(session_id, color=color, snapshot=snapshot)
+        host = self._multi_host
+        self._signals.session_count.emit(host.session_count() if host else 0)
 
     @staticmethod
     def _format_quality_tooltip(snapshot: Optional[StatsSnapshot]) -> str:
@@ -199,7 +200,7 @@ class _HostSessionsMixin(_PanelPart):
         )
         self._dispatch_session_menu(chosen, actions, sid, viewer_id)
 
-    def _dispatch_session_menu(self, chosen: object, actions: Dict[str, object],
+    def _dispatch_session_menu(self, chosen: object, actions: Mapping[str, object],
                                sid: str, viewer_id: str) -> None:
         """Run the action chosen from the sessions context menu."""
         if chosen is actions["disconnect"]:
@@ -231,9 +232,18 @@ class _HostSessionsMixin(_PanelPart):
         if sid in self._stopping_sessions:     # a second click on a session already closing
             return
         host = self._multi_host
+        # Captured now, so the stop closes this session even if another takes its id meanwhile.
+        try:
+            retirement = host.session_retirement(sid) if host is not None else None
+        except (KeyError, RuntimeError) as error:   # already gone, or the host is shutting down
+            autocontrol_logger.debug("disconnect session %s: %r", sid, error)
+            retirement = None
+        if retirement is None:
+            self._on_session_stopped(host, sid)
+            return
         self._stopping_sessions.add(sid)
-        # stop_session waits for the peer connection to close (seconds).
-        self._stops.retire(functools.partial(_stop_session, host, sid),
+        # Closing waits for the peer connection to close (seconds).
+        self._stops.retire(functools.partial(_stop_session, retirement),
                            on_done=self._on_session_stopped, args=(host, sid))
 
     def _on_session_stopped(self, host: MultiViewerHostT, sid: str, _outcome: object = None) -> None:

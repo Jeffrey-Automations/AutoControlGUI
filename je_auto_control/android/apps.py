@@ -178,8 +178,9 @@ class AndroidExtension:
                 alternative="type the text with type_text instead of pasting it")
         return ui_device
 
-    def get_clipboard(self) -> str:
-        """The device clipboard's text."""
+    def get_clipboard(self, *, allow_app_switch: bool = False) -> str:
+        """The device clipboard's text; uiautomator2 reads it without switching apps."""
+        del allow_app_switch  # nothing to allow on Android
         return _read_clipboard(self._clipboard_device())
 
     def set_clipboard(self, text: str) -> None:

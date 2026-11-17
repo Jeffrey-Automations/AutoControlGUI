@@ -436,3 +436,29 @@ assert not events, events
     env.update(JE_AUTOCONTROL_LINUX_BACKEND=backend, JE_AUTOCONTROL_LINUX_DISPLAY_SERVER="x11")
     result = subprocess.run([sys.executable, "-c", script], env=env, capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_record_status_is_nonblocking_and_never_acquires_listener(x11, monkeypatch):
+    class RefuseLock:
+        def __enter__(self):
+            raise AssertionError("status must not wait on listener startup")
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(x11.listener, "_listener_lock", RefuseLock())
+    assert x11.listener.x11_linux_is_recording() is False
+    listener = SimpleNamespace(closed=Event(), failure=None,
+                               handler=SimpleNamespace(record_flag=True))
+    monkeypatch.setattr(x11.listener, "_LISTENER", listener)
+    assert x11.listener.x11_linux_is_recording() is True
+    assert x11.recorder.x11_linux_recorder.is_recording is True
+    listener.handler.record_flag = False
+    assert x11.listener.x11_linux_is_recording() is False
+    listener.handler.record_flag = True
+    listener.failure = RuntimeError("listener stopped")
+    assert x11.listener.x11_linux_is_recording() is False
+    listener.failure = None
+    listener.closed.set()
+    assert x11.listener.x11_linux_is_recording() is False
+    assert x11.calls == []

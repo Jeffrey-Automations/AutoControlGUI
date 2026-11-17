@@ -14,7 +14,7 @@ from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
 from je_auto_control.utils.agent_runtime.target_config import browser_origins
 
 
-def validate_browser_clause(clause: Mapping) -> None:
+def validate_browser_clause(clause: Mapping[str, Any]) -> None:
     """Accept only exact URL/text/value/visibility checks with finite typed locator data."""
     if set(clause) - {"kind", "operation", "selector", "frame", "value"}:
         raise AgentTaskError("browser completion contains unreviewed fields")
@@ -40,7 +40,7 @@ def _expected_value(operation: str, value: Any) -> None:
     _bounded(value, "completion value", 8000, empty=True)
 
 
-def validate_browser_scope(spec: AgentTaskSpec, clause: Mapping) -> None:
+def validate_browser_scope(spec: AgentTaskSpec, clause: Mapping[str, Any]) -> None:
     """Completion never adds a read permission, application or network origin to the task."""
     validate_browser_clause(clause)
     if "AC_browser_read" not in spec.allowed_tools or spec.apps:
@@ -50,7 +50,7 @@ def validate_browser_scope(spec: AgentTaskSpec, clause: Mapping) -> None:
         raise AgentTaskError("browser completion URL exceeds task origins")
 
 
-def evaluate_browser_clause(spec: AgentTaskSpec, session: Any, clause: Mapping) -> bool:
+def evaluate_browser_clause(spec: AgentTaskSpec, session: Any, clause: Mapping[str, Any]) -> bool:
     """Read through the guarded leaf command and compare the full current result exactly."""
     from je_auto_control.utils.agent_runtime.policy import TaskPolicy
     from je_auto_control.utils.tool_use_schema import run_tool_call
@@ -77,7 +77,7 @@ def evaluate_browser_clause(spec: AgentTaskSpec, session: Any, clause: Mapping) 
     return result
 
 
-def _read_condition(clause: Mapping, read: Any) -> bool:
+def _read_condition(clause: Mapping[str, Any], read: Any) -> bool:
     locator = {"selector": clause["selector"], "frame": clause.get("frame", "")}
     visible = read("AC_browser_read", {**locator, "operation": "visible"})
     if not isinstance(visible, bool):

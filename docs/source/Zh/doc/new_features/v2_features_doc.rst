@@ -453,6 +453,15 @@ Wayland CLI backend
 Wayland libei native backend
 ----------------------------
 
+NORMAL's default EI sender now owns a fixed helper process for libei and portal
+calls. The direct ``LibeiBackend`` API remains in-process. Batches are bounded to
+128 events and 16 KiB; deadlines include client queue time. Uncertain replies
+and cancellation retire the helper without replay or provider fallback. Failed
+close retains ownership for explicit retry. Emission acknowledgements and process
+retirement do not prove application delivery or compositor input release; native
+acceptance remains pending.
+
+
 對 ``libei.so.*`` 的 ctypes 綁定，繞過 CLI shim 取得微秒級延遲。
 以 ``JE_AUTOCONTROL_WAYLAND_INPUT_BACKEND=libei|cli|auto`` 啟用；
 ``auto`` （預設）只在選用原生後端缺席時改用 CLI。portal 拒絕／逾時、
@@ -543,7 +552,8 @@ D-Bus 寫入與回覆共用預算，connect／驗證／Hello 中斷時，即使 
 
 
 repo 的 dev／main 無頭工作在原生失敗後仍保留合併測試輸出與執行環境版本。
-Linux 經 GDB 擷取各執行緒原生堆疊，其他平台保留 Python faulthandler 輸出。
+Linux 經 GDB 擷取各執行緒原生堆疊；Windows 由 Windows Error Reporting 把當掉的 ``python.exe``
+的 minidump（各執行緒原生堆疊）寫進同一個 artifact；macOS 保留 Python faulthandler 輸出。
 ``native-<os>-<python>`` artifact 保留七天；子行程失敗仍使 CI 失敗。
 Linux 先在完整套件的 debugger 外檢查工具，保留原始 argv 與已處理的 SIGINT。
 重現方法見 :doc:`/getting_started/run_in_ci`。蒐集證據不代表完成尚缺的 portal／原生生命週期驗收。

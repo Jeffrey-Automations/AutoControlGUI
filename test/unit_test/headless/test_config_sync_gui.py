@@ -34,26 +34,22 @@ def panel(app, tmp_path, monkeypatch):
     view = ConfigSyncTab()
     yield view
     view.cancel()
-    if view._handle is not None:
-        assert view._handle.wait(5)
+    idle(app, view)
     view.deleteLater()
     app.processEvents()
 
 
 def idle(app, view):
     deadline = time.monotonic() + 10
-    while view._handle is not None and time.monotonic() < deadline:
+    while view._task.running and time.monotonic() < deadline:
         app.processEvents()
         time.sleep(0.005)
-    assert view._handle is None
+    assert not view._task.running
 
 
 def run(worker):
-    results = []
-    worker.finished.connect(results.append)
-    worker.run()
-    assert len(results) == 1
-    return results[0]
+    # The worker's own event, so a request_stop() made before the call still counts.
+    return worker(worker._stop)
 
 
 def test_constructing_sync_is_inert_and_local_actions_run_off_the_gui_thread(panel, app, tmp_path, monkeypatch):
@@ -90,7 +86,7 @@ def test_review_selection_resolves_all_heads_and_configuration_change_discards_r
     panel._configuration.setPlainText(json.dumps(config))
     panel._kind.setCurrentText('workspace')
     panel.begin('preferences')
-    assert panel._handle is None
+    assert not panel._task.running
     assert panel._status_key == 'error'
     panel.begin('review')
     idle(app, panel)
@@ -154,8 +150,7 @@ def test_loopback_sync_does_not_apply_preferences_until_explicit_reviewed_action
             assert settings.value('workspace/theme') is None
     finally:
         view.cancel()
-        if view._handle is not None:
-            view._handle.wait(5)
+        idle(app, view)
         window.close()
         window.deleteLater()
         app.processEvents()
@@ -194,6 +189,9 @@ def test_cancelled_or_closed_view_discards_delayed_preference_application(panel,
     panel.begin('preferences')
     assert entered.wait(5)
     panel.cancel()
+    assert panel._task.running                  # busy until the request has unwound
+    panel.begin('preferences')
+    assert panel._status_key == 'busy'
     release.set()
     idle(app, panel)
     assert applied == []
@@ -220,15 +218,12 @@ def test_worker_captures_context_preserves_committed_success_and_cancels_late_de
         return {'captured': 1}
 
     monkeypatch.setattr(config_sync_worker, '_sync_workspace', committed)
-    try:
-        assert run(worker).status == 'ok'
-        with pytest.raises(CancelledError):
-            worker.deliver(lambda: pytest.fail('stopped preferences must not be delivered'), require_active=True)
-        delivered = []
-        worker.deliver(lambda: delivered.append(context.get()))
-        assert delivered == ['registrant']
-    finally:
-        worker.deleteLater()
+    assert run(worker).status == 'ok'
+    with pytest.raises(CancelledError):
+        worker.deliver(lambda: pytest.fail('stopped preferences must not be delivered'), require_active=True)
+    delivered = []
+    worker.deliver(lambda: delivered.append(context.get()))
+    assert delivered == ['registrant']
 
 
 def test_viewer_and_pre_cancelled_workers_do_not_enter_core(app, monkeypatch):
@@ -237,12 +232,8 @@ def test_viewer_and_pre_cancelled_workers_do_not_enter_core(app, monkeypatch):
         viewer = ConfigSyncWorker(SyncUIRequest(1, 'status', '{}'))
     stopped = ConfigSyncWorker(SyncUIRequest(2, 'capture', '{}'))
     stopped.request_stop()
-    try:
-        assert run(viewer).status == 'error'
-        assert run(stopped).status == 'cancelled'
-    finally:
-        viewer.deleteLater()
-        stopped.deleteLater()
+    assert run(viewer).status == 'error'
+    assert run(stopped).status == 'cancelled'
 
 
 def test_network_failure_masks_declared_secret_while_local_worker_never_resolves_it(app, monkeypatch):
@@ -263,18 +254,14 @@ def test_network_failure_masks_declared_secret_while_local_worker_never_resolves
     monkeypatch.setattr(config_sync_worker, '_sync_workspace', failure)
     network = ConfigSyncWorker(SyncUIRequest(1, 'sync', '{}', '{"secret_env":"SYNC_UI_TEST_SECRET"}'))
     local = ConfigSyncWorker(SyncUIRequest(2, 'status', '{}', '{"secret_env":"SYNC_UI_TEST_SECRET"}'))
-    try:
-        outcome = run(network)
-        assert outcome.status == 'error'
-        assert secret not in outcome.error
-        assert '***' in outcome.error
-        assert accesses == ['SYNC_UI_TEST_SECRET']
-        accesses.clear()
-        assert run(local).status == 'error'
-        assert accesses == []
-    finally:
-        network.deleteLater()
-        local.deleteLater()
+    outcome = run(network)
+    assert outcome.status == 'error'
+    assert secret not in outcome.error
+    assert '***' in outcome.error
+    assert accesses == ['SYNC_UI_TEST_SECRET']
+    accesses.clear()
+    assert run(local).status == 'error'
+    assert accesses == []
 
 
 def test_live_store_revocation_blocks_checkpoint_and_queued_delivery(app, tmp_path, monkeypatch):
@@ -289,12 +276,9 @@ def test_live_store_revocation_blocks_checkpoint_and_queued_delivery(app, tmp_pa
         pytest.fail('revoked checkpoint must stop')
 
     monkeypatch.setattr(config_sync_worker, '_sync_workspace', revoked)
-    try:
-        assert run(worker).status == 'error'
-        with pytest.raises(AutoControlException):
-            worker.deliver(lambda: pytest.fail('revoked delivery must stop'))
-    finally:
-        worker.deleteLater()
+    assert run(worker).status == 'error'
+    with pytest.raises(AutoControlException):
+        worker.deliver(lambda: pytest.fail('revoked delivery must stop'))
 
 
 @pytest.mark.parametrize('text', ['[]', '{"value":NaN}', '{' * 1500, ' ' * (1024 * 1024 + 1)],
@@ -302,7 +286,4 @@ def test_live_store_revocation_blocks_checkpoint_and_queued_delivery(app, tmp_pa
 def test_worker_rejects_invalid_or_unbounded_json_before_core_io(app, monkeypatch, text):
     monkeypatch.setattr(config_sync_worker, '_sync_workspace', lambda *_a, **_k: pytest.fail('invalid input'))
     worker = ConfigSyncWorker(SyncUIRequest(1, 'status', text))
-    try:
-        assert run(worker).status == 'error'
-    finally:
-        worker.deleteLater()
+    assert run(worker).status == 'error'

@@ -50,14 +50,14 @@ def test_executor_and_read_only_mcp_share_the_sdk_snapshot_without_accepting_sup
         tool.invoke({'context': {'input_state': 'available'}})
 
 
-def test_builder_and_rbac_declare_passive_capabilities_as_read_only():
+def test_builder_keeps_passive_metadata_read_only_but_rbac_requires_data_authority():
     spec = COMMAND_SPECS['AC_probe_capabilities']
     assert not spec.fields
-    assert capability_for_command('AC_probe_capabilities') == Capability.READ_SCREEN
-    assert capability_for_tool('ac_probe_capabilities', True) == Capability.READ_SCREEN
+    assert capability_for_command('AC_probe_capabilities') == Capability.READ_DATA
+    assert capability_for_tool('ac_probe_capabilities', True) == Capability.READ_DATA
 
 
-def test_read_only_viewer_can_use_the_real_executor_and_jsonrpc_dispatcher(current, tmp_path):
+def test_read_only_operator_can_use_the_real_executor_and_jsonrpc_dispatcher(current, tmp_path):
     from je_auto_control.utils.mcp_server.audit import AuditLogger
     from je_auto_control.utils.mcp_server.server import MCPServer
     tools = [tool for tool in build_default_tool_registry(read_only=True) if tool.name == 'ac_probe_capabilities']
@@ -65,7 +65,7 @@ def test_read_only_viewer_can_use_the_real_executor_and_jsonrpc_dispatcher(curre
     request = {'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call',
                'params': {'name': 'ac_probe_capabilities', 'arguments': {}}}
     expected = probe_capabilities(current).to_dict()
-    with authorization_scope(AuthorizationContext('reader', Role.VIEWER)):
+    with authorization_scope(AuthorizationContext('reader', Role.OPERATOR)):
         record = ac.execute_action([['AC_probe_capabilities']])
         response = json.loads(server.handle_line(json.dumps(request)))
     assert expected in record.values()

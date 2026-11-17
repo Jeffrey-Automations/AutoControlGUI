@@ -15,11 +15,10 @@ connected-component helper. Imports no ``PySide6``.
 from typing import Any, Dict, List
 
 from je_auto_control.utils.visual_match.visual_match import _contain_cv2_error, _to_gray
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 
-
-def _diff_mask(before: ImageSource, after: ImageSource, threshold: int, blur: int):
+def _diff_mask(before: ImageSource, after: ImageSource, threshold: int, blur: int) -> Any:
     """Return the binary motion mask between two frames (same size required)."""
     import cv2
     from je_auto_control.utils.preprocess.preprocess import _as_uint8, _eight_bit

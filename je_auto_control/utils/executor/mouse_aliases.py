@@ -5,16 +5,17 @@ Each ``AC_mouse_<button>`` command name needs a callable whose signature is
 not threaded through ``mouse_keycode``. Generating the three callables from
 one factory keeps the registration sites identical across executors.
 """
-from typing import Callable, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 from je_auto_control.wrapper.auto_control_mouse import click_mouse
+from je_auto_control.wrapper.backend_contract import MouseKeycode
 
-ClickFn = Callable[[Optional[int], Optional[int]], Tuple[int, int, int]]
+ClickFn = Callable[[Optional[int], Optional[int]], Tuple[MouseKeycode, int, int]]
 
 
 def _make_button_click(button: str) -> ClickFn:
     def click(x: Optional[int] = None,
-              y: Optional[int] = None) -> Tuple[int, int, int]:
+              y: Optional[int] = None) -> Tuple[MouseKeycode, int, int]:
         return click_mouse(button, x, y)
 
     click.__name__ = f"click_{button}"
@@ -27,7 +28,7 @@ click_mouse_left: ClickFn = _make_button_click("mouse_left")
 click_mouse_right: ClickFn = _make_button_click("mouse_right")
 click_mouse_middle: ClickFn = _make_button_click("mouse_middle")
 
-MOUSE_BUTTON_COMMANDS: dict = {
+MOUSE_BUTTON_COMMANDS: Dict[str, ClickFn] = {
     "AC_mouse_left": click_mouse_left,
     "AC_mouse_right": click_mouse_right,
     "AC_mouse_middle": click_mouse_middle,

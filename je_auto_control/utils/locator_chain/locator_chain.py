@@ -11,7 +11,7 @@ returns a new ``Candidates`` so chains are side-effect-free and fully unit-testa
 Pure-stdlib, imports no ``PySide6``.
 """
 import math
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple
 
 Box = Dict[str, Any]
 
@@ -28,10 +28,10 @@ def _area(box: Box) -> int:
 class Candidates:
     """An immutable, chainable set of element boxes."""
 
-    def __init__(self, boxes: Sequence[Box]):
+    def __init__(self, boxes: Sequence[Box]) -> None:
         self._boxes: List[Box] = [dict(box) for box in boxes]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Box]:
         return iter(self._boxes)
 
     def __len__(self) -> int:

@@ -9,7 +9,7 @@ both views.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 from je_auto_control.gui.script_builder.step_model import Step
 
@@ -20,7 +20,7 @@ H_GAP = 80.0
 V_GAP = 30.0
 
 # Path = tuple of (step_index | (body_key, child_index), ...)
-NodePath = Tuple
+NodePath = Tuple[Union[int, Tuple[str, int]], ...]
 
 
 @dataclass(frozen=True)

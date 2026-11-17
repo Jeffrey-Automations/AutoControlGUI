@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from je_auto_control.utils.exception.exceptions import (
     AutoControlAssertionException,
@@ -144,7 +144,7 @@ def _segment_motion(video_path: str, start_s: float,
         capture.release()
 
 
-def _clipped(region: Sequence[int], frame) -> Tuple[int, int, int, int]:
+def _clipped(region: Sequence[int], frame: Any) -> Tuple[int, int, int, int]:
     """``region`` (x1, y1, x2, y2) clipped to ``frame``; ``ValueError`` if nothing is left.
 
     An off-frame, negative or zero-width region sliced an empty frame, and
@@ -159,7 +159,7 @@ def _clipped(region: Sequence[int], frame) -> Tuple[int, int, int, int]:
     return x1, y1, x2, y2
 
 
-def _sum_frame_diffs(capture, cv2, start_frame: int, end_frame: Optional[int],
+def _sum_frame_diffs(capture: Any, cv2: Any, start_frame: int, end_frame: Optional[int],
                      region: Optional[Sequence[int]]) -> Tuple[int, float]:
     """Read frames until ``end_frame`` or the end, keeping only the previous one.
 
@@ -200,7 +200,7 @@ def video_segment_motion(video_path: str,
     return total / (count - 1)
 
 
-def _contained(function, *args):
+def _contained(function: Callable[..., Any], *args: Any) -> Any:
     """Call ``function``, with OpenCV's ``cv2.error`` as a framework error the executor records."""
     from je_auto_control.utils.visual_match.visual_match import _contain_cv2_error
     return _contain_cv2_error(function)(*args)

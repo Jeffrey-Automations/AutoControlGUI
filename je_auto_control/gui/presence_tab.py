@@ -6,7 +6,7 @@ timestamp, and exposes one-click promote / demote / kick buttons. The
 table auto-refreshes when the registry notifies of a change.
 """
 import functools
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._weak_call import weak_slot
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -49,11 +51,13 @@ class PresenceTab(TranslatableMixin, QWidget):
         self._registry_changed.connect(self.refresh)
         # Listener fires on every change; the timer is a belt-and-braces
         # refresh in case a listener exception drops us off.
-        self._registry.add_listener(self._on_registry_event)
-        # The registry outlives the tab; left registered, it kept calling a
-        # deleted widget after every change.
-        registry, listener = self._registry, self._on_registry_event
-        self.destroyed.connect(lambda *_args: registry.remove_listener(listener))
+        # The registry outlives the tab, so it holds the tab's listener weakly: a bound
+        # method there (and in the closure connected to ``destroyed``) kept the tab alive
+        # until Qt's teardown released it and deleted it a second time.
+        self._registry_listener = weak_slot(self._on_registry_event)
+        self._registry.add_listener(self._registry_listener)
+        # Left registered, it kept calling a deleted widget after every change.
+        self.destroyed.connect(functools.partial(self._registry.remove_listener, self._registry_listener))
         self._timer = QTimer(self)
         self._timer.setInterval(5000)
         self._timer.timeout.connect(self.refresh)
@@ -65,7 +69,7 @@ class PresenceTab(TranslatableMixin, QWidget):
 
         Called by ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
         """
-        release_resources(self, functools.partial(self._registry.remove_listener, self._on_registry_event))
+        release_resources(self, functools.partial(self._registry.remove_listener, self._registry_listener))
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
@@ -77,13 +81,16 @@ class PresenceTab(TranslatableMixin, QWidget):
         # Refresh/promote/demote/kick commands run from the Actions menu;
         # the tab keeps only the roster table and the status line.
         root = QVBoxLayout(self)
-        root.addWidget(self._table, stretch=1)
+        root.setSpacing(12)
+        root.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         root.addWidget(self._status)
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._apply_translations()
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("presence_refresh_btn", self.refresh),

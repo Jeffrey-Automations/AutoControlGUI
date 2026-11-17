@@ -50,7 +50,7 @@ def _header_offset(text: str, name: str) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
-def parse_cf_html(blob) -> str:
+def parse_cf_html(blob: bytes | bytearray | str) -> str:
     """Extract the HTML fragment from a ``CF_HTML`` payload (bytes or str).
 
     Prefers the ``StartFragment`` / ``EndFragment`` comment markers, falling back to
@@ -92,7 +92,7 @@ def get_clipboard_html() -> Optional[str]:
     return parse_cf_html(blob) if blob is not None else None
 
 
-def _html_format_id():
+def _html_format_id() -> int:
     from je_auto_control.utils.clipboard.win32_clipboard_api import register_format
     return register_format(_HTML_FORMAT_NAME)
 

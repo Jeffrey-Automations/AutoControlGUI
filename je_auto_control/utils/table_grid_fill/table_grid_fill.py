@@ -36,7 +36,8 @@ def _box_bounds(box: Box) -> Bounds:
     return int(left), int(top), int(left) + int(box["width"]), int(top) + int(box["height"])
 
 
-def _covered(bounds: Bounds, col_spans, row_spans):
+def _covered(bounds: Bounds, col_spans: Sequence[Tuple[int, int]],
+             row_spans: Sequence[Tuple[int, int]]) -> Optional[Tuple[int, int, int, int]]:
     """``(r0, c0, r1, c1)``: the cells under the middle half of a box, or ``None`` off the grid.
 
     The middle half, so a box crossing a rule by a sliver stays in its cell,
@@ -46,7 +47,7 @@ def _covered(bounds: Bounds, col_spans, row_spans):
     quarter_x, quarter_y = (right - left) / 4, (bottom - top) / 4
     c0, c1 = _index_of(left + quarter_x, col_spans), _index_of(right - quarter_x, col_spans)
     r0, r1 = _index_of(top + quarter_y, row_spans), _index_of(bottom - quarter_y, row_spans)
-    if None in (c0, c1, r0, r1):
+    if c0 is None or c1 is None or r0 is None or r1 is None:
         return None
     return r0, c0, r1, c1
 
@@ -79,7 +80,8 @@ def _grid_spans(grid: Dict[str, Any]) -> Tuple[List[Tuple[int, int]], List[Tuple
     return _intervals(grid.get("cols", [])), _intervals(grid.get("rows", []))
 
 
-def _placed(box: Box, col_spans, row_spans, overlap: float):
+def _placed(box: Box, col_spans: Sequence[Tuple[int, int]],
+            row_spans: Sequence[Tuple[int, int]], overlap: float) -> Optional[Tuple[int, int]]:
     """Return ``(row, col)`` for a box, or ``None`` if it misses every cell.
 
     A spanning box goes to its anchor (top-left) cell, where its span is

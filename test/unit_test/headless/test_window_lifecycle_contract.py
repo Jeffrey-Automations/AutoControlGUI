@@ -149,6 +149,25 @@ def test_an_unknown_key_name_is_still_refused(monkeypatch):
         w.post_key_to_window("Editor", "no_such_key")
 
 
+@pytest.mark.parametrize("name", ["%", "é", "中"])
+def test_a_character_the_table_has_no_key_for_is_posted_as_text(monkeypatch, name):
+    """Windows' table has no punctuation, so ``"%"`` raised although ``WM_CHAR`` types it."""
+    from je_auto_control.wrapper import platform_wrapper
+    backend = _PostBackend()
+    monkeypatch.setattr(w, "get_backend", lambda: backend)
+    monkeypatch.setattr(platform_wrapper, "keyboard_keys_table", {"return": 13}, raising=False)
+    assert w.post_key_to_window("Editor", name) is True
+    assert backend.posted == [(11, 0, name)]
+
+
+@windows_only
+def test_a_character_beyond_the_bmp_is_posted_as_its_two_utf16_units(queue):
+    from je_auto_control.windows.window import windows_window_manage as module
+    assert module.post_key(5, 0, "\U0001F600") is True
+    assert [(message, w_param) for message, w_param, _l in queue.messages] == [
+        (WM_CHAR, 0xD83D), (WM_CHAR, 0xDE00)]
+
+
 # --- focus / show / z-order --------------------------------------------------
 
 class _FocusBackend:
@@ -314,6 +333,7 @@ class _Window:
 
     def __init__(self, x, y, width, height):
         self.rect = (x, y, width, height)
+        self.maximized = 0
 
     def win32(self):
         """``ctypes.windll`` reading this window: the DWM frame is inside the rect."""
@@ -331,7 +351,8 @@ class _Window:
             return 0
 
         return types.SimpleNamespace(
-            user32=types.SimpleNamespace(IsIconic=lambda hwnd: 0, GetWindowRect=get_window_rect),
+            user32=types.SimpleNamespace(IsIconic=lambda hwnd: 0, IsZoomed=lambda hwnd: self.maximized,
+                                         GetWindowRect=get_window_rect),
             dwmapi=types.SimpleNamespace(DwmGetWindowAttribute=frame_bounds))
 
 
@@ -356,6 +377,70 @@ def test_a_window_capture_still_takes_the_visible_frame(monkeypatch):
     monkeypatch.setattr(ctypes, "windll", _Window(100, 50, 800, 600).win32())
     assert window_capture._win32_geometry(1) == (107, 50, 786, 593)
     assert window_capture._win32_window_rect(1) == (100, 50, 800, 600)
+
+
+@windows_only
+def test_a_maximized_window_is_saved_at_its_restored_rectangle(monkeypatch):
+    """Saved maximized, the layout held the screen-sized rectangle and restored it as a normal window."""
+    from je_auto_control.windows.window import windows_window_manage as module
+    window = _Window(-11, -11, 1942, 1030)
+    window.maximized = 1
+    monkeypatch.setattr(ctypes, "windll", window.win32())
+    monkeypatch.setattr(module, "get_normal_window_rect", lambda hwnd: (150, 160, 750, 460))
+    assert window_capture.save_window_layout(lister=lambda: [(1, "Editor")]) == [
+        {"title": "Editor", "x": 150, "y": 160, "width": 600, "height": 300, "maximized": True}]
+
+
+class _Placement:
+    """``user32`` as far as ``get_normal_window_rect`` uses it."""
+
+    def __init__(self, normal, work_offset, tool_window=False):
+        self.normal, self.work_offset, self.tool_window = normal, work_offset, tool_window
+
+    def GetWindowPlacement(self, hwnd, reference):  # noqa: N802  # reason: Win32 name
+        rect = reference._obj.rcNormalPosition
+        rect.left, rect.top, rect.right, rect.bottom = self.normal
+        return 1
+
+    def GetWindowLongW(self, hwnd, index):  # noqa: N802  # reason: Win32 name
+        return 0x80 if self.tool_window else 0
+
+    def MonitorFromWindow(self, hwnd, flags):  # noqa: N802  # reason: Win32 name
+        return 77
+
+    def GetMonitorInfoW(self, monitor, reference):  # noqa: N802  # reason: Win32 name
+        info = reference._obj
+        info.rcMonitor.left, info.rcMonitor.top, info.rcMonitor.right, info.rcMonitor.bottom = 0, 0, 1920, 1080
+        dx, dy = self.work_offset
+        info.rcWork.left, info.rcWork.top, info.rcWork.right, info.rcWork.bottom = dx, dy, 1920, 1080
+        return 1
+
+
+@windows_only
+@pytest.mark.parametrize("work_offset, tool_window, expected", [
+    ((0, 0), False, (100, 50, 900, 650)),        # taskbar at the bottom: workspace == screen
+    ((48, 0), False, (148, 50, 948, 650)),       # taskbar on the left: add the work area's offset
+    ((0, 40), False, (100, 90, 900, 690)),       # taskbar on top
+    ((48, 0), True, (100, 50, 900, 650)),        # a tool window's placement is already in screen coordinates
+])
+def test_the_restored_rectangle_is_converted_from_workspace_coordinates(monkeypatch, work_offset, tool_window,
+                                                                         expected):
+    from je_auto_control.windows.window import windows_window_manage as module
+    monkeypatch.setattr(module, "_user32", _Placement((100, 50, 900, 650), work_offset, tool_window))
+    assert module.get_normal_window_rect(5) == expected
+
+
+@windows_only
+@pytest.mark.parametrize("maximize, expected", [(False, ["move"]), (True, ["move", "maximize"])])
+def test_the_layout_mover_maximizes_only_when_asked(monkeypatch, maximize, expected):
+    from je_auto_control.windows.window import windows_window_manage as module
+    calls = []
+    monkeypatch.setattr(w, "list_windows", lambda titled_only=True: [(11, "Editor")])
+    monkeypatch.setattr(module, "move_window", lambda *args: calls.append("move") or True)
+    monkeypatch.setattr(module, "maximize_window", lambda hwnd: calls.append("maximize") or True)
+    move = window_capture._exact_title_mover()
+    assert move("Editor", 1, 2, 3, 4, maximize=maximize) is True
+    assert calls == expected
 
 
 @windows_only
@@ -474,3 +559,20 @@ def test_a_short_poll_still_polls_at_its_own_pace(clock):
         w.wait_for_window("never", timeout=1.0, poll=0.25)
     assert clock.sleeps[0] == pytest.approx(0.25)
     assert sum(clock.sleeps) == pytest.approx(1.0)
+
+
+@windows_only
+@pytest.mark.parametrize("zoomed", [True, False])
+def test_moving_a_maximized_window_restores_it_first_without_activating(monkeypatch, zoomed):
+    """Measured on Windows 11: MoveWindow alone left a maximized window flagged maximized."""
+    from je_auto_control.windows.window import windows_window_manage
+    calls = []
+    fake = types.SimpleNamespace(
+        IsZoomed=lambda hwnd: int(zoomed),
+        ShowWindow=lambda hwnd, command: calls.append(("show", command)),
+        SetForegroundWindow=lambda hwnd: calls.append(("foreground",)),
+        MoveWindow=lambda hwnd, x, y, w, h, repaint: calls.append(("move", x, y, w, h)) or 1)
+    monkeypatch.setattr(windows_window_manage, "_user32", fake)
+    assert windows_window_manage.move_window(7, 150, 160, 600, 300)
+    expected = [("show", 4)] if zoomed else []   # SW_SHOWNOACTIVATE
+    assert calls == expected + [("move", 150, 160, 600, 300)]

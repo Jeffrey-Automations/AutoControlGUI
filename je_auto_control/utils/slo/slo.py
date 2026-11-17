@@ -12,7 +12,7 @@ standard library; imports no ``PySide6``.
 """
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
@@ -47,7 +47,7 @@ def _window(records: Sequence[Mapping[str, Any]], window_s: Optional[float],
             if cutoff <= float(r.get("timestamp", now)) <= now]
 
 
-def _counts(records: Sequence[Mapping[str, Any]]) -> tuple:
+def _counts(records: Sequence[Mapping[str, Any]]) -> Tuple[int, int]:
     total = len(records)
     good = sum(1 for r in records if r.get("ok"))
     return good, total

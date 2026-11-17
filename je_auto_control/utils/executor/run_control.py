@@ -35,6 +35,7 @@ part of it -- on every build, including a free-threaded one, where a new
 thread inherits its creator's context variables -- unless it is handed the
 token and binds it with :func:`bound_stop_token`, as ``AC_parallel`` does.
 """
+import contextvars
 import threading
 import time
 import uuid
@@ -153,6 +154,46 @@ def checkpoint() -> None:
     if _SHIELDED.get() and not token.forced:
         return
     raise ExecutionStopped(token.run_id, token.reason)
+
+
+# How often a caller waiting on :func:`stoppable_call` looks at its stop.
+_CALL_POLL_SECONDS = 0.1
+
+
+def stoppable_call(function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    """Run one call that cannot look at a stop itself, so a stop does not wait for it.
+
+    Inside a stoppable run or a cancellation scope the call runs on a helper
+    thread under the caller's context, and the caller waits in 0.1 s slices
+    that look at both: a stop or cancel raises at once (``ExecutionStopped`` /
+    ``CancelledError``). The call itself cannot be interrupted -- a native
+    image search or OCR pass runs to its end in the background and its result
+    is discarded. Outside both it is a plain call on the caller's thread.
+    """
+    from je_auto_control.utils.exception.cancellation import cancellation_checkpoint, current_cancellation_token
+    if _CURRENT.get() is None and current_cancellation_token() is None:
+        return function(*args, **kwargs)
+    cancellation_checkpoint()
+    checkpoint()
+    outcome: Dict[str, Any] = {}
+    done = threading.Event()
+    context = contextvars.copy_context()
+
+    def run() -> None:
+        try:
+            outcome["value"] = context.run(function, *args, **kwargs)
+        except BaseException as error:  # reason: handed to the waiting caller, which raises it
+            outcome["error"] = error
+        finally:
+            done.set()
+
+    threading.Thread(target=run, name="stoppable-call", daemon=True).start()
+    while not done.wait(_CALL_POLL_SECONDS):
+        cancellation_checkpoint()
+        checkpoint()
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome["value"]
 
 
 def pause(seconds: float, sleep: Optional[Callable[[float], Any]] = None) -> None:
@@ -302,5 +343,5 @@ def release_held_inputs(token: StopToken) -> int:
 __all__ = [
     "ExecutionStopped", "StopToken", "active_executions", "bound_stop_token",
     "checkpoint", "current_stop_token", "note_command", "pause",
-    "release_held_inputs", "shielded", "stop_execution", "stoppable_run",
+    "release_held_inputs", "shielded", "stop_execution", "stoppable_call", "stoppable_run",
 ]

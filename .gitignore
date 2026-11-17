@@ -125,6 +125,7 @@ dmypy.json
 /.claude
 
 # Local test/smoke artifacts
+.audit/
 .worktrees/
 .superpowers/
 .test-tmp/

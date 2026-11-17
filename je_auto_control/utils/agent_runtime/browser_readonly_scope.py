@@ -8,7 +8,7 @@ from typing import Any
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 
 
-def _fixed(value: dict) -> str:
+def _fixed(value: dict[str, Any]) -> str:
     result = dict(value)
     result.pop("roots")
     options = dict(result["options"])

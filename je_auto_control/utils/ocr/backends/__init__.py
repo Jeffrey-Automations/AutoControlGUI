@@ -8,7 +8,7 @@ from je_auto_control.utils.ocr.backends.base import (
     OCRBackend, OCRBackendNotAvailableError,
 )
 
-_cached: dict = {}
+_cached: dict[str, OCRBackend] = {}
 
 
 def get_backend(name: Optional[str] = None) -> OCRBackend:

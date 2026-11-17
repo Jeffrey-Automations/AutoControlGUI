@@ -14,7 +14,7 @@ from je_auto_control.utils.agent_runtime.transfer_models import TransferManifest
 from je_auto_control.utils.agent_runtime.transfer_records import TransferRecords, _text
 
 
-def _created_digest(operation: str, reply: dict) -> str:
+def _created_digest(operation: str, reply: dict[str, Any]) -> str:
     if operation == 'create_evidence':
         return evidence_digest(reply['evidence']['summary'])
     if operation == 'create_import':
@@ -25,14 +25,14 @@ def _created_digest(operation: str, reply: dict) -> str:
 class RoutedTransfers:
     """A local opaque review binds its actual caller, host fingerprint, foreign review, digest and key."""
 
-    def __init__(self, runtime: Any, records: TransferRecords, peer: Any, binding: Callable,
+    def __init__(self, runtime: Any, records: TransferRecords, peer: Any, binding: Callable[[str], str],
                  checkpoint: Callable[[], float]) -> None:
         self.runtime, self.records, self.peer = runtime, records, peer
         self.binding, self.checkpoint = binding, checkpoint
-        self._reviews: dict[str, dict] = {}
+        self._reviews: dict[str, dict[str, Any]] = {}
         self._initialized = False
 
-    def control(self, host: str, operation: str, request: Mapping) -> dict:
+    def control(self, host: str, operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
         """Route only closed source operations; no coordinator path or principal crosses the wire."""
         value = management_request(operation, request)
         if self.peer is None:
@@ -63,7 +63,8 @@ class RoutedTransfers:
             self._check(host, binding)
         self._initialized = True
 
-    def _review(self, host: str, binding: str, request: dict, actor: dict, operation: str) -> dict:
+    def _review(self, host: str, binding: str, request: dict[str, Any], actor: dict[str, Any],
+                operation: str) -> dict[str, Any]:
         self._prepare(host, binding)
         now = time.time()
         self._reviews = {key: record for key, record in self._reviews.items() if record['review_expires'] > now}
@@ -85,7 +86,8 @@ class RoutedTransfers:
                       'request': deepcopy(request)}}
         return {**reply, 'review': review, 'review_expires': review_expiry}
 
-    def _create(self, host: str, binding: str, request: dict, actor: dict, operation: str) -> dict:
+    def _create(self, host: str, binding: str, request: dict[str, Any], actor: dict[str, Any],
+                operation: str) -> dict[str, Any]:
         self._prepare(host, binding)
         record = self._approved(host, binding, request, actor, operation)
         self._check(host, binding)
@@ -97,7 +99,8 @@ class RoutedTransfers:
             raise AgentTaskError('routed creation reply differs from its approved immutable manifest')
         return reply
 
-    def _approved(self, host: str, binding: str, request: dict, actor: dict, operation: str) -> dict:
+    def _approved(self, host: str, binding: str, request: dict[str, Any], actor: dict[str, Any],
+                  operation: str) -> dict[str, Any]:
         key_hash = _text(request['idempotency_key'], 256, 'idempotency key')
         note_hash = _text(request['note'], 4000, 'approval note')
         with self.runtime.store.connection() as connection:
@@ -125,7 +128,7 @@ class RoutedTransfers:
         return created
 
     @staticmethod
-    def _bound(record: dict, host: str, binding: str, actor: dict, operation: str) -> None:
+    def _bound(record: dict[str, Any], host: str, binding: str, actor: dict[str, Any], operation: str) -> None:
         scope = record['scope']
         if (record['kind'] != 'route' or record['actor'] != actor_key(actor)
                 or scope.get('host') != host or scope.get('binding') != binding

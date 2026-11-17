@@ -17,7 +17,7 @@ colours, then grade their WCAG contrast.
 The grading and split are pure and reuse :func:`a11y_audit.contrast_ratio`, so
 they are fully testable without a screen. Imports no ``PySide6``.
 """
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from je_auto_control.utils.a11y_audit import contrast_ratio
 from je_auto_control.utils.a11y_audit.audit import relative_luminance
@@ -60,7 +60,8 @@ def _mean_color(pixels: Sequence[Sequence[int]]) -> RGB:
     return [totals[0] // count, totals[1] // count, totals[2] // count]
 
 
-def _partition_by_luminance(rgbs: Sequence[Sequence[int]]) -> tuple:
+def _partition_by_luminance(rgbs: Sequence[Sequence[int]]
+                            ) -> Tuple[List[Sequence[int]], List[Sequence[int]]]:
     """Split RGB pixels into (darker, lighter) groups at the mean luminance."""
     lums = [relative_luminance(rgb) for rgb in rgbs]
     average = sum(lums) / len(lums)

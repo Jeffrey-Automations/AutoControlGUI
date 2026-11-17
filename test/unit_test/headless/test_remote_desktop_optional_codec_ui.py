@@ -31,7 +31,7 @@ def test_missing_codec_helpers_disable_picker(qapp, monkeypatch, missing):
     for name in ("available_hardware_codecs", "active_hardware_codec"):
         monkeypatch.setattr(advanced_group, name, None if missing in (name, "both") else unexpected_call)
     panel = SimpleNamespace(_tr=lambda widget, key: widget, _on_hw_codec_changed=lambda: None)
-    group = advanced_group.build_advanced_group(panel, include_hw_codec=True)
+    group = advanced_group.build_advanced_group(panel, hardware_codec=panel)
     assert not panel._hw_codec_combo.isEnabled()
     assert panel._hw_codec_combo.count() == 1
     assert panel._hw_codec_combo.currentData() == ""
@@ -43,7 +43,7 @@ def test_available_codec_helpers_populate_and_select_picker(qapp, monkeypatch):
     monkeypatch.setattr(advanced_group, "available_hardware_codecs", lambda: ["h264_nvenc", "h264_qsv"])
     monkeypatch.setattr(advanced_group, "active_hardware_codec", lambda: "h264_qsv")
     panel = SimpleNamespace(_tr=lambda widget, key: widget, _on_hw_codec_changed=lambda: None)
-    group = advanced_group.build_advanced_group(panel, include_hw_codec=True)
+    group = advanced_group.build_advanced_group(panel, hardware_codec=panel)
     assert panel._hw_codec_combo.isEnabled()
     assert panel._hw_codec_combo.count() == 3
     assert panel._hw_codec_combo.currentData() == "h264_qsv"
@@ -65,3 +65,17 @@ def test_missing_codec_actions_report_failure(qapp, monkeypatch, codec):
     assert label.text() == expected
     combo.close()
     label.close()
+
+
+def test_viewer_advanced_group_needs_no_hardware_controls(qapp, monkeypatch):
+    def unexpected_probe():
+        raise AssertionError("viewer must not enumerate codecs")
+
+    monkeypatch.setattr(advanced_group, "available_hardware_codecs", unexpected_probe)
+    monkeypatch.setattr(advanced_group, "active_hardware_codec", unexpected_probe)
+    panel = SimpleNamespace(_tr=lambda widget, key: widget)
+    group = advanced_group.build_advanced_group(panel)
+    assert panel._stun_edit.text() == advanced_group.DEFAULT_STUN
+    assert panel._turn_edit.text() == ""
+    assert not hasattr(panel, "_hw_codec_combo")
+    group.close()

@@ -8,7 +8,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from je_auto_control.utils.json.json_file import read_executable_action_json
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -65,7 +65,7 @@ class ScheduledJob:
 class Scheduler:
     """Thread-safe scheduler that polls jobs on a background thread."""
 
-    def __init__(self, executor: Optional[Callable[[list], object]] = None,
+    def __init__(self, executor: Optional[Callable[[List[Any]], object]] = None,
                  tick_seconds: float = 0.5) -> None:
         from je_auto_control.utils.executor.action_executor import execute_action
         self._execute = executor or execute_action

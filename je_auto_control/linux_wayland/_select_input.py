@@ -12,16 +12,19 @@ the input-pipeline choice can evolve independently.
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from je_auto_control.linux_wayland._input_state import raise_if_input_blocked
+
+if TYPE_CHECKING:
+    from je_auto_control.linux_wayland.ei_protocol import InputBackend
 
 
 _ENV_OVERRIDE = "JE_AUTOCONTROL_WAYLAND_INPUT_BACKEND"
 _VALID = frozenset({"auto", "libei", "cli"})
 
 
-def select_input_backend(environ: Optional[dict] = None) -> str:
+def select_input_backend(environ: Optional[dict[str, str]] = None) -> str:
     """Return one of ``"libei"`` or ``"cli"`` based on env + libei probe."""
     env = environ if environ is not None else os.environ
     forced = (env.get(_ENV_OVERRIDE) or "auto").strip().lower()
@@ -51,7 +54,7 @@ def _libei_loadable() -> bool:
         return False
 
 
-def active_backend():
+def active_backend() -> Optional[InputBackend]:
     """Return a connected libei backend, or None to use the ydotool CLI.
 
     The single entry point ``keyboard`` and ``mouse`` use. It lives here
@@ -82,7 +85,7 @@ def _refuse_required(error: BaseException) -> None:
         raise LibeiUnavailable(str(error), fallback_allowed=False) from error
 
 
-def emitted(backend, send) -> bool:
+def emitted(backend: InputBackend, send: Callable[..., object]) -> bool:
     """Run one emission on ``backend``; False means the CLI has to take it.
 
     Unclassified optional-backend misses retain their legacy auto fallback.

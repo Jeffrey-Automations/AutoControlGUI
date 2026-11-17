@@ -5,6 +5,7 @@ viewer is that the connect-time channel factory performs an HTTP upgrade
 handshake before falling back to the shared auth + receive loop.
 """
 import socket
+from typing import Any
 
 from je_auto_control.utils.remote_desktop.transport import (
     MessageChannel, WsMessageChannel,
@@ -18,7 +19,7 @@ _DEFAULT_PATH = "/"
 class WebSocketDesktopViewer(RemoteDesktopViewer):
     """Speak the same protocol as :class:`RemoteDesktopViewer` over WebSockets."""
 
-    def __init__(self, *args, path: str = _DEFAULT_PATH, **kwargs) -> None:
+    def __init__(self, *args: Any, path: str = _DEFAULT_PATH, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         if not isinstance(path, str) or not path.startswith("/"):
             raise ValueError("path must be an absolute URL path starting with '/'")

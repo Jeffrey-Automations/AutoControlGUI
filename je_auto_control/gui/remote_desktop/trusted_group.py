@@ -15,8 +15,10 @@ from __future__ import annotations
 from typing import Any, Protocol, TypeVar
 
 from PySide6.QtWidgets import (
-    QGroupBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget,
+    QGroupBox, QPushButton, QVBoxLayout, QWidget,
 )
+
+from je_auto_control.gui.adaptive.flow_layout import flow_of
 
 from je_auto_control.gui.remote_desktop.webrtc_dialogs import TrustedViewersList
 
@@ -55,7 +57,7 @@ def build_trusted_group(panel: TrustedGroupHost) -> QGroupBox:
     panel._trusted_list = TrustedViewersList()
     panel._trusted_list.removed.connect(panel._on_remove_trust)
     layout.addWidget(panel._trusted_list)
-    button_row = QHBoxLayout()
+    buttons = []
     for key, slot in (
         ("rd_webrtc_remove_trusted", panel._on_remove_trust_button),
         ("rd_webrtc_clear_trusted", panel._on_clear_trust),
@@ -64,8 +66,8 @@ def build_trusted_group(panel: TrustedGroupHost) -> QGroupBox:
     ):
         button = panel._tr(QPushButton(), key)
         button.clicked.connect(slot)
-        button_row.addWidget(button)
-    layout.addLayout(button_row)
+        buttons.append(button)
+    layout.addLayout(flow_of(*buttons))
     group.setLayout(layout)
     return group
 

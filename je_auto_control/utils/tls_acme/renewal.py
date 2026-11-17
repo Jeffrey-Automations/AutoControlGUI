@@ -16,7 +16,7 @@ _DEFAULT_THRESHOLD = timedelta(days=30)
 _DEFAULT_CHECK_INTERVAL_S = 60 * 60  # one hour
 
 
-def renewal_due(certificate_path,
+def renewal_due(certificate_path: str | os.PathLike[str],
                 *, now: Optional[datetime] = None,
                 threshold: timedelta = _DEFAULT_THRESHOLD) -> bool:
     """Return ``True`` when the cert at ``certificate_path`` should be renewed.
@@ -49,7 +49,7 @@ class RenewalScheduler:
     answer "is it time yet?" and call the renew hook.
     """
 
-    def __init__(self, certificate_path,
+    def __init__(self, certificate_path: str | os.PathLike[str],
                  renew: Callable[[], None],
                  *, threshold: timedelta = _DEFAULT_THRESHOLD,
                  check_interval_s: float = _DEFAULT_CHECK_INTERVAL_S,

@@ -8,7 +8,7 @@ Dice — for better matching of typos and reordered tokens.
 Pure standard library; imports no ``PySide6``. Every function is pure (two
 strings in, number out), so it is fully deterministic in CI.
 """
-from typing import Set
+from typing import List, Set, Tuple
 
 _METRICS = ("levenshtein", "damerau_levenshtein", "jaro", "jaro_winkler",
             "jaccard", "dice")
@@ -33,7 +33,7 @@ def levenshtein(a: str, b: str) -> int:
     return previous[-1]
 
 
-def _osa_cell(d, a, b, i, j):
+def _osa_cell(d: List[List[int]], a: str, b: str, i: int, j: int) -> int:
     cost = 0 if a[i - 1] == b[j - 1] else 1
     value = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
     if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
@@ -59,7 +59,7 @@ def damerau_levenshtein(a: str, b: str) -> int:
     return d[-1][-1]
 
 
-def _match_flags(a: str, b: str, max_dist: int):
+def _match_flags(a: str, b: str, max_dist: int) -> Tuple[List[bool], List[bool], int]:
     a_match = [False] * len(a)
     b_match = [False] * len(b)
     matches = 0
@@ -74,7 +74,7 @@ def _match_flags(a: str, b: str, max_dist: int):
     return a_match, b_match, matches
 
 
-def _transpositions(a: str, b: str, a_match, b_match) -> int:
+def _transpositions(a: str, b: str, a_match: List[bool], b_match: List[bool]) -> int:
     transposed = 0
     k = 0
     for i, flag in enumerate(a_match):

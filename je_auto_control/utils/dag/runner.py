@@ -165,7 +165,7 @@ def _execute_with_pool(dag: DagDefinition,
                        stop_event: Optional[threading.Event] = None) -> None:
     """Schedule nodes whose deps are all done; cascade skip on failure."""
     pending: Set[str] = set(results)
-    inflight: Dict[Future, str] = {}
+    inflight: Dict[Future[None], str] = {}
     ancestors: Dict[str, Set[str]] = _ancestor_index(dag)
     nodes_by_id = dag.by_id()
     with ThreadPoolExecutor(max_workers=max_parallel) as pool:
@@ -182,7 +182,7 @@ def _execute_with_pool(dag: DagDefinition,
             _harvest_one(inflight, results)
 
 
-def _spawn_ready_nodes(pending: Set[str], inflight: Dict[Future, str],
+def _spawn_ready_nodes(pending: Set[str], inflight: Dict[Future[None], str],
                        results: Dict[str, NodeResult],
                        ancestors: Dict[str, Set[str]],
                        nodes_by_id: Dict[str, DagNode],
@@ -229,7 +229,7 @@ def _blocked_by_ancestor(ancestor_ids: Set[str],
     )
 
 
-def _harvest_one(inflight: Dict[Future, str],
+def _harvest_one(inflight: Dict[Future[None], str],
                  results: Dict[str, NodeResult]) -> None:
     # Whichever node finishes first: waiting on the oldest submitted one
     # held back every node whose inputs a faster sibling had just produced.
@@ -238,7 +238,7 @@ def _harvest_one(inflight: Dict[Future, str],
         _record_future(inflight.pop(finished), finished, results)
 
 
-def _record_future(nid: str, finished: Future,
+def _record_future(nid: str, finished: Future[None],
                    results: Dict[str, NodeResult]) -> None:
     try:
         finished.result()

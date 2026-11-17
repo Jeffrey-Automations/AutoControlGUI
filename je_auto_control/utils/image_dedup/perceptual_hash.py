@@ -10,10 +10,10 @@ package required); the dedupe/compare logic is pure Python and the ``hasher`` is
 injectable, so clustering is unit-testable without any image. Imports no
 ``PySide6``.
 """
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 
-def _gray_resized(image: Any, size: tuple) -> Any:
+def _gray_resized(image: Any, size: Tuple[int, int]) -> Any:
     """``image`` (PIL, RGB ndarray or path) as a resized grayscale PIL image.
 
     An ndarray was passed to ``Image.open`` and failed with a bare

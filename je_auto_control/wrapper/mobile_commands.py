@@ -275,8 +275,10 @@ def _pull_file(session: DeviceSession, remote_path: str, local_path: str) -> str
     return extensions.mobile_extension(session).pull_file(remote_path, local_path)
 
 
-def _get_clipboard(session: DeviceSession) -> str:
-    return extensions.mobile_extension(session).get_clipboard()
+def _get_clipboard(session: DeviceSession, allow_app_switch: bool = False) -> str:
+    extension = extensions.mobile_extension(session)
+    # Only when asked: an adapter registered before the flag existed takes no keyword.
+    return extension.get_clipboard(allow_app_switch=True) if allow_app_switch else extension.get_clipboard()
 
 
 def _set_clipboard(session: DeviceSession, text: str) -> None:
@@ -382,7 +384,10 @@ _OPERATIONS: Tuple[_Operation, ...] = (
                (Param("remote_path", required=True), Param("local_path", "file_path", True)),
                "files", "mobile_extension"),
     _Operation("get_clipboard", "Get Clipboard", "Read the device clipboard's text.",
-               _get_clipboard, capability="clipboard", api="mobile_extension", read_only=True),
+               _get_clipboard, (Param("allow_app_switch", "bool", default=False,
+                                      description="iOS: let WebDriverAgent come to the front through Siri "
+                                                  "for about 3 s to read the pasteboard"),),
+               capability="clipboard", api="mobile_extension", read_only=True),
     _Operation("set_clipboard", "Set Clipboard", "Put text on the device clipboard.",
                _set_clipboard, (Param("text", required=True),), "clipboard",
                "mobile_extension"),

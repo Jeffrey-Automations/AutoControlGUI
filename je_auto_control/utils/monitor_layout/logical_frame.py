@@ -124,7 +124,7 @@ def _load_image_grab() -> Any:
     return image_grabber()
 
 
-def _resample():
+def _resample() -> int:
     """Pillow's high-quality downscale filter, across Pillow versions."""
     from PIL import Image
     return getattr(getattr(Image, "Resampling", Image), "LANCZOS")

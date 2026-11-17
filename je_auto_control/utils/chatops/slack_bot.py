@@ -89,6 +89,9 @@ class SlackBot:
     # while it posts its reply: the answer to a /stop is posted before the
     # "stopped" reply of the run it ended.
     _turn: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+    # The thread holding ``_turn`` for a message, so stop() / wait_idle() called from a
+    # command handler know not to wait for a worker that needs that same turn.
+    _turn_owner: Optional[int] = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if not self.token or not self.token.startswith("xox"):
@@ -163,7 +166,9 @@ class SlackBot:
         whether no worker is left. ``False`` means the command is inside a
         call that cannot be interrupted (the worker is a daemon thread and
         ends with the process), or that this was called from a command
-        handler, which holds the turn the worker needs to post its reply.
+        handler, which holds the turn the worker needs to post its reply: then
+        the stop is requested and ``False`` comes back at once, without
+        waiting out ``timeout``.
         Until :meth:`run_forever` is called again a background command is
         refused rather than started.
         """
@@ -174,6 +179,8 @@ class SlackBot:
             return True
         if token is not None:
             token.stop("the bot was stopped")
+        if self._in_handler():
+            return False  # the worker posts its reply once this handler gives the turn back
         return self._join(worker, timeout)
 
     def wait_idle(self, timeout: float = _JOIN_TIMEOUT) -> bool:
@@ -185,7 +192,13 @@ class SlackBot:
             worker = self._worker
         if worker is None or not worker.is_alive():
             return True
+        if self._in_handler():
+            return False  # waiting here would hold the turn the worker needs to finish
         return self._join(worker, timeout)
+
+    def _in_handler(self) -> bool:
+        """Whether this thread is dispatching a message, and so holds the turn a worker's reply needs."""
+        return self._turn_owner == threading.get_ident()
 
     @property
     def running_run_id(self) -> Optional[str]:
@@ -212,11 +225,15 @@ class SlackBot:
     def _handle(self, text: str, message: Dict[str, Any]) -> bool:
         """Dispatch one message; whether it was a command."""
         with self._turn:
-            argv = self._background_argv(text)
-            if argv is None:
-                return self._route_one(text, message) is not None
-            self._start_background(argv, text, message)
-            return True
+            self._turn_owner = threading.get_ident()
+            try:
+                argv = self._background_argv(text)
+                if argv is None:
+                    return self._route_one(text, message) is not None
+                self._start_background(argv, text, message)
+                return True
+            finally:
+                self._turn_owner = None
 
     def _context(self, message: Dict[str, Any]) -> Dict[str, Any]:
         return {"slack_user": message.get("user"), "slack_ts": message.get("ts"),
@@ -317,7 +334,7 @@ class SlackBot:
             payload["thread_ts"] = thread_ts
         return self._api_post("chat.postMessage", payload)
 
-    def _fetch_messages(self) -> list:
+    def _fetch_messages(self) -> List[Dict[str, Any]]:
         """Every message since ``last_seen_ts``, newest first, across pages.
 
         One page of 50 was read and ``last_seen_ts`` then moved past the
@@ -329,7 +346,7 @@ class SlackBot:
         }
         if self.last_seen_ts:
             params["oldest"] = self.last_seen_ts
-        messages: list = []
+        messages: List[Dict[str, Any]] = []
         for _ in range(_MAX_PAGES):
             body = self._api_get("conversations.history", params)
             messages.extend(message for message in body.get("messages") or []

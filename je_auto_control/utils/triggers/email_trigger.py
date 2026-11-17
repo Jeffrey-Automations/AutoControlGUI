@@ -23,8 +23,10 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from email.header import decode_header, make_header
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from email.message import EmailMessage
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set
 
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.json.json_file import read_executable_action_json
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.run_history.context import HistoryBinding, bound_history
@@ -64,8 +66,8 @@ class EmailTrigger:
     enabled: bool = True
     fired: int = 0
     last_error: Optional[str] = None
-    _seen_uids: set = field(default_factory=set, repr=False)
-    _inflight: set = field(default_factory=set, repr=False)
+    _seen_uids: Set[str] = field(default_factory=set, repr=False)
+    _inflight: Set[str] = field(default_factory=set, repr=False)
     _uidvalidity: Optional[str] = field(default=None, repr=False)
     _authorization: DeferredAuthorization = field(
         default_factory=DeferredAuthorization.capture, init=False, repr=False, compare=False)
@@ -83,7 +85,7 @@ def _decode_header_value(value: Optional[str]) -> str:
         return str(value)
 
 
-def _part_text(part) -> Optional[str]:
+def _part_text(part: EmailMessage) -> Optional[str]:
     """A text part's content, or ``None`` when its bytes cannot be read.
 
     A charset Python does not know (``unknown-8bit``, ``x-user-defined``,
@@ -101,7 +103,7 @@ def _part_text(part) -> Optional[str]:
         return None
 
 
-def _extract_text_body(msg) -> str:
+def _extract_text_body(msg: EmailMessage) -> str:
     """Return the first text/plain part as a string, falling back to the body."""
     if msg.is_multipart():
         for part in msg.walk():
@@ -114,7 +116,7 @@ def _extract_text_body(msg) -> str:
     return _part_text(msg) or ""
 
 
-def _header(msg, name: str) -> str:
+def _header(msg: EmailMessage, name: str) -> str:
     """A header's decoded value, or its raw text when it does not parse.
 
     ``email.policy.default`` parses a header when it is read, and a
@@ -130,7 +132,7 @@ def _header(msg, name: str) -> str:
     return _decode_header_value(value)
 
 
-def _build_payload(uid: str, msg) -> Dict[str, Any]:
+def _build_payload(uid: str, msg: EmailMessage) -> Dict[str, Any]:
     return {
         "email.uid": uid,
         "email.from": _header(msg, "From"),
@@ -178,7 +180,7 @@ def _search_uids(client: imaplib.IMAP4, criteria: str) -> List[str]:
     return [chunk.decode("ascii", "replace") for chunk in data[0].split()]
 
 
-def _fetch_message(client: imaplib.IMAP4, uid: str):
+def _fetch_message(client: imaplib.IMAP4, uid: str) -> Optional[EmailMessage]:
     # BODY.PEEK[]: a plain RFC822 fetch sets \Seen on the server (RFC 3501),
     # so messages were marked read with mark_seen=False, and before the
     # script had run -- one lost for good if the process died mid-run.
@@ -246,14 +248,14 @@ class EmailTriggerWatcher:
     """Polls registered IMAP triggers from a single background thread."""
 
     def __init__(self,
-                 executor: Optional[Callable[[list, Dict[str, Any]], Any]] = None,
+                 executor: Optional[Callable[[List[Any], Dict[str, Any]], Any]] = None,
                  ) -> None:
         self._lock = threading.RLock()
         self._fire_lock = threading.Lock()
         self._triggers: Dict[str, EmailTrigger] = {}
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
-        self._executor: Callable[[list, Dict[str, Any]], Any] = (
+        self._executor: Callable[[List[Any], Dict[str, Any]], Any] = (
             self._default_executor if executor is None else executor
         )
 
@@ -334,7 +336,12 @@ class EmailTriggerWatcher:
             self._thread = None
 
     def poll_once(self) -> int:
-        """Run exactly one polling pass; return total messages fired."""
+        """Run exactly one polling pass; return total messages fired.
+
+        Inside a cancellation scope a cancelled pass stops before the next
+        trigger's server, raising ``CancelledError``; a trigger already being
+        polled finishes, so no message is marked seen without being fired.
+        """
         return self._poll_pass()
 
     def _run(self, stop: threading.Event) -> None:
@@ -366,6 +373,7 @@ class EmailTriggerWatcher:
         fired = 0
         for trigger in self.list_triggers():
             if trigger.enabled:
+                cancellation_checkpoint()
                 fired += self._poll_one(trigger)
         return fired
 
@@ -508,7 +516,7 @@ class EmailTriggerWatcher:
                 trigger.fired += 1
 
     @staticmethod
-    def _default_executor(actions: list, variables: Dict[str, Any]) -> Any:
+    def _default_executor(actions: List[Any], variables: Dict[str, Any]) -> Any:
         from je_auto_control.utils.executor.action_executor import (
             execute_action_with_vars,
         )

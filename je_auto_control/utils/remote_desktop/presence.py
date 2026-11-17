@@ -2,10 +2,12 @@
 
 Tracks one ``ViewerPresence`` row per connected viewer: identity,
 role (``controller`` / ``observer``), and most-recent cursor position.
-Plugged into :class:`MultiViewerHost` it lets the host fan out the
-roster to every viewer so each one can render the other cursors as
-ghost overlays, and gates input dispatch by role so observers cannot
-move the mouse / type.
+Plugged into a host it would let it fan out the roster to every viewer
+so each one can render the other cursors as ghost overlays, and
+:meth:`PresenceRegistry.can_control` answers whether a viewer's role
+allows input. No host consults it yet: :class:`MultiViewerHost` does not
+gate input on presence, so the roles are advisory (see
+``utils/rbac/command_review.py``).
 
 Pure stdlib + dataclasses — no aiortc / Qt deps — so the module is
 unit-testable on any platform and can be re-used by the REST API and

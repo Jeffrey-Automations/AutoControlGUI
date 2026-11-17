@@ -107,7 +107,7 @@ def diff_formats(before: Sequence[_Format],
 
 # --- Win32 live enumeration ------------------------------------------------
 
-def _format_name(user32, format_id: int) -> str:
+def _format_name(user32: Any, format_id: int) -> str:
     import ctypes
     buffer = ctypes.create_unicode_buffer(256)
     if user32.GetClipboardFormatNameW(format_id, buffer, 256):

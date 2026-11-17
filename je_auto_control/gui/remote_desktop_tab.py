@@ -7,11 +7,10 @@ paths working — tests and main_widget import names like ``_HostPanel``,
 ``_ViewerPanel``, ``_FrameDisplay`` and ``RemoteDesktopTab`` from here.
 """
 from je_auto_control.gui.remote_desktop import (
-    RemoteDesktopTab, _FileSendThread, _FrameDisplay, _HostPanel,
+    RemoteDesktopTab, _FrameDisplay, _HostPanel,
     _ViewerPanel,
 )
 
 __all__ = [
     "RemoteDesktopTab", "_HostPanel", "_ViewerPanel", "_FrameDisplay",
-    "_FileSendThread",
 ]

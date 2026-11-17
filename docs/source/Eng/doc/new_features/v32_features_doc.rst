@@ -36,6 +36,12 @@ requester, compared after trimming, NFKC normalisation and case folding (so
 ``get(token)`` returns the full record, and ``pending()`` lists every request
 still awaiting a decision.
 
+With RBAC on (``JE_AUTOCONTROL_RBAC_USERS``), the maker and the checker are the
+authenticated user, not the name passed in: a ``requester`` or ``approver`` naming
+anyone else raises ``AuthorizationError``, and an empty one means that user. One
+operator therefore cannot file a request and approve it under a second name.
+Without RBAC the supplied names are used as above.
+
 Executor commands
 -----------------
 

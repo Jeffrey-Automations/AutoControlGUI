@@ -1,6 +1,7 @@
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 from je_auto_control.utils.cv2_utils import template_detection
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.exception.exception_tags import cant_find_image_error_message
 from je_auto_control.utils.exception.exceptions import ImageNotFoundException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -8,7 +9,7 @@ from je_auto_control.utils.test_record.record_test_class import record_action_to
 from je_auto_control.wrapper.auto_control_mouse import click_mouse, set_mouse_position
 
 
-def locate_all_image(image, detect_threshold: float = 1.0,
+def locate_all_image(image: Any, detect_threshold: float = 1.0,
                      draw_image: bool = False) -> List[List[int]]:
     """
     找出螢幕上所有符合的影像位置
@@ -32,7 +33,7 @@ def locate_all_image(image, detect_threshold: float = 1.0,
         raise
 
 
-def locate_image_center(image, detect_threshold: float = 1.0,
+def locate_image_center(image: Any, detect_threshold: float = 1.0,
                         draw_image: bool = False) -> Tuple[int, int]:
     """
     找出單一影像並回傳中心座標
@@ -58,7 +59,7 @@ def locate_image_center(image, detect_threshold: float = 1.0,
         raise
 
 
-def locate_and_click(image, mouse_keycode: int | str,
+def locate_and_click(image: Any, mouse_keycode: int | str,
                      detect_threshold: float = 1.0,
                      draw_image: bool = False) -> Tuple[int, int]:
     """
@@ -67,6 +68,7 @@ def locate_and_click(image, mouse_keycode: int | str,
 
     :return: (center_x, center_y)
     """
+    cancellation_checkpoint()
     autocontrol_logger.info(f"Locate and click {image}, keycode={mouse_keycode}, threshold={detect_threshold}")
     try:
         image_data_array = template_detection.find_image(image, detect_threshold, draw_image)
@@ -74,7 +76,9 @@ def locate_and_click(image, mouse_keycode: int | str,
             x1, y1, x2, y2 = image_data_array[1]
             center_x = int((x1 + x2) // 2)
             center_y = int((y1 + y2) // 2)
+            cancellation_checkpoint()
             set_mouse_position(center_x, center_y)
+            cancellation_checkpoint()
             click_mouse(mouse_keycode)
             record_action_to_list("locate_and_click", {"image": image, "threshold": detect_threshold})
             return center_x, center_y

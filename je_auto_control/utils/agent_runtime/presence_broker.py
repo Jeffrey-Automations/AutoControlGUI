@@ -3,11 +3,14 @@ from __future__ import annotations
 
 from contextlib import ExitStack
 from dataclasses import dataclass
+from functools import partial
 import sys
 import threading
 from typing import Any, Callable
 
 from je_auto_control.utils.agent_runtime.errors import AgentControlBusy, AgentTaskError
+from je_auto_control.utils.agent_runtime import owner_service_nested
+from je_auto_control.utils.agent_runtime.owned_channel_factory import owned_channel
 from je_auto_control.utils.agent_runtime.presence_frames import (
     decode_frame, encode_frame, identifier, presence_body, validate_response,
 )
@@ -18,6 +21,7 @@ from je_auto_control.utils.agent_runtime.presence_platform import (
 )
 from je_auto_control.utils.agent_runtime.presence_worker import SourceProcess
 from je_auto_control.utils.agent_runtime.parent_watch import start_parent_watch
+from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
 
 
 @dataclass
@@ -27,6 +31,7 @@ class _Binding:
     owner: Any = None
     generation: str | None = None
     expected: str | None = None
+    endpoint: Any = None
     sequence: int = 1
     closed: bool = False
 
@@ -40,7 +45,7 @@ def _ready(value: Any) -> str | None:
     raise AgentTaskError('physical presence source startup response is invalid')
 
 
-def _available(reply: dict) -> bool:
+def _available(reply: dict[str, Any]) -> bool:
     if reply['status'] in {'busy', 'lease_lost'}:
         return False
     if reply['status'] != 'ok' or reply['result']['state'] not in {'waiting_idle', 'locked', 'monitoring'}:
@@ -74,13 +79,14 @@ class PresenceBroker:
         self._binding.expected = _ready(started)
         if self._binding.expected is not None and 'endpoint' in started:
             # Only this owned launch may name the endpoint; the channel then pins its listener.
-            self._pipe.use(started['endpoint'])
+            self._binding.endpoint = endpoint_from_wire(started['endpoint'])
+            self._pipe.use(endpoint_to_wire(self._binding.endpoint))
         if self._binding.expected is None:
             self._binding.owner.close()
             self._binding.owner = None
         return self._pipe.connect()
 
-    def bootstrap(self) -> dict:
+    def bootstrap(self) -> dict[str, Any]:
         """Borrow a verified source or launch one missing source after the parent owns this helper."""
         with self._mutex:
             if self._binding.closed:
@@ -94,14 +100,17 @@ class PresenceBroker:
                     self._binding.generation = generation
                 if not _available(self.request('inspect', {})):
                     return {'ready': False, 'status': 'busy'}
-                return {'ready': True, 'generation': self._binding.generation}
+                result: dict[str, Any] = {'ready': True, 'generation': self._binding.generation}
+                if self._binding.endpoint is not None:
+                    result['endpoint'] = endpoint_to_wire(self._binding.endpoint)
+                return result
             except AgentControlBusy:
                 return {'ready': False, 'status': 'busy'}
             except BaseException:
                 self.close()
                 raise
 
-    def request(self, operation: str, body: dict) -> dict:
+    def request(self, operation: str, body: dict[str, Any]) -> dict[str, Any]:
         """Return closed expected gate results; transport/source loss is fatal and never replayed."""
         with self._mutex:
             if self._binding.closed or self._binding.connection is None or self._binding.generation is None:
@@ -123,7 +132,7 @@ class PresenceBroker:
                 self.close()
                 raise
 
-    def dispatch(self, operation: str, body: dict) -> dict:
+    def dispatch(self, operation: str, body: dict[str, Any]) -> dict[str, Any]:
         """The host wire may select only bootstrap or the four closed presence operations."""
         if operation == 'bootstrap':
             if not isinstance(body, dict) or body:
@@ -163,7 +172,10 @@ def run(source: Any, sink: Any, broker: PresenceBroker | None = None) -> None:
 def main() -> None:
     """Run only as the fixed hidden helper of a host-owned presence pool."""
     start_parent_watch()
-    run(sys.stdin.buffer, sys.stdout.buffer)
+    grant = owner_service_nested.read_nested_bootstrap() if sys.platform.startswith('linux') else None
+    # Only the inherited, immutable grant may authorize source child leases.
+    launch = partial(SourceProcess, channel_factory=partial(owned_channel, nested=grant))
+    run(sys.stdin.buffer, sys.stdout.buffer, PresenceBroker(launch=launch))
 
 
 if __name__ == '__main__':

@@ -14,7 +14,7 @@ import json
 import re
 from importlib import metadata
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, Iterator, List, Optional, Set
 
 _SCHEMA = "https://cyclonedx.org/schema/bom-1.6.schema.json"
 _BOM_FORMAT = "CycloneDX"
@@ -68,7 +68,7 @@ def _component(dist: "metadata.Distribution") -> Dict[str, Any]:
     return component
 
 
-def _iter_distributions(root: Optional[str]):
+def _iter_distributions(root: Optional[str]) -> Iterator[metadata.Distribution]:
     """Yield distributions that have metadata: all installed, or the closure of ``root``."""
     if root is None:
         yield from (dist for dist in metadata.distributions() if _name(dist) is not None)
@@ -76,7 +76,7 @@ def _iter_distributions(root: Optional[str]):
     yield from _closure(root)
 
 
-def _closure(root: str):
+def _closure(root: str) -> Iterator[metadata.Distribution]:
     """Yield ``root`` and every distribution it requires here, each once."""
     seen: Set[str] = set()
     queue = [root]

@@ -12,8 +12,7 @@ screen. OpenCV + NumPy come in via the project's ``je_open_cv`` dependency and a
 imported lazily. Imports no ``PySide6``.
 """
 from typing import Any, Dict, List, Optional, Sequence, Tuple
-
-ImageSource = Any
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
 
 def _array_as_rgb(array: Any) -> Any:
@@ -34,7 +33,7 @@ def _array_as_rgb(array: Any) -> Any:
     return array
 
 
-def _to_rgb(source: ImageSource):
+def _to_rgb(source: ImageSource) -> Any:
     """Load a path / ndarray / PIL image as an RGB ndarray."""
     import cv2
     import numpy as np
@@ -47,7 +46,7 @@ def _to_rgb(source: ImageSource):
     return np.asarray(source.convert("RGB"))
 
 
-def _grab_rgb(region: Optional[Sequence[int]]):
+def _grab_rgb(region: Optional[Sequence[int]]) -> Any:
     import numpy as np
     from je_auto_control.utils.cv2_utils.region_capture import grab_screen_region
     return np.asarray(grab_screen_region(region).convert("RGB"))

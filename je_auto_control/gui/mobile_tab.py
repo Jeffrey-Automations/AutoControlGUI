@@ -22,6 +22,8 @@ from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui._qt_typed import filled_item
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -89,17 +91,21 @@ class MobileTab(TranslatableMixin, QWidget):
         # Probe / run / fill live in the Actions menu; the tab keeps only the
         # inputs, the capability table and the result view.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
+        set_role(self._note, "warning")
         root.addWidget(self._tr(self._note, "mob_untested"))
         form = QFormLayout()
         for key, widget in (("mob_platform", self._platform), ("mob_device", self._device),
                             ("mob_adb_path", self._adb_path), ("mob_command", self._command)):
             form.addRow(self._tr(QLabel(), key), widget)
-        root.addLayout(form)
-        root.addWidget(self._tr(QLabel(), "mob_params"))
-        root.addWidget(self._params)
-        root.addWidget(self._table, stretch=1)
-        root.addWidget(self._tr(QLabel(), "mob_result"))
-        root.addWidget(self._result, stretch=1)
+        setup = Card().add(form)
+        setup.add(self._tr(QLabel(), "mob_params"))
+        setup.add(self._params)
+        root.addWidget(setup)
+        result = Card()
+        result.add(self._tr(QLabel(), "mob_result"))
+        result.add(self._result, stretch=1)
+        root.addWidget(ResponsiveBox(Card().add(self._table, stretch=1), result), stretch=1)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: the command still running in the background.

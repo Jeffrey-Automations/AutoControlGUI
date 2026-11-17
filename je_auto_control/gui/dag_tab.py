@@ -1,13 +1,19 @@
-"""DAG Runner tab: edit, validate, and execute cross-host DAGs."""
+"""DAG Runner tab: edit, validate, and execute cross-host DAGs.
+
+Requests run as a :class:`~je_auto_control.gui._tab_task.TabTask` started with
+``start_until_stopped``: Stop stops scheduling (managed nodes are asked to
+pause, running nodes finish), and the tab stays busy until the run has ended
+and shows what it did. Closing the tab stops it the same way.
+"""
 import json
 import threading
 from functools import partial
 from contextvars import copy_context
 from typing import Any, Callable, Optional
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLabel, QSpinBox,
+    QFileDialog, QLabel, QSpinBox,
     QPlainTextEdit, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
 )
 # pylint: disable-next=no-name-in-module  # reason: compiled Qt export is exercised by offscreen batch-ID tests
@@ -15,7 +21,10 @@ from PySide6.QtWidgets import QLineEdit
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import WorkerHandle, start_worker
+from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox, fit_columns
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -24,7 +33,6 @@ from je_auto_control.utils.dag import (
 )
 from je_auto_control.utils.agent_runtime.api import inspect_agent_dag, manage_agent_dag
 from je_auto_control.utils.dag.managed_tasks import managed_stop_scope
-from je_auto_control.utils.exception.exceptions import AutoControlException
 
 
 _COLUMNS = ("id", "host", "status", "task_id", "duration_ms", "error")
@@ -34,33 +42,24 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
-class _DagWorker(QObject):
-    finished = Signal(object)
-    failed = Signal(str)
+class _DagWorker:
+    """One DAG request: built on the GUI thread, whose context it keeps, and called on the worker thread."""
 
-    def __init__(self, definition: dict, max_parallel: int,
-                 stop_event: threading.Event, *, inspect_only: bool = False,
-                 batch_id: str = "", batch_operation: str | dict = "") -> None:
-        super().__init__()
+    def __init__(self, definition: dict[str, Any], max_parallel: int,
+                 stop_event: Optional[threading.Event] = None, *, inspect_only: bool = False,
+                 batch_id: str = "", batch_operation: str | dict[str, Any] = "") -> None:
         self._definition = definition
         self._max_parallel = max_parallel
-        self._stop_event = stop_event
+        self._stop_event = stop_event if stop_event is not None else threading.Event()
         self._context = copy_context()
         self._mode = (inspect_only, batch_id, batch_operation)
 
-    def request_stop(self) -> None:
-        """Stop scheduling; managed nodes request owned pause, other running nodes finish."""
-        self._stop_event.set()
+    def __call__(self, stop_event: threading.Event) -> DagRunResult | dict[str, Any]:
+        """Run the request; setting ``stop_event`` stops scheduling, and managed nodes are asked to pause."""
+        self._stop_event = stop_event
+        return self._context.run(self._execute)
 
-    def run(self) -> None:
-        try:
-            result = self._context.run(self._execute)
-        except (AutoControlException, RuntimeError) as error:
-            self.failed.emit(f"{type(error).__name__}: {error}")
-            return
-        self.finished.emit(result)
-
-    def _execute(self) -> DagRunResult | dict:
+    def _execute(self) -> DagRunResult | dict[str, Any]:
         inspect_only, batch_id, batch_operation = self._mode
         if batch_operation:
             return self._execute_batch(batch_id, batch_operation)
@@ -74,7 +73,7 @@ class _DagWorker(QObject):
                            stop_event=self._stop_event, batch_id=batch_id)
         return run_dag(self._definition, max_parallel=self._max_parallel, stop_event=self._stop_event)
 
-    def _execute_batch(self, batch_id: str, operation: str | dict) -> DagRunResult | dict:
+    def _execute_batch(self, batch_id: str, operation: str | dict[str, Any]) -> DagRunResult | dict[str, Any]:
         action = operation["operation"] if isinstance(operation, dict) else operation
         payload = operation.get("request", {}) if isinstance(operation, dict) else {}
         if action in {"run_background", "continue_background"}:
@@ -91,7 +90,7 @@ class _DagWorker(QObject):
                 request.update({key: payload[key] for key in ("decisions", "timeout_seconds") if key in payload})
         return manage_agent_dag(action, request)
 
-    def _submit_background(self, batch_id: str, action: str, payload: dict) -> dict:
+    def _submit_background(self, batch_id: str, action: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = {"batch_id": batch_id, "definition": self._definition, "max_parallel": self._max_parallel}
         if action == "continue_background":
             approved = manage_agent_dag("approve_continuation", {
@@ -113,8 +112,9 @@ class DagTab(TranslatableMixin, QWidget):
         self._max_parallel.setValue(4)
         self._status_label = QLabel()
         self._table = QTableWidget(0, len(_COLUMNS))
-        self._thread: Optional[WorkerHandle] = None
-        self._stop_event = threading.Event()
+        self._run = TabTask(self)
+        self._run.result.connect(self._show_outcome)
+        self._run.error.connect(self._on_worker_failed)
         self._inspection_source = ""
         self._inspection_output = QPlainTextEdit()
         self._inspection_output.setReadOnly(True)
@@ -142,23 +142,22 @@ class DagTab(TranslatableMixin, QWidget):
         # Load/validate/run commands run from the Actions menu; the tab
         # keeps only the editor, the parallel input, table, and status.
         root = QVBoxLayout(self)
-        controls = QHBoxLayout()
-        controls.addWidget(QLabel(_t("dag_parallel_label")))
-        controls.addWidget(self._max_parallel)
+        root.setSpacing(12)
         batch_label, batch_id = QLabel(), QLineEdit()
         batch_label.setObjectName("dag_batch_label")
         batch_id.setObjectName("dag_batch_id")
-        controls.addWidget(batch_label)
-        controls.addWidget(batch_id)
-        controls.addStretch()
-        root.addLayout(controls)
-        root.addWidget(self._editor, stretch=2)
+        root.addWidget(Card().add(flow_of(
+            field_pair(self._tr(QLabel(), "dag_parallel_label"), self._max_parallel),
+            field_pair(batch_label, batch_id))))
+        editor = Card().add(self._editor, stretch=1)
+        nodes = Card().add(self._table, stretch=1)
+        root.addWidget(ResponsiveBox(editor, nodes, stretches=(2, 3)), stretch=1)
+        self._status_label.setWordWrap(True)
+        set_role(self._status_label, "hint")
         root.addWidget(self._status_label)
-        root.addWidget(self._table, stretch=3)
-        root.addWidget(self._inspection_output)
         continuation = QPlainTextEdit("{}")
         continuation.setObjectName("dag_continuation_request")
-        root.addWidget(continuation)
+        root.addWidget(ResponsiveBox(Card().add(self._inspection_output), Card().add(continuation)))
         self._apply_translations()
 
     def dispose(self) -> None:
@@ -169,7 +168,7 @@ class DagTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("dag_load_btn", self._on_load),
@@ -235,7 +234,7 @@ class DagTab(TranslatableMixin, QWidget):
         definition = {} if batch_operation in {"get", "pause_batch"} else self._parse_editor()
         if definition is None:
             return
-        if self._thread is not None and self._thread.isRunning():
+        if self._run.running:
             self._status_label.setText(_t("dag_already_running"))
             return
         if batch_operation in {"run_continuation", "continue_background"} and not self._continuation_current():
@@ -244,9 +243,9 @@ class DagTab(TranslatableMixin, QWidget):
         self._status_label.setText(_t("dag_inspecting" if inspect_only else "dag_running"))
         self._spawn_worker(definition, inspect_only=inspect_only, batch_operation=batch_operation)
 
-    def _spawn_worker(self, definition: dict, *, inspect_only: bool = False, batch_operation: str = "") -> None:
-        self._stop_event = threading.Event()
-        operation: str | dict = batch_operation
+    def _spawn_worker(self, definition: dict[str, Any], *, inspect_only: bool = False,
+                      batch_operation: str = "") -> None:
+        operation: str | dict[str, Any] = batch_operation
         if batch_operation in {"review_continuation", "run_continuation", "continue_background"}:
             try:
                 payload = json.loads(self._continuation_request.toPlainText())
@@ -259,32 +258,31 @@ class DagTab(TranslatableMixin, QWidget):
                 payload = {}
             operation = {"operation": batch_operation, "request": payload}
         worker = _DagWorker(definition, int(self._max_parallel.value()),
-                            self._stop_event, inspect_only=inspect_only,
+                            inspect_only=inspect_only,
                             batch_id=self._batch_id.text(), batch_operation=operation)
         self._inspection_source = self._editor.toPlainText()
         self.setProperty("dag_batch_source", self._batch_id.text())
         self._inspection_output.clear()
-        on_done: Callable[[Any], None]
         if batch_operation and batch_operation != "run_continuation":
-            on_done = self._on_batch_finished
-        elif inspect_only:
-            on_done = self._on_inspection_finished
+            tag = "batch"
         else:
-            on_done = self._on_worker_finished
-        self._thread = start_worker(
-            self, worker, on_done=on_done,
-            on_fail=self._on_worker_failed, on_thread_done=self._on_thread_done)
+            tag = "inspect" if inspect_only else "run"
+        self._run.start_until_stopped(worker, tag=tag)
 
     def _on_stop(self) -> None:
-        if self._thread is None:
-            return
-        self._stop_event.set()
-        self._status_label.setText(_t("dag_stopping"))
+        if self._run.stop():
+            self._status_label.setText(_t("dag_stopping"))
 
-    def _on_thread_done(self) -> None:
-        self._thread = None
+    def _show_outcome(self, result: Any) -> None:
+        tag = self._run.tag
+        if tag == "batch":
+            self._on_batch_finished(result)
+        elif tag == "inspect":
+            self._on_inspection_finished(result)
+        else:
+            self._on_worker_finished(result)
 
-    def _parse_editor(self) -> Optional[dict]:
+    def _parse_editor(self) -> Optional[dict[str, Any]]:
         raw = self._editor.toPlainText().strip()
         if not raw:
             self._status_label.setText(_t("dag_empty"))
@@ -295,7 +293,7 @@ class DagTab(TranslatableMixin, QWidget):
             self._status_label.setText(f"{_t('dag_invalid')}: {error}")
             return None
 
-    def _on_inspection_finished(self, result: dict) -> None:
+    def _on_inspection_finished(self, result: dict[str, Any]) -> None:
         if not self._inspection_current():
             self._status_label.setText(_t("dag_inspection_stale"))
             return
@@ -306,7 +304,7 @@ class DagTab(TranslatableMixin, QWidget):
                    row.get("task_id") or "", "", row.get("error", "")) for row in rows]
         self._render_rows(values)
 
-    def _on_batch_finished(self, result: dict) -> None:
+    def _on_batch_finished(self, result: dict[str, Any]) -> None:
         if not self._inspection_current():
             self._status_label.setText(_t("dag_inspection_stale"))
             return
@@ -342,8 +340,8 @@ class DagTab(TranslatableMixin, QWidget):
         )
         self._populate_table(result)
 
-    def _on_worker_failed(self, message: str) -> None:
-        self._status_label.setText(f"{_t('dag_error')}: {message}")
+    def _on_worker_failed(self, error: object) -> None:
+        self._status_label.setText(f"{_t('dag_error')}: {type(error).__name__}: {error}")
 
     def _populate_table(self, result: DagRunResult) -> None:
         nodes = list(result.nodes.values())
@@ -356,14 +354,14 @@ class DagTab(TranslatableMixin, QWidget):
             ))
         self._render_rows(rows)
 
-    def _render_rows(self, rows: list[tuple]) -> None:
+    def _render_rows(self, rows: list[tuple[Any, ...]]) -> None:
         self._table.setRowCount(len(rows))
         for row, values in enumerate(rows):
             for col, text in enumerate(values):
                 item = QTableWidgetItem(str(text))
                 item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                 self._table.setItem(row, col, item)
-        self._table.resizeColumnsToContents()
+        fit_columns(self._table)
 
 
 __all__ = ["DagTab"]

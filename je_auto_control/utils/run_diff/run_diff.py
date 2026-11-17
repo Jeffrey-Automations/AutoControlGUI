@@ -15,7 +15,7 @@ A step is any dict with a name key (default ``"name"``) and optional ``status`` 
 ``duration`` / ``error``. Pure standard library; no device, no ``PySide6``.
 """
 import math
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 Step = Dict[str, Any]
 
@@ -24,7 +24,7 @@ Step = Dict[str, Any]
 _ZERO_BASELINE_S = 0.1
 
 
-def _lcs_pairs(left: Sequence[str], right: Sequence[str]) -> List[tuple]:
+def _lcs_pairs(left: Sequence[str], right: Sequence[str]) -> List[Tuple[int, int]]:
     """Return aligned ``(i, j)`` index pairs of the longest common subsequence."""
     n, m = len(left), len(right)
     table = [[0] * (m + 1) for _ in range(n + 1)]
@@ -85,8 +85,8 @@ def _regression(before: Step, after: Step, name: str,
 
 
 def _aligned_changes(before: Sequence[Step], after: Sequence[Step],
-                     names: Sequence[str], pairs: List[tuple],
-                     factor: float) -> tuple:
+                     names: Sequence[str], pairs: List[Tuple[int, int]],
+                     factor: float) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Classify the LCS-aligned pairs into (status flips, timing regressions)."""
     flips, regressions = [], []
     for i, j in pairs:
@@ -102,7 +102,7 @@ def _keys(steps: Sequence[Step], key: str) -> List[str]:
     return [str(step.get(key, "")) for step in steps]
 
 
-def _unmatched(steps: Sequence[Step], matched: set) -> List[Step]:
+def _unmatched(steps: Sequence[Step], matched: Set[int]) -> List[Step]:
     return [steps[k] for k in range(len(steps)) if k not in matched]
 
 

@@ -38,7 +38,7 @@ def protects_task(store: Any, task_id: str) -> bool:
     return row is not None
 
 
-def prune_batches(runtime: Any, cutoff: float, identity: Any) -> dict:
+def prune_batches(runtime: Any, cutoff: float, identity: Any) -> dict[str, Any]:
     """Collect up to one thousand visible settled batches; unresolved work has no automatic expiry."""
     with runtime.store.connection() as connection:
         rows = connection.execute("SELECT id,owner FROM agent_dag_batches WHERE updated<? "

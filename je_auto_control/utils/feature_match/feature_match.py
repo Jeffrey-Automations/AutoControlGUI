@@ -16,13 +16,15 @@ OpenCV (no contrib modules).
 """
 from dataclasses import asdict, dataclass
 import dataclasses
-from typing import Any, Dict, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 from je_auto_control.utils.visual_match.visual_match import (
     _contain_cv2_error, _haystack_gray_with_origin, _to_gray,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
+if TYPE_CHECKING:
+    import cv2
 
 
 @dataclass(frozen=True)
@@ -40,7 +42,7 @@ class FeatureMatch:
         return asdict(self)
 
 
-def _ratio_filter(knn_matches, ratio: float) -> list:
+def _ratio_filter(knn_matches: Sequence[Sequence["cv2.DMatch"]], ratio: float) -> List["cv2.DMatch"]:
     """Lowe's ratio test: keep matches clearly better than their runner-up."""
     good = []
     for pair in knn_matches:
@@ -49,7 +51,7 @@ def _ratio_filter(knn_matches, ratio: float) -> list:
     return good
 
 
-def _make_orb(template_gray, max_features: int):
+def _make_orb(template_gray: Any, max_features: int) -> "cv2.ORB":
     """Build an ORB detector with border/patch sizes that suit small templates.
 
     OpenCV's default ``edgeThreshold``/``patchSize`` (31) reject every keypoint
@@ -64,7 +66,8 @@ def _make_orb(template_gray, max_features: int):
         patchSize=patch)
 
 
-def _keypoint_matches(template_gray, scene_gray, max_features: int, ratio: float):
+def _keypoint_matches(template_gray: Any, scene_gray: Any, max_features: int, ratio: float
+                      ) -> Optional[Tuple[Sequence["cv2.KeyPoint"], Sequence["cv2.KeyPoint"], List["cv2.DMatch"]]]:
     """Return (kp_template, kp_scene, good_matches) or None if too few features."""
     import cv2
     orb = _make_orb(template_gray, max_features)
@@ -77,8 +80,8 @@ def _keypoint_matches(template_gray, scene_gray, max_features: int, ratio: float
     return kp1, kp2, good
 
 
-def _locate(template_shape, kp1, kp2, good, min_inliers: int
-            ) -> Optional[FeatureMatch]:
+def _locate(template_shape: Tuple[int, ...], kp1: Sequence["cv2.KeyPoint"], kp2: Sequence["cv2.KeyPoint"],
+            good: List["cv2.DMatch"], min_inliers: int) -> Optional[FeatureMatch]:
     """Fit a RANSAC homography from ``good`` matches and project the template box."""
     import cv2
     import numpy as np

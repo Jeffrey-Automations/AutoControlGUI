@@ -34,15 +34,19 @@ the leading arguments given in ``args`` (:mod:`je_auto_control.gui._weak_call`);
 pass a method and ``args``, never a lambda that closes over the tab.
 """
 import functools
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QCoreApplication, QObject, Signal
 
 from je_auto_control.gui._weak_call import Callback, WeakCall as _WeakCall, weak_slot
 from je_auto_control.gui.tab_task_controller import (
     CancellationToken, TaskController, TaskUsageError, _widgets_reachable_from, task_controller,
 )
+from je_auto_control.gui._stop_custody import stop_custody
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.rbac.deferred import DeferredAuthorization
+from je_auto_control.utils.remote_desktop.media_retirement import interrupted_retirement_owners
 
 
 def _call(work: Callable[[], Any], _token: CancellationToken) -> Any:
@@ -53,6 +57,69 @@ def _call(work: Callable[[], Any], _token: CancellationToken) -> Any:
 def _log_failure(error: object) -> None:
     """A failed stop with nobody to tell is still recorded."""
     autocontrol_logger.warning(f"GUI background operation failed: {error!r}")
+
+
+class StopsFailed(AutoControlException, RuntimeError):
+    """Some of :func:`stop_each`'s stops raised; ``failures`` pairs each with its error."""
+
+    def __init__(self, failures: List[Tuple[Callable[[], Any], BaseException]]) -> None:
+        super().__init__("; ".join(f"{type(error).__name__}: {error}" for _stop, error in failures))
+        self.failures = failures
+
+
+def hold_failed_stop(stop: Callable[[], Any], error: object,
+                     authority: Optional[DeferredAuthorization] = None) -> None:
+    """Hand a failed stop to the application's custody (each one of a :class:`StopsFailed` separately).
+
+    An interruption that cut a media cleanup short carries the original owners
+    it left holding resources (``interrupted_retirement_owners``); each is kept
+    as well, with its own ``stop``, unless it is the stop already being kept.
+    """
+    if isinstance(error, StopsFailed):
+        for inner, inner_error in error.failures:
+            hold_failed_stop(inner, inner_error, authority)
+        return
+    stop_custody().hold(stop, error, authority=authority)
+    if isinstance(error, BaseException):
+        for owner in interrupted_retirement_owners(error):
+            if getattr(stop, "__self__", None) is not owner:
+                stop_custody().hold(owner.stop, error, authority=authority)
+
+
+def _admission_owners(stop: object, depth: int = 0) -> List[object]:
+    """The objects ``stop`` would stop that can close admission: bound methods' owners, through partials."""
+    if depth > 4:
+        return []
+    found: List[object] = []
+    owner = getattr(stop, "__self__", None)
+    if owner is not None and callable(getattr(owner, "close_admission", None)):
+        found.append(owner)
+    if isinstance(stop, functools.partial):
+        for inner in (stop.func, *stop.args, *stop.keywords.values()):
+            if callable(getattr(inner, "close_admission", None)) and not callable(inner):
+                found.append(inner)                  # an owner passed as an argument
+            elif callable(inner):
+                found.extend(_admission_owners(inner, depth + 1))
+    return found
+
+
+def close_admission_of(stop: Callable[[], Any]) -> int:
+    """Close admission, now, on every owner ``stop`` would stop; return how many were closed.
+
+    ``close_admission()`` takes only short locks and makes no native call, so
+    this runs on the GUI thread before the full stop is queued: a session,
+    stream or browser a panel let go of admits nothing more from that moment,
+    even while its full stop waits on a native lock -- or is refused because
+    the caller's authority was revoked.
+    """
+    closed = 0
+    for owner in _admission_owners(stop):
+        try:
+            owner.close_admission()  # type: ignore[attr-defined]  # reason: checked callable by _admission_owners
+            closed += 1
+        except Exception as error:  # noqa: BLE001  # reason: logged; the full stop is still queued
+            autocontrol_logger.warning(f"closing admission failed for {type(owner).__name__}: {error!r}")
+    return closed
 
 
 def _refuse_widgets(work: Callable[[], Any]) -> None:
@@ -83,7 +150,7 @@ class SlowOp(QObject):
     def run(self, work: Callable[[], Any], *,   # noqa: PLR0913  # reason: keyword-only options of one call
             on_done: Callback = None, on_error: Callback = None, args: Tuple[Any, ...] = (),
             discard: Optional[Callable[[Any], object]] = None,
-            timeout_s: Optional[float] = None) -> bool:
+            timeout_s: Optional[float] = None, retain_failure: bool = False) -> bool:
         """Run ``work()`` off the GUI thread; return ``False`` (and do nothing) while busy.
 
         ``on_done(*args, result)`` or ``on_error(*args, exception)`` runs on
@@ -91,7 +158,9 @@ class SlowOp(QObject):
         false. Neither runs when the owner was destroyed meanwhile; the work
         itself still runs to its end, and what it returned then goes to
         ``discard`` (stop the server nobody is left to show). An error nobody
-        handles is logged.
+        handles is logged. With ``retain_failure`` -- for a stop, never a start
+        -- a failure is also kept by the stop custody, under the authority
+        captured now, so it can be retried from the Diagnostics tab.
         """
         if self._busy:
             return False
@@ -104,6 +173,9 @@ class SlowOp(QObject):
         self._on_error = _WeakCall(on_error, args)
         handle.result.connect(self._deliver_result)
         handle.error.connect(self._deliver_error)
+        if retain_failure:
+            handle.error.connect(functools.partial(hold_failed_stop, work,
+                                                   authority=DeferredAuthorization.capture()))
         handle.finished.connect(self._settle)
         self.busy_changed.emit(True)
         return True
@@ -151,19 +223,27 @@ class StopQueue(QObject):
         return self._pending
 
     def retire(self, stop: Callable[[], Any], *, on_done: Callback = None,
-               args: Tuple[Any, ...] = ()) -> None:
+               on_error: Callback = None, args: Tuple[Any, ...] = ()) -> None:
         """Run ``stop()`` off the GUI thread; ``on_done(*args, result)`` follows on the GUI thread.
 
-        A shutdown that raises is logged: the object is already out of use
-        and there is nothing for the panel to undo.
+        ``on_error(*args, exception)`` follows instead when it raised, for a
+        panel that shows a state until its stop reports (both are held weakly).
+
+        A shutdown that raises is kept by :func:`~je_auto_control.gui._stop_custody.stop_custody`,
+        with the caller's authority captured now, so it can be retried from
+        the Diagnostics tab: the object is out of the panel's hands, but its
+        resource may still be held.
         """
         _refuse_widgets(stop)
+        close_admission_of(stop)            # at once: nothing new is admitted while the stop is queued
         controller = self._controller if self._controller is not None else task_controller()
         handle = controller.submit(functools.partial(_call, stop), owner=self)
         self._pending += 1
-        handle.error.connect(_log_failure)
+        handle.error.connect(functools.partial(hold_failed_stop, stop, authority=DeferredAuthorization.capture()))
         if on_done is not None:
             handle.result.connect(weak_slot(on_done, *args))     # a weak call, never the panel
+        if on_error is not None:
+            handle.error.connect(weak_slot(on_error, *args))
         handle.finished.connect(self._one_reported)
 
     def _one_reported(self) -> None:
@@ -172,13 +252,47 @@ class StopQueue(QObject):
             self.drained.emit()
 
 
+_APP_STOPS: Optional["StopQueue"] = None
+
+
+def app_stop_queue() -> "StopQueue":
+    """A :class:`StopQueue` owned by the application, for a window or dialog that is gone before its stop reports.
+
+    A queue owned by a dialog dies with it, and so does the delivery of a
+    stop that failed after the dialog closed; this one lives as long as the
+    application, so the failure still reaches the stop custody. GUI thread.
+    """
+    global _APP_STOPS  # pylint: disable=global-statement  # reason: one queue per application, made on first use
+    app = QCoreApplication.instance()
+    queue = _APP_STOPS
+    try:
+        alive = queue is not None and queue.parent() is app
+    except RuntimeError:                    # its application was destroyed (a test made a new one)
+        alive = False
+    if alive and queue is not None:
+        return queue
+    if app is None:
+        raise RuntimeError("app_stop_queue() needs a running QApplication")
+    _APP_STOPS = StopQueue(app)
+    return _APP_STOPS
+
+
 def stop_each(*stops: Callable[[], Any]) -> None:
-    """Worker thread: call every ``stop`` in order; one that fails does not keep the rest from running."""
+    """Worker thread: call every ``stop`` in order; one that fails does not keep the rest from running.
+
+    Raises :class:`StopsFailed` afterwards when any did, naming each failed
+    stop, so a :class:`StopQueue` keeps every one of them for a retry.
+    """
+    failures: List[Tuple[Callable[[], Any], BaseException]] = []
     for stop in stops:
         try:
             stop()
-        except Exception as error:  # noqa: BLE001  # reason: logged; the remaining shutdowns must still run
-            autocontrol_logger.warning(f"GUI background shutdown failed: {error!r}")
+        except Exception as error:  # noqa: BLE001  # reason: collected and raised below; the remaining shutdowns must still run
+            failures.append((stop, error))
+    if failures:
+        raise StopsFailed(failures)
 
 
-__all__ = ["SlowOp", "StopQueue", "stop_each"]
+__all__ = [
+    "SlowOp", "StopQueue", "StopsFailed", "app_stop_queue", "close_admission_of", "hold_failed_stop", "stop_each",
+]

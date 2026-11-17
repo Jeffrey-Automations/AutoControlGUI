@@ -20,7 +20,7 @@ risking ``RuntimeError: dictionary changed size during iteration``.
 from __future__ import annotations
 
 import threading
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 
 class SessionQualityCache:
@@ -76,7 +76,7 @@ class SessionQualityCache:
         with self._lock:
             return session_id in self._qualities
 
-    def known_sessions(self) -> list:
+    def known_sessions(self) -> List[str]:
         """Return a list snapshot of currently-tracked session ids."""
         with self._lock:
             return list(self._qualities.keys())

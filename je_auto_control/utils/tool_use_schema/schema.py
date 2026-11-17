@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Set, Tuple
 
-def _executor():
+if TYPE_CHECKING:
+    from je_auto_control.utils.executor.action_executor import Executor
+
+def _executor() -> Executor:
     """Lazy import to keep this module dependency-free at import time."""
     from je_auto_control.utils.executor.action_executor import executor
     return executor
@@ -85,7 +88,7 @@ def _description_for(name: str, callable_obj: Callable[..., Any]) -> str:
     return f"AutoControl command {name}"
 
 
-def _allowed_names(only: Optional[List[str]]) -> Optional[set]:
+def _allowed_names(only: Optional[List[str]]) -> Optional[Set[str]]:
     """``None`` exports every command; any list, even an empty one, is the whole set.
 
     An empty list used to export every command, so a filter that matched

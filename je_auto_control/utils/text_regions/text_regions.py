@@ -17,8 +17,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from je_auto_control.utils.visual_match.visual_match import (
     _contain_cv2_error, _haystack_gray_with_origin, _to_screen,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 Rect = Tuple[int, int, int, int]
 
 
@@ -28,7 +28,7 @@ def _box_dict(rect: Rect) -> Dict[str, Any]:
             "area": width * height, "center": [x + width // 2, y + height // 2]}
 
 
-def _accept(rect: Rect, shape, min_area: int, max_area: Optional[int],
+def _accept(rect: Rect, shape: Sequence[int], min_area: int, max_area: Optional[int],
             max_aspect: float) -> bool:
     """Whether an MSER box looks like text (size / aspect, not the whole frame)."""
     _x, _y, width, height = rect
@@ -50,7 +50,7 @@ _MSER_PARAM_LADDER: Tuple[Dict[str, Any], ...] = (
     {}, {"min_diversity": 0.01}, {"delta": 1, "min_diversity": 0.0})
 
 
-def _detect_regions(gray):
+def _detect_regions(gray: Any) -> Any:
     """Return MSER point sets, relaxing diversity pruning if none found."""
     import cv2
     regions = ()
@@ -64,7 +64,7 @@ def _detect_regions(gray):
     return regions
 
 
-def _filtered_boxes(gray, min_area: int, max_area: Optional[int],
+def _filtered_boxes(gray: Any, min_area: int, max_area: Optional[int],
                     max_aspect: float) -> List[Rect]:
     """Return de-duplicated MSER bounding boxes passing the size / aspect filters."""
     import cv2

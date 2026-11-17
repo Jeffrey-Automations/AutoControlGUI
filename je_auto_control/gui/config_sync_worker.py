@@ -8,8 +8,6 @@ import os
 from threading import Event
 from typing import Callable, Literal, Optional, cast
 
-from PySide6.QtCore import QObject, Signal, Slot
-
 from je_auto_control.utils.config_sync.contract import ConfigSyncError, _encoded
 from je_auto_control.utils.config_sync.profile_commands import profile_parameters
 from je_auto_control.utils.config_sync.profile_load import load_sync_profile
@@ -55,20 +53,21 @@ def _object(text: str) -> dict[str, object]:
     return cast(dict[str, object], value)
 
 
-class ConfigSyncWorker(QObject):
-    """Refresh captured DRIVE authority at every core checkpoint and again before GUI delivery."""
+class ConfigSyncWorker:
+    """Refresh captured DRIVE authority at every core checkpoint and again before GUI delivery.
 
-    finished = Signal(object)
+    Built on the GUI thread, which captures that context and authority, called
+    on a worker thread with the stop event, and kept by the tab so that
+    :meth:`deliver` applies the result under the same authority.
+    """
 
     def __init__(self, request: SyncUIRequest, *, path_policy: Optional[PathPolicy] = None) -> None:
-        super().__init__()
         self._request = request
         self._stop = Event()
         self._context = copy_context()
         self._authority = DeferredAuthorization.capture()
         self._policy = path_policy
 
-    @Slot()
     def request_stop(self) -> None:
         """Stop before the next checkpoint; an already committed write is not rolled back."""
         self._stop.set()
@@ -93,10 +92,10 @@ class ConfigSyncWorker(QObject):
                 callback()
         self._context.run(apply)
 
-    @Slot()
-    def run(self) -> None:
-        """Emit one scrubbed outcome after releasing the captured execution context."""
-        self.finished.emit(self._context.run(self._perform))
+    def __call__(self, stop_event: Event) -> SyncUIOutcome:
+        """Return one scrubbed outcome after releasing the captured execution context."""
+        self._stop = stop_event
+        return self._context.run(self._perform)
 
     def _perform(self) -> SyncUIOutcome:
         request = self._request

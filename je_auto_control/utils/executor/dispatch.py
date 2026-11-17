@@ -69,7 +69,7 @@ def execute_one(executor: Executor, name: str, arguments: Optional[Mapping[str, 
         _RUNNING.value, _STRICT_BODIES.value = previous, strict
 
 
-def _prepare(executor: Executor, name: str, arguments: Optional[Mapping[str, Any]]) -> list:
+def _prepare(executor: Executor, name: str, arguments: Optional[Mapping[str, Any]]) -> list[Any]:
     from je_auto_control.utils.executor.action_schema import validate_actions
 
     if not isinstance(name, str) or name not in executor.known_commands():

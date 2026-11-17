@@ -6,7 +6,7 @@ tests that just want a one-line helper.
 """
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 from je_auto_control.utils.timeouts import deadline_after
 
@@ -35,7 +35,7 @@ def keyword_press_key(keycode: str) -> None:
 
 
 def keyword_screenshot(path: str,
-                        region: Optional[list] = None) -> str:
+                        region: Optional[List[int]] = None) -> str:
     """Capture the screen (or ``region``) to ``path``; returns the path."""
     from je_auto_control.wrapper.auto_control_screen import screenshot
     screenshot(file_path=path, screen_region=region)
@@ -75,7 +75,7 @@ def keyword_wait_for_image(image_path: str,
 
 def keyword_wait_for_text(text: str,
                           timeout: float = 10.0,
-                          region: Optional[list] = None) -> Tuple[int, int]:
+                          region: Optional[List[int]] = None) -> Tuple[int, int]:
     """Block until ``text`` is rendered on screen via OCR."""
     from je_auto_control.utils.ocr.ocr_engine import wait_for_text
     return wait_for_text(text, timeout=float(timeout), region=region)

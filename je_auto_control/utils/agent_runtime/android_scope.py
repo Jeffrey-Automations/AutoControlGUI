@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 
@@ -59,14 +60,14 @@ class AndroidSnapshot:
                 or int(activity[1]) != self.user or activity[2] != self.package):
             raise AgentTaskError("Android window/activity is outside its device-user/app scope")
 
-    def identity(self) -> dict:
+    def identity(self) -> dict[str, Any]:
         """Return detached scope metadata, excluding raw remote diagnostics or control text."""
         return {"platform": "android", "physical_id": self.physical_id, "boot_id": self.boot_id,
                 "package": self.package, "user": self.user, "display": 0,
                 "window": self.window, "activity": self.activity}
 
 
-def _record(value: str, pattern: re.Pattern) -> re.Match | None:
+def _record(value: str, pattern: re.Pattern[str]) -> re.Match[str] | None:
     return pattern.fullmatch(value) if isinstance(value, str) and len(value) <= 512 else None
 
 

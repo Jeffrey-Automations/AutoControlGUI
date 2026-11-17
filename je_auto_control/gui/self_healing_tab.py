@@ -4,7 +4,7 @@ Fire a template-first / VLM-fallback locate from the GUI and browse the
 audit log, or compare explicit versions on provided PNG samples without device effects.
 """
 import json
-from typing import Optional
+from typing import Callable, Optional, Sequence
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent
@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.responsive import fit_columns
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.healing_evaluation_panel import HealingEvaluationPanel
 from je_auto_control.gui.journal_browser import JournalBrowser
 from je_auto_control.gui.template_candidate_panel import TemplateCandidatePanel
@@ -88,13 +90,18 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         # Browse/locate/click/refresh/clear commands run from the Actions
         # menu; the tab keeps only the inputs, the log table, and the status.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         runtime = QWidget()
+        runtime.setProperty("role", "bare")
         runtime_layout = QVBoxLayout(runtime)
+        runtime_layout.setSpacing(12)
         runtime_layout.addWidget(self._build_form_group())
         views = QSplitter(Qt.Orientation.Vertical)
         views.addWidget(self._table)
         views.addWidget(self._details)
-        runtime_layout.addWidget(views, stretch=1)
+        runtime_layout.addWidget(Card().add(views, stretch=1), stretch=1)
+        self._status.setWordWrap(True)
+        set_role(self._status, "hint")
         runtime_layout.addWidget(self._status)
         self._views = QTabWidget()
         self._evaluation = HealingEvaluationPanel(self)
@@ -119,7 +126,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         form.addRow(QLabel(), self._click_check)
         return group
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("self_heal_browse", self._on_browse_template),
@@ -170,7 +177,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         if path:
             self._template_input.setText(path)
 
-    def _collect_inputs(self):
+    def _collect_inputs(self) -> Optional[tuple[Optional[str], Optional[str], float, Optional[list[int]]]]:
         template = self._template_input.text().strip() or None
         description = self._description_input.text().strip() or None
         if template is None and description is None:
@@ -245,10 +252,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
                 item = QTableWidgetItem(str(text))
                 item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                 self._table.setItem(row, col, item)
-        self._table.resizeColumnsToContents()
-        for name in ("template_path", "description"):
-            column = _COLUMNS.index(name)
-            self._table.setColumnWidth(column, min(self._table.columnWidth(column), 240))
+        fit_columns(self._table, capped=(_COLUMNS.index("template_path"), _COLUMNS.index("description")))
         self._show_event()
 
     def _show_event(self) -> None:
@@ -280,7 +284,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         super().closeEvent(event)
 
 
-def _format_coordinates(coords) -> str:
+def _format_coordinates(coords: Optional[Sequence[int]]) -> str:
     if coords is None:
         return ""
     return f"({coords[0]}, {coords[1]})"

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 pytest.importorskip('PySide6.QtWidgets', exc_type=ImportError)
+from headless._remote_view_owner import RemoteViewOwner
 from headless._webrtc_doubles import FakePeerConnection
 from headless.test_folder_sync_content import loop
 from headless.test_webrtc_file_commit import bounded_waits as bounded_waits, native_pair as native_pair
@@ -27,7 +28,7 @@ def folder_panel(native_pair, tmp_path, monkeypatch):
     (watch / 'existing.bin').write_bytes(b'initial baseline')
     button = SimpleNamespace(setChecked=lambda _value: None, setText=lambda _text: None,
                              setEnabled=lambda _value: None)
-    owner = SimpleNamespace(_viewer=native_pair.viewer, _sync_engine=None, _offer_worker=None, _answer_worker=None,
+    owner = RemoteViewOwner(_viewer=native_pair.viewer, _sync_engine=None, _offer_worker=None, _answer_worker=None,
                             _recorder=None, _sync_dir_edit=SimpleNamespace(text=lambda: str(watch)), _sync_btn=button,
                             _stop_stats_polling=lambda: None, watch=watch, warnings=[],
                             # The panel's StopQueue runs shutdowns off the GUI thread; here, at once.

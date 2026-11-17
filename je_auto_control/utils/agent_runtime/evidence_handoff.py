@@ -28,11 +28,11 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, allow_nan=False).encode()).hexdigest()
 
 
-def _identity(value: dict) -> tuple[Any, Any]:
+def _identity(value: dict[str, Any]) -> tuple[Any, Any]:
     return value.get('user_id'), value.get('store_path')
 
 
-def _principal() -> dict:
+def _principal() -> dict[str, Any]:
     actor = current_authorization()
     return asdict(actor) if actor is not None else {}
 
@@ -43,7 +43,7 @@ def _identifier(value: Any) -> str:
     return value
 
 
-def _manager(actor: dict, owner: dict) -> None:
+def _manager(actor: dict[str, Any], owner: dict[str, Any]) -> None:
     try:
         authority = DeferredAuthorization(AuthorizationContext(**actor) if actor else None)
     except (TypeError, ValueError) as error:
@@ -54,7 +54,7 @@ def _manager(actor: dict, owner: dict) -> None:
             raise AuthorizationError('handoff issuer can no longer manage the actual evidence owner')
 
 
-def _expiry(rows: list[dict]) -> float:
+def _expiry(rows: list[dict[str, Any]]) -> float:
     values = [row['updated'] for row in rows if row['state'] in _TERMINAL]
     if not values or any(isinstance(value, bool) or not isinstance(value, (int, float))
                          or not math.isfinite(value) for value in values):
@@ -65,12 +65,12 @@ def _expiry(rows: list[dict]) -> float:
     return deadline
 
 
-def _retained_tasks(context: dict, tasks: list[dict]) -> list[dict]:
+def _retained_tasks(context: dict[str, Any], tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows = context.get('retained_rows', []) + tasks
     return list({row['id']: row for row in rows}.values())
 
 
-def _public(row: dict) -> dict:
+def _public(row: dict[str, Any]) -> dict[str, Any]:
     fields = ('id', *(key for key in ('batch_id', 'node_id') if key in row),
               'source_task', 'task_id', 'review', 'state', 'expires')
     result = {key: row[key] for key in fields}
@@ -82,13 +82,14 @@ def _public(row: dict) -> dict:
 class EvidenceHandoffs:
     """Grant immutable task/DAG completion projections without ambient task-read capability."""
 
-    def __init__(self, runtime: Any, context: Callable, witness: Callable, scope: Callable | None = None,
+    def __init__(self, runtime: Any, context: Callable[..., dict[str, Any]], witness: Callable[..., dict[str, Any]],
+                 scope: Callable[..., dict[str, Any]] | None = None,
                  records: HandoffRecords | None = None) -> None:
         self.runtime, self.context, self.witness = runtime, context, witness
         self.scope = scope
         self.records = records if records is not None else HandoffRecords()
 
-    def control(self, operation: str, request: dict) -> dict:
+    def control(self, operation: str, request: dict[str, Any]) -> dict[str, Any]:
         """Review, issue, inspect or revoke a closed caller-scoped evidence handoff."""
         self._open()
         expected = _FIELDS[operation]
@@ -117,14 +118,15 @@ class EvidenceHandoffs:
         if self.runtime._closed:
             raise AgentTaskError('runtime is closed')
 
-    def describe(self, connection: Any, request: dict, actor: dict, *, issuing: bool = False,
-                 issuer_policies: list[str] | None = None, authorization: dict | None = None) -> tuple:
+    def describe(self, connection: Any, request: dict[str, Any], actor: dict[str, Any], *, issuing: bool = False,
+                 issuer_policies: list[str] | None = None, authorization: dict[str, Any] | None = None
+                 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
         """Supply current private proof to an owning host; this neither issues nor consumes a local grant."""
         self._open()
         return self._proof(connection, request, actor, issuing=issuing,
                            issuer_policies=issuer_policies, authorization=authorization)
 
-    def _issue(self, operation: str, request: dict) -> dict:
+    def _issue(self, operation: str, request: dict[str, Any]) -> dict[str, Any]:
         actor = _principal()
         with self.runtime.store.connection(write=True) as connection:
             proof, _tasks, _context = self._proof(connection, request, actor, issuing=True)
@@ -152,18 +154,20 @@ class EvidenceHandoffs:
         return {'handoff': _public(row)}
 
     @staticmethod
-    def _insert(connection: Any, row: dict) -> None:
+    def _insert(connection: Any, row: dict[str, Any]) -> None:
         HandoffRecords('batch_id' not in row).insert(connection, row)
 
-    def _context(self, request: dict, *, connection: Any = None, issuer_policies: list[str] | None = None) -> dict:
+    def _context(self, request: dict[str, Any], *, connection: Any = None,
+                 issuer_policies: list[str] | None = None) -> dict[str, Any]:
         options = {'identity_only': True} if self.scope is not None else {}
         identifiers = ((request['source_task'],) if self.records.standalone
                        else (request['batch_id'], request['node_id']))
         return self.context(*identifiers, origin_policies=issuer_policies, connection=connection, **options)
 
-    def _proof(self, connection: Any, request: dict, actor: dict, *, issuing: bool = False,
+    def _proof(self, connection: Any, request: dict[str, Any], actor: dict[str, Any], *, issuing: bool = False,
                issuer_policies: list[str] | None = None,
-               authorization: dict | None = None) -> tuple[dict, list[dict], dict]:
+               authorization: dict[str, Any] | None = None
+               ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
         context = self._context(request, connection=connection, issuer_policies=issuer_policies)
         if self.records.standalone:
             allowed = {'paused', 'waiting_user', 'recovering', 'cancelled', 'timed_out', 'failed', 'succeeded'}
@@ -193,7 +197,9 @@ class EvidenceHandoffs:
             proof['completion_authorization'] = context['completion_authorization']
         return proof, [self._task(connection, child, link) for _source, child, link in reversed(links)], context
 
-    def _segments(self, connection: Any, context: dict, links: list, actor: dict) -> tuple[list, list]:
+    def _segments(self, connection: Any, context: dict[str, Any],
+                  links: list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]],
+                  actor: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         segments, tasks = [], [context['source']]
         for source, child, link in links:
             _manager(actor, source['owner'])
@@ -209,7 +215,8 @@ class EvidenceHandoffs:
                              **{key: evidence[key] for key in ('source_snapshot', 'snapshot', 'completion_snapshot')}})
         return segments, tasks
 
-    def _chain(self, connection: Any, root: str, identifier: str, *, issuing: bool) -> list[tuple[dict, dict, dict]]:
+    def _chain(self, connection: Any, root: str, identifier: str, *,
+               issuing: bool) -> list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]]:
         _identifier(identifier)
         chain, seen = [], {root}
         for _index in range(16):
@@ -228,7 +235,7 @@ class EvidenceHandoffs:
             identifier = source['id']
         raise AgentTaskError('handoff has no bounded real recovery chain to the original DAG source')
 
-    def _row(self, connection: Any, identifier: str, *, issuing: bool) -> dict:
+    def _row(self, connection: Any, identifier: str, *, issuing: bool) -> dict[str, Any]:
         if issuing:
             # pylint: disable-next=protected-access  # reason: keep ordinary task ownership before reading issuance evidence
             self.runtime._row(identifier)
@@ -237,7 +244,7 @@ class EvidenceHandoffs:
             _manager(_principal(), row['owner'])
         return row
 
-    def _task(self, connection: Any, row: dict, link: dict) -> dict:
+    def _task(self, connection: Any, row: dict[str, Any], link: dict[str, Any]) -> dict[str, Any]:
         completion = connection.execute('SELECT contract FROM agent_completion WHERE task_id=?',
                                         (row['id'],)).fetchone()
         return {'task_id': row['id'], 'state': row['state'],
@@ -247,7 +254,7 @@ class EvidenceHandoffs:
                                  'source_task': link['source_task'], 'snapshot': link['snapshot']}}}
 
     @staticmethod
-    def _projection(proof: dict) -> dict:
+    def _projection(proof: dict[str, Any]) -> dict[str, Any]:
         binding = proof['binding']
         result = {'contract': 1,
                 **{key: binding[key] for key in ('batch_id', 'node_id', 'source_task') if key in binding},
@@ -264,7 +271,7 @@ class EvidenceHandoffs:
                    for name in ('replaced_origins', 'retained_origins', 'current_origins')}}
         return result
 
-    def _load(self, connection: Any, identifier: str) -> tuple[dict, dict]:
+    def _load(self, connection: Any, identifier: str) -> tuple[dict[str, Any], dict[str, Any]]:
         _identifier(identifier)
         found = self.records.find(connection, identifier)
         if found is None:
@@ -285,14 +292,14 @@ class EvidenceHandoffs:
         return row, proof
 
     @staticmethod
-    def _audit_authority(proof: dict) -> None:
+    def _audit_authority(proof: dict[str, Any]) -> None:
         current = _principal()
         participants = (proof['issuer'], proof['binding']['owner'], proof['leaf_owner'])
         if current and current.get('role') != 'admin' and not any(
                 _identity(current) == _identity(actor) for actor in participants):
             raise AgentTaskError('handoff does not exist or belongs to another caller')
 
-    def _inspect(self, operation: str, request: dict) -> dict:
+    def _inspect(self, operation: str, request: dict[str, Any]) -> dict[str, Any]:
         with self.runtime.store.connection() as connection:
             if operation == 'get_handoff':
                 row, proof = self._load(connection, request['handoff_id'])
@@ -302,7 +309,7 @@ class EvidenceHandoffs:
             found = self.records.list(connection, context['binding'])
             return {'handoffs': [_public(dict(row)) for row in found]}
 
-    def _revoke(self, identifier: str) -> dict:
+    def _revoke(self, identifier: str) -> dict[str, Any]:
         with self.runtime.store.connection(write=True) as connection:
             row, proof = self._load(connection, identifier)
             self._audit_authority(proof)
@@ -312,7 +319,7 @@ class EvidenceHandoffs:
             row['state'] = 'revoked'
         return {'handoff': _public(row)}
 
-    def _active(self, connection: Any, row: dict) -> None:
+    def _active(self, connection: Any, row: dict[str, Any]) -> None:
         current, revoked = self.records.current(connection, row['id'])
         if current is None or current['state'] != 'active' or revoked or row['expires'] <= time.time():
             raise AgentTaskError('handoff is revoked or expired')
@@ -320,7 +327,7 @@ class EvidenceHandoffs:
             raise AgentTaskError('handoff evidence changed')
 
     def consume(self, batch_id: str, node_id: str, source_task: str, task_id: str, handoff_id: str,
-                *, connection: Any = None) -> tuple[dict, list]:
+                *, connection: Any = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """Read only completion projections for the exact private grant under the current batch owner."""
         request = {'batch_id': batch_id, 'node_id': node_id, 'source_task': source_task,
                    'task_id': task_id, 'handoff_id': handoff_id}
@@ -338,7 +345,8 @@ class EvidenceHandoffs:
         authority = HandoffPolicy(context['policy'], context.get('completion_authorization') is not None)
         return HandoffAccess(projection, rows, links, authority, self.witness, grant)
 
-    def _consume(self, request: dict, *, connection: Any = None) -> tuple[dict, list, dict]:
+    def _consume(self, request: dict[str, Any], *,
+                 connection: Any = None) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
         self._open()
         try:
             transaction = self.runtime.store.connection(write=True) if connection is None else nullcontext(connection)

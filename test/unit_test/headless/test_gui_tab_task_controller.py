@@ -7,6 +7,7 @@ stayed open after the tab was closed; and a result that arrived after its tab
 was destroyed had nowhere safe to go.
 """
 import functools
+import types
 import os
 import threading
 import time
@@ -512,9 +513,11 @@ class _SlowSdp:
         if self.fail is not None:
             raise self.fail
 
-    def create_session_offer(self):
+    def create_owned_session_offer(self):
         self._wait()
-        return "session-1", "v=0 offer"
+        retirement = types.SimpleNamespace(session_id="session-1",
+                                           stop=functools.partial(self.stop_session, "session-1"))
+        return types.SimpleNamespace(session_id="session-1", sdp="v=0 offer", retirement=retirement)
 
     def process_offer(self, offer_sdp, expected_dtls_fingerprint=None):
         self._wait()

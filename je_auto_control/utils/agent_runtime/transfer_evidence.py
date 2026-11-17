@@ -18,7 +18,7 @@ from je_auto_control.utils.agent_runtime.transfer_records import _text
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 
 
-def _summary(context: dict, identifier: str, source: str, task: str) -> dict:
+def _summary(context: dict[str, Any], identifier: str, source: str, task: str) -> dict[str, Any]:
     proof = context['proof']
     result = {'contract': 1, 'grant_id': identifier, 'source_task': source, 'task_id': task,
         'source_snapshot': context['source_snapshot'], 'completion_snapshot': context['completion_snapshot'],
@@ -30,12 +30,12 @@ def _summary(context: dict, identifier: str, source: str, task: str) -> dict:
     return portable_evidence(result, resolved=False)
 
 
-def _public(record: dict) -> dict:
+def _public(record: dict[str, Any]) -> dict[str, Any]:
     state = 'expired' if record['state'] == 'active' and record['expires'] <= time.time() else record['state']
     return {'grant_id': record['id'], 'state': state, 'summary': deepcopy(record['scope']['summary'])}
 
 
-def _bound_summary(context: dict, record: dict, expected: dict) -> dict:
+def _bound_summary(context: dict[str, Any], record: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
     if (expected['source_task'] != record['scope']['source_task'] or
             expected['submitted_spec_digest'] != context['submitted_spec_digest'] or
             expected['request_key_hash'] not in {item['key_hash'] for item in context['requests']}):
@@ -56,7 +56,7 @@ class RemoteEvidenceSource:
 
     def __init__(self, runtime: Any, records: Any, host: Any, checkpoint: Any) -> None:
         self.runtime, self.records, self.host, self.checkpoint = runtime, records, host, checkpoint
-        self.reviews: dict[str, dict] = {}
+        self.reviews: dict[str, dict[str, Any]] = {}
         self.initialized = False
 
     def _initialize(self) -> None:
@@ -65,7 +65,7 @@ class RemoteEvidenceSource:
                 self.records.initialize(connection)
             self.initialized = True
 
-    def control(self, operation: str, request: Mapping) -> dict:
+    def control(self, operation: str, request: Mapping[str, Any]) -> dict[str, Any]:
         """Review and manage finite source-owned grants without adding foreign task-read authority."""
         self.host.check_open()
         self.checkpoint()
@@ -95,12 +95,12 @@ class RemoteEvidenceSource:
                 row = self.records.find(connection, row['id'])
         return {'evidence': _public(row)}
 
-    def _manager(self, record: dict, actor: dict) -> None:
+    def _manager(self, record: dict[str, Any], actor: dict[str, Any]) -> None:
         if record['kind'] != 'evidence':
             raise AgentTaskError('identity does not select a portable evidence grant')
         self.host.managed(record['scope']['source_task'], actor)
 
-    def _review(self, request: dict, actor: dict) -> dict:
+    def _review(self, request: dict[str, Any], actor: dict[str, Any]) -> dict[str, Any]:
         _text(request['idempotency_key'], 256, 'idempotency key')
         if request['recipient_policy'] not in ('caller', 'source_owner'):
             raise AgentTaskError('evidence recipient must derive caller or original source owner')
@@ -123,8 +123,8 @@ class RemoteEvidenceSource:
         return {'review': review, 'digest': sha256(_canonical(summary)).hexdigest(), 'evidence': summary,
                 'review_expires': record['review_expires'], 'approval_required': True}
 
-    def _check(self, record: dict, *, connection: Any = None, issuing: bool = False,
-               checkpoint: Callable | None = None) -> dict:
+    def _check(self, record: dict[str, Any], *, connection: Any = None, issuing: bool = False,
+               checkpoint: Callable[[], None] | None = None) -> dict[str, Any]:
         check = self.checkpoint if checkpoint is None else checkpoint
         check()
         scope = record['scope']
@@ -159,7 +159,7 @@ class RemoteEvidenceSource:
             raise AgentTaskError('portable skill evidence recipient changed')
         return access
 
-    def _create(self, request: dict, actor: dict) -> dict:
+    def _create(self, request: dict[str, Any], actor: dict[str, Any]) -> dict[str, Any]:
         _hex(request['review'], 32)
         note = _text(request['note'], 4000, 'approval note')
         key = _text(request['idempotency_key'], 256, 'idempotency key')
@@ -183,7 +183,7 @@ class RemoteEvidenceSource:
             self._check(created, connection=connection, issuing=True)
         return {'evidence': _public(created)}
 
-    def resolve(self, grant_id: str, binding: Mapping) -> dict:
+    def resolve(self, grant_id: str, binding: Mapping[str, Any]) -> dict[str, Any]:
         """Revalidate one exact original accepted witness under the actual receiving account every time."""
         self.host.check_open()
         self.checkpoint()
@@ -224,7 +224,7 @@ class RemoteEvidenceSource:
 
 
 def resolve_remote_evidence(peer: Any, host: str, host_binding: str, grant_id: str,
-                            binding: Mapping, timeout: float = 30) -> dict:
+                            binding: Mapping[str, Any], timeout: float = 30) -> dict[str, Any]:
     """Resolve fresh authenticated evidence without interpreting foreign principals or local paths."""
     request = {'grant_id': grant_id, 'binding': evidence_binding(binding)}
     return peer.call(host, host_binding, 'evidence', request, timeout)

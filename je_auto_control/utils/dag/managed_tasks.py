@@ -41,7 +41,8 @@ def registered_transfer_binding(host: str) -> str:
     return host_fingerprint(*identity)
 
 
-def registered_host_transfer(host: str, binding: str, path: str, body: dict, timeout: float) -> dict:
+def registered_host_transfer(host: str, binding: str, path: str, body: dict[str, Any],
+                             timeout: float) -> dict[str, Any]:
     """Use only reviewed transfer routes with fresh pre/post host and local authorization checks."""
     if not isinstance(path, str) or path not in {'/agent/transfer', '/agent/transfer/peer'}:
         raise AgentTaskError('unavailable registered transfer route')
@@ -230,7 +231,8 @@ def _remote_connection(base: str, token: str) -> Call:
     return remote
 
 
-def _remote_json(url: str, *, body: dict | None = None, token: str, timeout: float, control: bool = False) -> dict:
+def _remote_json(url: str, *, body: dict[str, Any] | None = None, token: str, timeout: float,
+                 control: bool = False) -> dict[str, Any]:
     from je_auto_control.utils.agent_runtime.transport import request_json
     options: dict[str, Any] = {'body': body, 'token': token, 'timeout': timeout, 'control': control}
     if urlsplit(url).path.endswith(('/agent/transfer', '/agent/transfer/peer')):

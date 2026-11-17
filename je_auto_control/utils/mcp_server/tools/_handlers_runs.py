@@ -30,10 +30,12 @@ def stop_execution(run_id: Optional[str] = None, reason: str = "") -> Dict[str, 
     return {"stopped": _stop(str(run_id) if run_id else None, str(reason or ""))}
 
 
-def list_executions() -> List[Dict[str, Any]]:
-    """The stoppable runs in progress."""
+def list_executions(ctx: Any = None) -> List[Dict[str, Any]]:
+    """The stoppable runs in progress, other than the run of this MCP call itself."""
     from je_auto_control.utils.executor.run_control import active_executions
-    return active_executions()
+    own = getattr(ctx, "stop_token", None)
+    own_id = own.run_id if own is not None else None
+    return [run for run in active_executions() if run["run_id"] != own_id]
 
 
 def list_action_commands() -> List[str]:

@@ -11,7 +11,7 @@ element gets a fresh id.
 Pure-stdlib over plain element dicts (``x`` / ``y`` / ``width`` / ``height``), so it is
 fully unit-testable. Imports no ``PySide6``.
 """
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 from je_auto_control.utils.element_parse import iou
 
@@ -27,7 +27,7 @@ def match_elements(before: Sequence[Element], after: Sequence[Element], *,
     unmatched ``after`` element is *added*.
     """
     after = list(after)
-    taken: set = set()
+    taken: Set[int] = set()
     matched: List[Dict[str, Any]] = []
     removed: List[Element] = []
     for element in before:
@@ -75,7 +75,7 @@ def assign_stable_ids(elements: Sequence[Element],
     result: List[Element] = []
     # Each prior id is inherited once: two elements overlapping the same
     # prior element both took its id, so "stable" ids repeated.
-    used: set = set()
+    used: Set[int] = set()
     for element in elements:
         available = [p for p in prior if "id" in p and int(p["id"]) not in used]
         match = _best_prior(element, available, float(iou_threshold))

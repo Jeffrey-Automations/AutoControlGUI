@@ -175,7 +175,7 @@ def finish_agent_task(task_id: str) -> dict[str, Any]:
     return _task_call("finish", task_id)
 
 
-def _task_call(operation: str, task_id: str, extra: dict | None = None) -> dict[str, Any]:
+def _task_call(operation: str, task_id: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
     client = AgentRuntimeClient()
     try:
         return client.call(operation, {"task_id": task_id, **(extra or {})})

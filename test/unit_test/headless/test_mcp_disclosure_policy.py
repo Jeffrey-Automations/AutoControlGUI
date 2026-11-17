@@ -24,7 +24,7 @@ def test_async_call_keeps_the_callers_role_session_and_roots(tmp_path):
         return {"role": current_authorization().role, "session": ctx.session_id,
                 "same_policy": ctx.path_policy is policy}
 
-    server = MCPServer(tools=[MCPTool("fixture", "Inspect authority", {}, inspect,
+    server = MCPServer(tools=[MCPTool("ac_screen_size", "Inspect authority", {}, inspect,
                                      MCPToolAnnotations(read_only=True))])
     server.argument_policy = ArgumentPolicy(PathPolicy(use_client_roots=True))
     replies = []
@@ -33,7 +33,7 @@ def test_async_call_keeps_the_callers_role_session_and_roots(tmp_path):
             policy = server._active_argument_policy.path_policy
             policy.set_client_roots([tmp_path])
             assert server.handle_line(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                                                  "params": {"name": "fixture"}})) is None
+                                                  "params": {"name": "ac_screen_size"}})) is None
     server._join_workers()
     value = json.loads(json.loads(replies[0])["result"]["content"][0]["text"])
     assert value == {"role": "viewer", "session": server._agent_session + ":first", "same_policy": True}

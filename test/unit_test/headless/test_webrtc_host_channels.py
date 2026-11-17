@@ -394,12 +394,16 @@ def test_disabling_a_mic_that_was_never_enabled_is_a_no_op(host):
     assert host._mic_receiver is None
 
 
-def test_a_mic_that_fails_to_close_is_still_forgotten(host):
+def test_a_mic_that_fails_to_close_is_retained_and_reported(host):
+    # Since U-20261111-32 a failed close keeps its original owner instead of
+    # forgetting it (docs/media_retirement_contract.md).
     receiver = MicReceiver()
     receiver.stop_error = OSError("stream already closed")
     host._mic_receiver = receiver
-    host.disable_mic_receive()
-    assert host._mic_receiver is None
+    with pytest.raises(OSError, match="stream already closed"):
+        host.disable_mic_receive()
+    assert host._mic_receiver is receiver
+    assert host.media_failures
 
 
 # --- the files channel --------------------------------------------------------

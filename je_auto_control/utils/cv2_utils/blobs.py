@@ -8,7 +8,7 @@ no ``PySide6``.
 from typing import Any, Dict, List, Tuple
 
 
-def connected_boxes(mask, min_area: int = 1, *,
+def connected_boxes(mask: Any, min_area: int = 1, *,
                     origin: Tuple[int, int] = (0, 0)) -> List[Dict[str, Any]]:
     """Return ``{x, y, width, height, area, center}`` per blob, largest first.
 

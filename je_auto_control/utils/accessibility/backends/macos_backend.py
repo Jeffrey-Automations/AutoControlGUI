@@ -4,7 +4,7 @@ Requires Accessibility permission for the Python interpreter (System
 Settings → Privacy & Security → Accessibility). Enumerates the frontmost
 application's window tree, or a specific ``app_name``.
 """
-from typing import List, Optional
+from typing import Any, List, Optional, Tuple
 
 from je_auto_control.utils.accessibility.backends.base import (
     AccessibilityBackend,
@@ -98,7 +98,7 @@ class MacOSAccessibilityBackend(AccessibilityBackend):
             return None
         return _convert_ax(ax_module, element, name, pid)
 
-    def _walk(self, ax_module, element, app_name: str, pid: int,
+    def _walk(self, ax_module: Any, element: Any, app_name: str, pid: int,
               results: List[AccessibilityElement], max_results: int) -> None:
         if len(results) >= max_results:
             return
@@ -116,7 +116,7 @@ class MacOSAccessibilityBackend(AccessibilityBackend):
             self._walk(ax_module, child, app_name, pid, results, max_results)
 
 
-def _convert_ax(ax_module, element, app_name: str, pid: int,
+def _convert_ax(ax_module: Any, element: Any, app_name: str, pid: int,
                 ) -> Optional[AccessibilityElement]:
     try:
         _err, role = ax_module.AXUIElementCopyAttributeValue(
@@ -143,7 +143,7 @@ def _convert_ax(ax_module, element, app_name: str, pid: int,
     )
 
 
-def _extract_bounds(position, size, ax_module=None) -> tuple:
+def _extract_bounds(position: Any, size: Any, ax_module: Any = None) -> Tuple[int, int, int, int]:
     """``(x, y, width, height)`` from ``AXPosition`` / ``AXSize``; zeros when unreadable.
 
     The attributes come back as opaque ``AXValueRef`` objects, not pairs:
@@ -157,7 +157,7 @@ def _extract_bounds(position, size, ax_module=None) -> tuple:
     return (int(point[0]), int(point[1]), int(extent[0]), int(extent[1]))
 
 
-def _ax_pair(ax_module, value, value_type: str, fields: tuple) -> Optional[tuple]:
+def _ax_pair(ax_module: Any, value: Any, value_type: str, fields: Tuple[str, ...]) -> Optional[Tuple[float, ...]]:
     """Two numbers out of an ``AXValue`` (or a plain pair); ``None`` when unreadable."""
     if value is None:
         return None

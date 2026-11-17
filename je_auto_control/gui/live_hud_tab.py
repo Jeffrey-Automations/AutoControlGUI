@@ -1,16 +1,19 @@
 """Live HUD: mouse position, pixel colour under cursor and log tail."""
-from typing import Optional
+from typing import Callable, Optional
 
 import logging
 import threading
+import weakref
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QHideEvent, QShowEvent
 from PySide6.QtWidgets import (
     QGroupBox, QLabel, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.surfaces import Card
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -20,6 +23,17 @@ from je_auto_control.utils.watcher.watcher import LogTail, MouseWatcher, PixelWa
 
 def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
+
+
+class _WeakFilter:
+    """A logging filter that calls a method without keeping its object alive; a record passes once it is gone."""
+
+    def __init__(self, method: Callable[[logging.LogRecord], bool]) -> None:
+        self._method = weakref.WeakMethod(method)
+
+    def __call__(self, record: logging.LogRecord) -> bool:
+        method = self._method()
+        return True if method is None else method(record)
 
 
 class LiveHUDTab(TranslatableMixin, QWidget):
@@ -35,7 +49,10 @@ class LiveHUDTab(TranslatableMixin, QWidget):
         # at 4 ticks a second they were every line in the pane.
         self._sampling = False
         self._gui_thread = threading.get_ident()
-        self._log_tail.addFilter(self._not_own_sampling)
+        # Held weakly: the tail outlives the tab on the global logger, and the closure
+        # connected to ``destroyed`` below reaches the tail, so a strong filter kept the
+        # tab alive until Qt's teardown released it -- and deleted it a second time.
+        self._log_tail.addFilter(_WeakFilter(self._not_own_sampling))
         self._pos_suffix = " --"
         self._color_suffix = " --"
         self._pos_label = QLabel()
@@ -72,6 +89,7 @@ class LiveHUDTab(TranslatableMixin, QWidget):
         # Start/stop/clear commands run from the Actions menu; the tab
         # keeps only the watcher labels and the log view.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         status_group = self._tr(QGroupBox(), "hud_watchers_group")
         status_layout = QVBoxLayout()
         status_layout.addWidget(self._pos_label)
@@ -79,10 +97,12 @@ class LiveHUDTab(TranslatableMixin, QWidget):
         status_group.setLayout(status_layout)
         root.addWidget(status_group)
 
-        root.addWidget(self._tr(QLabel(), "hud_recent_log"))
-        root.addWidget(self._log_view, stretch=1)
+        log_card = Card()
+        log_card.add(self._tr(QLabel(), "hud_recent_log"))
+        log_card.add(self._log_view, stretch=1)
+        root.addWidget(log_card, stretch=1)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("hud_start", self._start),
@@ -126,11 +146,11 @@ class LiveHUDTab(TranslatableMixin, QWidget):
     # The HUD samples the cursor and a pixel four times a second only while
     # it is on screen: a closed or switched-away tab kept polling. The log
     # tail stays attached, so lines logged meanwhile are there on return.
-    def hideEvent(self, event) -> None:  # noqa: N802  # reason: Qt override
+    def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802  # reason: Qt override
         self._timer.stop()
         super().hideEvent(event)
 
-    def showEvent(self, event) -> None:  # noqa: N802  # reason: Qt override
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802  # reason: Qt override
         if self._running:
             self._timer.start()
         super().showEvent(event)

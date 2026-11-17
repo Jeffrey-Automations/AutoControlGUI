@@ -15,7 +15,7 @@ import sys
 import threading
 import uuid
 from dataclasses import dataclass, field
-from typing import Callable, Dict, FrozenSet, List, Optional, Tuple
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.json.json_file import read_executable_action_json
@@ -72,7 +72,7 @@ def split_combo(combo: str) -> Tuple[FrozenSet[str], str]:
     parts = [p.strip().lower() for p in combo.split("+") if p.strip()]
     if not parts:
         raise ValueError(f"invalid hotkey combo: {combo!r}")
-    mods: set = set()
+    mods: Set[str] = set()
     key_part: Optional[str] = None
     for part in parts:
         if part in _MODIFIER_NAMES:
@@ -140,7 +140,7 @@ class HotkeyDaemon:
     """Register OS-level hotkeys and run their action JSON on trigger."""
 
     def __init__(self,
-                 executor: Optional[Callable[[list], object]] = None) -> None:
+                 executor: Optional[Callable[[List[Any]], object]] = None) -> None:
         from je_auto_control.utils.executor.action_executor import execute_action
         self._execute = executor or execute_action
         self._bindings: Dict[str, HotkeyBinding] = {}

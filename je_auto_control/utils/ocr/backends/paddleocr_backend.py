@@ -13,11 +13,14 @@ heavy machine).
 from __future__ import annotations
 
 from threading import Lock
-from typing import Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from je_auto_control.utils.ocr.backends.base import (
     OCRBackendNotAvailableError,
 )
+
+if TYPE_CHECKING:  # pragma: no cover
+    from je_auto_control.utils.ocr.ocr_engine import TextMatch
 
 
 _paddle = None
@@ -25,7 +28,7 @@ _readers: Dict[str, object] = {}
 _reader_lock = Lock()
 
 
-def _load():
+def _load() -> Any:
     """Lazily import paddleocr. Raises a clear error if missing."""
     global _paddle
     if _paddle is not None:
@@ -59,7 +62,7 @@ def _resolve_lang(lang: str) -> str:
     return PADDLEOCR_LANG.get(lang, lang or "en")
 
 
-def _get_reader(lang: str):
+def _get_reader(lang: str) -> Any:
     """Build + cache one PaddleOCR Reader per language."""
     code = _resolve_lang(lang)
     with _reader_lock:
@@ -76,7 +79,7 @@ def _get_reader(lang: str):
         return reader
 
 
-def _entry_to_match(entry, threshold: float):
+def _entry_to_match(entry: Any, threshold: float) -> Optional[TextMatch]:
     """Convert one PaddleOCR row into a ``TextMatch`` or ``None`` to skip."""
     from je_auto_control.utils.ocr.ocr_engine import TextMatch
     if not entry or len(entry) < 2:
@@ -116,8 +119,8 @@ class PaddleOCRBackend:
     def available(self) -> bool:
         return self._available
 
-    def image_to_matches(self, image, lang: str,
-                         min_confidence: float) -> List:
+    def image_to_matches(self, image: Any, lang: str,
+                         min_confidence: float) -> List[TextMatch]:
         import numpy as np
 
         reader = _get_reader(lang)

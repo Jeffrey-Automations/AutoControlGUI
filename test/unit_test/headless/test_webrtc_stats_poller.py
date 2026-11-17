@@ -237,4 +237,4 @@ def test_stopping_a_poller_that_never_started_is_harmless():
     poller = StatsPoller(_PeerConnection(), lambda snap: None)
     poller.stop()
     assert poller._stopped is True
-    assert poller._task is None
+    assert poller._future is None

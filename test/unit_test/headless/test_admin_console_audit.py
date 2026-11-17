@@ -91,7 +91,7 @@ def test_a_dripping_host_is_cut_off_at_the_timeout(console):
 
 def test_an_unknown_label_is_reported(console):
     rows = console.broadcast_execute([["AC_screen_size"]], labels=["typo-host"])
-    assert rows == [{"label": "typo-host", "ok": False, "error": "unknown host"}]
+    assert rows == [{"label": "typo-host", "ok": False, "sent": False, "error": "unknown host"}]
 
 
 def test_a_whitespace_label_is_refused(console):

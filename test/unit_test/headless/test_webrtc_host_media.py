@@ -17,6 +17,9 @@ and `_Host` supplies exactly the list the mixin's own docstring asks for.
 """
 import asyncio
 import types
+import threading
+
+from je_auto_control.utils.remote_desktop.webrtc_media_owners import PeerMediaOwners
 
 import pytest
 
@@ -28,7 +31,12 @@ from je_auto_control.utils.remote_desktop.webrtc_host_media import (
 
 class _Bridge:
     def call_soon(self, callback):
-        callback()
+        async def drive():
+            callback()
+            pending = asyncio.all_tasks() - {asyncio.current_task()}
+            if pending:
+                await asyncio.gather(*pending)
+        asyncio.run(drive())
 
 
 class _Receiver:
@@ -71,12 +79,22 @@ class _Task:
     def cancel(self):
         self.cancelled = True
 
+    def done(self):
+        return self.cancelled
+
+    def __await__(self):
+        async def finish():
+            return None
+        return finish().__await__()
+
 
 class _Host(MediaNegotiationMixin):
     """A host with exactly the attributes the mixin's docstring asks for."""
 
     def __init__(self, pc=None, config=None):
         self._pc = pc
+        self._closed = threading.Event()
+        self._media_owners = PeerMediaOwners()
         self._config = config or _Config()
         self._viewer_video_task = None
         self._opus_audio_receiver = None
@@ -238,16 +256,17 @@ def test_disabling_viewer_audio_deactivates_and_stops_the_receiver():
     assert host._opus_audio_receiver is None
 
 
-def test_a_receiver_that_throws_on_stop_is_still_dropped():
+def test_a_receiver_that_throws_on_stop_remains_owned():
     class _Opus:
         def stop(self):
             raise OSError("already gone")
 
     host = _Host(_PeerConnection(_Transceiver("audio")),
                  _Config(accept_viewer_audio_opus=True))
-    host._opus_audio_receiver = _Opus()
-    host.disable_accept_viewer_audio_opus()
-    assert host._opus_audio_receiver is None
+    receiver = host._opus_audio_receiver = _Opus()
+    with pytest.raises(OSError):
+        host.disable_accept_viewer_audio_opus()
+    assert host._opus_audio_receiver is receiver
 
 
 # === Re-subscribing after a renegotiation ===================================

@@ -6,7 +6,7 @@ runs off the GUI thread as a stoppable executor run, one at a time.
 """
 import functools
 import json
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask, was_stopped
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -25,6 +27,7 @@ import je_auto_control as ac
 from je_auto_control.utils.quarantine import (
     auto_quarantine_from_flakiness, default_quarantine_store,
 )
+from je_auto_control.utils.test_suite import TestSuiteResult
 
 _COLS = ("suite_col_case", "suite_col_status", "suite_col_time",
          "suite_col_message")
@@ -73,12 +76,13 @@ class TestSuiteTab(TranslatableMixin, QWidget):
         # Load/run/export and quarantine commands run from the Actions
         # menu; the tab keeps only the spec editor, tables, and summary.
         root = QVBoxLayout(self)
-        root.addWidget(QLabel(_t("suite_spec_label")))
-        root.addWidget(self._spec, stretch=1)
-        root.addWidget(self._table, stretch=2)
-        root.addWidget(self._summary)
-        root.addWidget(QLabel(_t("suite_q_label")))
-        root.addWidget(self._quarantine)
+        root.setSpacing(12)
+        root.addWidget(Card("suite_spec_label").add(self._spec, stretch=1), stretch=1)
+        self._summary.setWordWrap(True)
+        set_role(self._summary, "hint")
+        results = Card().add(self._table, stretch=1).add(self._summary)
+        quarantine = Card("suite_q_label").add(self._quarantine, stretch=1)
+        root.addWidget(ResponsiveBox(results, quarantine, stretches=(2, 1)), stretch=2)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: the command still running in the background.
@@ -88,7 +92,7 @@ class TestSuiteTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("suite_load_file", self._on_load_file),
@@ -101,7 +105,7 @@ class TestSuiteTab(TranslatableMixin, QWidget):
             ("suite_q_clear", self._on_clear_quarantine),
         ]
 
-    def _parse_spec(self):
+    def _parse_spec(self) -> Any:
         return json.loads(self._spec.toPlainText() or "{}")
 
     def _on_load_file(self) -> None:
@@ -142,7 +146,7 @@ class TestSuiteTab(TranslatableMixin, QWidget):
             return
         self._summary.setText(_t("suite_error").replace("{error}", str(error)))
 
-    def _render_result(self, result) -> None:
+    def _render_result(self, result: TestSuiteResult) -> None:
         self._table.setRowCount(len(result.cases))
         for row, case in enumerate(result.cases):
             values = (case.name, case.status, f"{case.duration_s:.3f}s",

@@ -21,7 +21,7 @@ Scope (pure standard library — no ``freezegun`` dependency):
 Imports no ``PySide6``.
 """
 import random
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 from unittest import mock
 
 _UNSET = object()
@@ -60,7 +60,7 @@ class DeterministicRun:
                              else float(freeze_time))
         self._rng_state: Any = _UNSET
         self._numpy_state: Any = None
-        self._patches: list = []
+        self._patches: List[Any] = []
 
     @property
     def seed(self) -> int:

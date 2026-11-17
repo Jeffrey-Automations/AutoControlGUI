@@ -1,4 +1,6 @@
 """Real native state-machine refusals must not silently switch to an independently privileged CLI."""
+from je_auto_control.linux_wayland import ei_default
+
 from unittest.mock import MagicMock
 import asyncio
 from concurrent.futures import CancelledError
@@ -43,7 +45,7 @@ def test_cancelled_portal_stops_every_layer_and_remains_blocked_without_another_
     portal = FakeOeffis(events=[event], error=b'operator refused the request')
     backend = libei.LibeiBackend(symbols=native,
                                 portal_connect=lambda: oeffis.connect_eis_fd(symbols=portal))
-    monkeypatch.setattr(libei, 'LibeiBackend', lambda: backend)
+    monkeypatch.setattr(ei_default, '_new_default_backend', lambda: backend)
     monkeypatch.setenv('JE_AUTOCONTROL_WAYLAND_INPUT_BACKEND', forced)
     commands = capture_cli(monkeypatch)
     execute = (lambda: keyboard.press_key(28)) if operation == 'key' else (lambda: mouse.set_position(20, 30))
@@ -60,7 +62,7 @@ def test_cancelled_portal_stops_every_layer_and_remains_blocked_without_another_
 @pytest.mark.parametrize('operation', ['key', 'pointer', 'chord'])
 def test_revoked_or_paused_native_devices_cannot_send_via_the_cli(monkeypatch, event, operation):
     backend, native = _connected(session=MagicMock())
-    monkeypatch.setattr(libei, '_DEFAULT_BACKEND', backend)
+    monkeypatch.setattr(ei_default, '_DEFAULT_BACKEND', backend)
     device = POINTER_DEVICE if operation == 'pointer' else KEYBOARD_DEVICE
     native.pending = [(event, device)]
     commands = capture_cli(monkeypatch)
@@ -122,7 +124,7 @@ def test_an_explicit_cli_choice_can_follow_a_portal_refusal_without_reopening_it
     portal = FakeOeffis(events=[oeffis.OEFFIS_EVENT_CLOSED])
     backend = libei.LibeiBackend(symbols=FakeLibei(),
                                 portal_connect=lambda: oeffis.connect_eis_fd(symbols=portal))
-    monkeypatch.setattr(libei, 'LibeiBackend', lambda: backend)
+    monkeypatch.setattr(ei_default, '_new_default_backend', lambda: backend)
     commands = capture_cli(monkeypatch)
     with pytest.raises(libei.LibeiUnavailable) as caught:
         keyboard.press_key(28)
@@ -138,7 +140,7 @@ def test_explicit_reset_allows_a_fresh_portal_grant_and_native_input(monkeypatch
     portal = FakeOeffis(events=[oeffis.OEFFIS_EVENT_CLOSED])
     backend = libei.LibeiBackend(symbols=FakeLibei(),
                                 portal_connect=lambda: oeffis.connect_eis_fd(symbols=portal))
-    monkeypatch.setattr(libei, 'LibeiBackend', lambda: backend)
+    monkeypatch.setattr(ei_default, '_new_default_backend', lambda: backend)
     commands = capture_cli(monkeypatch)
     with pytest.raises(libei.LibeiUnavailable):
         keyboard.press_key(28)
@@ -153,7 +155,7 @@ def test_explicit_reset_allows_a_fresh_portal_grant_and_native_input(monkeypatch
 @pytest.mark.parametrize('kind', ['pause', 'remove'])
 def test_native_device_resume_or_replacement_can_restore_the_same_live_session(monkeypatch, kind):
     backend, native = _connected()
-    monkeypatch.setattr(libei, '_DEFAULT_BACKEND', backend)
+    monkeypatch.setattr(ei_default, '_DEFAULT_BACKEND', backend)
     commands = capture_cli(monkeypatch)
     event = libei.EI_EVENT_DEVICE_PAUSED if kind == 'pause' else libei.EI_EVENT_DEVICE_REMOVED
     native.pending = [(event, KEYBOARD_DEVICE)]
@@ -193,7 +195,7 @@ def test_portal_timeout_remains_a_permission_refusal_not_a_cli_request(monkeypat
     portal = FakeOeffis()
     backend = libei.LibeiBackend(symbols=FakeLibei(),
                                 portal_connect=lambda: oeffis.connect_eis_fd(symbols=portal, timeout=0))
-    monkeypatch.setattr(libei, 'LibeiBackend', lambda: backend)
+    monkeypatch.setattr(ei_default, '_new_default_backend', lambda: backend)
     commands = capture_cli(monkeypatch)
     with pytest.raises(libei.LibeiUnavailable) as caught:
         keyboard.press_key(28)
@@ -207,7 +209,7 @@ def test_incomplete_native_handshake_stops_and_closes_its_portal_session(monkeyp
     backend = libei.LibeiBackend(symbols=FakeLibei(events=[]), portal_connect=lambda: (7, session))
     connect = backend.connect
     monkeypatch.setattr(backend, 'connect', lambda: connect(timeout=0))
-    monkeypatch.setattr(libei, 'LibeiBackend', lambda: backend)
+    monkeypatch.setattr(ei_default, '_new_default_backend', lambda: backend)
     commands = capture_cli(monkeypatch)
     for _ in range(2):
         with pytest.raises(libei.LibeiUnavailable) as caught:
@@ -231,7 +233,7 @@ def test_native_failure_after_a_portal_grant_cannot_select_cli(monkeypatch, phas
     else:
         native.ei_dispatch = MagicMock(side_effect=(OSError('controlled dispatch failure') if failure == 'exception'
                                                    else libei.LibeiUnavailable('controlled protocol failure')))
-    monkeypatch.setattr(libei, 'LibeiBackend', lambda: backend)
+    monkeypatch.setattr(ei_default, '_new_default_backend', lambda: backend)
     commands = capture_cli(monkeypatch)
     for _ in range(2):
         with pytest.raises(libei.LibeiUnavailable) as caught:

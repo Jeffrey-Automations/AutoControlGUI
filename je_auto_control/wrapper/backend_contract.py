@@ -48,14 +48,21 @@ __all__ = ["DarwinKeyboardBackend", "DarwinMouseBackend", "KeyboardBackend",
            "Win32MouseBackend", "X11UnixKeyboardBackend",
            "X11UnixMouseBackend"]
 
-#: 一顆滑鼠鍵在**當前平台**的代碼。X11／Wayland／macOS 是 int，Windows 是
-#: 三個 Win32 事件旗標組成的 tuple——這是 `mouse_keys_table` 的值型別，也是
-#: `press_mouse` 之類的函式收下與回傳的東西。
+#: 一顆滑鼠鍵在**當前平台**的代碼。X11／Wayland 是 int，macOS 是字串
+#: （``"Left"``），Windows 是三個 Win32 事件旗標組成的 tuple——這是
+#: `mouse_keys_table` 的值型別，也是 `press_mouse` 之類的函式收下與回傳的東西。
+#: 用字面的 ``sys.platform`` 比較，因為 mypy 只認得這種寫法來分平台。
 #:
-#: One mouse button as *this* platform spells it: an int on X11, Wayland and
-#: macOS, a tuple of three Win32 event flags on Windows. Named rather than
-#: written as a bare ``Any`` so a signature says which kind of unknown it is.
-MouseKeycode = Any
+#: One mouse button as *this* platform spells it: an int on X11 and Wayland, a
+#: string on macOS (``"Left"``), a tuple of three Win32 event flags on Windows.
+#: Spelt with literal ``sys.platform`` checks, the only form mypy reads per
+#: platform; ``platform_id.is_windows`` stays the run-time decision.
+if sys.platform == "win32" or sys.platform == "cygwin" or sys.platform == "msys":
+    MouseKeycode = Tuple[int, int, int]
+elif sys.platform == "darwin":
+    MouseKeycode = str
+else:
+    MouseKeycode = int
 
 
 class ScreenBackend(Protocol):
@@ -178,15 +185,15 @@ class DarwinMouseBackend(Protocol):
     def set_position(self, x: int, y: int) -> None:
         """Move the cursor to a point on the desktop."""
 
-    def press_mouse(self, x: int, y: int, mouse_button: int,
+    def press_mouse(self, x: int, y: int, mouse_button: str,
                     click_count: int = 1) -> None:
         """Hold a button down at a point; ``click_count`` as in ``click_mouse``."""
 
-    def release_mouse(self, x: int, y: int, mouse_button: int,
+    def release_mouse(self, x: int, y: int, mouse_button: str,
                       click_count: int = 1) -> None:
         """Let a button up at a point; ``click_count`` as in ``click_mouse``."""
 
-    def click_mouse(self, x: int, y: int, mouse_button: int,
+    def click_mouse(self, x: int, y: int, mouse_button: str,
                     click_count: int = 1) -> None:
         """Press and release a button at a point.
 

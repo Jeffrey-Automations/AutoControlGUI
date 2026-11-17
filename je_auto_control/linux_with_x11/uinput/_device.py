@@ -210,7 +210,7 @@ def emit(ev_type: int, code: int, value: int, *, sync: bool = True) -> None:
         os.write(fd, _pack_input_event(EV_SYN, SYN_REPORT, 0))
 
 
-def emit_combo(events: list, *, sync: bool = True) -> None:
+def emit_combo(events: list[tuple[int, int, int]], *, sync: bool = True) -> None:
     """Write a batch of (type, code, value) events, then SYN_REPORT."""
     fd = _ensure_fd()
     for ev_type, code, value in events:

@@ -86,7 +86,7 @@ class TransferImportLedger:
         connection.execute('UPDATE agent_transfer_deliveries SET ceilings=? WHERE id=?',
                            (json.dumps(ceilings), identifier))
 
-    def read(self, connection: Any, identifier: str) -> dict:
+    def read(self, connection: Any, identifier: str) -> dict[str, Any]:
         """Read only a real delivery associated with an accepted local import."""
         row = connection.execute('SELECT * FROM agent_transfer_deliveries WHERE id=?', (identifier,)).fetchone()
         if row is None:
@@ -121,7 +121,7 @@ class TransferImportLedger:
             connection.execute("UPDATE agent_transfer_deliveries SET claim=?,state='receiving',updated=? WHERE id=?",
                                (item.claim, time.time(), item.reference))
 
-    def check(self, connection: Any, identifier: str, generation: int) -> dict:
+    def check(self, connection: Any, identifier: str, generation: int) -> dict[str, Any]:
         """Refuse a retired generation or any delivery whose exact queue performer lost its claim."""
         row = self.read(connection, identifier)
         queue = connection.execute('SELECT status,claim,reference FROM work_items WHERE id=? AND queue=?',
@@ -134,7 +134,7 @@ class TransferImportLedger:
         return row
 
     def advance(self, connection: Any, identifier: str, generation: int, state: str, *,
-                publication: dict | None = None, files_directory: str = '') -> None:
+                publication: dict[str, Any] | None = None, files_directory: str = '') -> None:
         """Record a verified phase only while the same generation and queue claim remain authoritative."""
         if state not in {'receiving', 'verified', 'published', 'requires_review', 'expired'}:
             raise AgentTaskError('invalid destination import transition')
@@ -143,7 +143,7 @@ class TransferImportLedger:
                            'WHERE id=?', (state, json.dumps(row['publication'] if publication is None else publication),
                                          files_directory, time.time(), identifier))
 
-    def staging_retired(self, connection: Any, identifier: str, witness: dict) -> None:
+    def staging_retired(self, connection: Any, identifier: str, witness: dict[str, Any]) -> None:
         """Acknowledge only a previously journaled allocation's cleanup without granting a delivery generation."""
         row = self.read(connection, identifier)
         publication = row['publication']

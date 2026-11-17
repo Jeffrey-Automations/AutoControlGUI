@@ -19,8 +19,8 @@ from je_auto_control.utils.preprocess.preprocess import _as_uint8
 from je_auto_control.utils.visual_match.visual_match import (
     _contain_cv2_error, _haystack_gray_with_origin, _to_screen,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 _CANNY_LOW = 50
 _CANNY_HIGH = 150
 # Hough accumulator votes a segment needs, bounded around min_length / 2.
@@ -37,7 +37,7 @@ def _orientation(angle: float) -> str:
     return "diagonal"
 
 
-def _segments(gray, min_length: int, max_gap: int):
+def _segments(gray: Any, min_length: int, max_gap: int) -> Any:
     import cv2
     import numpy as np
     # Canny takes 8-bit only: a 16-bit or float image raised cv2.error.

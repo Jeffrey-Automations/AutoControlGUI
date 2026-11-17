@@ -10,7 +10,7 @@ from je_auto_control.utils.rbac.authorization import AuthorizationContext, autho
 
 def catalog():
     return [
-        MCPTool("ac_read", "Read a document", {"type": "object"}, lambda: None,
+        MCPTool("ac_screen_size", "Read document screen size", {"type": "object"}, lambda: None,
                 MCPToolAnnotations(read_only=True)),
         MCPTool("ac_click", "Click a document", {"type": "object"}, lambda: None),
         MCPTool("ac_agent_target", "Register host target", {"type": "object"}, lambda: None),
@@ -21,7 +21,7 @@ def test_search_returns_summary_not_full_schema():
     from je_auto_control.utils.mcp_server.discovery import ToolIndex
     index = ToolIndex(catalog())
     results = index.search("document")
-    assert {item["name"] for item in results} == {"ac_read", "ac_click"}
+    assert {item["name"] for item in results} == {"ac_screen_size", "ac_click"}
     assert all("inputSchema" not in item and "capability" in item and "category" in item for item in results)
 
 
@@ -29,7 +29,7 @@ def test_only_authorized_tools_are_indexed():
     from je_auto_control.utils.mcp_server.discovery import ToolIndex
     index = ToolIndex(catalog())
     with authorization_scope(AuthorizationContext("reader", "viewer")):
-        assert [item["name"] for item in index.search("")] == ["ac_read"]
+        assert [item["name"] for item in index.search("")] == ["ac_screen_size"]
         with pytest.raises(ToolDiscoveryError, match="not available"):
             index.get_schema("ac_click")
     with authorization_scope(AuthorizationContext("driver", "operator")):
@@ -41,11 +41,11 @@ def test_schema_lookup_is_single_tool_and_detached():
     tools = catalog()
     index = ToolIndex(tools)
     tools[0].input_schema["changed"] = True
-    descriptor = index.get_schema("ac_read")
-    assert descriptor["name"] == "ac_read"
+    descriptor = index.get_schema("ac_screen_size")
+    assert descriptor["name"] == "ac_screen_size"
     assert "changed" not in descriptor["inputSchema"]
     descriptor["inputSchema"]["corrupt"] = True
-    assert "corrupt" not in index.get_schema("ac_read")["inputSchema"]
+    assert "corrupt" not in index.get_schema("ac_screen_size")["inputSchema"]
     assert index.snapshot_id == ToolIndex(catalog()).snapshot_id
     assert index.snapshot_id != ToolIndex(tools).snapshot_id
 
@@ -103,7 +103,7 @@ def test_queries_refresh_a_store_backed_role(tmp_path):
         with pytest.raises(AuthorizationError):
             index.search("")
         with pytest.raises(AuthorizationError):
-            index.get_schema("ac_read")
+            index.get_schema("ac_screen_size")
 
 
 def test_schema_discovery_does_not_bypass_the_argument_root_policy(tmp_path):

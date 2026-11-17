@@ -188,13 +188,45 @@ def test_another_thread_and_a_thread_started_by_the_run_are_not_observed(runner)
     assert [entry[0] for entry in seen] == ["AC_fake_spawn"]
 
 
-def test_a_parallel_branch_runs_on_its_own_thread_and_is_not_reported(runner):
+def test_a_parallel_branch_reports_under_its_step_with_its_index_as_run(runner):
     seen, hook = _recorder()
     record = execute_action(
-        [["AC_parallel", {"branches": [[["AC_get_var", {"name": "missing", "default": 5}]]]}]],
+        [["AC_parallel", {"branches": [[["AC_get_var", {"name": "missing", "default": 5}]],
+                                       [["AC_get_var", {"name": "missing", "default": 6}]]]}]],
         result_callback=hook)
-    assert [entry[0] for entry in seen] == ["AC_parallel"]
-    assert seen[0][2] is list(record.values())[0], "what the branch answered is in the block's result"
+    branch = {entry[2]: entry[3] for entry in seen if entry[0] == "AC_get_var"}
+    step = StepPosition(1, 1, "AC_parallel")
+    assert branch == {5: (step, StepPosition(1, 1, "AC_get_var")),
+                      6: (step, StepPosition(2, 1, "AC_get_var"))}
+    assert seen[-1][0] == "AC_parallel" and seen[-1][3] == (step,)
+    assert seen[-1][2] is list(record.values())[0], "what the branches answered is in the block's result"
+
+
+def test_parallel_branches_never_enter_the_callback_at_once(runner):
+    inside, overlaps = [0], []
+    gate = threading.Lock()
+
+    def hook(command, arguments, result, path):
+        with gate:
+            inside[0] += 1
+            overlaps.append(inside[0])
+        threading.Event().wait(0.02)   # long enough for another branch to arrive
+        with gate:
+            inside[0] -= 1
+
+    branches = [[["AC_get_var", {"name": "missing", "default": index}]] for index in range(4)]
+    execute_action([["AC_parallel", {"branches": branches}]], result_callback=hook)
+    assert len(overlaps) == 5, "four branch commands and the block itself"
+    assert max(overlaps) == 1
+
+
+def test_a_branch_without_a_hook_registers_none(runner):
+    seen = []
+    execute_action([["AC_parallel", {"branches": [[["AC_get_var", {"name": "m", "default": 1}]]]}]])
+    assert result_hook.capture_branch_hook() is None
+    with result_hook.bound_branch_hook(None, 0):
+        result_hook.report_result(["AC_fake_echo", {"value": 1}], 1)
+    assert seen == []
 
 
 def test_no_hook_means_no_frame_and_no_call(runner, monkeypatch):

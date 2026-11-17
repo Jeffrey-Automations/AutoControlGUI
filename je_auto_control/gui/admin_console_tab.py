@@ -1,9 +1,21 @@
-"""Admin console tab: manage many remote AutoControl REST endpoints."""
-import json
-from typing import Dict, List, Optional
+"""Admin console tab: manage many remote AutoControl REST endpoints.
 
-from PySide6.QtCore import QObject, QSize, QTimer, Qt, Signal
-from PySide6.QtGui import QIcon, QImage, QPixmap
+A broadcast runs as a :class:`~je_auto_control.gui._tab_task.TabTask`. Its
+Stop skips the hosts not sent to yet and still shows every host's row, with
+``sent`` saying whether the actions went there; closing the tab does the same
+skipping and drops the rows.
+
+The health poll and the thumbnail fetch are tasks too, with a deadline and
+**Stop polling** in the Actions menu: stopping either, or closing the tab,
+skips the hosts not reached yet and drops the answer.
+"""
+import functools
+import json
+import threading
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from PySide6.QtCore import QSize, QTimer, Qt
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QSpinBox, QTableWidget,
@@ -12,55 +24,26 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._worker_thread import CallWorker, WorkerHandle, start_worker
+from je_auto_control.gui._qt_typed import decoded_image
+from je_auto_control.gui._tab_task import TabTask
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.responsive import ResponsiveBox
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
+from je_auto_control.gui.tab_task_controller import TaskTimeout
 from je_auto_control.utils.admin.admin_client import (
-    AdminConsoleClient, default_admin_console,
+    HostStatus, default_admin_console,
 )
+from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+
+#: How long one poll or thumbnail round may take before the tab gives up on it.
+POLL_DEADLINE_S = 60.0
 
 
 def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
-
-
-class _PollWorker(QObject):
-    """Background poller — runs ``client.poll_all`` off the GUI thread."""
-
-    finished = Signal(list)
-    failed = Signal(str)
-
-    def __init__(self, client: AdminConsoleClient,
-                 labels: Optional[List[str]] = None) -> None:
-        super().__init__()
-        self._client = client
-        self._labels = labels
-
-    def run(self) -> None:
-        try:
-            result = self._client.poll_all(labels=self._labels)
-        except (OSError, RuntimeError, ValueError) as error:
-            self.failed.emit(str(error))
-            return
-        self.finished.emit(result)
-
-
-class _ThumbnailWorker(QObject):
-    """Phase 6.5 GUI: poll fetch_thumbnails off the GUI thread."""
-
-    finished = Signal(dict)
-
-    def __init__(self, client: AdminConsoleClient) -> None:
-        super().__init__()
-        self._client = client
-
-    def run(self) -> None:
-        try:
-            result = self._client.fetch_thumbnails()
-        except (OSError, RuntimeError, ValueError):
-            result = {}
-        self.finished.emit(result)
 
 
 class AdminConsoleTab(TranslatableMixin, QWidget):
@@ -87,8 +70,17 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._actions_input.setPlaceholderText('[["AC_get_mouse_position"]]')
         self._broadcast_output = QTextEdit()
         self._broadcast_output.setReadOnly(True)
-        self._poll_thread: Optional[WorkerHandle] = None
-        self._broadcast_thread: Optional[WorkerHandle] = None
+        # Closing the tab, Stop polling or the deadline skip the hosts not reached yet.
+        self._polls = TabTask(self)
+        self._polls.result.connect(self._apply_poll_result)
+        self._polls.error.connect(self._apply_poll_failure)
+        self._broadcast_status = QLabel()
+        self._broadcast_status.setWordWrap(True)
+        set_role(self._broadcast_status, "hint")
+        self._broadcasts = TabTask(self)       # one broadcast at a time
+        self._broadcasts.result.connect(self._show_broadcast)
+        self._broadcasts.error.connect(self._show_broadcast_error)
+        self._broadcast_stop: Optional[threading.Event] = None
         # Phase 6.5: live-thumbnail grid + auto-poll timer.
         self._thumbnails = QListWidget()
         self._thumbnails.setViewMode(QListWidget.ViewMode.IconMode)
@@ -103,7 +95,9 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._thumb_interval.valueChanged.connect(self._on_thumb_interval_changed)
         self._thumb_timer = QTimer(self)
         self._thumb_timer.timeout.connect(self._refresh_thumbnails)
-        self._thumb_thread: Optional[WorkerHandle] = None
+        self._thumbs = TabTask(self, details=False)     # a timer tick, not a run to report
+        self._thumbs.result.connect(self._apply_thumbnails)
+        self._thumbs.error.connect(self._on_thumbnails_failed)
         self._build_layout()
         self._refresh_table()
         self._apply_thumb_interval()
@@ -112,26 +106,38 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         # Add/remove/refresh/thumbnail/broadcast commands run from the
         # Actions menu; the tab keeps only the inputs, tables, and output.
         root = QVBoxLayout(self)
+        root.setSpacing(12)
         root.addWidget(self._build_add_group())
-        root.addWidget(self._table, stretch=1)
-        root.addWidget(self._build_thumbnails_group(), stretch=1)
-        root.addWidget(self._build_broadcast_group(), stretch=1)
+        # Hosts and their thumbnails in one column, the broadcast beside them:
+        # side by side the page stays one screen tall; stacked it keeps the old order.
+        hosts = QWidget()
+        hosts.setProperty("role", "bare")
+        column = QVBoxLayout(hosts)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(12)
+        column.addWidget(Card().add(self._table, stretch=1), stretch=1)
+        column.addWidget(self._build_thumbnails_group(), stretch=1)
+        root.addWidget(ResponsiveBox(hosts, self._build_broadcast_group(), stretches=(3, 2)), stretch=1)
 
     def dispose(self) -> None:
-        """Release what the tab holds beyond its widgets: its thumbnail timer and the polls still out.
+        """Release what the tab holds beyond its widgets: its thumbnail timer, the polls still out and a broadcast.
+
+        A broadcast skips the hosts it has not sent to yet; one already being sent to finishes.
 
         Called by ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
         """
         release_resources(self)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("admin_add", self._on_add),
             ("admin_remove", self._on_remove),
             ("admin_refresh", self._on_refresh),
+            ("admin_poll_stop", self._on_poll_stop),
             ("admin_thumb_refresh_now", self._refresh_thumbnails),
             ("admin_broadcast_run", self._on_broadcast),
+            ("admin_broadcast_stop", self._on_broadcast_stop),
         ]
 
     def _build_thumbnails_group(self) -> QGroupBox:
@@ -147,13 +153,10 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
 
     def _build_add_group(self) -> QGroupBox:
         group = self._tr(QGroupBox(), "admin_add_group")
-        form = QHBoxLayout(group)
-        form.addWidget(self._tr(QLabel(), "admin_label"))
-        form.addWidget(self._label_input)
-        form.addWidget(self._tr(QLabel(), "admin_url"))
-        form.addWidget(self._url_input, stretch=1)
-        form.addWidget(self._tr(QLabel(), "admin_token"))
-        form.addWidget(self._token_input)
+        layout = QVBoxLayout(group)
+        layout.addLayout(flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
+            ("admin_label", self._label_input), ("admin_url", self._url_input),
+            ("admin_token", self._token_input)))))
         return group
 
     def _build_broadcast_group(self) -> QGroupBox:
@@ -163,6 +166,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         form.addWidget(self._actions_input)
         form.addWidget(self._tr(QLabel(), "admin_results_label"))
         form.addWidget(self._broadcast_output, stretch=1)
+        form.addWidget(self._broadcast_status)
         return group
 
     def _on_add(self) -> None:
@@ -188,12 +192,12 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._refresh_table()
 
     def _on_refresh(self) -> None:
-        if self._poll_thread is not None:
-            return
-        self._poll_thread = start_worker(
-            self, _PollWorker(self._client),
-            on_done=self._apply_poll_result, on_fail=self._apply_poll_failure,
-            on_thread_done=self._on_poll_thread_done)
+        self._polls.start(self._client.poll_all, timeout_s=POLL_DEADLINE_S)
+
+    def _on_poll_stop(self) -> None:
+        """Cancel the poll and the thumbnail fetch still out; the hosts not reached yet are skipped."""
+        self._polls.stop()
+        self._thumbs.stop()
 
     def _on_broadcast(self) -> None:
         text = self._actions_input.toPlainText().strip()
@@ -206,29 +210,42 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
             return
         # Each host stops at its first failing action and its row says so.
         # Off the GUI thread: every host is an HTTP round trip.
-        if self._broadcast_thread is not None:
+        stop = threading.Event()
+        work = functools.partial(self._client.broadcast_execute, actions=actions,
+                                 raise_on_error=True, stop_event=stop)
+        if not self._broadcasts.start(work):
+            self._broadcast_status.setText(_t("task_busy"))
             return
-        self._broadcast_thread = start_worker(
-            self, CallWorker(lambda: self._client.broadcast_execute(actions=actions, raise_on_error=True)),
-            on_done=self._show_broadcast, on_fail=self._broadcast_output.setPlainText,
-            on_thread_done=self._on_broadcast_thread_done)
+        self._broadcast_stop = stop
+        self._broadcast_status.setText(_t("admin_broadcast_running"))
 
-    def _show_broadcast(self, results) -> None:
+    def _on_broadcast_stop(self) -> None:
+        """Skip the hosts not sent to yet; the rows of every host still arrive."""
+        if self._broadcast_stop is None or not self._broadcasts.running:
+            return
+        self._broadcast_stop.set()
+        self._broadcast_status.setText(_t("admin_broadcast_stopping"))
+
+    def _show_broadcast(self, results: List[Dict[str, Any]]) -> None:
+        self._broadcast_stop = None
         self._broadcast_output.setPlainText(
             json.dumps(results, indent=2, ensure_ascii=False, default=str),
         )
+        sent = sum(1 for row in results if row.get("sent"))
+        self._broadcast_status.setText(_t("admin_broadcast_summary").format(
+            sent=sent, total=len(results), skipped=len(results) - sent))
 
-    def _on_broadcast_thread_done(self) -> None:
-        self._broadcast_thread = None
+    def _show_broadcast_error(self, error: object) -> None:
+        self._broadcast_stop = None
+        self._broadcast_output.setPlainText(str(error))
+        self._broadcast_status.setText("")
 
-    def _apply_poll_result(self, statuses: list) -> None:
+    def _apply_poll_result(self, statuses: List[HostStatus]) -> None:
         self._refresh_table(statuses=statuses)
 
-    def _apply_poll_failure(self, message: str) -> None:
+    def _apply_poll_failure(self, error: object) -> None:
+        message = _t("task_timed_out") if isinstance(error, TaskTimeout) else str(error)
         QMessageBox.warning(self, _t("admin_refresh"), message)
-
-    def _on_poll_thread_done(self) -> None:
-        self._poll_thread = None
 
     # --- live thumbnails (Phase 6.5 GUI) -------------------------------
 
@@ -243,17 +260,13 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._thumb_timer.start(seconds * 1000)
 
     def _refresh_thumbnails(self) -> None:
-        if self._thumb_thread is not None:
-            return
-        # start_worker releases the worker and its relay on finish, so one
-        # poll tick no longer leaves one of each behind.
-        self._thumb_thread = start_worker(
-            self, _ThumbnailWorker(self._client),
-            on_done=self._apply_thumbnails,
-            on_thread_done=self._on_thumb_thread_done)
+        # A tick while the previous fetch is still out is skipped.
+        self._thumbs.start(self._client.fetch_thumbnails, timeout_s=POLL_DEADLINE_S)
 
-    def _on_thumb_thread_done(self) -> None:
-        self._thumb_thread = None
+    def _on_thumbnails_failed(self, error: object) -> None:
+        # A failed round shows every host as a placeholder, as an empty answer does.
+        autocontrol_logger.info("admin: thumbnail round failed: %r", error)
+        self._apply_thumbnails({})
 
     def _apply_thumbnails(self, png_by_label: Dict[str, Optional[bytes]]) -> None:
         """Paint every host as one tile; placeholder when fetch failed."""
@@ -270,7 +283,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
     def _icon_for(png: Optional[bytes]) -> Optional[QIcon]:
         if not png:
             return None
-        image = QImage.fromData(png, "PNG")  # type: ignore[arg-type]  # reason: the stub says bytes; PySide6 raises ValueError for bytes
+        image = decoded_image(png, "PNG")
         if image.isNull():
             return None
         scaled = image.scaled(
@@ -288,7 +301,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
                 out.append(item.text())
         return out
 
-    def _refresh_table(self, statuses: Optional[list] = None) -> None:
+    def _refresh_table(self, statuses: Optional[List[HostStatus]] = None) -> None:
         hosts = self._client.list_hosts()
         status_by_label = {s.label: s for s in (statuses or [])}
         self._table.setRowCount(len(hosts))

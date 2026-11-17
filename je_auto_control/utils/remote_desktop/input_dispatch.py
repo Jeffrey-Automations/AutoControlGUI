@@ -25,7 +25,7 @@ _ALLOWED_ACTIONS = {
 }
 
 
-def _import_wrappers():
+def _import_wrappers() -> Dict[str, Callable[..., Any]]:
     """Lazy import so headless/viewer-only consumers stay platform-agnostic."""
     from je_auto_control.wrapper.auto_control_keyboard import (
         press_keyboard_key, release_keyboard_key, write,

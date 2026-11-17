@@ -92,7 +92,7 @@ def _shape(binary: Any) -> Tuple[float, int]:
     return min(1.0, 4.0 * math.pi * area / (perimeter * perimeter)), vertices
 
 
-def _foreground(binary):
+def _foreground(binary: Any) -> Any:
     """The widget's pixels: the Otsu ink, flipped when it is the background.
 
     ``THRESH_BINARY_INV`` takes dark ink on a light background, so on a dark

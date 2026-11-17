@@ -4,7 +4,7 @@ Requires an X11 display — Wayland is not supported. The grab consumes the
 key, matching Windows ``RegisterHotKey`` semantics. NumLock / CapsLock are
 masked so the hotkey still fires with those toggles active.
 """
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from je_auto_control.utils.hotkey.backends.base import FailedCombos, HotkeyBackend
 from je_auto_control.utils.hotkey.hotkey_daemon import (
@@ -89,7 +89,7 @@ class LinuxHotkeyBackend(HotkeyBackend):
             self._ungrab_all(disp, root)
             disp.close()
 
-    def _sync(self, disp, root, bindings: List[HotkeyBinding]) -> None:
+    def _sync(self, disp: Any, root: Any, bindings: List[HotkeyBinding]) -> None:
         current_ids = {b.binding_id for b in bindings}
         self._ungrab_stale(root, current_ids)
         self._failed.forget_missing(current_ids)
@@ -97,13 +97,13 @@ class LinuxHotkeyBackend(HotkeyBackend):
             self._sync_one(root, binding)
         disp.sync()
 
-    def _ungrab_stale(self, root, current_ids: set) -> None:
+    def _ungrab_stale(self, root: Any, current_ids: Set[str]) -> None:
         stale_ids = [bid for bid in self._registered if bid not in current_ids]
         for stale in stale_ids:
             _combo, mask, keycode = self._registered.pop(stale)
             self._ungrab_masked(root, keycode, mask)
 
-    def _sync_one(self, root, binding: HotkeyBinding) -> None:
+    def _sync_one(self, root: Any, binding: HotkeyBinding) -> None:
         prior = self._registered.get(binding.binding_id)
         if prior is not None and prior[0] == binding.combo:
             return
@@ -137,7 +137,7 @@ class LinuxHotkeyBackend(HotkeyBackend):
             self._failed.record(binding)
 
     @staticmethod
-    def _ungrab_masked(root, keycode: int, mask: int) -> None:
+    def _ungrab_masked(root: Any, keycode: int, mask: int) -> None:
         for extra_mask in _lock_mask_variants():
             try:
                 root.ungrab_key(keycode, mask | extra_mask)
@@ -145,7 +145,7 @@ class LinuxHotkeyBackend(HotkeyBackend):
                 pass
 
     @staticmethod
-    def _grab_masked(root, binding: HotkeyBinding,
+    def _grab_masked(root: Any, binding: HotkeyBinding,
                      mask: int, keycode: int) -> bool:
         from Xlib import X
 
@@ -172,7 +172,7 @@ class LinuxHotkeyBackend(HotkeyBackend):
             grabbed.append(extra_mask)
         return True
 
-    def _drain(self, disp, fire: Callable[[str], None]) -> None:
+    def _drain(self, disp: Any, fire: Callable[[str], None]) -> None:
         from Xlib import X
 
         while disp.pending_events():
@@ -191,7 +191,8 @@ class LinuxHotkeyBackend(HotkeyBackend):
                 return bid
         return None
 
-    def _ungrab_all(self, disp, root) -> None:
+    def _ungrab_all(self, disp: Any, root: Any) -> None:
+
         for _combo, mask, keycode in self._registered.values():
             for extra_mask in _lock_mask_variants():
                 try:

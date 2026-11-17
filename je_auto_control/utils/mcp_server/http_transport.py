@@ -104,7 +104,8 @@ def _forget_if_dropped(bridge: "MCPServer", session: Optional[HttpSession]) -> N
         bridge.forget_connection(session.id)
 
 
-def _notifier_for(writer: Optional[Callable[[str], None]]):
+def _notifier_for(writer: Optional[Callable[[str], None]],
+                 ) -> Optional[Callable[[str, Dict[str, Any]], None]]:
     """Wrap a raw writer as a (method, params) notifier, or ``None``."""
     if writer is None:
         return None
@@ -124,7 +125,7 @@ class _MCPHttpHandler(HttpResponseMixin, BaseHTTPRequestHandler):
     timeout = _REQUEST_TIMEOUT
 
     # Suppress default stderr access logs — route through project logger.
-    def log_message(self, format, *args) -> None:  # noqa: A002  # pylint: disable=redefined-builtin  # reason: stdlib override
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002  # pylint: disable=redefined-builtin  # reason: stdlib override
         autocontrol_logger.info("mcp-http %s - %s",
                                 self.address_string(), log_safe(format % args))
 

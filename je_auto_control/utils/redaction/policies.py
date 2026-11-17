@@ -19,7 +19,7 @@ otherwise know about (e.g. the user's wallet popup).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 
 # Detector tag constants (avoid magic strings in the engine + tests).
@@ -61,7 +61,7 @@ class RedactionPolicy:
             overlay_color=self.overlay_color,
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """JSON-safe snapshot for transport over the REST / MCP wire."""
         return {
             "detectors": list(self.detectors),

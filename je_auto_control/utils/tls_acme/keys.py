@@ -37,7 +37,7 @@ class KeyMaterial:
             encryption_algorithm=serialization.NoEncryption(),
         )
 
-    def save_pem(self, path) -> Path:
+    def save_pem(self, path: str | os.PathLike[str]) -> Path:
         target = Path(os.path.expanduser(str(path)))
         target.parent.mkdir(parents=True, exist_ok=True)
         # Atomic and 0600 from creation: write_bytes made the key readable

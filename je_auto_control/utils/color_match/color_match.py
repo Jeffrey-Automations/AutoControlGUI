@@ -17,18 +17,19 @@ solid colour blobs use ``color_region``. ``color_match`` is for targets with col
 """
 from typing import Any, List, Optional, Sequence
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.color_region.color_region import _grab_rgb, _origin, _to_rgb
 from je_auto_control.utils.visual_match.visual_match import (
     Match, _contain_cv2_error, _nms, _resize, _select_candidates,
 )
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 _CHANNEL_INDEX = {"h": 0, "s": 1, "v": 2}
 # Saturation from which a template pixel carries colour; below it, hue is noise.
 _MIN_SATURATION = 40
 
 
-def _hsv(source, region, is_haystack: bool):
+def _hsv(source: Optional[ImageSource], region: Optional[Sequence[int]], is_haystack: bool) -> Any:
     import cv2
     if is_haystack:
         rgb = _to_rgb(source) if source is not None else _grab_rgb(region)
@@ -37,7 +38,7 @@ def _hsv(source, region, is_haystack: bool):
     return cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
 
 
-def _chromatic_mask(template_hsv):
+def _chromatic_mask(template_hsv: Any) -> Any:
     """The template pixels that carry colour, or ``None`` when too few do.
 
     A thin coloured glyph on white is mostly background: scored over every
@@ -50,7 +51,7 @@ def _chromatic_mask(template_hsv):
     return mask.astype(np.float32)
 
 
-def _channel_distance(template, haystack, channel: str, mask=None):
+def _channel_distance(template: Any, haystack: Any, channel: str, mask: Any = None) -> Any:
     """Mean squared distance per pixel, scaled to 0..1, for one HSV channel.
 
     Plain ``TM_SQDIFF`` divided by the largest possible distance -- not
@@ -68,14 +69,14 @@ def _channel_distance(template, haystack, channel: str, mask=None):
     pixels = float(mask.sum()) if mask is not None else float(t_plane.size)
     masked = {"mask": mask} if mask is not None else {}
     if channel != "h":
-        return cv2.matchTemplate(h_plane, t_plane, cv2.TM_SQDIFF, **masked) / (pixels * 255.0 ** 2)
-    direct = cv2.matchTemplate(h_plane, t_plane, cv2.TM_SQDIFF, **masked)
-    shifted = cv2.matchTemplate(np.mod(h_plane + 90.0, 180.0),
+        return stoppable_call(cv2.matchTemplate, h_plane, t_plane, cv2.TM_SQDIFF, **masked) / (pixels * 255.0 ** 2)
+    direct = stoppable_call(cv2.matchTemplate, h_plane, t_plane, cv2.TM_SQDIFF, **masked)
+    shifted = stoppable_call(cv2.matchTemplate, np.mod(h_plane + 90.0, 180.0),
                                 np.mod(t_plane + 90.0, 180.0), cv2.TM_SQDIFF, **masked)
     return np.minimum(direct, shifted) / (pixels * 90.0 ** 2)
 
 
-def _score_map(template_hsv, haystack_hsv, channels: Sequence[str]):
+def _score_map(template_hsv: Any, haystack_hsv: Any, channels: Sequence[str]) -> Any:
     """Per-channel colour-distance score (higher = better) over the chosen channels.
 
     Uses squared distance (not a correlation): correlation methods normalise away the

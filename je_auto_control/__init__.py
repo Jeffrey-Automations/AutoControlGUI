@@ -1,6 +1,6 @@
 """Public automation exports, resolved from their original owners on first access."""
 import sys as _sys
-from typing import TYPE_CHECKING as _TYPE_CHECKING
+from typing import TYPE_CHECKING as _TYPE_CHECKING, Any as _Any
 
 from je_auto_control._export_bindings import EXPORTS as _EXPORTS
 from je_auto_control._lazy_exports import resolve_export as _resolve_export
@@ -1961,7 +1961,7 @@ else:
     windows_window_manage = None  # type: ignore[assignment]
 
 
-def start_autocontrol_gui(*args, **kwargs):
+def start_autocontrol_gui(*args: _Any, **kwargs: _Any) -> None:
     """Launch the GUI (imports PySide6 lazily so headless usage stays Qt-free)."""
     from je_auto_control.gui import start_autocontrol_gui as _impl
     return _impl(*args, **kwargs)

@@ -9,16 +9,19 @@ from je_auto_control.utils.agent_runtime.completion_contract import validate_rec
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.handoff_records import HandoffAccess
 
+_Link = tuple[dict[str, Any], dict[str, Any], dict[str, Any]]
+_Review = Callable[[Any, dict[str, Any], dict[str, Any], dict[str, Any]], dict[str, Any]]
 
-def _execution_row(runtime: Any, identifier: str, access: HandoffAccess | None) -> dict:
+
+def _execution_row(runtime: Any, identifier: str, access: HandoffAccess | None) -> dict[str, Any]:
     if access is not None:
         return access.read(identifier)
     # pylint: disable-next=protected-access  # reason: ungranted evidence retains ordinary caller ownership checks
     return runtime._row(identifier)
 
 
-def _chain(runtime: Any, connection: Any, root: dict, identifier: Any,
-           access: HandoffAccess | None = None) -> list[tuple[dict, dict, dict]]:
+def _chain(runtime: Any, connection: Any, root: dict[str, Any], identifier: Any,
+           access: HandoffAccess | None = None) -> list[_Link]:
     if not isinstance(identifier, str) or not 1 <= len(identifier) <= 256 or identifier == root['id']:
         raise AgentTaskError('execution_task_id must identify a separate reviewed executable successor')
     result, seen = [], {root['id']}
@@ -47,7 +50,7 @@ def _same(first: Any, second: Any) -> bool:
             == json.dumps(second, sort_keys=True, separators=(',', ':'), allow_nan=False))
 
 
-def _scope(parent: dict, child: dict, *, renewed: bool = False) -> None:
+def _scope(parent: dict[str, Any], child: dict[str, Any], *, renewed: bool = False) -> None:
     fixed = set(parent) - {'goal', 'actions', 'roots', 'options'}
     if set(parent) != set(child) or not _same({key: parent[key] for key in fixed},
                                            {key: child[key] for key in fixed}):
@@ -58,7 +61,7 @@ def _scope(parent: dict, child: dict, *, renewed: bool = False) -> None:
     _scope_options(parent['options'], child['options'], renewed=renewed)
 
 
-def _scope_options(parent: dict, child: dict, *, renewed: bool) -> None:
+def _scope_options(parent: dict[str, Any], child: dict[str, Any], *, renewed: bool) -> None:
     before, after = dict(parent), dict(child)
     before.pop('skill_pin', None)
     origins = set(before.pop('origin_policies', []))
@@ -67,11 +70,12 @@ def _scope_options(parent: dict, child: dict, *, renewed: bool) -> None:
         raise AgentTaskError('execution recovery removed original restrictions or changed fixed options')
 
 
-def _execution_segments(connection: Any, links: list, root: dict, review: Callable,
-                        verify_plan: Callable) -> tuple[list[dict], list[dict]]:
-    combined: list[dict] = []
-    segments: list[dict] = []
-    actions: list[dict] = []
+def _execution_segments(connection: Any, links: list[_Link], root: dict[str, Any], review: _Review,
+                        verify_plan: Callable[..., list[dict[str, Any]]]
+                        ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    combined: list[dict[str, Any]] = []
+    segments: list[dict[str, Any]] = []
+    actions: list[dict[str, Any]] = []
     for parent, child, link in links:
         evidence = review(connection, parent, child, link)
         _scope(parent['spec'], child['spec'], renewed=isinstance(review, HandoffAccess) and review.renewed)
@@ -88,8 +92,9 @@ def _execution_segments(connection: Any, links: list, root: dict, review: Callab
     return segments, actions
 
 
-def check_skill_execution(runtime: Any, connection: Any, root: dict, request: dict,
-                          review: Callable, verify_plan: Callable, completion: Callable) -> dict:
+def check_skill_execution(runtime: Any, connection: Any, root: dict[str, Any], request: dict[str, Any],
+                          review: _Review, verify_plan: Callable[..., list[dict[str, Any]]],
+                          completion: Callable[[Any, dict[str, Any], Any], dict[str, Any]]) -> dict[str, Any]:
     """Combine only exact confirmed semantic effects and independently completed final verification."""
     access = review if isinstance(review, HandoffAccess) else None
     links = _chain(runtime, connection, root, request['execution_task_id'], access)

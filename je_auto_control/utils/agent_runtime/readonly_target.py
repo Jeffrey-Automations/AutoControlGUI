@@ -41,11 +41,11 @@ class ReadOnlyNativeTarget(NativeDesktopTarget):
         """Refuse host-side workflow launch/file tools as well as helper-dispatched input."""
         raise AgentTaskError("read-only target cannot perform tools")
 
-    def recover(self, note: str, *, actor: str) -> dict:
+    def recover(self, note: str, *, actor: str) -> dict[str, Any]:
         """Read-only observation cannot clear a previous owner's unknown input witness."""
         raise AgentTaskError("read-only target cannot recover input resources")
 
-    def _input(self, event: dict, *, cleanup: bool = False) -> None:
+    def _input(self, event: dict[str, Any], *, cleanup: bool = False) -> None:
         self._pending = "readonly_input_violation"
         try:
             self._ledger.consume(event, cleanup=cleanup)
@@ -87,7 +87,7 @@ class CompletionReader:
             self._policy.validate_snapshot()
             self._parent.checkpoint()
 
-    def _call(self, operation: str, body: dict) -> Any:
+    def _call(self, operation: str, body: dict[str, Any]) -> Any:
         if current_operation() is not self._parent:
             raise AgentTaskError("completion reader cannot be borrowed by another operation")
         actual, captured = current_authorization(), self._authority.context
@@ -100,7 +100,7 @@ class CompletionReader:
         self._check()
         return result
 
-    def observe(self) -> dict:
+    def observe(self) -> dict[str, Any]:
         """Return a fresh scoped observation with no historical-frame or replacement-context fallback."""
         return self._call("observe", {})
 

@@ -12,7 +12,8 @@ Threads: each calling thread gets its own automation object, created after COM
 is initialised on that thread, and no raw element outlives the call that found
 it -- see :mod:`~je_auto_control.utils.accessibility.backends.windows_automation`.
 """
-from typing import Any, Dict, List, Optional
+import queue
+from typing import Any, Callable, Dict, List, Optional
 
 from je_auto_control.utils.accessibility.backends.base import (
     AccessibilityBackend,
@@ -37,6 +38,7 @@ from je_auto_control.utils.accessibility.backends.windows_reads import (
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 _UIA_ERRORS = UIA_READ_ERRORS
+_Opt = Optional[str]  # an optional control filter: name / role / app / automation id
 
 _UIA_IS_CONTROL_ELEMENT_PROPERTY = 30016
 _UIA_NAME_PROPERTY = 30005
@@ -79,7 +81,6 @@ _WINDOW_INTERACTION_STATES = {
 }
 
 
-
 class WindowsAccessibilityBackend(AccessibilityBackend):
     """UIAutomation-based flat element listing."""
 
@@ -95,7 +96,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         self._uia_module: Any = None
         self._event_lock = threading.Lock()
 
-    def _ensure_automation(self):
+    def _ensure_automation(self) -> Any:
         if self._automation is not None:
             return self._automation
         if not self.available:
@@ -116,7 +117,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         self._uia_module = uia_module
         return automation
 
-    def _collect_from(self, automation, root, app_name, wanted,
+    def _collect_from(self, automation: Any, root: Any, app_name: _Opt, wanted: int,
                       results: List[AccessibilityElement]) -> None:
         """Append this root's elements to ``results``, stopping at ``wanted``.
 
@@ -176,7 +177,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
             self._collect_from(automation, root, app_name, wanted, results)
         return results
 
-    def _raw_matches(self, raw, filters, cached: bool) -> bool:
+    def _raw_matches(self, raw: Any, filters: Dict[str, Any], cached: bool) -> bool:
         """Whether this element satisfies the caller's filters."""
         element = _convert_uia(raw, cached=cached)
         if element is None:
@@ -189,8 +190,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
                                app_name=filters.get("app_name"),
                                contains=bool(filters.get("contains")))
 
-    def _find_raw(self, name, role, app_name, automation_id,
-                  window_title=None, contains=False):
+    def _find_raw(self, name: _Opt, role: _Opt, app_name: _Opt, automation_id: _Opt,
+                  window_title: _Opt = None, contains: bool = False) -> Any:
         """Return the first matching raw UIA element, or ``None``.
 
         Every control-pattern call lands here, so this is the hot path for
@@ -226,7 +227,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
             autocontrol_logger.error("UIA element search failed: %r", error)
         return None
 
-    def _pattern(self, raw, pattern_id, interface_name):
+    def _pattern(self, raw: Any, pattern_id: int, interface_name: str) -> Any:
         """Return a queried control pattern interface, or None."""
         try:
             unknown = raw.GetCurrentPattern(pattern_id)
@@ -237,9 +238,9 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return None
 
-    def get_value(self, name=None, role=None, app_name=None,
-                  automation_id=None, window_title=None,
-                  contains=False) -> Optional[str]:
+    def get_value(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                  automation_id: _Opt = None, window_title: _Opt = None,
+                  contains: bool = False) -> Optional[str]:
         raw = self._find_raw(name, role, app_name, automation_id,
                              window_title=window_title, contains=contains)
         if raw is not None and is_password(raw):
@@ -257,8 +258,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return None
 
-    def set_value(self, value, name=None, role=None, app_name=None,
-                  automation_id=None) -> bool:
+    def set_value(self, value: str, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                  automation_id: _Opt = None) -> bool:
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, _UIA_VALUE_PATTERN_ID,
                                 "IUIAutomationValuePattern") if raw else None
@@ -270,8 +271,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return False
 
-    def invoke(self, name=None, role=None, app_name=None,
-               automation_id=None) -> bool:
+    def invoke(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+               automation_id: _Opt = None) -> bool:
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, _UIA_INVOKE_PATTERN_ID,
                                 "IUIAutomationInvokePattern") if raw else None
@@ -283,8 +284,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return False
 
-    def toggle(self, name=None, role=None, app_name=None,
-               automation_id=None) -> bool:
+    def toggle(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+               automation_id: _Opt = None) -> bool:
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, _UIA_TOGGLE_PATTERN_ID,
                                 "IUIAutomationTogglePattern") if raw else None
@@ -296,8 +297,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return False
 
-    def read_table(self, name=None, role=None, app_name=None,
-                   automation_id=None):
+    def read_table(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                   automation_id: _Opt = None) -> List[List[str]]:
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, _UIA_GRID_PATTERN_ID,
                                 "IUIAutomationGridPattern") if raw else None
@@ -310,8 +311,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
             return []
         return [self._read_row(pattern, r, cols) for r in range(rows)]
 
-    def _invoke_pattern_method(self, name, role, app_name, automation_id,
-                               pattern_id, interface_name, action):
+    def _invoke_pattern_method(self, name: _Opt, role: _Opt, app_name: _Opt, automation_id: _Opt,
+                               pattern_id: int, interface_name: str, action: Callable[[Any], Any]) -> bool:
         """Find a control, query a pattern, run ``action(pattern)`` → bool."""
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, pattern_id, interface_name) if raw else None
@@ -323,18 +324,18 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return False
 
-    def expand(self, name=None, role=None, app_name=None, automation_id=None):
+    def expand(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None, automation_id: _Opt = None) -> bool:
         return self._invoke_pattern_method(
             name, role, app_name, automation_id, _UIA_EXPANDCOLLAPSE_PATTERN_ID,
             "IUIAutomationExpandCollapsePattern", lambda p: p.Expand())
 
-    def collapse(self, name=None, role=None, app_name=None, automation_id=None):
+    def collapse(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None, automation_id: _Opt = None) -> bool:
         return self._invoke_pattern_method(
             name, role, app_name, automation_id, _UIA_EXPANDCOLLAPSE_PATTERN_ID,
             "IUIAutomationExpandCollapsePattern", lambda p: p.Collapse())
 
-    def expand_state(self, name=None, role=None, app_name=None,
-                     automation_id=None) -> Optional[str]:
+    def expand_state(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                     automation_id: _Opt = None) -> Optional[str]:
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, _UIA_EXPANDCOLLAPSE_PATTERN_ID,
                                 "IUIAutomationExpandCollapsePattern") if raw else None
@@ -345,25 +346,26 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return None
 
-    def select_item(self, name=None, role=None, app_name=None, automation_id=None):
+    def select_item(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                    automation_id: _Opt = None) -> bool:
         return self._invoke_pattern_method(
             name, role, app_name, automation_id, _UIA_SELECTIONITEM_PATTERN_ID,
             "IUIAutomationSelectionItemPattern", lambda p: p.Select())
 
-    def set_range_value(self, value, name=None, role=None, app_name=None,
-                        automation_id=None):
+    def set_range_value(self, value: float, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                        automation_id: _Opt = None) -> bool:
         return self._invoke_pattern_method(
             name, role, app_name, automation_id, _UIA_RANGEVALUE_PATTERN_ID,
             "IUIAutomationRangeValuePattern", lambda p: p.SetValue(float(value)))
 
-    def scroll_into_view(self, name=None, role=None, app_name=None,
-                         automation_id=None):
+    def scroll_into_view(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                         automation_id: _Opt = None) -> bool:
         return self._invoke_pattern_method(
             name, role, app_name, automation_id, _UIA_SCROLLITEM_PATTERN_ID,
             "IUIAutomationScrollItemPattern", lambda p: p.ScrollIntoView())
 
-    def get_range(self, name=None, role=None, app_name=None,
-                  automation_id=None) -> Optional[Dict[str, Any]]:
+    def get_range(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                  automation_id: _Opt = None) -> Optional[Dict[str, Any]]:
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, _UIA_RANGEVALUE_PATTERN_ID,
                                 "IUIAutomationRangeValuePattern") if raw else None
@@ -376,7 +378,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return None
 
-    def _realize(self, raw) -> None:
+    def _realize(self, raw: Any) -> None:
         """Realize a virtualized element so it materializes (VirtualizedItemPattern)."""
         pattern = self._pattern(raw, _UIA_VIRTUALIZEDITEM_PATTERN_ID,
                                 "IUIAutomationVirtualizedItemPattern")
@@ -387,8 +389,9 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             pass
 
-    def find_virtual_item(self, item_name=None, by="name", container_name=None,
-                          container_role=None, app_name=None, automation_id=None):
+    def find_virtual_item(self, item_name: _Opt = None, by: str = "name", container_name: _Opt = None,
+                          container_role: _Opt = None, app_name: _Opt = None, automation_id: _Opt = None,
+                          ) -> Optional[AccessibilityElement]:
         container = self._find_raw(container_name, container_role, app_name,
                                    automation_id)
         pattern = self._pattern(container, _UIA_ITEMCONTAINER_PATTERN_ID,
@@ -407,36 +410,36 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         self._realize(found)
         return _convert_uia(found)
 
-    def get_properties(self, name=None, role=None, app_name=None,
-                       automation_id=None) -> Optional[Dict[str, Any]]:
+    def get_properties(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                       automation_id: _Opt = None) -> Optional[Dict[str, Any]]:
         raw = self._find_raw(name, role, app_name, automation_id)
         if not raw:
             return None
         return _read_properties(raw)
 
-    def get_state(self, name=None, role=None, app_name=None,
-                  automation_id=None, window_title=None,
-                  contains=False) -> Optional[Dict[str, Any]]:
+    def get_state(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                  automation_id: _Opt = None, window_title: _Opt = None,
+                  contains: bool = False) -> Optional[Dict[str, Any]]:
         raw = self._find_raw(name, role, app_name, automation_id,
                              window_title=window_title, contains=contains)
         return None if not raw else read_state(raw)
 
-    def move_element(self, x=0.0, y=0.0, name=None, role=None, app_name=None,
-                     automation_id=None):
+    def move_element(self, x: float = 0.0, y: float = 0.0, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                     automation_id: _Opt = None) -> bool:
         return self._invoke_pattern_method(
             name, role, app_name, automation_id, _UIA_TRANSFORM_PATTERN_ID,
             "IUIAutomationTransformPattern",
             lambda pattern: pattern.Move(float(x), float(y)))
 
-    def resize_element(self, width=0.0, height=0.0, name=None, role=None,
-                       app_name=None, automation_id=None):
+    def resize_element(self, width: float = 0.0, height: float = 0.0, name: _Opt = None, role: _Opt = None,
+                       app_name: _Opt = None, automation_id: _Opt = None) -> bool:
         return self._invoke_pattern_method(
             name, role, app_name, automation_id, _UIA_TRANSFORM_PATTERN_ID,
             "IUIAutomationTransformPattern",
             lambda pattern: pattern.Resize(float(width), float(height)))
 
-    def set_window_state(self, state="normal", name=None, role=None,
-                         app_name=None, automation_id=None):
+    def set_window_state(self, state: str = "normal", name: _Opt = None, role: _Opt = None,
+                         app_name: _Opt = None, automation_id: _Opt = None) -> bool:
         visual = _WINDOW_VISUAL_STATES.get(str(state).lower())
         if visual is None:
             return False
@@ -445,8 +448,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
             "IUIAutomationWindowPattern",
             lambda pattern: pattern.SetWindowVisualState(visual))
 
-    def window_interaction_state(self, name=None, role=None, app_name=None,
-                                 automation_id=None) -> Optional[str]:
+    def window_interaction_state(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                                 automation_id: _Opt = None) -> Optional[str]:
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, _UIA_WINDOW_PATTERN_ID,
                                 "IUIAutomationWindowPattern") if raw else None
@@ -458,8 +461,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return None
 
-    def legacy_info(self, name=None, role=None, app_name=None,
-                    automation_id=None) -> Optional[Dict[str, Any]]:
+    def legacy_info(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                    automation_id: _Opt = None) -> Optional[Dict[str, Any]]:
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, _UIA_LEGACYIACCESSIBLE_PATTERN_ID,
                                 "IUIAutomationLegacyIAccessiblePattern"
@@ -468,16 +471,16 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
             return None
         return _read_legacy(pattern)
 
-    def legacy_default_action(self, name=None, role=None, app_name=None,
-                              automation_id=None):
+    def legacy_default_action(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                              automation_id: _Opt = None) -> bool:
         return self._invoke_pattern_method(
             name, role, app_name, automation_id,
             _UIA_LEGACYIACCESSIBLE_PATTERN_ID,
             "IUIAutomationLegacyIAccessiblePattern",
             lambda pattern: pattern.DoDefaultAction())
 
-    def get_selection(self, name=None, role=None, app_name=None,
-                      automation_id=None) -> Optional[Dict[str, Any]]:
+    def get_selection(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                      automation_id: _Opt = None) -> Optional[Dict[str, Any]]:
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, _UIA_SELECTION_PATTERN_ID,
                                 "IUIAutomationSelectionPattern") if raw else None
@@ -492,13 +495,13 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         return {"items": items, "can_select_multiple": can_multiple,
                 "is_required": required}
 
-    def _multiple_view(self, name, role, app_name, automation_id):
+    def _multiple_view(self, name: _Opt, role: _Opt, app_name: _Opt, automation_id: _Opt) -> Any:
         raw = self._find_raw(name, role, app_name, automation_id)
         return self._pattern(raw, _UIA_MULTIPLEVIEW_PATTERN_ID,
                              "IUIAutomationMultipleViewPattern") if raw else None
 
-    def list_views(self, name=None, role=None, app_name=None,
-                   automation_id=None) -> Optional[Dict[str, Any]]:
+    def list_views(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                   automation_id: _Opt = None) -> Optional[Dict[str, Any]]:
         pattern = self._multiple_view(name, role, app_name, automation_id)
         if pattern is None:
             return None
@@ -510,8 +513,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         return {"current": _view_name(pattern, current),
                 "views": [_view_name(pattern, view_id) for view_id in view_ids]}
 
-    def set_view(self, view="", name=None, role=None, app_name=None,
-                 automation_id=None):
+    def set_view(self, view: str = "", name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                 automation_id: _Opt = None) -> bool:
         pattern = self._multiple_view(name, role, app_name, automation_id)
         if pattern is None:
             return False
@@ -524,7 +527,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
             return False
         return False
 
-    def _make_focus_handler(self, sink):
+    def _make_focus_handler(self, sink: "queue.Queue[Dict[str, Any]]") -> Any:
         """Build a COM focus-changed event handler that puts events on ``sink``."""
         try:
             import comtypes
@@ -536,17 +539,18 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
             _com_interfaces_ = [interface]
 
             def IUIAutomationFocusChangedEventHandler_HandleFocusChangedEvent(
-                    self, sender):  # noqa: N802  # reason: comtypes callback name
+                    self, sender: Any) -> int:  # noqa: N802  # reason: comtypes callback name
                 element = _convert_uia(sender)
                 sink.put(element.to_dict() if element else {"focused": True})
                 return 0
 
         return _FocusHandler()
 
-    def wait_for_focus_change(self, timeout=5.0) -> Optional[Dict[str, Any]]:
+    def wait_for_focus_change(self, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
         import queue
+        from je_auto_control.utils.accessibility.backends.windows_events import wait_for_event
         automation = self._ensure_automation()
-        events: "queue.Queue" = queue.Queue()
+        events: "queue.Queue[Dict[str, Any]]" = queue.Queue()
         handler = self._make_focus_handler(events)
         if handler is None:
             return None
@@ -555,10 +559,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
                 automation.AddFocusChangedEventHandler(None, handler)
         except _UIA_ERRORS:
             return None
-        try:  # Queue.get(inf) raises OverflowError on Windows; None waits for good.
-            return events.get(timeout=None if float(timeout) == float("inf") else float(timeout))
-        except queue.Empty:
-            return None
+        try:
+            return wait_for_event(events, float(timeout))
         finally:
             with self._event_lock:
                 try:
@@ -566,8 +568,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
                 except _UIA_ERRORS:
                     pass
 
-    def get_table_headers(self, name=None, role=None, app_name=None,
-                          automation_id=None) -> Optional[Dict[str, Any]]:
+    def get_table_headers(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                          automation_id: _Opt = None) -> Optional[Dict[str, Any]]:
         raw = self._find_raw(name, role, app_name, automation_id)
         pattern = self._pattern(raw, _UIA_TABLE_PATTERN_ID,
                                 "IUIAutomationTablePattern") if raw else None
@@ -580,8 +582,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
             return None
         return {"columns": _header_names(columns), "rows": _header_names(rows)}
 
-    def get_grid_cell(self, row=0, column=0, name=None, role=None,
-                      app_name=None, automation_id=None) -> Optional[Dict[str, Any]]:
+    def get_grid_cell(self, row: int = 0, column: int = 0, name: _Opt = None, role: _Opt = None,
+                      app_name: _Opt = None, automation_id: _Opt = None) -> Optional[Dict[str, Any]]:
         raw = self._find_raw(name, role, app_name, automation_id)
         grid = self._pattern(raw, _UIA_GRID_PATTERN_ID,
                              "IUIAutomationGridPattern") if raw else None
@@ -597,7 +599,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
                                         "IUIAutomationGridItemPattern"),
                           cell, int(row), int(column))
 
-    def _text_pattern(self, name, role, app_name, automation_id):
+    def _text_pattern(self, name: _Opt, role: _Opt, app_name: _Opt, automation_id: _Opt) -> Any:
         """Find a control and return its IUIAutomationTextPattern, or None."""
         raw = self._find_raw(name, role, app_name, automation_id)
         if not raw:
@@ -605,8 +607,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         return self._pattern(raw, _UIA_TEXT_PATTERN_ID,
                              "IUIAutomationTextPattern")
 
-    def document_text(self, name=None, role=None, app_name=None,
-                      automation_id=None) -> Optional[str]:
+    def document_text(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                      automation_id: _Opt = None) -> Optional[str]:
         pattern = self._text_pattern(name, role, app_name, automation_id)
         if pattern is None:
             return None
@@ -615,8 +617,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return None
 
-    def selected_text(self, name=None, role=None, app_name=None,
-                      automation_id=None) -> Optional[str]:
+    def selected_text(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                      automation_id: _Opt = None) -> Optional[str]:
         pattern = self._text_pattern(name, role, app_name, automation_id)
         if pattern is None:
             return None
@@ -628,8 +630,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return None
 
-    def visible_text(self, name=None, role=None, app_name=None,
-                     automation_id=None) -> Optional[str]:
+    def visible_text(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                     automation_id: _Opt = None) -> Optional[str]:
         pattern = self._text_pattern(name, role, app_name, automation_id)
         if pattern is None:
             return None
@@ -641,7 +643,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return None
 
-    def _find_range(self, text, ignore_case, name, role, app_name, automation_id):
+    def _find_range(self, text: str, ignore_case: bool, name: _Opt, role: _Opt, app_name: _Opt,
+                    automation_id: _Opt) -> Any:
         """Find ``text`` in the control's document range (TextPattern.FindText)."""
         pattern = self._text_pattern(name, role, app_name, automation_id)
         if pattern is None:
@@ -652,13 +655,12 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return None
 
-    def find_text(self, text="", ignore_case=True, name=None, role=None,
-                  app_name=None, automation_id=None) -> bool:
-        return not _is_null(self._find_range(text, ignore_case, name, role, app_name,
-                                             automation_id))
+    def find_text(self, text: str = "", ignore_case: bool = True, name: _Opt = None, role: _Opt = None,
+                  app_name: _Opt = None, automation_id: _Opt = None) -> bool:
+        return not _is_null(self._find_range(text, ignore_case, name, role, app_name, automation_id))
 
-    def select_text(self, text="", ignore_case=True, name=None, role=None,
-                    app_name=None, automation_id=None) -> bool:
+    def select_text(self, text: str = "", ignore_case: bool = True, name: _Opt = None, role: _Opt = None,
+                    app_name: _Opt = None, automation_id: _Opt = None) -> bool:
         found = self._find_range(text, ignore_case, name, role, app_name,
                                  automation_id)
         if not found:
@@ -669,8 +671,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         except _UIA_ERRORS:
             return False
 
-    def text_attributes(self, name=None, role=None, app_name=None,
-                        automation_id=None) -> Optional[Dict[str, Any]]:
+    def text_attributes(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                        automation_id: _Opt = None) -> Optional[Dict[str, Any]]:
         pattern = self._text_pattern(name, role, app_name, automation_id)
         if pattern is None:
             return None
@@ -683,8 +685,8 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
             return None
         return _read_text_attributes(text_range)
 
-    def set_focus(self, name=None, role=None, app_name=None,
-                  automation_id=None) -> bool:
+    def set_focus(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
+                  automation_id: _Opt = None) -> bool:
         raw = self._find_raw(name, role, app_name, automation_id)
         if not raw:
             return False
@@ -699,9 +701,9 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         return None if raw is None else _convert_uia(raw)
 
     @staticmethod
-    def _read_row(pattern, row: int, cols: int):
+    def _read_row(pattern: Any, row: int, cols: int) -> List[str]:
         """Read one grid row into a list of cell strings."""
-        cells = []
+        cells: List[str] = []
         for col in range(cols):
             try:
                 cell = pattern.GetItem(row, col)
@@ -711,7 +713,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
         return cells
 
 
-def _convert_uia(raw, cached: bool = False) -> Optional[AccessibilityElement]:
+def _convert_uia(raw: Any, cached: bool = False) -> Optional[AccessibilityElement]:
     """Convert one UIA element. ``cached`` reads the pre-fetched properties.
 
     Every ``Current*`` read is a cross-process call into the application that

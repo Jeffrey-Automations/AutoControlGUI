@@ -29,7 +29,7 @@ from je_auto_control.utils.rbac import (
 )
 
 _SSE = "application/json, text/event-stream"
-_ALL = ["peek", "poke", "ac_load_plugins"]
+_ALL = ["ac_screen_size", "poke", "ac_load_plugins"]
 _VISIBLE = {Role.VIEWER: _ALL[:1], Role.OPERATOR: _ALL[:2], Role.ADMIN: _ALL}
 
 
@@ -66,7 +66,7 @@ def serve(tmp_path, users):
     started = []
 
     def start(**kwargs):
-        tools = [tool("peek", READ_ONLY), tool("poke", DESTRUCTIVE),
+        tools = [tool("ac_screen_size", READ_ONLY), tool("poke", DESTRUCTIVE),
                  tool("ac_load_plugins", DESTRUCTIVE)]
         server = HttpMCPServer(
             mcp=MCPServer(tools=tools, audit_logger=AuditLogger(path=str(audit_path))),
@@ -201,7 +201,7 @@ def test_session_requests_are_authorised_one_by_one(serve, users):
                                       users.tokens[Role.OPERATOR], own)
     assert status == 200
     assert json.loads(raw)["error"]["code"] == -32003
-    assert _exchange(server, _call("peek"), None, session)[0] == 401
+    assert _exchange(server, _call("ac_screen_size"), None, session)[0] == 401
     assert server.calls == [("ac_load_plugins", "admin-user")]
 
 
@@ -258,7 +258,7 @@ def test_stateless_lists_and_runs_only_what_the_role_grants(serve, users, role):
     assert status == 200
     assert "Mcp-Session-Id" not in headers
     assert [tool["name"] for tool in json.loads(raw)["result"]["tools"]] == _VISIBLE[role]
-    for name in ("peek", "ac_load_plugins"):
+    for name in ("ac_screen_size", "ac_load_plugins"):
         body = _stateless("tools/call", {"name": name, "arguments": {}})
         _status, _headers, raw = _exchange(server, body, token,
                                            _stateless_headers("tools/call", name))
@@ -267,19 +267,19 @@ def test_stateless_lists_and_runs_only_what_the_role_grants(serve, users, role):
             assert reply["result"]["isError"] is False
         else:
             assert reply["error"]["code"] == -32003
-    expected = [name for name in ("peek", "ac_load_plugins") if name in _VISIBLE[role]]
+    expected = [name for name in ("ac_screen_size", "ac_load_plugins") if name in _VISIBLE[role]]
     assert server.calls == [(name, f"{role}-user") for name in expected]
 
 
 def test_stateless_sse_reply_is_authorised_too(serve, users):
     server = serve()
-    body = _stateless("tools/call", {"name": "peek", "arguments": {}})
-    headers = {**_stateless_headers("tools/call", "peek"), "Accept": _SSE}
+    body = _stateless("tools/call", {"name": "ac_screen_size", "arguments": {}})
+    headers = {**_stateless_headers("tools/call", "ac_screen_size"), "Accept": _SSE}
     status, _headers, raw = _exchange(server, body, users.tokens[Role.VIEWER], headers)
     assert status == 200
     assert _events(raw)[-1]["result"]["isError"] is False
     assert _exchange(server, body, "wrong", headers)[0] == 401
-    assert server.calls == [("peek", "viewer-user")]
+    assert server.calls == [("ac_screen_size", "viewer-user")]
 
 
 # --- subscriptions/listen ---------------------------------------------------
@@ -335,7 +335,7 @@ def test_a_viewer_may_listen_and_gets_only_the_change_signal(serve, users):
     _status, _headers, raw = _exchange(server, _stateless("tools/list"),
                                        users.tokens[Role.VIEWER],
                                        _stateless_headers("tools/list"))
-    assert [tool["name"] for tool in json.loads(raw)["result"]["tools"]] == ["peek"]
+    assert [tool["name"] for tool in json.loads(raw)["result"]["tools"]] == ["ac_screen_size"]
 
 
 # --- TLS --------------------------------------------------------------------

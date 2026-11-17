@@ -76,7 +76,7 @@ def test_tools_start_resyncs_every_engine_tab():
     synced = []
     entries = [types.SimpleNamespace(widget=types.SimpleNamespace(sync_with_engine=lambda: synced.append(1))),
                types.SimpleNamespace(widget=types.SimpleNamespace())]
-    AutoControlGUIWidget.sync_engine_tabs(types.SimpleNamespace(_tab_entries=entries))
+    AutoControlGUIWidget.sync_engine_tabs(types.SimpleNamespace(tab_registry=types.SimpleNamespace(entries=entries)))
     assert synced == [1]
 
 

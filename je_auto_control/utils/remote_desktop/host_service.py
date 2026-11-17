@@ -27,7 +27,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -363,7 +363,7 @@ def _install_windows_service(config_path: Path) -> int:
     # Windows service auto-discovers its config at runtime.
     del config_path  # suppress S1172
     try:
-        import win32serviceutil  # type: ignore  # noqa: F401
+        import win32serviceutil  # noqa: F401
     except ImportError:
         print("pywin32 is required: pip install pywin32", file=sys.stderr)
         return 2
@@ -389,9 +389,9 @@ def _install_windows_service(config_path: Path) -> int:
 
 if sys.platform == "win32":  # pragma: no cover - Windows-only
     try:
-        import win32event  # type: ignore
-        import win32service  # type: ignore
-        import win32serviceutil  # type: ignore
+        import win32event
+        import win32service
+        import win32serviceutil
 
         class _WindowsService(win32serviceutil.ServiceFramework):
             _svc_name_ = "JeAutoControlRemoteHost"
@@ -401,7 +401,7 @@ if sys.platform == "win32":  # pragma: no cover - Windows-only
                 "to a signaling server for remote-desktop connections."
             )
 
-            def __init__(self, args) -> None:
+            def __init__(self, args: Sequence[str]) -> None:
                 super().__init__(args)
                 self._stop_event = win32event.CreateEvent(None, 0, 0, None)
                 self._running = True
@@ -424,9 +424,9 @@ if sys.platform == "win32":  # pragma: no cover - Windows-only
                     return
                 run_daemon(config)
     except ImportError:
-        _WindowsService = None  # type: ignore
+        _WindowsService = None  # type: ignore[misc, assignment]
 else:
-    _WindowsService = None  # type: ignore
+    _WindowsService = None
 
 
 # --- CLI -----------------------------------------------------------------
@@ -481,20 +481,20 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _cmd_init(args) -> int:
+def _cmd_init(args: argparse.Namespace) -> int:
     path = write_default_config(args.config)
     print(f"Wrote stub config: {path}")
     print("Edit the file (token, server_url, host_id) before running 'run'.")
     return 0
 
 
-def _cmd_run(args) -> int:
+def _cmd_run(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     run_daemon(config)
     return 0
 
 
-def _cmd_available_codecs(_args) -> int:
+def _cmd_available_codecs(_args: argparse.Namespace) -> int:
     from je_auto_control.utils.remote_desktop.hw_codec import (
         available_hardware_codecs,
     )
@@ -508,11 +508,11 @@ def _cmd_available_codecs(_args) -> int:
     return 0
 
 
-def _cmd_install_windows_service(args) -> int:
+def _cmd_install_windows_service(args: argparse.Namespace) -> int:
     return _install_windows_service(args.config or _default_config_path())
 
 
-def _cmd_generate_launchd(args) -> int:
+def _cmd_generate_launchd(args: argparse.Namespace) -> int:
     _generate_launchd_plist(args.config or _default_config_path(), args.output)
     print(f"Wrote launchd plist: {args.output}")
     print("Activate with:")
@@ -521,7 +521,7 @@ def _cmd_generate_launchd(args) -> int:
     return 0
 
 
-def _cmd_generate_systemd(args) -> int:
+def _cmd_generate_systemd(args: argparse.Namespace) -> int:
     _generate_systemd_unit(args.config or _default_config_path(), args.output)
     print(f"Wrote systemd unit: {args.output}")
     print("Activate with:")
@@ -547,7 +547,7 @@ _COMMAND_DISPATCH = {
 }
 
 
-def main(argv: Optional[list] = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     args = _build_arg_parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")

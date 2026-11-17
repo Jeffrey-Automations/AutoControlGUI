@@ -1,17 +1,20 @@
 """Run History tab: browse recorded runs, artifacts and explicit journal links."""
 import datetime as _dt
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from PySide6.QtCore import QTimer, Qt, QUrl
-from PySide6.QtGui import QCloseEvent, QDesktopServices, QPixmap
+from PySide6.QtGui import QCloseEvent, QDesktopServices, QPixmap, QResizeEvent
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
+    QAbstractItemView, QComboBox, QFrame, QHeaderView, QLabel,
     QMessageBox, QSplitter, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
+from je_auto_control.gui.adaptive.responsive import ResponsiveSplitter
+from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -117,7 +120,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         self.dispose()
         super().closeEvent(event)
 
-    def resizeEvent(self, event) -> None:
+    def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
         self._refresh_preview()
 
@@ -147,39 +150,33 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         # Refresh/clear/open-artifact commands run from the Actions menu;
         # the tab keeps only the filter, timeline, table, and preview.
         root = QVBoxLayout(self)
-        top = QHBoxLayout()
-        top.addWidget(self._tr(QLabel(), "rh_filter_label"))
-        top.addWidget(self._filter)
-        top.addStretch()
-        root.addLayout(top)
+        root.setSpacing(12)
+        root.addWidget(Card().add(flow_of(field_pair(self._tr(QLabel(), "rh_filter_label"), self._filter))))
 
-        timeline_label = self._tr(QLabel(), "rh_timeline_heading")
-        root.addWidget(timeline_label)
-        root.addWidget(self._timeline)
+        timeline_label = set_role(self._tr(QLabel(), "rh_timeline_heading"), "sectionTitle")
+        root.addWidget(Card().add(timeline_label).add(self._timeline))
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self._table)
-        preview = QWidget()
-        preview_layout = QVBoxLayout(preview)
-        preview_layout.setContentsMargins(0, 0, 0, 0)
-        preview_layout.addWidget(self._tr(QLabel(), "rh_preview_heading"))
-        preview_layout.addWidget(self._thumb_label, stretch=1)
-        preview_layout.addWidget(self._thumb_caption)
-        splitter.addWidget(preview)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 1)
+        preview = Card().add(set_role(self._tr(QLabel(), "rh_preview_heading"), "sectionTitle"))
+        preview.add(self._thumb_label, stretch=1).add(self._thumb_caption)
+        # Stacked under a narrow window the table would otherwise shrink to its header.
+        self._table.setMinimumHeight(200)
+        runs = ResponsiveSplitter(Card().add(self._table, stretch=1), preview, stretches=(3, 1))
+        # The journal browser is shared with Self-Healing; tag it so it shows the card behind it.
+        self._journal.setProperty("role", "bare")
         sections = QSplitter(Qt.Orientation.Vertical)
-        sections.addWidget(splitter)
-        sections.addWidget(self._journal)
+        sections.addWidget(runs)
+        sections.addWidget(Card().add(self._journal, stretch=1))
         sections.setStretchFactor(0, 1)
         sections.setStretchFactor(1, 1)
         root.addWidget(sections, stretch=1)
 
         self._table.cellDoubleClicked.connect(self._on_cell_double_clicked)
         self._table.itemSelectionChanged.connect(self._on_selection_changed)
+        self._count_label.setWordWrap(True)
+        set_role(self._count_label, "hint")
         root.addWidget(self._count_label)
 
-    def menu_actions(self) -> list:
+    def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("rh_refresh", self._refresh),
@@ -223,7 +220,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         self._timeline.set_records(runs)
         self._refresh_preview()
 
-    def _set_row(self, row: int, record) -> None:
+    def _set_row(self, row: int, record: RunRecord) -> None:
         status_key = _STATUS_LABEL_KEYS.get(record.status, record.status)
         status_text = _t(status_key) if record.error_text is None \
             else f"{_t(status_key)}: {record.error_text}"

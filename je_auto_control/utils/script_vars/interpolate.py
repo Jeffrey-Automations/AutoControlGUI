@@ -40,7 +40,7 @@ def interpolate_value(value: Any, variables: Mapping[str, Any]) -> Any:
     return value
 
 
-def interpolate_actions(actions: list, variables: Mapping[str, Any]) -> list:
+def interpolate_actions(actions: List[Any], variables: Mapping[str, Any]) -> List[Any]:
     """Return a new action list with placeholders substituted."""
     return interpolate_value(actions, variables)
 

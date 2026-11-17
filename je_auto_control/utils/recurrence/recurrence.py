@@ -17,7 +17,7 @@ Pure standard library (``datetime`` + ``calendar``); imports no ``PySide6``.
 import datetime as _dt
 from calendar import monthrange
 from dataclasses import dataclass
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Set, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 
@@ -241,7 +241,7 @@ def _monthly_dates(year: int, month: int, dtstart: _dt.datetime,
     return _setpos(sorted(set(chosen)), rule.by_set_pos)
 
 
-def _weekday_set(dtstart: _dt.datetime, rule: Recurrence) -> set:
+def _weekday_set(dtstart: _dt.datetime, rule: Recurrence) -> Set[int]:
     if rule.by_day:
         return {weekday for _, weekday in rule.by_day}
     return {dtstart.weekday()}

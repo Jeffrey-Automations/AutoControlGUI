@@ -27,7 +27,7 @@ import sys
 import threading
 import time
 from ctypes import wintypes
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from je_auto_control.utils.exception.exception_tags import (
     windows_import_error_message,
@@ -101,6 +101,11 @@ class Win32InputHook:
         # still calls that address and the process dies.
         self._procs: List[Any] = []
 
+    @property
+    def is_recording(self) -> bool:
+        """Report retained capture state without probing native hook health."""
+        return bool(self._hooks) and bool(self._thread_id) and self.error is None
+
     # -- public ------------------------------------------------------------
     def start(self) -> None:
         """Install the hooks and begin recording. Raises if they cannot be set."""
@@ -139,7 +144,7 @@ class Win32InputHook:
         finally:
             self._unhook(user32)
 
-    def _install(self, user32) -> None:
+    def _install(self, user32: Any) -> None:
         kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]  # reason: win32-only ctypes
         self._thread_id = kernel32.GetCurrentThreadId()
         proto = ctypes.WINFUNCTYPE(  # type: ignore[attr-defined]  # reason: win32-only ctypes
@@ -162,7 +167,7 @@ class Win32InputHook:
                 raise OSError(f"SetWindowsHookExW failed for {hook_id}")
             self._hooks.append(handle)
 
-    def _unhook(self, user32) -> None:
+    def _unhook(self, user32: Any) -> None:
         for handle in self._hooks:
             try:
                 user32.UnhookWindowsHookEx(handle)
@@ -178,8 +183,8 @@ class Win32InputHook:
         event["time"] = time.monotonic()
         self.events.append(event)
 
-    def _keyboard_proc(self, user32):
-        def _proc(code, w_param, l_param):
+    def _keyboard_proc(self, user32: Any) -> Callable[[int, int, int], int]:
+        def _proc(code: int, w_param: int, l_param: int) -> int:
             # Called by the OS on this thread: an exception must not escape,
             # and it must not be slow — all desktop input queues behind it.
             try:
@@ -196,8 +201,8 @@ class Win32InputHook:
 
         return _proc
 
-    def _mouse_proc(self, user32):
-        def _proc(code, w_param, l_param):
+    def _mouse_proc(self, user32: Any) -> Callable[[int, int, int], int]:
+        def _proc(code: int, w_param: int, l_param: int) -> int:
             try:
                 if code >= 0:
                     self._mouse_event(l_param, int(w_param))
@@ -207,7 +212,7 @@ class Win32InputHook:
 
         return _proc
 
-    def _mouse_event(self, l_param, message: int) -> None:
+    def _mouse_event(self, l_param: int, message: int) -> None:
         data = ctypes.cast(l_param, ctypes.POINTER(_MSLLHOOKSTRUCT)).contents
         button = _MOUSE_BUTTONS.get(message)
         if button is not None:

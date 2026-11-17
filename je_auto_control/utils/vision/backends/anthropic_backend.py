@@ -1,7 +1,7 @@
 """Anthropic (Claude) VLM backend."""
 import base64
 import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Type
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.vision.backends._parse import (
@@ -83,7 +83,7 @@ class AnthropicVLMBackend(VLMBackend):
         # The SDK's errors (rate limit, timeout, 5xx) derive from
         # anthropic.AnthropicError, a bare Exception, so they escaped here while
         # the LLM backend already caught them.
-        except (*_sdk_errors(), OSError, ValueError, RuntimeError) as error:
+        except _sdk_errors() + (OSError, ValueError, RuntimeError) as error:
             raise VLMRequestError(f"Anthropic VLM request failed: {error!r}") from error
         self.last_usage = read_usage(response, "input_tokens", "output_tokens")
         coords = parse_coords(_first_text_block(response))
@@ -94,14 +94,14 @@ class AnthropicVLMBackend(VLMBackend):
         return (int(round(coords[0] / scale[0])), int(round(coords[1] / scale[1])))
 
 
-def _first_text_block(response) -> str:
+def _first_text_block(response: object) -> str:
     for block in getattr(response, "content", []) or []:
         if getattr(block, "type", None) == "text":
             return getattr(block, "text", "") or ""
     return ""
 
 
-def _sdk_errors() -> tuple:  # NOSONAR python:S8495  # reason: unpacked into an except tuple; empty with no SDK
+def _sdk_errors() -> Tuple[Type[BaseException], ...]:  # NOSONAR python:S8495  # reason: empty with no SDK
     """``(anthropic.AnthropicError,)``, the base of every error the SDK raises.
 
     Evaluated while an exception is being matched, so it must not raise:

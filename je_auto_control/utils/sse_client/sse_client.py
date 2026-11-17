@@ -11,7 +11,7 @@ fully deterministic, so streaming logic is CI-testable without a live server.
 """
 import re
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 _LINE_SPLIT = re.compile(r"\r\n|\r|\n")
 _BOM = chr(0xFEFF)
@@ -26,7 +26,7 @@ class SSEEvent:
     id: Optional[str] = None
     retry: Optional[int] = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Return a JSON-friendly view of the event."""
         return {"event": self.event, "data": self.data,
                 "id": self.id, "retry": self.retry}

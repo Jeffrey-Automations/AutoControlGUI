@@ -13,7 +13,7 @@ Pure standard library; imports no ``PySide6``. The pure functions
 elements) are unit-testable without a live desktop.
 """
 import math
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 _INTERACTIVE_HINTS = ("button", "edit", "text", "combo", "check", "radio",
                       "menu", "link", "tab", "list", "slider")
@@ -46,23 +46,23 @@ def snapshot(elements: List[Any]) -> List[Dict[str, Any]]:
             for el in elements]
 
 
-def _key(item: Dict[str, Any]) -> tuple:
+def _key(item: Dict[str, Any]) -> Tuple[Any, Any]:
     return (item.get("role", ""), item.get("name", ""))
 
 
-def _group(items: List[Dict[str, Any]]) -> Dict[tuple, List[Dict[str, Any]]]:
-    groups: Dict[tuple, List[Dict[str, Any]]] = {}
+def _group(items: List[Dict[str, Any]]) -> Dict[Tuple[Any, Any], List[Dict[str, Any]]]:
+    groups: Dict[Tuple[Any, Any], List[Dict[str, Any]]] = {}
     for item in items:
         groups.setdefault(_key(item), []).append(item)
     return groups
 
 
-def _centre(item: Dict[str, Any]) -> tuple:
+def _centre(item: Dict[str, Any]) -> Tuple[float, float]:
     bbox = list(item.get("bbox") or [0, 0, 0, 0])[:4] + [0, 0, 0, 0]
     return (bbox[0] + bbox[2] / 2.0, bbox[1] + bbox[3] / 2.0)
 
 
-def _distance_from(target: tuple) -> Callable[[Dict[str, Any]], float]:
+def _distance_from(target: Tuple[float, float]) -> Callable[[Dict[str, Any]], float]:
     """Key function: how far an item's centre is from ``target``."""
     return lambda item: math.dist(_centre(item), target)
 

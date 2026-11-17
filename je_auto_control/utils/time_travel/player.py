@@ -57,7 +57,7 @@ class TimelineSnapshot:
     relative_time_s: float
 
 
-def load_action_log(path) -> List[ActionEvent]:
+def load_action_log(path: str | os.PathLike[str]) -> List[ActionEvent]:
     """Load a ``actions.jsonl`` file (one JSON object per line)."""
     target = Path(os.path.expanduser(str(path)))
     events: List[ActionEvent] = []
@@ -76,7 +76,7 @@ def load_action_log(path) -> List[ActionEvent]:
     return sorted(events, key=lambda e: e.timestamp)
 
 
-def save_action_log(events: Sequence[ActionEvent], path) -> Path:
+def save_action_log(events: Sequence[ActionEvent], path: str | os.PathLike[str]) -> Path:
     """Write events as ``actions.jsonl`` — one JSON object per line."""
     target = Path(os.path.expanduser(str(path)))
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -99,7 +99,7 @@ class TimelinePlayer:
     returns empty slices in that case.
     """
 
-    def __init__(self, recording_dir) -> None:
+    def __init__(self, recording_dir: str | os.PathLike[str]) -> None:
         self._dir = Path(os.path.expanduser(str(recording_dir)))
         self._frames: List[FrameRef] = []
         self._actions: List[ActionEvent] = []

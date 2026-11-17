@@ -94,7 +94,7 @@ class _SelfLoadedNames:
         self._loadable = loadable
         self._prefixes: List[str] = []
 
-    def note(self, name: Any, action: list) -> None:
+    def note(self, name: Any, action: List[Any]) -> None:
         """Remember the package ``action`` loads, if it is a load the gate allows."""
         if self._loadable is None or name not in PACKAGE_LOAD_COMMANDS:
             return
@@ -108,7 +108,7 @@ class _SelfLoadedNames:
                    for prefix in self._prefixes)
 
 
-def _literal_package(action: list) -> Optional[str]:
+def _literal_package(action: List[Any]) -> Optional[str]:
     """The package a load command names: ``[name, [pkg]]`` or ``[name, {"package": pkg}]``."""
     if len(action) != 2:
         return None
@@ -164,7 +164,7 @@ def unknown_command_names(actions: Any,
     return unknown
 
 
-def _iter_actions(actions: Any, trail: str) -> Iterator[Tuple[str, Any, list]]:
+def _iter_actions(actions: Any, trail: str) -> Iterator[Tuple[str, Any, List[Any]]]:
     """Yield ``(trail, command_name, action)`` for every action in the tree, in order.
 
     Structural problems raise as they are met, but whether the name is in the
@@ -194,8 +194,8 @@ def _iter_actions(actions: Any, trail: str) -> Iterator[Tuple[str, Any, list]]:
         yield from _iter_nested_actions(action[0], action, node)
 
 
-def _iter_nested_actions(name: Any, action: list,
-                         trail: str) -> Iterator[Tuple[str, Any, list]]:
+def _iter_nested_actions(name: Any, action: List[Any],
+                         trail: str) -> Iterator[Tuple[str, Any, List[Any]]]:
     """Yield the actions held in a flow-control command's nested body keys."""
     # ``name`` arrives unvalidated — the collector does not stop on a bad one —
     # and an unhashable name would blow up the two lookups below.

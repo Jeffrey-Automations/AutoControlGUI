@@ -13,8 +13,8 @@ def _directory(directory: str) -> None:
         raise AgentTaskError('destination directory must be an absolute text path')
 
 
-def destination_scope(profile: Callable, origins: Callable, target: str, directory: str, *,
-                      reviewed: dict | None = None, connection: Any = None) -> dict:
+def destination_scope(profile: Callable[..., Any], origins: Callable[..., Any], target: str, directory: str, *,
+                      reviewed: dict[str, Any] | None = None, connection: Any = None) -> dict[str, Any]:
     """Recheck host-owned scope without creating output or fabricating an ordinary agent task."""
     _directory(directory)
     configuration = profile(target, connection=connection)

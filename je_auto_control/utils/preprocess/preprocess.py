@@ -18,12 +18,12 @@ import math
 from typing import Any, Callable, Dict, Optional, Sequence
 
 from je_auto_control.utils.visual_match.visual_match import _contain_cv2_error
+from je_auto_control.utils.visual_match.image_source import ImageSource
 
-ImageSource = Any
 _INTERP = ("nearest", "linear", "cubic", "lanczos")
 
 
-def _pil_to_bgr(image: Any):
+def _pil_to_bgr(image: Any) -> Any:
     """A PIL image as an OpenCV array: ``L`` stays single-channel, colour becomes BGR(A).
 
     ``np.asarray`` on a palette image gives palette *indices*, and RGB order
@@ -39,7 +39,7 @@ def _pil_to_bgr(image: Any):
     return cv2.cvtColor(np.asarray(image.convert("RGB")), cv2.COLOR_RGB2BGR)
 
 
-def _to_array(source: ImageSource):
+def _to_array(source: ImageSource) -> Any:
     """Load a path / ndarray / PIL image as a uint8 ndarray in OpenCV's BGR order."""
     import cv2
     import numpy as np
@@ -51,7 +51,7 @@ def _to_array(source: ImageSource):
     return _pil_to_bgr(source)
 
 
-def _resolve(haystack: Optional[ImageSource], region: Optional[Sequence[int]]):
+def _resolve(haystack: Optional[ImageSource], region: Optional[Sequence[int]]) -> Any:
     if haystack is not None:
         return _as_uint8(_to_array(haystack))
     from je_auto_control.utils.cv2_utils.region_capture import grab_screen_region
@@ -78,7 +78,7 @@ def _eight_bit(source: Any) -> Any:
     return Image.fromarray(_as_uint8(array))
 
 
-def _as_uint8(array):
+def _as_uint8(array: Any) -> Any:
     """``array`` as uint8, which every step assumes.
 
     A 16-bit PNG stayed 16-bit: Otsu then wrote 0 and 255 into a uint16 image,
@@ -96,7 +96,7 @@ def _as_uint8(array):
     return np.clip(np.rint(values), 0, 255).astype(np.uint8)
 
 
-def _gray(array):
+def _gray(array: Any) -> Any:
     import cv2
     if array.ndim == 3 and array.shape[2] == 1:
         array = array[:, :, 0]
@@ -108,7 +108,7 @@ def _gray(array):
 
 @_contain_cv2_error
 def to_grayscale(haystack: Optional[ImageSource] = None, *,
-                 region: Optional[Sequence[int]] = None):
+                 region: Optional[Sequence[int]] = None) -> Any:
     """Return the image as a single-channel grayscale ndarray."""
     return _gray(_resolve(haystack, region))
 
@@ -116,7 +116,7 @@ def to_grayscale(haystack: Optional[ImageSource] = None, *,
 @_contain_cv2_error
 def upscale(haystack: Optional[ImageSource] = None, *,
             region: Optional[Sequence[int]] = None, scale: float = 2.0,
-            interp: str = "cubic"):
+            interp: str = "cubic") -> Any:
     """Return the image resized by ``scale`` — enlarge small UI text before OCR."""
     import cv2
     if interp not in _INTERP:
@@ -136,7 +136,7 @@ def upscale(haystack: Optional[ImageSource] = None, *,
 @_contain_cv2_error
 def binarize(haystack: Optional[ImageSource] = None, *,
              region: Optional[Sequence[int]] = None, method: str = "otsu",
-             block_size: int = 31, c: int = 11):
+             block_size: int = 31, c: int = 11) -> Any:
     """Return a black/white image. ``method``: otsu / adaptive_mean / adaptive_gaussian."""
     import cv2
     gray = _gray(_resolve(haystack, region))
@@ -157,7 +157,7 @@ def binarize(haystack: Optional[ImageSource] = None, *,
 
 @_contain_cv2_error
 def denoise(haystack: Optional[ImageSource] = None, *,
-            region: Optional[Sequence[int]] = None, strength: int = 7):
+            region: Optional[Sequence[int]] = None, strength: int = 7) -> Any:
     """Return a denoised grayscale image (non-local means)."""
     import cv2
     return cv2.fastNlMeansDenoising(_gray(_resolve(haystack, region)), None,
@@ -167,7 +167,7 @@ def denoise(haystack: Optional[ImageSource] = None, *,
 @_contain_cv2_error
 def enhance_contrast(haystack: Optional[ImageSource] = None, *,
                      region: Optional[Sequence[int]] = None, clip: float = 2.0,
-                     grid: int = 8):
+                     grid: int = 8) -> Any:
     """Return a CLAHE contrast-enhanced grayscale image (rescues dark/low-contrast UI)."""
     import cv2
     if int(grid) < 1:
@@ -201,7 +201,7 @@ def detect_skew_angle(haystack: Optional[ImageSource] = None, *,
 
 @_contain_cv2_error
 def deskew(haystack: Optional[ImageSource] = None, *,
-           region: Optional[Sequence[int]] = None, max_angle: float = 15.0):
+           region: Optional[Sequence[int]] = None, max_angle: float = 15.0) -> Any:
     """Return the image rotated to remove text skew (no-op when none is detected)."""
     import cv2
     array = _resolve(haystack, region)
@@ -214,20 +214,20 @@ def deskew(haystack: Optional[ImageSource] = None, *,
                           flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
 
 
-def _step_grayscale(array, **_kwargs):
+def _step_grayscale(array: Any, **_kwargs: Any) -> Any:
     return to_grayscale(array)
 
 
-def _step_upscale(array, *, scale: float, **_kwargs):
+def _step_upscale(array: Any, *, scale: float, **_kwargs: Any) -> Any:
     return upscale(array, scale=scale)
 
 
-def _step_binarize(array, **_kwargs):
+def _step_binarize(array: Any, **_kwargs: Any) -> Any:
     return binarize(array)
 
 
 def _step_adaptive(method: str) -> Callable[..., Any]:
-    def _step(array, *, block_size: int, c: int, **_kwargs):
+    def _step(array: Any, *, block_size: int, c: int, **_kwargs: Any) -> Any:
         return binarize(array, method=method, block_size=block_size, c=c)
     return _step
 
@@ -249,7 +249,7 @@ _STEPS: Dict[str, Callable[..., Any]] = {
 def preprocess_image(haystack: Optional[ImageSource] = None, *,
                      region: Optional[Sequence[int]] = None,
                      steps: Sequence[str] = ("grayscale", "upscale", "binarize"),
-                     scale: float = 2.0, block_size: int = 31, c: int = 11):
+                     scale: float = 2.0, block_size: int = 31, c: int = 11) -> Any:
     """Apply a pipeline of named preprocessing ``steps`` in order, returning the result.
 
     Steps: ``grayscale``, ``upscale`` (by ``scale``), ``binarize`` (Otsu),

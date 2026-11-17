@@ -13,6 +13,8 @@ not resolve at module-load time. ``from je_auto_control.gui.flow_editor
 import FlowEditorTab`` still works — Python falls through to
 ``__getattr__`` when the attribute is not pre-bound.
 """
+from typing import Any
+
 from je_auto_control.gui.flow_editor.layout import (
     FlowEdge, FlowLayout, FlowNodePosition, layout_steps,
 )
@@ -27,7 +29,7 @@ _LAZY_SUBMODULES = {
 }
 
 
-def __getattr__(name):
+def __getattr__(name: str) -> Any:
     target = _LAZY_SUBMODULES.get(name)
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

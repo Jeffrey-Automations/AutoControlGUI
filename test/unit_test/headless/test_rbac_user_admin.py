@@ -418,12 +418,12 @@ _STORED_RECORD_TOOLS = (
     "ac_lease_active", "ac_element_list", "ac_skill_list",
     "ac_skill_search", "ac_repair_pending", "ac_repair_resolved", "ac_quarantine_list",
     "ac_pending_artifacts",
-    "ac_android_get_clipboard", "ac_ios_get_clipboard",
+    "ac_android_get_clipboard", "ac_ios_get_clipboard", "ac_locate_image_center",
+    "ac_list_executions", "ac_scheduler_list_jobs",
 )
 _LIVE_SCREEN_TOOLS = (
     "ac_vlm_locate", "ac_self_heal_locate",  # they read the screen; cost is not a capability
-    "ac_locate_text", "ac_locate_image_center", "ac_a11y_list", "ac_element_find",
-    "ac_list_executions", "ac_scheduler_list_jobs",
+    "ac_locate_text", "ac_a11y_list", "ac_element_find",
 )
 
 

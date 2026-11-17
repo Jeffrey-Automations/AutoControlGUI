@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from je_auto_control.utils.agent_runtime.errors import AgentControlBusy, AgentTaskError
 from je_auto_control.utils.agent_runtime.presence_pool import PresenceReference, shared_reference
+from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
 
 
 def require_windows() -> None:
@@ -44,7 +45,7 @@ class RuntimePresence:
                 self._reference.close()
                 self._reference = None
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         """Report this runtime's passive binding state without creating any shared reference."""
         with self._mutex:
             if self._reference is None:
@@ -52,12 +53,13 @@ class RuntimePresence:
             return self._reference.status()
 
 
-@dataclass
+@dataclass(frozen=True)
 class _Grant:
     reference: PresenceReference
-    binding: dict
+    binding: dict[str, Any]
     channel: Any
     spec: Any
+    endpoint: Any = None
 
 
 class TargetPresence:
@@ -71,11 +73,14 @@ class TargetPresence:
         """Refuse unsupported defaults without starting helper, input journal or source."""
         require_windows()
 
-    def bind(self, operation: Any, channel: Any, timeout: float) -> dict:
+    def bind(self, operation: Any, channel: Any, timeout: float) -> dict[str, Any]:
         """Accept only the actual immutable host operation supplied by NativeDesktopTarget."""
         if self._grant is not None:
             if channel is not self._grant.channel or operation.spec != self._grant.spec:
                 raise AgentTaskError('presence binding requires prior input/helper retirement')
+            endpoint = self._grant.reference.endpoint(self._grant.binding)
+            if endpoint != self.endpoint():
+                raise AgentTaskError('presence helper endpoint cannot change')
             return dict(self._grant.binding)
         provider = operation.presence
         if provider is None:
@@ -83,7 +88,17 @@ class TargetPresence:
         reference = provider()
         binding = reference.acquire(operation.checkpoint, timeout)
         self._grant = _Grant(reference, dict(binding), channel, operation.spec)
+        endpoint = reference.endpoint(binding)
+        self._grant = _Grant(reference, dict(binding), channel, operation.spec,
+                             endpoint_from_wire(endpoint) if endpoint is not None else None)
         return dict(binding)
+
+    def endpoint(self) -> dict[str, Any] | None:
+        """Copy only the endpoint pinned with the current helper's host-owned grant."""
+        if self._grant is None:
+            raise AgentTaskError('presence endpoint requires a bound helper')
+        endpoint = self._grant.endpoint
+        return endpoint_to_wire(endpoint) if endpoint is not None else None
 
     def release(self) -> None:
         """Schedule owned token release only after proven input/helper cleanup, never certify input."""
@@ -92,7 +107,7 @@ class TargetPresence:
                 self._grant.reference.release(self._grant.binding)
             self._grant = None
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         """Expose only coarse binding/source availability; never query or disclose capability identifiers."""
         if self._grant is None:
             return {'state': 'not_bound' if sys.platform == 'win32' else 'not_supported',

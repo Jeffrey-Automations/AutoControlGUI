@@ -61,7 +61,7 @@ def _listener(callback: Callable[[], None]) -> Any:
         def alive(self) -> bool:
             return self._thread.is_alive() and not self.error
 
-        def stop(self) -> list:
+        def stop(self) -> list[dict[str, Any]]:
             super().stop()
             self._thread.join(timeout=1)
             if self._thread.is_alive():

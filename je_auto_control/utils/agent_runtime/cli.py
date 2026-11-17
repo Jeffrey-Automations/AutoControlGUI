@@ -114,13 +114,13 @@ def run(arguments: argparse.Namespace) -> dict[str, Any]:
     return AgentRuntimeClient().call(operation, body)
 
 
-def _lookup(arguments: argparse.Namespace) -> dict:
+def _lookup(arguments: argparse.Namespace) -> dict[str, Any]:
     if arguments.lookup_spec:
         return api.lookup_agent_task(arguments.idempotency_key, _read(arguments.lookup_spec))
     return api.lookup_agent_task(arguments.idempotency_key)
 
 
-def _draft(arguments: argparse.Namespace) -> dict:
+def _draft(arguments: argparse.Namespace) -> dict[str, Any]:
     from je_auto_control.utils.agent_runtime.workflow_specs import draft_agent_workflow
     return {"draft": draft_agent_workflow(arguments.workflow, _read(arguments.config))}
 

@@ -13,7 +13,7 @@ from je_auto_control.utils.agent_runtime.policy import TaskPolicy
 KINDS = ("interval", "cron", "file", "event")
 
 
-def validate_config(kind: str, config: dict, policy: TaskPolicy) -> dict[str, Any]:
+def validate_config(kind: str, config: dict[str, Any], policy: TaskPolicy) -> dict[str, Any]:
     """Require explicit schedule fields; event input can never select a task scope."""
     fields = {"interval": {"seconds"}, "cron": {"expression", "timezone"},
               "file": {"path", "stable_seconds"}, "event": set()}
@@ -24,7 +24,7 @@ def validate_config(kind: str, config: dict, policy: TaskPolicy) -> dict[str, An
     return checks[kind](config)
 
 
-def _interval(config: dict) -> dict:
+def _interval(config: dict[str, Any]) -> dict[str, Any]:
     positive(config.get("seconds"), "trigger seconds", 86400 * 365)
     seconds = float(config["seconds"])
     if seconds < 1:
@@ -32,7 +32,7 @@ def _interval(config: dict) -> dict:
     return {"seconds": seconds}
 
 
-def _cron(config: dict) -> dict:
+def _cron(config: dict[str, Any]) -> dict[str, Any]:
     from je_auto_control.utils.scheduler.cron import parse_cron
     expression, timezone = config.get("expression"), config.get("timezone", "UTC")
     if not isinstance(expression, str) or len(expression) > 128 or not isinstance(timezone, str):
@@ -45,7 +45,7 @@ def _cron(config: dict) -> dict:
     return {"expression": expression, "timezone": timezone}
 
 
-def _file(config: dict, policy: TaskPolicy) -> dict:
+def _file(config: dict[str, Any], policy: TaskPolicy) -> dict[str, Any]:
     path = policy.path(config.get("path"))
     stable = config.get("stable_seconds", 1)
     positive(stable, "file stability seconds", 300)
@@ -54,7 +54,7 @@ def _file(config: dict, policy: TaskPolicy) -> dict:
     return {"path": path, "stable_seconds": stable}
 
 
-def next_due(kind: str, config: dict, now: float) -> float:
+def next_due(kind: str, config: dict[str, Any], now: float) -> float:
     """Reuse the existing cron parser; missed schedule windows coalesce rather than replay a backlog."""
     if kind == "interval":
         return now + config["seconds"]

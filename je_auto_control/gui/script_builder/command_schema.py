@@ -1561,8 +1561,10 @@ def _add_window_specs(specs: List[CommandSpec]) -> None:
         ),
         CommandSpec(
             "AC_restore_window_layout", "Window", "Restore Window Layout",
-            fields=(FieldSpec("layout", FieldType.FILE_PATH),),
-            description="Move windows back to a saved layout file.",
+            fields=(FieldSpec("layout", FieldType.FILE_PATH),
+                    FieldSpec("maximize", FieldType.BOOL, optional=True, default=False)),
+            description="Move windows back to a saved layout file; maximize re-maximizes "
+                        "windows saved maximized, activating each.",
         ),
         CommandSpec(
             "AC_tile_rect", "Window", "Tile Rect (compute)",

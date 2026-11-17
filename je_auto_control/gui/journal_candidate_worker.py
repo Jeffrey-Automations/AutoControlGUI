@@ -7,9 +7,7 @@ from contextvars import copy_context
 from dataclasses import dataclass, field
 from hashlib import sha256
 from threading import Event
-from typing import Literal, Optional, cast
-
-from PySide6.QtCore import QObject, Signal, Slot
+from typing import Callable, Literal, Optional, cast
 
 from je_auto_control.utils.action_journal.events import ActionEvent
 from je_auto_control.utils.action_journal.redaction import sanitize_event
@@ -66,21 +64,26 @@ class JournalCandidateOutcome:
     truncated: bool = False
 
 
-class JournalCandidateWorker(QObject):
-    """Run under the registrant's authority and context, with stop checks before irreversible export."""
+def _no_report(_value: object) -> None:
+    """Progress sink for a worker run without one."""
 
-    finished = Signal(object)
-    progress = Signal(int, int)
+
+class JournalCandidateWorker:
+    """Run under the registrant's authority and context, with stop checks before irreversible export.
+
+    Built on the GUI thread, which captures that context and authority, and
+    called on a worker thread with the stop event and a progress report; each
+    report is ``(request_id, count)`` every hundred records.
+    """
 
     def __init__(self, task: JournalCandidateTask) -> None:
-        super().__init__()
         self._task = task
         self._count = 0
         self._stop = Event()
+        self._report: Callable[[object], None] = _no_report
         self._context = copy_context()
         self._authority = DeferredAuthorization.capture()
 
-    @Slot()
     def request_stop(self) -> None:
         """Request cooperative cancellation without blocking the GUI."""
         self._stop.set()
@@ -90,12 +93,12 @@ class JournalCandidateWorker(QObject):
             raise CancelledError()
         self._count = max(self._count, count)
         if self._count % 100 == 0:
-            self.progress.emit(self._task.request_id, self._count)
+            self._report((self._task.request_id, self._count))
 
-    @Slot()
-    def run(self) -> None:
-        """Emit one result under captured authority; successful committed exports stay successful."""
-        self.finished.emit(self._context.run(self._perform))
+    def __call__(self, stop_event: Event, report: Callable[[object], None] = _no_report) -> JournalCandidateOutcome:
+        """Return one result under captured authority; successful committed exports stay successful."""
+        self._stop, self._report = stop_event, report
+        return self._context.run(self._perform)
 
     def _perform(self) -> JournalCandidateOutcome:
         try:

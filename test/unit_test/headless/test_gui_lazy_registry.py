@@ -16,9 +16,11 @@ import pytest
 from je_auto_control.gui.tab_registry import TAB_SPECS, TabEntry, lazy_factory
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-# Built by the main widget itself: its mixin tabs, and Remote Desktop's placeholder fallback.
-OWN_TABS = {"auto_click", "screenshot", "image_detect", "record", "script", "remote_desktop", "report"}
+# Remote Desktop retains the main widget's optional-dependency fallback.
+OWN_TABS = {"remote_desktop"}
 OPEN_AT_START = ["record", "script_builder", "remote_desktop"]
+# Only the first start-up tab is built; the others wait in the tab bar until selected.
+BUILT_AT_START = ["record"]
 
 
 def test_keys_are_unique_and_the_start_tabs_are_the_three_documented():
@@ -90,6 +92,11 @@ report = {
     "open_at_start": [row["key"] for row in widget.list_registered_tabs() if row["visible"]],
     "variables_imported_at_start": "je_auto_control.gui.variables_tab" in sys.modules,
     "presence_imported_at_start": "je_auto_control.gui.presence_tab" in sys.modules,
+    "auto_click_imported_at_start": "je_auto_control.gui._auto_click_tab" in sys.modules,
+    "script_imported_at_start": "je_auto_control.gui._script_tab" in sys.modules,
+    "image_detect_imported_at_start": "je_auto_control.gui._image_detect_tab" in sys.modules,
+    "remote_desktop_imported_at_start": "je_auto_control.gui.remote_desktop_tab" in sys.modules,
+    "script_builder_imported_at_start": "je_auto_control.gui.script_builder" in sys.modules,
 }
 widget.list_registered_tabs()
 widget.retranslate()
@@ -112,8 +119,29 @@ widget.activate_tab("record")
 report["current_after_activate"] = widget.current_tab_key()
 report["changes"] = len(changes)
 report["unknown"] = widget.activate_tab("no_such_tab")
+
+index = [row["key"] for row in widget.list_registered_tabs() if row["visible"]].index("script_builder")
+widget.tabs.setCurrentIndex(index)
+report["selected_builds_in_place"] = (entries["script_builder"].built
+                                      and widget.tabs.widget(index) is entries["script_builder"].widget
+                                      and widget.current_tab_key() == "script_builder")
+widget.close_tab("remote_desktop")
+report["closing_unbuilt_builds_nothing"] = not entries["remote_desktop"].built
+report["closed_unbuilt_is_gone"] = "remote_desktop" not in [
+    row["key"] for row in widget.list_registered_tabs() if row["visible"]]
+widget.show_tab("remote_desktop")
+report["reopened_unbuilt_is_built"] = (entries["remote_desktop"].built
+                                       and widget.current_tab_key() == "remote_desktop")
 sys.stdout.write(json.dumps(report))
 sys.stdout.flush()
+if sys.platform == "win32":
+    # os._exit still runs every DLL's detach on Windows, where Qt's teardown
+    # races the helper threads tabs start and can fault (0xC0000005) after the
+    # report is written. TerminateProcess ends the process without it.
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+    kernel32.TerminateProcess(ctypes.c_void_p(kernel32.GetCurrentProcess()), 0)
 os._exit(0)
 """
 
@@ -133,11 +161,16 @@ def test_every_spec_is_registered_in_order(report):
     assert report["registered"] == report["specs"]
 
 
-def test_only_the_start_tabs_and_the_widgets_own_forms_are_built(report):
-    assert set(report["built_at_start"]) == OWN_TABS | set(OPEN_AT_START)
+def test_only_the_first_start_tab_is_built(report):
+    assert report["built_at_start"] == BUILT_AT_START
     assert report["open_at_start"] == OPEN_AT_START
+    assert not report["remote_desktop_imported_at_start"]
+    assert not report["script_builder_imported_at_start"]
     assert not report["variables_imported_at_start"]
     assert not report["presence_imported_at_start"]
+    assert not report["image_detect_imported_at_start"]
+    assert not report["auto_click_imported_at_start"]
+    assert not report["script_imported_at_start"]
 
 
 def test_listing_translating_and_hiding_build_nothing(report):
@@ -158,3 +191,13 @@ def test_activating_an_open_tab_only_selects_it(report):
     assert report["current_after_activate"] == "record"
     assert report["changes"] == 3          # opened, hidden, opened again
     assert report["unknown"] is False
+
+
+def test_a_start_tab_is_built_in_its_place_when_selected(report):
+    assert report["selected_builds_in_place"]
+
+
+def test_closing_a_start_tab_never_built_builds_nothing(report):
+    assert report["closing_unbuilt_builds_nothing"]
+    assert report["closed_unbuilt_is_gone"]
+    assert report["reopened_unbuilt_is_built"]

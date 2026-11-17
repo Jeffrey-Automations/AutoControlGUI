@@ -8,10 +8,13 @@ import base64
 import io
 import math
 import os
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from je_auto_control.utils.mcp_server.tools._base import MCPContent
 from je_auto_control.utils.timeouts import clamp_poll_interval, deadline_after
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 
 # === Screen / image / OCR ===================================================
@@ -74,7 +77,7 @@ def list_monitors() -> List[Dict[str, Any]]:
         ]
 
 
-def _grab_monitor(index: int):
+def _grab_monitor(index: int) -> "Image.Image":
     """Capture a single monitor through the platform grabber; returns a PIL Image."""
     from je_auto_control.utils.cv2_utils.screen_grabber import mss_grabber
     from PIL import Image
@@ -107,12 +110,17 @@ def _matching_channels(raw: Any, target: List[int], tol: int) -> Optional[List[i
 
 
 def _sleep_before(deadline: float, poll_seconds: float) -> bool:
-    """Sleep one poll, never past ``deadline``; ``False`` once the deadline has passed."""
+    """Sleep one poll, never past ``deadline``; ``False`` once the deadline has passed.
+
+    The sleep is :func:`run_control.pause`: a call from the server runs as a
+    stoppable run, so a cancel or ``ac_stop_execution`` wakes it mid-poll.
+    """
     import time as _time
+    from je_auto_control.utils.executor.run_control import pause
     remaining = deadline - _time.monotonic()
     if remaining <= 0:
         return False
-    _time.sleep(min(poll_seconds, remaining))
+    pause(min(poll_seconds, remaining), sleep=_time.sleep)
     return True
 
 

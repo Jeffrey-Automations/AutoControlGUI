@@ -34,7 +34,7 @@ _STATE_READS = (
 TOGGLE_STATES = {0: "off", 1: "on", 2: "mixed"}
 
 
-def _prop(raw, property_id: int) -> Any:
+def _prop(raw: Any, property_id: int) -> Any:
     """Read one UIA property; ``None`` when it cannot be read.
 
     ``UIA_ERRORS`` as every other UIA read uses: it holds ``COMError``
@@ -48,13 +48,13 @@ def _prop(raw, property_id: int) -> Any:
         return None
 
 
-def is_password(raw) -> bool:
+def is_password(raw: Any) -> bool:
     """Whether the element is a password field. Unreadable counts as yes."""
     value = _prop(raw, _UIA_IS_PASSWORD_PROPERTY)
     return True if value is None else bool(value)
 
 
-def _supported_values(raw) -> Dict[str, Any]:
+def _supported_values(raw: Any) -> Dict[str, Any]:
     """Raw values for every pattern the control actually supports."""
     state: Dict[str, Any] = {}
     for key, available_id, value_id in _STATE_READS:
@@ -66,7 +66,7 @@ def _supported_values(raw) -> Dict[str, Any]:
     return state
 
 
-def _normalise_value(raw, state: Dict[str, Any]) -> None:
+def _normalise_value(raw: Any, state: Dict[str, Any]) -> None:
     """Coerce ``value`` to text, or fall back to the legacy accessible value."""
     if "value" in state:
         state["value"] = str(state["value"] or "")
@@ -88,7 +88,7 @@ def _normalise_rest(state: Dict[str, Any]) -> None:
         state["number"] = float(state["number"])
 
 
-def read_state(raw) -> Dict[str, Any]:
+def read_state(raw: Any) -> Dict[str, Any]:
     """``{value?, read_only?, toggle?, selected?, number?}`` for one element.
 
     A key is absent when the control does not support it. Password fields

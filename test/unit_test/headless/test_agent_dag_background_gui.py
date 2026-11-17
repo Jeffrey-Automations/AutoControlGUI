@@ -51,7 +51,7 @@ def test_closing_the_view_does_not_stop_a_batch_already_accepted_by_the_service(
         def accepted_and_view_worker_finished():
             app.processEvents()
             accepted = read(instance, batch)["background"] is not None
-            return accepted and (tab._thread is None or not tab._thread.isRunning())
+            return accepted and not tab._run.running
 
         until(accepted_and_view_worker_finished)
         tab.close()

@@ -37,7 +37,7 @@ def run_batch(dag: DagDefinition, batch_id: str, max_parallel: int,
         return execute_started(client, started, stop_event, execute, max_parallel)
 
 
-def execute_started(client: Any, started: dict, stop_event: threading.Event | None,
+def execute_started(client: Any, started: dict[str, Any], stop_event: threading.Event | None,
                     execute: Callable[..., Any], max_parallel: int) -> Any:
     """Coordinate one pre-authorized attempt with the same claims, verification and finalization path."""
     runner = _BatchRun(client, started)
@@ -56,15 +56,15 @@ def execute_started(client: Any, started: dict, stop_event: threading.Event | No
 class _BatchRun:
     """One authorized attempt; no private coordinator identity enters destination specifications."""
 
-    def __init__(self, client: Any, started: dict) -> None:
+    def __init__(self, client: Any, started: dict[str, Any]) -> None:
         self.client, self.started = client, started
 
-    def control(self, operation: str, request: dict) -> dict:
+    def control(self, operation: str, request: dict[str, Any]) -> dict[str, Any]:
         """Send only the frozen batch/attempt identity with bounded lifecycle fields."""
         return self.client.call("dag", {"operation": operation, "request": {
             "batch_id": self.started["batch_id"], "attempt": self.started["attempt"], **request}})
 
-    def run_node(self, node: Any, _definition: Any) -> dict:
+    def run_node(self, node: Any, _definition: Any) -> dict[str, Any]:
         """Claim before destination contact; report independently checked completion before releasing dependants."""
         if node.id in self.started.get("adopted", {}):
             return self.control("validate_node", {"node_id": node.id})
@@ -83,13 +83,14 @@ class _BatchRun:
                     pass  # the durable pre-delivery claim remains an unsettled, non-replayable witness
             raise
 
-    def _dispatch(self, node: Any) -> dict:
+    def _dispatch(self, node: Any) -> dict[str, Any]:
         if node.host == "local":
             with managed_local_scope(partial(self._local_transport, node.id)):
                 return run_managed_task(node.host, node.task, host_binding=self.started["hosts"][node.host])
         return run_managed_task(node.host, node.task, host_binding=self.started["hosts"][node.host])
 
-    def _local_transport(self, node_id: str, operation: str, body: dict, timeout: float) -> dict:
+    def _local_transport(self, node_id: str, operation: str, body: dict[str, Any],
+                         timeout: float) -> dict[str, Any]:
         return self.client.call("dag", {"operation": "local_task", "request": {
             "batch_id": self.started["batch_id"], "attempt": self.started["attempt"],
             "node_id": node_id, "operation": operation, "body": body}}, timeout=timeout)

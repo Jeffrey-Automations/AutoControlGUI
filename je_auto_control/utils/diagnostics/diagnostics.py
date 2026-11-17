@@ -139,7 +139,7 @@ def _check_optional_deps() -> Check:
 
 
 def _check_audit_chain() -> Check:
-    from je_auto_control.utils.remote_desktop.audit_log import default_audit_log
+    from je_auto_control.utils.remote_desktop.audit_log import verify_audit_chain_read_only
     from je_auto_control.utils.sqlite_support import sqlite3_available
 
     # Without sqlite3 there is no chain to verify. Reporting that as a
@@ -149,7 +149,14 @@ def _check_audit_chain() -> Check:
             name="audit_chain", ok=True, severity=_SEVERITY_WARN,
             detail="no audit log on this Python: it has no sqlite3",
         )
-    result = default_audit_log().verify_chain()
+    # Read-only: a diagnosis must not create ~/.je_auto_control/audit.db,
+    # its schema, or run the one-off chain backfill.
+    result = verify_audit_chain_read_only()
+    if result is None:
+        return Check(
+            name="audit_chain", ok=True, severity=_SEVERITY_INFO,
+            detail="no chained audit log yet; diagnostics does not create one",
+        )
     if result.ok:
         return Check(
             name="audit_chain", ok=True, severity=_SEVERITY_INFO,

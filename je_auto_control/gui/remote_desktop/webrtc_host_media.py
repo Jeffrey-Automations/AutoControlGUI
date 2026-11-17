@@ -5,6 +5,10 @@ still owns every widget and slot under its original name.
 """
 from __future__ import annotations
 
+from je_auto_control.gui.remote_desktop.view_frames import ViewFrames
+
+from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
+
 from typing import Optional
 
 
@@ -35,12 +39,11 @@ from je_auto_control.utils.remote_desktop.webrtc_stats import (
     StatsPoller, StatsSnapshot,
 )
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
-    _PanelPart,
     _DEFAULT_MONITOR, _QUALITY_DOT_STYLE, _av_frame_to_qimage,
 )
 
 
-class _HostMediaMixin(_PanelPart):
+class _HostMediaMixin(_HostPanelPart):
     """Methods of ``_WebRTCHostPanel``; the module docstring says which group."""
 
     # State this group owns; the panel's __init__ sets the starting values.
@@ -73,7 +76,7 @@ class _HostMediaMixin(_PanelPart):
             try:
                 if value:
                     host.set_viewer_video_callback(
-                        self._on_viewer_video_av_frame,
+                        ViewFrames(self._view.callback("_on_viewer_video_image")),
                     )
                     host.enable_accept_viewer_video()
                 else:
@@ -195,7 +198,7 @@ class _HostMediaMixin(_PanelPart):
         else:
             self._adaptive_controller = None
         self._adaptive_poller = StatsPoller(
-            pc, self._on_host_stats, interval_s=1.0,
+            pc, self._view.callback("_on_host_stats"), interval_s=1.0,
         )
         self._adaptive_poller.start()
         autocontrol_logger.info(
@@ -263,7 +266,7 @@ class _HostMediaMixin(_PanelPart):
             host = self._multi_host._sessions.get(session_id)
         if host is None:
             return
-        host.set_viewer_video_callback(self._on_viewer_video_av_frame)
+        host.set_viewer_video_callback(ViewFrames(self._view.callback("_on_viewer_video_image")))
 
     def _on_viewer_video_av_frame(self, frame: AvFrameT) -> None:
         image = _av_frame_to_qimage(frame)

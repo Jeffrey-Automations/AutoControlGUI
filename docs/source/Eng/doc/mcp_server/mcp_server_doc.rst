@@ -88,6 +88,11 @@ Action executor / history
   ``ac_list_action_commands``, ``ac_list_run_history``,
   ``ac_stop_execution``, ``ac_list_executions`` (stop / list the stoppable
   runs; a list becomes stoppable by wrapping it in ``AC_run_stoppable``).
+  Every ``tools/call`` is itself a stoppable run, listed as ``mcp-…``
+  while it runs (``ac_list_executions`` omits its own call): a stop ends an
+  ``ac_execute_actions`` list or an ``ac_wait_for_image`` /
+  ``ac_wait_for_pixel`` poll at its next checkpoint and answers the call as
+  a tool error.
 
 Scheduler / triggers / hotkeys
   ``ac_scheduler_add_job``, ``ac_scheduler_remove_job``,
@@ -181,7 +186,10 @@ Logging notifications, progress, cancellation
   ``ctx.progress(value, total, message)`` to push
   ``notifications/progress`` (when the client supplied a
   ``progressToken``) and ``ctx.check_cancelled()`` to abort
-  cooperatively when ``notifications/cancelled`` arrives.
+  cooperatively when ``notifications/cancelled`` arrives. The cancel also
+  stops the call's stoppable run, so an action list the tool executes halts
+  at its next action and a wait on ``run_control.pause`` wakes at once; the
+  call is answered with ``-32800`` instead of a result.
 
 Starting the server (programmatic)
 ==================================
@@ -331,7 +339,7 @@ share one file. Without a store, live MCP tool sessions use an operator principa
 host-management tools require an authenticated administrator. The stdio transport has no
 bearer token and uses the same operator ceiling for its live tool sessions.
 
-- A tool defaults to ``read_screen`` for ``readOnlyHint`` and ``drive_input``
+- A tool defaults to ``read_data`` for ``readOnlyHint`` and ``drive_input``
   otherwise, with explicit capability overrides. Sensitive reads require
   ``drive_input`` (operator/admin): clipboard and history, local document/data/SQL
   readers, dotenv and reference resolution, JWT/OTP generation, persistent-store
@@ -347,54 +355,28 @@ bearer token and uses the same operator ceiling for its live tool sessions.
   ``ac_load_plugins`` need ``manage_hosts`` (``admin``); ``ac_user_add`` /
   ``_remove`` / ``_set_role`` / ``_rotate_token`` / ``_list`` need
   ``manage_users`` (``admin``).
-- Read-only is not the same as harmless to show: the read-only tools that
-  return the host's data rather than the state of its screen need
-  ``read_data``, which ``operator`` and ``admin`` hold and ``viewer`` does
-  not. They are the clipboard tools (``ac_get_clipboard`` and its
-  ``_csv`` / ``_files`` / ``_html`` / ``_image`` / ``_rtf`` variants,
-  ``ac_clipboard_formats``, ``ac_assert_clipboard``, ``ac_clip_history_list``
-  / ``_search``); the file readers (``ac_load_dotenv``, ``ac_load_data``,
-  ``ac_read_action_file``, ``ac_read_document``, ``ac_read_presentation``,
-  ``ac_read_workbook``, ``ac_extract_pdf_text``, ``ac_assert_pdf_text``,
-  ``ac_assert_file``, ``ac_build_provenance``, ``ac_verify_provenance``); the
-  database and store readers (``ac_sql_query``, ``ac_assert_db``,
-  ``ac_get_asset``, ``ac_list_assets``, ``ac_cas_get``, ``ac_outbox_pending``,
-  ``ac_checkpoint_status``, ``ac_memory_recall``, ``ac_memory_recent``,
-  ``ac_s3_list``); references and tokens (``ac_resolve_ref``,
-  ``ac_resolve_refs``, ``ac_generate_otp``, ``ac_jwt_encode``,
-  ``ac_jwt_decode``); and the process list, network and microphone probes
-  (``ac_list_processes``, ``ac_assert_process``, ``ac_wait_for_process``,
-  ``ac_assert_http``, ``ac_wait_for_port``, ``ac_assert_audio``). The list is
-  ``DATA_TOOLS`` in ``je_auto_control.utils.rbac.policy``. A ``viewer`` keeps
-  every other read-only tool: screen size, windows, pixels, image and text
-  location, accessibility reads, waits.
-- The rule behind that list: a tool that returns **records or configuration
-  the host keeps** needs ``read_data``; a tool that only observes the live
-  screen needs ``read_screen``. So ``read_data`` also covers run history and
-  what is computed from it (``ac_list_run_history``, ``ac_flaky_report``,
-  ``ac_rank_tests``, ``ac_select_tests``, ``ac_shard_suite``); agent traces
-  and the cost ledger (``ac_trace_export``, ``ac_trace_summary``,
-  ``ac_costs_list``, ``ac_costs_summary``); action journals
-  (``ac_journal_read``, ``ac_journal_runs``); the self-healing log, its
-  statistics, stored revisions and datasets (``ac_self_heal_log_list``,
-  ``ac_heal_stats``, ``ac_self_heal_revision_list``,
-  ``ac_self_heal_evaluate``); locator strategy history, repairs and saved
-  libraries (``ac_ab_report``, ``ac_ab_best_strategy``, ``ac_repair_pending``,
-  ``ac_repair_resolved``, ``ac_element_list``, ``ac_skill_list``,
-  ``ac_skill_search``); stored policy and state (``ac_usb_acl_list``,
-  ``ac_lease_active``, ``ac_quarantine_list``, ``ac_pending_artifacts``);
-  and a connected device's clipboard
-  (``ac_android_get_clipboard``, ``ac_ios_get_clipboard``). These were
-  ``read_screen`` before, so **a viewer token can no longer call them**;
-  ``operator`` and ``admin`` are unaffected.
-- What a call costs is not a capability. ``ac_vlm_locate`` and
-  ``ac_self_heal_locate`` read the screen and stay ``read_screen`` although a
-  call may be billed by a model provider; limit spend with the rate limiter
-  or by not configuring a VLM backend for a server viewers reach.
-- The REST API follows the same rule: ``GET /history`` and ``GET /usb/acl``
-  need ``read_data`` like ``ac_list_run_history`` and ``ac_usb_acl_list``, so
-  a viewer token reads neither the run history nor the USB ACL there either
-  (see the REST table in the operations chapter).
+- MCP read-only hints do not grant viewer access. Reviewed live-screen and caller-data
+  tools use ``read_screen``; stored files, device data and unknown tools require
+  ``read_data``. Aliases share canonical policy and stronger overrides take precedence.
+  Optional image sources, environment-backed config fields and file open plans require
+  ``read_data``. Anchor locators permit live accessibility/OCR; image templates require
+  ``read_data`` and VLM requests require ``drive_input``. Read-only invocation rejects
+  capture artifacts and VLM branches, and its catalogue excludes caller-selected ADB
+  executables. MCP CI annotations return formatted lines without writing to stdout.
+  Unreviewed plugin and WebRunner initialization tools are omitted from read-only
+  catalogues and require dependency-specific review.
+- Host read-only mode applies the same restrictions to explicitly supplied registries
+  and later registrations. Both admission and refreshed invocation check mixed
+  arguments. Configured MCP failure screenshots require a writable tool and a refreshed
+  caller with drive authority; readonly calls and viewers never trigger them. This does
+  not promise that every dependency or diagnostic read has no initialization side
+  effects.
+- The audited REST routes follow the same source policy: history, USB ACL, jobs,
+  sessions, USB passthrough status and loopback/remote inventories require
+  ``read_data``. Diagnostics and passive backend metadata also require data
+  authority. The corresponding registered AC status/diagnostic commands enforce
+  it before providers run; readonly descriptions do not grant viewer access.
+  See the endpoint table and command scope in the operations chapter.
 - Resources follow the same rule. ``autocontrol://history`` (the last 100
   run-history rows) and the action files under ``autocontrol://files/`` need
   ``read_data``; ``autocontrol://commands`` and the live screen feed need
@@ -402,11 +384,6 @@ bearer token and uses the same operator ceiling for its live tool sessions.
   and ``resources/read`` and ``resources/subscribe`` refuse the rest with
   ``-32003``. A resource URI the server does not recognise (one from a custom
   provider) is treated as stored data and needs ``read_data``.
-- Tools that report the live state of this process rather than a stored
-  record -- ``ac_list_executions``, ``ac_scheduler_list_jobs``,
-  ``ac_trigger_list``, ``ac_hotkey_list``, ``ac_observe_list``,
-  ``ac_watchdog_list``, ``ac_journal_status``, the USB device lists -- stay
-  ``read_screen``.
 - ``tools/list`` returns only the tools the caller may call, and
   ``tools/call`` on any other answers JSON-RPC error ``-32003``
   (``Forbidden: ...``, ``data.required_capability``) without running it.
@@ -830,7 +807,7 @@ under RBAC. A plugin opts one of its callables out by setting the attribute
 The tool is then registered with ``readOnlyHint`` true. It is listed and
 runs on a read-only server in all three tool modes (``full``,
 ``progressive`` -- once enabled -- and ``static``, when the profile names
-it), and under RBAC it needs only ``read_screen``, so a ``viewer`` may call
+it), and under RBAC it needs ``read_data``, so a ``viewer`` may not call
 it. Only the read-only hint is taken from the plugin; the tool is not
 marked idempotent.
 
@@ -839,7 +816,7 @@ marked idempotent.
    The declaration is **trusted, not verified**. It is the plugin author's
    word: the server cannot tell what arbitrary Python does, and a callable
    that declares itself read-only and then writes files or sends input will
-   do so on a read-only server and for a viewer. Declaring it does not
+   do so on a read-only server for an authorized caller. Declaring it does not
    sandbox it. Review a plugin before giving it a directory a read-only or
    viewer-facing server watches. Each time such a tool is registered the
    server logs a warning naming it (``plugin tool 'plugin_ac_queue_depth' is

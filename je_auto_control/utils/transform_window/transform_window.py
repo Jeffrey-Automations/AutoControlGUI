@@ -16,10 +16,13 @@ Each is a thin dispatch onto the injectable ``accessibility.backends.get_backend
 seam — headless-testable via a fake backend; the real UIA calls live in the
 Windows backend. Imports no ``PySide6``.
 """
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from je_auto_control.utils.accessibility.backends.base import AccessibilityBackend
 
 
-def _backend():
+def _backend() -> "AccessibilityBackend":
     from je_auto_control.utils.accessibility.backends import get_backend
     return get_backend()
 
