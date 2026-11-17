@@ -21,9 +21,15 @@ def main() -> None:
         receiver = WorkspaceSettingsSyncAdapter(receiver_source, SyncAdapterState(root / 'receiver.sqlite3',
             SyncLocalIdentity('https://controlled.invalid', 'example', 'laptop')))
         report = receiver.apply(sender.snapshot())
-        result = materialize_sync_profile([receiver], root / 'profile-cache')
+        cache = (root / 'profile-cache').resolve()
+        result = materialize_sync_profile([receiver], cache)
+        # The generation's directory comes back from the library; read from it only
+        # once it is proven to be inside the cache this example created.
+        generated = (Path(result.directory) / 'workspace.ini').resolve()
+        if not generated.is_relative_to(cache):
+            raise ConfigSyncError('the materialized profile is outside its cache directory')
         working_copy = root / 'explicit-workspace.ini'
-        working_copy.write_bytes((result.directory / 'workspace.ini').read_bytes())
+        working_copy.write_bytes(generated.read_bytes())
         # A caller may explicitly pass QSettings(working_copy, IniFormat) to AutoControlGUIUI.
         # The immutable generation itself must remain read-only when the GUI later saves preferences.
         if receiver_source.exists() or b'local-only' in working_copy.read_bytes():
