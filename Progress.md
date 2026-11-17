@@ -689,7 +689,12 @@ OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLa
 區段 padding 的原生相容性、實際頁面保護與 DLL 信任仍未驗證，不能當成完整 runtime attestation。
 內部 OwnedFixtureTarget 已組裝啟動、映像核對、fixture 命令與受管語意讀取；
 擁有者在啟動前保留，失敗回收可重試，終止後不得發布晚到的 target。
+`ready()` 已能在受管 scope 內先綁定固定 task／owner 再延遲取得資源，
+並防止另一個 session 在啟動發布與內部 owner 綁定之間接管。隱藏 Python helper
+已串起真實 reader 邏輯、既有語意 IPC、完成判定、失敗代碼與回收；原生呼叫及 buffer 仍為注入資料。
 目前僅有注入測試，尚未註冊到正式 profile／公開入口，原生信任與驗收仍待完成。
+自訂語意 worker 的本地 checkpoint 目前只有活動檢查；即時撤權／取消由主機 RPC 輪詢與 helper 退場處理。
+worker 逐次讀取的本地權限更新、正式 helper 來源交付，以及 Linux 非顯示 helper 的 owner-service 路由仍待接合。
 原生 smoke 工具已有初始讀值、操作回條、新讀回、runtime 完成及回收的分項報告；
 目前只跑過靜態產物預檢與注入測試，不代表原生驗收或完整故障矩陣通過。
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。

@@ -1,6 +1,7 @@
 """Own pinned fixture startup, guarded semantic reads and retryable resource retirement."""
 from __future__ import annotations
 
+from _thread import LockType
 from dataclasses import dataclass, field, replace
 from enum import Enum, auto
 import math
@@ -8,9 +9,10 @@ import threading
 from typing import Any, Callable, Mapping, NoReturn
 
 from .errors import AgentTaskError
-from .fixture_commands import FixtureCommands
+from .context import TaskOperation, current_operation
+from .fixture_commands import FIXTURE_COMMAND, FixtureCommands
 from .fixture_launch import OwnedChannelLauncher
-from .memory_target import MemoryBinding, MemorySemanticTarget
+from .memory_target import MemoryBinding, MemorySemanticTarget, _owner_key
 from .models import AgentTaskSpec
 from .semantic_target import SemanticReceipt, SemanticSnapshot, SemanticTarget
 from ..exception.control_signals import is_run_interruption
@@ -50,6 +52,19 @@ class _State(Enum):
     RETIRED = auto()
 
 
+@dataclass(frozen=True)
+class _ManagedScope:
+    spec: AgentTaskSpec
+    owner: tuple[str, str, str | None] | None
+
+
+@dataclass
+class _Lifecycle:
+    state: _State = _State.NEW
+    scope: _ManagedScope | None = field(default=None, repr=False)
+    ready: LockType = field(default_factory=threading.Lock, repr=False)
+
+
 def _raise_failure(failures: list[BaseException]) -> NoReturn:
     for error in failures:
         if (not isinstance(error, Exception) or isinstance(error, ExecutionStopped)
@@ -69,20 +84,20 @@ class OwnedFixtureTarget(SemanticTarget):
         self._provider_factory = provider_factory
         self._target: MemorySemanticTarget | None = None
         self._reader: ProcessMemoryReader | None = None
-        self._state = _State.NEW
+        self._lifecycle = _Lifecycle()
         self._publication = threading.Lock()
 
     def _live(self) -> None:
-        if self._state is _State.RETIRED:
+        if self._lifecycle.state is _State.RETIRED:
             raise AgentTaskError("fixture target is retired")
 
     def start(self, *, checkpoint: Callable[[], None]) -> OwnedFixtureTarget:
         """Acquire once; a failed start retires use but leaves every owner available."""
         with self._publication:
             self._live()
-            if self._state is not _State.NEW:
+            if self._lifecycle.state is not _State.NEW:
                 raise AgentTaskError("fixture target cannot be started twice")
-            self._state = _State.STARTING
+            self._lifecycle.state = _State.STARTING
 
         def check() -> None:
             self._live()
@@ -95,7 +110,7 @@ class OwnedFixtureTarget(SemanticTarget):
             with self._publication:
                 self._live()
                 self._target = target
-                self._state = _State.ACTIVE
+                self._lifecycle.state = _State.ACTIVE
         except BaseException as error:
             try:
                 self.cleanup()
@@ -143,8 +158,55 @@ class OwnedFixtureTarget(SemanticTarget):
         return target
 
     def ready(self, spec: AgentTaskSpec) -> tuple[bool, str]:
-        """Bind the task through the existing managed memory target."""
-        return self._active().ready(spec)
+        """Claim managed ownership before acquiring any fixture resources."""
+        # pylint: disable-next=consider-using-with  # reason: concurrent readiness must refuse instead of blocking
+        if not self._lifecycle.ready.acquire(blocking=False):
+            raise AgentTaskError("fixture readiness is already in progress")
+        try:
+            operation = self._claim_scope(spec)
+            return self._ready_owned(spec, operation)
+        finally:
+            self._lifecycle.ready.release()
+
+    def _claim_scope(self, spec: AgentTaskSpec) -> TaskOperation:
+        operation = current_operation()
+        if (operation is None or operation.spec != spec or spec.target != self._image.target_id
+                or set(spec.allowed_tools) != {FIXTURE_COMMAND}):
+            raise AgentTaskError("fixture startup requires its exact managed task scope")
+        operation.checkpoint()
+        scope = _ManagedScope(spec, _owner_key(operation.owner))
+        with self._publication:
+            self._live()
+            if self._lifecycle.state is _State.STARTING:
+                raise AgentTaskError("fixture startup is already in progress")
+            if self._lifecycle.scope is not None and self._lifecycle.scope != scope:
+                raise AgentTaskError("fixture belongs to a different managed owner or task")
+            self._lifecycle.scope = scope
+        return operation
+
+    def _ready_owned(self, spec: AgentTaskSpec, operation: TaskOperation) -> tuple[bool, str]:
+        def check() -> None:
+            if current_operation() is not operation:
+                raise AgentTaskError("fixture startup operation scope changed")
+            operation.checkpoint()
+            if current_operation() is not operation:
+                raise AgentTaskError("fixture startup operation scope changed")
+            self._live()
+
+        try:
+            if self._lifecycle.state is _State.NEW:
+                self.start(checkpoint=check)
+            check()
+            result = self._active().ready(spec)
+            check()
+            return result
+        except BaseException as error:
+            try:
+                self.cleanup()
+            # pylint: disable-next=broad-exception-caught  # reason: preserve readiness or cleanup interruption identity
+            except BaseException as cleanup:
+                _raise_failure([error, cleanup])
+            raise
 
     def observe(self) -> dict[str, Any]:
         """Expose only the reviewed semantic fields through the original runtime scope."""
@@ -167,7 +229,7 @@ class OwnedFixtureTarget(SemanticTarget):
     def cleanup(self) -> None:
         """Retire IPC first; try every resource and retain failed owners for retry."""
         with self._publication:
-            self._state = _State.RETIRED
+            self._lifecycle.state = _State.RETIRED
         actions = [self._owners.launcher.close]
         if self._target is not None:
             actions.append(self._target.cleanup)

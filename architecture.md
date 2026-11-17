@@ -86,6 +86,9 @@ Evidence covers matching bytes only, not live protection flags or runtime integr
 OwnedFixtureTarget assembles those checks with fixture commands and managed semantic
 reads. It owns the launcher and image observers before startup, rejects late startup
 publication after retirement, and retains every failed cleanup owner for retry.
+Managed readiness claims the exact task and owner before lazy acquisition and
+rechecks the original operation after callbacks. Competing readiness cannot bind
+the inner target between startup publication and owner configuration.
 It remains internal and unregistered pending native trust and acceptance evidence.
 The native fixture acceptance CLI defaults to static inventory matching. Its
 explicit smoke path uses this assembly and reports selected checks separately

@@ -317,11 +317,29 @@ fixture's self-reported PID must not be assumed equal or used as attestation.
 
 `OwnedFixtureTarget` is an internal, unregistered assembly for the native fixture.
 The host constructs it with a `FixtureImage`, an owned launcher, two fresh image
-observers and a provider factory before calling `start(checkpoint=...)`. The
+observers and a provider factory. Explicit diagnostic callers use
+`start(checkpoint=...)`; managed callers may let `ready()` start it lazily. The
 provider factory must return an unopened provider using the supplied launch
 attestor. Task JSON cannot supply these objects. Startup parses the pinned baseline,
 attests the launch, checks bootstrap identity, and binds the image guard to the
 original launch hash before publishing the private semantic target.
+
+Managed readiness requires the exact current task, fixed target and fixture command
+scope. It pins the task and owner key, including the authorization-store path,
+before acquisition. Readiness admission is nonblocking and remains exclusive until
+the private memory target is bound. A competing caller cannot claim a newly
+published inner target. Startup callbacks use the original operation and recheck
+that context before readiness succeeds. Failure after the claim retires the
+resources; unrelated scope refusals do not retire an existing owner's target.
+
+The hidden `memory_target_helper.py` test fixture serves this path through the real
+semantic worker/proxy with injected launch calls and buffers. It uses a fresh
+synthetic identity per helper process, not OS attestation. Tests cover semantic
+completion, typed read failures and process retirement. The worker's custom-target
+checkpoint currently checks activity rather than refreshing authorization locally;
+the host proxy polls live authority and retires the helper on cancellation/revocation.
+Worker-local refresh, reviewed source delivery and Linux non-display owner-service
+routing remain separate prerequisites for production registration.
 
 The assembly selects a read budget of the complete image plan plus the fixture's
 72 bytes, capped at 1 MiB, with at most 1,024 region checks. The host chooses a
