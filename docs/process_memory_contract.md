@@ -866,3 +866,38 @@ The isolated packaged worker help command was checked without native acquisition
 No UI profile was registered against a real native deployment. Trusted helper
 source/interpreter/DLL delivery, actual UIA behavior and desktop noninterference
 remain pending in Progress.md.
+## Internal service-status prerequisite
+
+`WindowsServiceStatusReader` in `agent_runtime/windows_service.py` accepts one
+host-selected service key name. Construction validates and binds functions but
+opens no handles. Its first `read(timeout=..., checkpoint=...)` opens the local
+active SCM database with `SC_MANAGER_CONNECT`, then the named service with
+`SERVICE_QUERY_STATUS`. It retains both handles until `close()`. Callers must
+retain the reader before reading and through any failed cleanup retry.
+
+Only Win32 own-process/shared-process services, optionally interactive, are
+accepted. The reader has no enumeration, remote host, process access, start,
+stop, configuration or elevation methods. This is an internal prerequisite,
+not a registered profile, executor command, public API or supported os.service
+operation. The managed helper, report adapter and operation/readback cycle
+remain in `Progress.md`.
+
+The nine-DWORD status is the latest SCM report, marked `best_effort`. Its progress
+checkpoint is not a revision. PID is diagnostic only and omitted for stopped,
+start-pending and stop-pending states, or when zero. Accepted controls do not
+grant operation permission. Query success does not establish an atomic snapshot,
+actual instantaneous service state or process identity.
+
+Every admitted acquisition/query/checkpoint failure retires the reader. Close
+sets retirement before waiting for the serialized native call, attempts service
+then SCM cleanup, and retains failed handles for retry. Nested reads are refused;
+checkpoint-triggered close is supported. An admission timeout does not retire
+another read already in progress. Deadlines reject late output but cannot
+interrupt native calls or cleanup; enclosing helper retirement remains necessary.
+Injected tests establish these contracts without calling actual services.
+
+Official contracts are documented in
+[QueryServiceStatusEx](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-queryservicestatusex),
+[OpenSCManagerW](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-openscmanagerw),
+[OpenServiceW](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-openservicew)
+and [SERVICE_STATUS_PROCESS](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_status_process).

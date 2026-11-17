@@ -1618,3 +1618,13 @@ The `uia_fixture` profile grants no tools, roots or desktop applications and use
 the existing host management and task editor surfaces. Empty tool scopes require
 external mode and no planned actions. They do not make an empty plan complete.
 Native execution and trusted Python/COM/DLL delivery remain unverified.
+
+`service_status.py` models the latest SCM report as diagnostic best-effort data.
+`windows_service.py` lazily acquires local SCM connect and service query handles
+for one host-selected key name. Reads retain those handles; failure or close
+permanently retires the owner. Failed closes remain owned for retry. An RLock
+serializes native calls, a retirement event rejects late results, and a separate
+read guard rejects checkpoint reentry without preventing reentrant close.
+Timeouts bound lock admission and reject late reports, but cannot interrupt a
+native call or cleanup. No service operations, profile or managed helper are
+exposed by this prerequisite. Native service acceptance remains paused.

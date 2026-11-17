@@ -642,6 +642,8 @@ proof = await target.verify(receipt, CompletionQuery("export_file_matches"))
 另外兩個使用情境：OS adapter 讀取指定服務狀態後執行該服務支援的管理操作，並重新查詢；
 browser adapter 從受管頁面取得欄位、透過 DOM 提交，再驗證新回應或產物。
 兩者都不必知道記憶體位址，也不能只靠命令回傳成功判定完成。
+服務讀取已有內部 SCM query-only owner 與注入測試；受管 helper、固定服務 profile、
+狀態報告接合、正式管理操作及獨立讀回仍待實作，不能視為 os.service 已支援。
 
 - `TargetIdentity`：主機／登入 session、PID、程序建立時間、執行檔身分與架構；視窗／文件／瀏覽器
   context 另帶各自身分。PID 或 HWND 相同不能單獨證明還是同一目標。
