@@ -10,9 +10,10 @@ from je_auto_control.utils.agent_runtime import AgentRuntime, AgentTaskSpec
 from je_auto_control.utils.agent_runtime.context import TaskOperation, operation_scope
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.fixture_commands import FIXTURE_COMMAND
+from je_auto_control.utils.agent_runtime.fixture_observations import FIXTURE_SOURCES
+from je_auto_control.utils.agent_runtime.observation_report import ObservationReport
 from je_auto_control.utils.agent_runtime.semantic_native_target import NativeSemanticTarget
 from je_auto_control.utils.exception.control_signals import OperationCancelledError
-from je_auto_control.utils.process_memory.models import MemoryObservationError
 from je_auto_control.utils.rbac.authorization import AuthorizationContext
 from headless.test_agent_fixture_target import setup
 
@@ -49,7 +50,8 @@ def test_lazy_readiness_binds_owner_before_launch_and_is_idempotent():
     with operation_scope(TaskOperation(requested, lambda: None, owner)):
         assert target.ready(requested) == (True, "")
         assert target.ready(requested) == (True, "")
-        assert target.observe()["fields"] == {"document_id": 7, "job_status": "ready"}
+        captured = ObservationReport.from_dict(target.observe(), required=FIXTURE_SOURCES)
+        assert dict(captured.require_grounding().fields) == {"document_id": 7, "job_status": "ready"}
     assert len(calls) == 1
     for other in (AuthorizationContext("bob", "admin", "alice-store"),
                   AuthorizationContext("alice", "admin", "other-store")):
@@ -133,8 +135,11 @@ def test_scope_change_during_startup_retires_the_acquired_fixture():
 
 
 def helper(tmp_path, *, partial=False):
+    class FixtureProxy(NativeSemanticTarget):
+        observation_sources = FIXTURE_SOURCES
+
     argv = [sys.executable, "-u", str(HELPER)] + (["--partial-read"] if partial else [])
-    target = NativeSemanticTarget(argv=argv, resource_path=tmp_path / "fixture.lock")
+    target = FixtureProxy(argv=argv, resource_path=tmp_path / "fixture.lock")
     return AgentRuntime(tmp_path / "runtime.sqlite", targets={"fixture": target}), target
 
 
@@ -144,8 +149,9 @@ def test_actual_helper_carries_guarded_memory_read_command_completion_and_retire
         task = runtime.submit(spec()).task_id
         frame = runtime.observe(task)
         channel = proxy._channel
-        assert frame.data["source"] == "process_memory"
-        assert frame.data["fields"] == {"document_id": 7, "job_status": "ready"}
+        captured = ObservationReport.from_dict(frame.data, required=FIXTURE_SOURCES)
+        assert dict(captured.require_grounding().fields) == {"document_id": 7, "job_status": "ready"}
+        assert len(captured.sources) == 2
         assert "header_address" not in str(frame.data)
         runtime.act(task, {"tool": FIXTURE_COMMAND, "observation_id": frame.observation_id,
                           "arguments": {"document_id": 42, "job_status": "done"}})
@@ -159,8 +165,11 @@ def test_actual_helper_preserves_memory_failure_reason(tmp_path):
     runtime, proxy = helper(tmp_path, partial=True)
     try:
         task = runtime.submit(spec()).task_id
-        with pytest.raises(MemoryObservationError, match="partial_read"):
-            runtime.observe(task)
+        frame = runtime.observe(task)
+        assert frame.data["status"] == "partial"
+        assert frame.data["sources"]["process_memory"] == {"failure": "partial_read"}
+        assert frame.data["sources"]["fixture_protocol"]["snapshot"]["fields"] == {
+            "document_id": 7, "job_status": "ready"}
         channel = proxy._channel
         runtime.cancel(task)
         assert channel.retired
@@ -176,8 +185,10 @@ def test_helper_restart_cannot_reuse_synthetic_memory_identity(tmp_path):
         runtime.cancel(first)
         second = runtime.submit(spec()).task_id
         after = runtime.observe(second)
-        assert before.data["identity_digest"] != after.data["identity_digest"]
-        assert after.data["fields"] == {"document_id": 7, "job_status": "ready"}
+        first_snapshot = ObservationReport.from_dict(before.data, required=FIXTURE_SOURCES).require_grounding()
+        second_snapshot = ObservationReport.from_dict(after.data, required=FIXTURE_SOURCES).require_grounding()
+        assert first_snapshot.identity_digest != second_snapshot.identity_digest
+        assert dict(second_snapshot.fields) == {"document_id": 7, "job_status": "ready"}
         runtime.cancel(second)
     finally:
         runtime.close()

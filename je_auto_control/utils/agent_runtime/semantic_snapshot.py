@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 import re
 import sys
 from typing import Any, Literal, Mapping
@@ -111,3 +112,7 @@ class SemanticSnapshot:
     def grounding(self) -> dict[str, Any]:
         """Keep every state and provenance field; omit only validated capture metadata."""
         return {key: value for key, value in self.to_dict().items() if key not in _METADATA}
+
+    def same_state(self, other: SemanticSnapshot) -> bool:
+        """Compare state and provenance without Python's boolean/integer coercion."""
+        return json.dumps(self.grounding(), sort_keys=True) == json.dumps(other.grounding(), sort_keys=True)

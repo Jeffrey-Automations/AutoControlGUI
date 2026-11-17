@@ -57,7 +57,8 @@ require `unreadable_region` from a read with matching payload-page evidence and 
 read of the protected second half. The same error from an image, header or sequence
 page cannot satisfy the case. Reports expose only the requested layout and closed
 check booleans, never the private locations or memory contents. Page cases issue no
-control command and do not claim runtime task completion. The overall fault matrix
+state-changing control command. They require the expected read-only IPC snapshot
+and do not claim runtime task completion. The overall fault matrix
 stays unverified; only injected tests have exercised this runner so far.
 
 The allocation and protection rules follow Microsoft's

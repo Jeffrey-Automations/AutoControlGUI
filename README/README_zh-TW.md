@@ -99,4 +99,4 @@ HostBrowser 亦會拒絕晚到發布，並保留未完成的執行緒與關閉�
 
 MultiViewerHost 可回傳含原始 session 清理物件的 offer，延後清理不會停止替換後的連線或畫面來源；GUI 接入仍待完成。
 
-主機選定的語意 adapter 可透過既有觀察 API 回傳多來源報告。缺失來源與衝突會保留顯示，但不能授權操作或確認完成。目前以合成來源與隱藏 helper 測試契約；fixture memory／IPC 擷取及 UIA／DOM 來源整合仍待完成。
+主機選定的語意 adapter 可透過既有觀察 API 回傳多來源報告。缺失來源與衝突會保留顯示，但不能授權操作或確認完成。fixture 已整合受審閱的記憶體讀取與自有唯讀 IPC snapshot，並在提交前重新核對兩者。目前以注入原生呼叫與隱藏 helper 測試；UIA／DOM 整合及原生驗收仍待完成。

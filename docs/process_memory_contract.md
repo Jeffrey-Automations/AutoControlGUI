@@ -535,12 +535,25 @@ fresh compatible evidence from every original source; disagreement or missing
 sources produces an unknown result. The complete-only `SemanticSnapshot` wire schema
 is unchanged and lives in `semantic_snapshot.py`, re-exported by `semantic_target.py`.
 
-The report/runtime contract is verified using synthetic two-source targets and real
-hidden Python helper IPC. The managed fixture still uses its existing single-source
-observation pending migration to memory plus owned IPC snapshot acquisition. Scoped
-UIA/DOM source identity, field-missing semantics and revision normalization remain
-pending; existing foreground desktop or legacy DOM dictionaries are not converted
-automatically. This work is not native observation or background-application acceptance.
+The managed fixture now captures `process_memory` and `fixture_protocol` sources.
+The IPC source uses the retained launch-bound control, stamps identity from the
+measured memory binding and accepts only the fixed snapshot fields and sequence.
+Capture and precommit readback share one owner lock; cleanup can interrupt IPC
+without acquiring that lock. Before `compare_set`, fresh complete agreement must
+still match the original memory snapshot. The fixture remains responsible for its
+atomic sequence comparison at commit.
+
+Safe memory read failures retain the IPC snapshot in a partial report. Unsupported
+memory observations can indicate failed code attestation and therefore propagate,
+as do scope, lifetime and cleanup errors. IPC protocol/transport failures are not
+downgraded to missing sources; their retirement failures remain reachable. Checkpoints
+revalidate the captured operation and owner before and after each source boundary.
+
+Tests use injected native calls/buffers, the actual reader and real hidden Python
+helper IPC. Scoped UIA/DOM source identity, field-missing semantics and revision
+normalization remain pending; existing foreground desktop or legacy DOM dictionaries
+are not converted automatically. This work is not native observation or
+background-application acceptance.
 
 A `semantic` success criterion compares fresh completion-time observations with
 the recorded target witness for a named command. For the test-owned counter:
@@ -721,7 +734,8 @@ claims and consumes a fresh observation scope; earlier successful traces cannot
 be replayed against another target. Split mode
 requires complete initial semantic readback; refusal modes require both the expected
 reader reason and matching payload evidence, without reading the protected half.
-These cases perform no command and do not claim runtime completion or full native
+These cases request only read-only IPC snapshots, never state mutations, and do not
+claim runtime completion or full native
 fault coverage. Only injected tests have exercised the runner.
 Native execution stays paused under `Progress.md`; native verification of the typed calls,
 trusted bootstrap matching, page-protection fault injection, host probe configuration, runtime

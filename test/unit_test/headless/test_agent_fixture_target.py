@@ -35,6 +35,10 @@ def setup():
         if operation == "bootstrap":
             return original(operation, value, **kwargs)
         kwargs["check"]()
+        if value["command"] == "snapshot":
+            document, status = struct.unpack_from("<I12s", provider.memory, 0x2300)
+            return {"kind": "snapshot", "document_id": document, "job_status": status.rstrip(b"\0").decode(),
+                    "sequence": struct.unpack_from("<Q", provider.memory, 0x2400)[0]}
         assert value["expected_sequence"] == struct.unpack_from("<Q", provider.memory, 0x2400)[0]
         revision = value["expected_sequence"] + 2
         struct.pack_into("<I12s", provider.memory, 0x2300,

@@ -19,7 +19,9 @@ from je_auto_control.utils.agent_runtime.fixture_launch import OwnedChannelLaunc
 from je_auto_control.utils.agent_runtime.fixture_target import FixtureImage, OwnedFixtureTarget
 from je_auto_control.utils.agent_runtime.fixture_worker import create_target
 from je_auto_control.utils.agent_runtime.models import AgentTaskBudget
-from je_auto_control.utils.agent_runtime.semantic_target import SemanticSnapshot
+from je_auto_control.utils.agent_runtime.observation_report import ObservationReport
+from je_auto_control.utils.agent_runtime.fixture_observations import FIXTURE_SOURCES
+from je_auto_control.utils.agent_runtime.semantic_snapshot import SemanticSnapshot
 from je_auto_control.utils.exception.control_signals import is_run_interruption
 from je_auto_control.utils.executor.run_control import ExecutionStopped
 from je_auto_control.utils.process_memory.fixture_probe import FixtureBinding
@@ -287,7 +289,7 @@ def _roundtrip(runtime: AgentRuntime, checks: dict[str, bool]) -> None:
         success_criteria=({"kind": "semantic", "tool": FIXTURE_COMMAND,
                            "fields": expected},))).task_id
     initial = runtime.observe(task)
-    snapshot = SemanticSnapshot.from_dict(initial.data)
+    snapshot = ObservationReport.from_dict(initial.data, required=FIXTURE_SOURCES).require_grounding()
     _require(dict(snapshot.fields) == {"document_id": 17, "job_status": "ready"}
              and snapshot.revision == 0)
     checks["initial_state"] = True
@@ -295,7 +297,7 @@ def _roundtrip(runtime: AgentRuntime, checks: dict[str, bool]) -> None:
                                  "arguments": expected})
     _require(receipt.status == "confirmed" and receipt.result["comparison"] == "atomic")
     checks["operation_receipt"] = True
-    after = SemanticSnapshot.from_dict(runtime.observe(task).data)
+    after = ObservationReport.from_dict(runtime.observe(task).data, required=FIXTURE_SOURCES).require_grounding()
     _require(dict(after.fields) == expected and after.revision == 2
              and after.identity_digest == snapshot.identity_digest)
     checks["independent_readback"] = True
@@ -310,14 +312,18 @@ def _page_read(runtime: AgentRuntime, checks: dict[str, bool], trace: PageTrace)
         success_criteria=({"kind": "semantic", "tool": FIXTURE_COMMAND,
                            "fields": {"job_status": "ready"}},))).task_id
     trace.begin()
-    try:
-        snapshot = SemanticSnapshot.from_dict(runtime.observe(task).data)
-    except MemoryObservationError as error:
-        _require(trace.layout != "split" and error.reason is FailureReason.UNREADABLE_REGION
+    observation = ObservationReport.from_dict(runtime.observe(task).data, required=FIXTURE_SOURCES)
+    protocol = dict(observation.sources)["fixture_protocol"]
+    _require(isinstance(protocol, SemanticSnapshot)
+             and dict(protocol.fields) == {"document_id": 17, "job_status": "ready"} and protocol.revision == 0)
+    if trace.layout != "split":
+        _require(observation.status == "partial"
+                 and dict(observation.sources)["process_memory"] == FailureReason.UNREADABLE_REGION.value
                  and trace.consume())
         checks["expected_reader_refusal"] = True
     else:
-        _require(trace.layout == "split" and trace.consume()
+        snapshot = observation.require_grounding()
+        _require(trace.consume()
                  and dict(snapshot.fields) == {"document_id": 17, "job_status": "ready"}
                  and snapshot.revision == 0)
         checks["split_readback"] = True

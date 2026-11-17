@@ -9,6 +9,12 @@ request are rejected. Counter-fixture IPC tests cover success without effect,
 cached pre-dispatch observations and helper restart. Native memory targets,
 cross-clock helpers and desktop noninterference are not established by these tests.
 
+The managed fixture now corroborates reviewed memory fields with its retained
+read-only IPC snapshot. Partial memory reads and differing values/revisions remain
+visible but cannot ground actions; submission rechecks both sources before the
+fixture's atomic sequence comparison. Injected native calls and hidden Python helper
+tests cover this path. UIA/DOM fusion and native acceptance remain unverified.
+
 X11 package import defers display connections, server keycode resolution, RECORD listener startup
 and uinput device selection until use. Explicit key-table retrieval returns a real mutable dict
 and requires an X connection. Screen and input operations do not start recording. This startup

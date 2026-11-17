@@ -146,7 +146,10 @@ def test_packaged_worker_uses_managed_acquisition_and_eof_cleanup(tmp_path, mode
     replies = [json.loads(line) for line in sink.getvalue().splitlines()]
     if mode == "managed":
         assert len(calls) == 1 and channel.retired
-        assert replies[-1]["result"]["fields"] == {"document_id": 7, "job_status": "ready"}
+        captured = replies[-1]["result"]
+        assert captured["status"] == "complete"
+        assert captured["sources"]["process_memory"]["snapshot"]["fields"] == {
+            "document_id": 7, "job_status": "ready"}
     else:
         assert not calls
         if mode in {"wrong_scope", "revoked_owner"}:

@@ -112,7 +112,7 @@ class MemorySemanticTarget(SemanticTarget):
             TaskPolicy(operation.spec).check(name, arguments)
             _identifier(operation_id)
             current = SemanticSnapshot.from_dict(self.observe())
-            if current.grounding() != expected.grounding():
+            if not current.same_state(expected):
                 raise AgentObservationStale("memory target changed before dispatch")
             self._checkpoint()
             receipt = self._commands.perform_grounded(

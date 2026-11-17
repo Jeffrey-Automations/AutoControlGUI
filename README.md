@@ -99,4 +99,4 @@ HostBrowser also rejects late publications and retains unfinished thread/close o
 
 MultiViewerHost can return an owned offer or capture an original-session retirement receipt, so delayed cleanup cannot stop a replacement peer or screen source. GUI adoption remains pending.
 
-Host-selected semantic adapters can return multi-source reports through the existing observation API. Missing sources and conflicts remain visible but cannot authorize actions or completion. Synthetic and hidden-helper tests cover the contract; fixture memory/IPC acquisition and UIA/DOM source integration remain pending.
+Host-selected semantic adapters can return multi-source reports through the existing observation API. Missing sources and conflicts remain visible but cannot authorize actions or completion. The fixture now combines reviewed memory reads with its owned read-only IPC snapshot and rechecks both before commit. Injected native calls and hidden-helper tests cover this path; UIA/DOM integration and native acceptance remain pending.

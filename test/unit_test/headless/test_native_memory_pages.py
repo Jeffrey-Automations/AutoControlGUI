@@ -37,7 +37,7 @@ def page_target(layout):
 
     def request(operation, value, **kwargs):
         operations.append(operation)
-        assert operation == "bootstrap"
+        assert operation == "bootstrap" or (operation == "control" and value == {"command": "snapshot"})
         return original(operation, value, **kwargs)
 
     channel.request = request
@@ -54,14 +54,14 @@ def run(target, prepared, trace):
 
 
 @pytest.mark.parametrize("layout", tuple(acceptance.PAGE_LAYOUTS))
-def test_layout_evidence_comes_from_payload_queries_without_any_command(layout):
+def test_layout_evidence_comes_from_payload_queries_without_any_mutation(layout):
     target, channel, provider, prepared, trace, operations = page_target(layout)
     result = run(target, prepared, trace)
     assert result["execution"] == "passed", result
     assert result["checks"]["payload_page_evidence"] is True
     assert result["page_layout"] == layout and result["fault_matrix"] == "not_verified"
     assert "runtime_completion" not in result["checks"]
-    assert operations == ["bootstrap"] and channel.retired and provider.closed == 1
+    assert operations == ["bootstrap", "control"] and channel.retired and provider.closed == 1
     assert (BASE + 0x3FF8, 8) in provider.reads
     assert ((BASE + 0x4000, 8) in provider.reads) == (layout == "split")
 

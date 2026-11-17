@@ -9,6 +9,7 @@ from je_auto_control.utils.agent_runtime import AgentRuntime
 from je_auto_control.utils.agent_runtime import native_target, target_config
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.fixture_commands import FIXTURE_COMMAND
+from je_auto_control.utils.agent_runtime.fixture_observations import FIXTURE_SOURCES
 from je_auto_control.utils.agent_runtime.fixture_deployment import load_fixture_image
 from je_auto_control.utils.agent_runtime.fixture_native_target import NativeFixtureTarget
 from je_auto_control.utils.agent_runtime.fixture_worker import FixtureWorker
@@ -72,8 +73,9 @@ def test_proxy_requires_exact_loaded_deployment_bootstrap(tmp_path, change):
     value = config(tmp_path)
     target = NativeFixtureTarget(AgentTargetProfile.from_dict(value))
     contract = {"version": 1, "config_sha256": value["settings"]["config_sha256"], "target": "fixture"}
-    assert target._supports_bootstrap({"protocol": 1, "semantic": 1, "fixture": contract})
-    assert not target._supports_bootstrap({"protocol": 1, "semantic": 1, "fixture": contract | change})
+    bootstrap = {"protocol": 1, "semantic": 1, "semantic_report": 1, "semantic_sources": list(FIXTURE_SOURCES)}
+    assert target._supports_bootstrap(bootstrap | {"fixture": contract})
+    assert not target._supports_bootstrap(bootstrap | {"fixture": contract | change})
 
 
 def test_wrong_bootstrap_is_retired_before_any_configure(tmp_path, monkeypatch):
@@ -85,7 +87,8 @@ def test_wrong_bootstrap_is_retired_before_any_configure(tmp_path, monkeypatch):
 
         def request(self, operation, _payload, **_kwargs):
             requests.append(operation)
-            return {"protocol": 1, "semantic": 1, "fixture": {
+            return {"protocol": 1, "semantic": 1, "semantic_report": 1,
+                    "semantic_sources": list(FIXTURE_SOURCES), "fixture": {
                 "version": 1, "config_sha256": "0" * 64, "target": "fixture"}}
 
         def close(self):

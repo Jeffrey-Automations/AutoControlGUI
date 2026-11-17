@@ -665,7 +665,8 @@ M2 的自有 fixture schema-one adapter 已有嚴格版本／布局驗證、不�
 成功的序號觀察保留 `revision`，供後續 runtime grounding 區分相同欄位值但已更新的狀態；
 best-effort 觀察沒有 revision，也不承諾後續操作具原子性。原生語意閉環驗收仍待完成。
 多來源報告與 runtime／helper 契約已有合成來源驗證，可保留部分缺失及型別化衝突，
-且拒絕以不完整資料執行或確認完成。自有 fixture 的 memory＋IPC 擷取尚待遷移；
+且拒絕以不完整資料執行或確認完成。自有 fixture 已接合 memory＋IPC 擷取及提交前雙來源核對，
+目前以注入原生呼叫、真實 reader 邏輯與隱藏 Python helper 驗證，仍非原生驗收；
 UIA／DOM 的來源身分、缺失欄位及 revision 正規化仍未接合，不能由報告契約推論已完成。
 
 M3 已加入內部受信任 `SemanticTarget` runtime 接點：封閉語意快照驗證、排除擷取時間的狀態比較、

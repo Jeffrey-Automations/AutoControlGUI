@@ -8,6 +8,13 @@ Completion compares fresh fields and target provenance, while `result_equals`
 continues to inspect an earlier result. Semantic captures must fit inside the
 current read request on the host monotonic clock; cached captures are rejected.
 
+Managed fixture observations now use the closed multi-source report shape rather
+than a flat memory snapshot. The complete report, including the owned IPC source,
+must pass its grounding gate before consumers use the primary snapshot. Safe memory
+failures remain partial observations; trust, scope and cleanup failures still raise.
+Commands preserve the full report across IPC, and completion checks every source.
+Single-source semantic adapters retain their existing snapshot schema.
+
 The root and remote-desktop packages resolve public exports on first attribute access.
 Export names, order and source-object identities stay unchanged. Required import errors occur
 when the corresponding export is requested. Optional remote features retain their grouped

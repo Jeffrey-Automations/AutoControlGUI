@@ -6,14 +6,16 @@ from dataclasses import dataclass, field, replace
 from enum import Enum, auto
 import math
 import threading
-from typing import Any, Callable, Mapping, NoReturn
+from typing import Any, Callable, ClassVar, Mapping, NoReturn
 
-from .errors import AgentTaskError
+from .errors import AgentObservationStale, AgentTaskError
 from .context import TaskOperation, authorization_key, current_operation
 from .fixture_commands import FIXTURE_COMMAND, FixtureCommands
 from .fixture_launch import OwnedChannelLauncher
+from .fixture_observations import FIXTURE_SOURCES, FixtureObservations
 from .memory_target import MemoryBinding, MemorySemanticTarget
 from .models import AgentTaskSpec
+from .observation_report import ObservationReport
 from .semantic_target import SemanticReceipt, SemanticSnapshot, SemanticTarget
 from ..exception.control_signals import is_run_interruption
 from ..executor.run_control import ExecutionStopped
@@ -76,6 +78,8 @@ def _raise_failure(failures: list[BaseException]) -> NoReturn:
 class OwnedFixtureTarget(SemanticTarget):
     """Internal assembly; construct before startup so failed cleanup remains reachable."""
 
+    observation_sources: ClassVar[tuple[str, ...]] = FIXTURE_SOURCES
+
     def __init__(self, image: FixtureImage, *, launcher: OwnedChannelLauncher,
                  lease: ImageLease, observer: ImageObserver,
                  provider_factory: Callable[[OwnedLaunchAttestor], ProcessProvider]) -> None:
@@ -84,8 +88,10 @@ class OwnedFixtureTarget(SemanticTarget):
         self._provider_factory = provider_factory
         self._target: MemorySemanticTarget | None = None
         self._reader: ProcessMemoryReader | None = None
+        self._observations: FixtureObservations | None = None
         self._lifecycle = _Lifecycle()
         self._publication = threading.Lock()
+        self._work = threading.RLock()
 
     def _live(self) -> None:
         if self._lifecycle.state is _State.RETIRED:
@@ -147,8 +153,9 @@ class OwnedFixtureTarget(SemanticTarget):
         check()
         self._reader = ProcessMemoryReader(self._provider_factory(launch.attestor))
         check()
-        return MemorySemanticTarget(binding, self._reader,
-                                    FixtureCommands(binding, session.launch_nonce, control))
+        target = MemorySemanticTarget(binding, self._reader, FixtureCommands(binding, session.launch_nonce, control))
+        self._observations = FixtureObservations(binding, target, control)
+        return target
 
     def _active(self) -> MemorySemanticTarget:
         self._live()
@@ -209,18 +216,46 @@ class OwnedFixtureTarget(SemanticTarget):
             raise
 
     def observe(self) -> dict[str, Any]:
-        """Expose only the reviewed semantic fields through the original runtime scope."""
-        result = self._active().observe()
-        self._live()
+        """Publish both fresh sources while retaining disagreement and safe partial memory failures."""
+        with self._work:
+            return self._observe().to_dict()
+
+    def _observe(self) -> ObservationReport:
+        target = self._active()
+        sources = self._observations
+        operation = current_operation()
+        if operation is None or sources is None:
+            raise AgentTaskError("fixture observation requires its managed source owners")
+
+        def validate() -> None:
+            expected_scope = _ManagedScope(operation.spec, authorization_key(operation.owner))
+            if (current_operation() is not operation or self._lifecycle.scope != expected_scope
+                    or self._target is not target or self._observations is not sources):
+                raise AgentTaskError("fixture observation scope changed")
+            self._live()
+            if self._reader is not None and self._reader.pending_cleanup:
+                raise MemoryObservationError(FailureReason.CLEANUP_FAILED)
+
+        def checkpoint() -> None:
+            validate()
+            operation.checkpoint()
+            validate()
+
+        result = sources.observe(checkpoint)
+        checkpoint()
         return result
 
     def perform_grounded(self, name: str, arguments: Mapping[str, Any], *,
                          expected: SemanticSnapshot, operation_id: str) -> SemanticReceipt:
-        """Keep original grounding, command policy and unknown-effect handling."""
-        result = self._active().perform_grounded(
-            name, arguments, expected=expected, operation_id=operation_id)
-        self._live()
-        return result
+        """Require fresh agreement before the existing revision-fenced commit; never retry effects."""
+        with self._work:
+            current = self._observe().require_grounding()
+            if not current.same_state(expected):
+                raise AgentObservationStale("fixture sources changed before dispatch")
+            result = self._active().perform_grounded(
+                name, arguments, expected=expected, operation_id=operation_id)
+            self._live()
+            return result
 
     def perform(self, _name: str, _arguments: Mapping[str, Any]) -> None:
         """Refuse calls that omit the original semantic observation."""
