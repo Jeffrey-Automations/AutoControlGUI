@@ -91,6 +91,20 @@ def test_cleanup_during_acquisition_prevents_late_source_publication():
     assert adapter._source is None and closed
 
 
+def test_cleanup_during_contract_check_prevents_source_publication(monkeypatch):
+    adapter, closed = target()
+    from je_auto_control.utils.agent_runtime.scoped_uia import ScopedUiaSource
+    def fields(_source):
+        adapter.cleanup()
+        return UIA_FIELDS
+    monkeypatch.setattr(ScopedUiaSource, "field_scope", property(fields))
+    request = AgentTaskSpec.from_dict(spec())
+    with operation_scope(TaskOperation(request, lambda: None, None)):
+        with pytest.raises(AgentTaskError):
+            adapter.ready(request)
+    assert adapter._source is None and closed
+
+
 @pytest.mark.parametrize("mode", ["partial", "complete", "hang"])
 def test_hidden_helper_preserves_partial_fields_and_retires_blocked_provider(tmp_path, mode):
     class Proxy(NativeSemanticTarget):

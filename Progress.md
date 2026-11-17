@@ -21,7 +21,8 @@
 ### 自有 UI 觀察 fixture 的限定範圍讀取
 
 `TODO` — `test/fixtures/native_memory/uia_fixture.c` 的原生執行仍暫緩。
-尚須完成 `OwnedUiaLauncher`、映像租約與原生 UIA worker 的部署／profile 組裝。
+尚須完成原生 UIA worker 的固定部署與 profile 組裝；啟動器、映像租約與受管唯讀 adapter
+的組合目前只有注入測試，不能據此宣告原生載入／COM 信任成立。
 指定 HWND 的 root／祖先核實、逐欄報告與受管唯讀 adapter 目前只有注入呼叫驗證；
 隱藏 Python helper 的阻塞退休測試不能證明原生 COM、HWND 與 provider 行為。
 解除暫緩後才驗證 hidden controls 的 UIA 暴露與 AutomationId、空值／停用／密碼／重複 selector、

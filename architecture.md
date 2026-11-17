@@ -1601,3 +1601,9 @@ closed per-field failures. Best-effort UIA observations cannot ground actions.
 `uia_target.py` binds the reader to managed scope with lazy COM acquisition and
 retryable cleanup. Native deployment/profile assembly remains in `Progress.md`;
 hidden Python helper tests establish IPC retirement, not native COM acceptance.
+
+`uia_owner.py` retains the launcher and two independent image owners before
+attestation starts. A private owner bundle supplies the managed adapter callbacks;
+the adapter remains the sole lifecycle owner. Its publication lock excludes source
+installation after cleanup. The native factory constructs inert owners only;
+fixed worker deployment and profile registration remain pending.

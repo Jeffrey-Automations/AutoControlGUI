@@ -31,7 +31,7 @@ process. Existing desktop foreground and input-presence gates are unchanged.
 | Operation | Source and scope | Background requirement | Evidence and present state |
 |---|---|---|---|
 | Process/session identity | Retained OS handle, creation time, session and architecture; reviewed application attestor | Read/query/synchronize rights only; no privilege escalation | Typed calls and injected tests implemented; executable attestation and native acceptance pending |
-| UI state | UIA read-only element properties for an explicitly selected application | No Invoke, SetValue or focus change | Scoped reader and internal read-only managed adapter have injected/helper coverage; native launcher/profile assembly and acceptance pending |
+| UI state | UIA read-only element properties for an explicitly selected application | No Invoke, SetValue or focus change | Scoped reader and internal read-only managed adapter have injected/helper coverage; native worker deployment/profile registration and acceptance pending |
 | Browser state | Existing WebRunner managed DOM session and reviewed origins | Dedicated managed browser; no desktop input fallback | Existing browser path; this reader adds no browser access |
 | Fixture semantic state | Reviewed schema resolved for the retained fixture process identity | Bounded `VirtualQueryEx` / `ReadProcessMemory` provider; no writes | Typed provider and injected-call tests implemented; trusted resolver and native acceptance pending |
 | Application command | Each application's official API, CLI or IPC with scoped resources | Must independently prove no foreground/focus/mouse/input interference | Application selection and command adapter pending |
@@ -566,7 +566,7 @@ revalidate the captured operation and owner before and after each source boundar
 
 Tests use injected native calls/buffers, the actual reader and real hidden Python
 helper IPC. The scoped UIA reader described below preserves explicit field failures
-and best-effort capture metadata. Native UI launcher/profile assembly, DOM source
+and best-effort capture metadata. Native UI worker deployment/profile registration, DOM source
 identity and revision normalization remain pending. Existing foreground desktop or
 legacy DOM dictionaries are not converted automatically. This work is not native
 observation or background-application acceptance.
@@ -795,10 +795,21 @@ fields from the same capture. A complete UIA capture still has `revision=None` a
 `consistency=best_effort`, so it cannot authorize actions or semantic completion.
 The adapter rejects commands and grants no Invoke, SetValue, focus or input rights.
 
+`owned_uia_target` retains the launcher, pre-launch lease and post-launch observer
+before acquisition. `UiaFixtureImage` requires the separate `uia-fixture` version-1
+identity, an absolute Windows path and bounded image bytes. Its `attestation_timeout`
+covers image attestation; window bootstrap has a separate five-second timeout.
+The enclosing helper must bound total readiness and blocking COM work.
+The managed adapter owns readiness and terminal state; no second lifecycle is
+introduced. Cleanup attempts child retirement first and then both image owners,
+retaining failures for retry. The publication lock contains no native work and
+prevents source installation after cleanup. `native_uia_target` constructs inert
+owners and does not launch a child or create COM until managed readiness.
+
 The helper owner must bound blocking COM work and retain cleanup ownership.
 Injected COM tests cover scoped reads, field failures and root replacement; hidden
-Python helpers cover managed reporting and timeout retirement. Native launcher/profile
-assembly remains pending. No native UI executable was run, and native UIA property
+Python helpers cover managed reporting and timeout retirement. Native worker deployment/profile
+registration remains pending. No native UI executable was run, and native UIA property
 exposure and desktop noninterference remain unverified. The UI artifact manifest
 stays schema 2; it is independent of observation report version 3. See the fixture
 README for the field table and startup protocol.

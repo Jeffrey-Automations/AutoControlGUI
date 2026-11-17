@@ -52,6 +52,7 @@ class UiaObservationTarget(SemanticTarget):
         self._scope: _Scope | None = None
         self._terminal = threading.Event()
         self._work = threading.RLock()
+        self._publication = threading.Lock()
 
     @classmethod
     def from_window_owner(cls, target_id: str,
@@ -97,7 +98,9 @@ class UiaObservationTarget(SemanticTarget):
             self._checkpoint(operation)
             if source.field_scope != UIA_FIELDS or source.target_id != self._target_id:
                 raise AgentTaskError("UI fixture source does not match its host field contract")
-            self._source = source
+            with self._publication:
+                self._validate(operation)
+                self._source = source
         except BaseException as primary:  # reason: failed acquisition owners remain reachable for retry cleanup
             try:
                 self.cleanup()
@@ -124,5 +127,6 @@ class UiaObservationTarget(SemanticTarget):
 
     def cleanup(self) -> None:
         """Interrupt owned work without the capture lock; failed close remains retryable."""
-        self._terminal.set()
+        with self._publication:
+            self._terminal.set()
         self._close()

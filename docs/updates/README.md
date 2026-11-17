@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261118-27 | 2026-11-18 | Retain UI fixture resources through managed startup and cleanup | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
 | U-20261118-26 | 2026-11-18 | Preserve partial fields from scoped read-only UI observations | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
 | U-20261118-25 | 2026-11-18 | Bind UI startup to retained process and window ownership | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
 | U-20261118-24 | 2026-11-18 | Build a separate owned UI observation fixture | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |

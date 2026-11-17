@@ -103,4 +103,8 @@ MultiViewerHost 可返回含原始 session 清理对象的 offer，延后清理�
 
 独立自有 UI 观察 fixture 可通过 `test/fixtures/native_memory/build_fixture.py --kind uia` 构建，静态 manifest 维持 schema 2。内部 launcher 将启动消息绑定保留进程与窗口所有者。限定范围的 UIA reader 核对该窗口、进程与根节点身份，限制树遍历并保护密码字段。只读受管 adapter 延迟创建 COM，通过共用观察 API 保留部分字段结果。
 
-注入调用与隐藏 Python helper 已覆盖限定范围读取、报告与超时回收。原生 launcher／profile 组装、DOM 整合与桌面验收仍待完成，尚未执行原生 UI fixture，也未证明不干扰桌面。
+注入调用与隐藏 Python helper 已覆盖限定范围读取、报告与超时回收。原生 worker 部署／profile 注册、DOM 整合与桌面验收仍待完成，尚未执行原生 UI fixture，也未证明不干扰桌面。
+
+内部自有 UI target 在 attestation 前保留启动器及两个独立映像租约拥有者；
+清理会尝试全部资源并保留失败项目供重试。发布锁防止关闭后存入晚到的来源。
+原生 factory 仅建立拥有者；固定 worker 部署、profile 注册及原生验收仍待完成。

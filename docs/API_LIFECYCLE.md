@@ -1488,5 +1488,11 @@ ancestry and a root runtime ID pinned across captures. It preserves per-field fa
 and protects password text. COM calls stay on the source owner thread. The internal
 read-only managed adapter creates COM lazily during readiness and reports best-effort
 UIA captures through the shared task API. Injected COM and hidden-helper tests cover
-reporting and timeout retirement. Native launcher/profile assembly and all desktop
+reporting and timeout retirement. Native worker deployment/profile registration and all desktop
 acceptance remain pending; no native UI fixture execution is claimed.
+
+The internal owned UI target retains its launcher and both image leases before
+attestation, attempts every owner during cleanup, and retains failed cleanup for
+retry. A publication lock prevents late source installation after shutdown. The
+native factory only constructs owners; fixed worker deployment/profile registration
+and native acceptance remain pending.

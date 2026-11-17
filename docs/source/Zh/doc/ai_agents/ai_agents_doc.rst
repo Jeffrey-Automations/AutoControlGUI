@@ -992,7 +992,7 @@ Linux 內部 presence_peer_linux 以不可繼承的 pidfd 保留原始 Unix stre
 wheel 與原始碼發行套件包含 REST Dashboard 和 Swagger 的 HTML、CSS、JavaScript 資源。
 安裝後的套件沿用相同的本機 REST 路由與授權規則；提供靜態頁面不授予任務或桌面輸入權限。
 
-主機選定的語意 adapter 可宣告固定的多來源觀察契約。既有 observe 呼叫保留部分缺失與衝突報告；操作及完成判定要求每個來源的新鮮完整一致證據。helper bootstrap 固定來源契約，完整報告跨 IPC 傳遞後才轉換為命令快照。fixture 已在同一把擷取／提交鎖下結合受審閱的記憶體讀取與保留的唯讀 IPC snapshot，cleanup 仍可中斷 IPC。注入 reader 與隱藏 helper 測試涵蓋來源衝突、部分記憶體失敗及提交前一致性。原生 UI launcher／profile 組裝、DOM 整合與桌面驗收仍待完成。
+主機選定的語意 adapter 可宣告固定的多來源觀察契約。既有 observe 呼叫保留部分缺失與衝突報告；操作及完成判定要求每個來源的新鮮完整一致證據。helper bootstrap 固定來源契約，完整報告跨 IPC 傳遞後才轉換為命令快照。fixture 已在同一把擷取／提交鎖下結合受審閱的記憶體讀取與保留的唯讀 IPC snapshot，cleanup 仍可中斷 IPC。注入 reader 與隱藏 helper 測試涵蓋來源衝突、部分記憶體失敗及提交前一致性。原生 UI worker 部署／profile 註冊、DOM 整合與桌面驗收仍待完成。
 
 語意觀察欄位契約
 ----------------
@@ -1010,5 +1010,9 @@ wheel 與原始碼發行套件包含 REST Dashboard 和 Swagger 的 HTML、CSS�
 
 ``UiaObservationTarget`` 在受管 readiness 中延遲建立 COM，透過既有觀察 API 發布唯讀 UIA 結果。
 它不提供 Invoke、SetValue、焦點或輸入操作。注入 COM 與隱藏 Python helper 測試涵蓋部分欄位、
-受管報告及逾時回收。原生 launcher／profile 組裝與所有桌面驗收仍待完成。
+受管報告及逾時回收。原生 worker 部署／profile 註冊與所有桌面驗收仍待完成。
 尚未執行原生 UI fixture，也未證明不干擾桌面。
+
+內部自有 UI target 在 attestation 前保留啟動器及兩個獨立映像租約擁有者；
+清理會嘗試全部資源並保留失敗項目供重試。發布鎖防止關閉後存入晚到的來源。
+原生 factory 僅建立擁有者；固定 worker 部署、profile 註冊及原生驗收仍待完成。
