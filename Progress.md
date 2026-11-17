@@ -24,6 +24,8 @@
 再驗證 ASLR、32／64 位配置、跨區段／guard／不可讀頁、程序退出、PID 重用、權限拒絕、
 取消及 handle 回收。以 fixture 的已知狀態比對語意結果，獨立觀測前景、焦點、滑鼠與輸入事件。
 目前 injected-provider 測試不算原生通過；設計見 [記憶體觀察契約](docs/process_memory_contract.md)。
+已有 `test/fixtures/native_memory/acceptance.py` 的靜態預檢與明確選用的 smoke 執行路徑，
+但原生執行尚未啟用；頁面故障、權限、PID 重用、背景不干擾及長時間資源驗收仍待完成。
 
 ### 桌面行為驗收
 
@@ -685,6 +687,8 @@ OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLa
 內部 OwnedFixtureTarget 已組裝啟動、映像核對、fixture 命令與受管語意讀取；
 擁有者在啟動前保留，失敗回收可重試，終止後不得發布晚到的 target。
 目前僅有注入測試，尚未註冊到正式 profile／公開入口，原生信任與驗收仍待完成。
+原生 smoke 工具已有初始讀值、操作回條、新讀回、runtime 完成及回收的分項報告；
+目前只跑過靜態產物預檢與注入測試，不代表原生驗收或完整故障矩陣通過。
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。
 內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
 並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。

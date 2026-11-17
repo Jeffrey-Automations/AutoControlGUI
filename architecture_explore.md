@@ -1602,5 +1602,7 @@ non-evicting receipt ledger. Runtime adapter integration remains in `Progress.md
 this fixture protocol does not establish native memory acceptance.
 
 `test/fixtures/native_memory/` contains the x64 static-CRT fixture source and a
-build-only compiler/import-inventory tool. The artifact is not executed by ordinary
-tests; native behavior and loaded-image trust remain in `Progress.md`.
+build-only compiler/import-inventory tool. Its acceptance CLI defaults to static
+inventory checks; an explicit execution path assembles the managed smoke roundtrip
+and reports independent readback and cleanup separately. The artifact is not
+executed by ordinary tests; native behavior and loaded-image trust remain in `Progress.md`.

@@ -87,6 +87,9 @@ OwnedFixtureTarget assembles those checks with fixture commands and managed sema
 reads. It owns the launcher and image observers before startup, rejects late startup
 publication after retirement, and retains every failed cleanup owner for retry.
 It remains internal and unregistered pending native trust and acceptance evidence.
+The native fixture acceptance CLI defaults to static inventory matching. Its
+explicit smoke path uses this assembly and reports selected checks separately
+from full native acceptance, dependency trust and foreground noninterference.
 The helper error codec preserves fixed memory failure reasons across IPC without
 serializing exception text; malformed or mixed memory error packets are refused.
 The internal Windows provider owns read/query handles and measures native process

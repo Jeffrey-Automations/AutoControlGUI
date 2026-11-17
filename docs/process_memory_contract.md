@@ -539,7 +539,10 @@ cross-process memory readback, ASLR resolution, native publication guarantees or
 desktop noninterference. Shared-memory mappings were rejected because parent-side
 mapping reads would bypass the future process-memory provider.
 
-No native acceptance command is supplied or executed by this increment. Native
-execution stays paused under `Progress.md`; native verification of the typed calls,
+The native fixture README documents a static-by-default smoke CLI with an explicit
+execution option. Its external image pin and source inventory checks do not establish
+dependency trust. Injected smoke tests cover initial state, receipts, fresh readback,
+managed completion and retryable cleanup, without running the native artifact.
+Native execution stays paused under `Progress.md`; native verification of the typed calls,
 trusted bootstrap matching, page-protection fault injection, host probe configuration, runtime
 lifecycle/policy integration and application coverage remain required for M1/M3.

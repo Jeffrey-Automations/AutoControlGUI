@@ -40,4 +40,41 @@ The manifest records execution, dependency trust and acceptance as unverified.
 Do not register this artifact as a supported target or execute it as part of
 ordinary tests. Native execution remains subject to the explicit pause in
 `Progress.md`. Loaded-image comparison, trusted dependency binding and the native
-fault/acceptance harness remain separate requirements.
+fault acceptance remain separate requirements.
+
+## Prepare the smoke check
+
+From the repository root, use the checkout's modules rather than a separately
+installed AutoControl version:
+
+```powershell
+.venv/Scripts/python.exe -c "import runpy; runpy.run_path('test/fixtures/native_memory/acceptance.py', run_name='__main__')" `
+  --build '<build directory>' --sha256 '<independently reviewed executable hash>'
+```
+
+This default command only reads bounded files. It matches the image against the
+external pin, checks the build inventory and source snapshot, and parses the PE
+plan. Source inventory matching does not prove how the binary was compiled.
+The report must say `execution=not_run`; the build manifest is never rewritten.
+
+After the user explicitly resumes native acceptance, the same command's
+`--execute` option runs one owned fixture. Do not use that option while the pause
+in `Progress.md` remains active. It verifies the initial state, sends one grounded
+command, checks a fresh semantic readback, and checks runtime completion. Cleanup
+tries runtime, target and temporary-directory retirement independently, with one
+retry for failed cleanup only. It never retries the command. Cancellation and
+hard interruption propagate after cleanup; no success JSON is emitted for them.
+
+The diagnostic selects a 60-second read ceiling and a 60-second action ceiling,
+within the existing allowed limits, to include repeated live policy checkpoints.
+These are diagnostic ceilings, not performance targets; ordinary target defaults
+remain unchanged. The report exposes the read ceiling and each completed check.
+An ordinary failure yields a fixed category or reader failure code, never an
+exception message, address, nonce or bootstrap packet.
+
+Even `execution=passed` means only this smoke path passed. Dependency trust,
+foreground noninterference, page faults, PID reuse, permissions, architecture
+coverage, resource growth and full native acceptance remain unverified. A cleanup
+failure keeps the run failed even when the retry retires the resources. This
+script is not registered as a supported production target or included in ordinary
+native test execution.
