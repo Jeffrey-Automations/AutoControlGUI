@@ -696,7 +696,9 @@ OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLa
 自訂語意 worker 已在請求、讀取 checkpoint、命令守衛與發布前重新核對原帳號／角色／store 來源，
 並拒絕回呼替換 operation 或 worker 綁定；目前以真實暫存帳號檔及注入 buffer 驗證。
 取消與即時 profile 停用仍由主機 RPC 輪詢及 helper 退場處理，不能把 checkpoint 當成原子撤權或 syscall 中斷。
-正式 helper 來源交付與 Linux 非顯示 helper 的 owner-service 路由仍待接合。
+語意 helper 已使用既有非顯示路由，Linux 有主機 binding 時只走精確 argv 的 owner service，
+政策缺失或服務失敗不得退回本機。此項僅有注入路由測試，尚未證明 Linux 原生隔離。
+正式 helper 來源交付、服務獨立身分／空環境下的套件與帳號檔存取，以及子 fixture 的 nested grant 仍待接合。
 型別檢查另有既存缺口：`native_worker.close` 呼叫的 cleanup 尚未在 SemanticTarget 名義契約宣告。
 原生 smoke 工具已有初始讀值、操作回條、新讀回、runtime 完成及回收的分項報告；
 目前只跑過靜態產物預檢與注入測試，不代表原生驗收或完整故障矩陣通過。

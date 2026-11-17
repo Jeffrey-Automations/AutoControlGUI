@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, ClassVar, Mapping, Sequence
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
@@ -14,6 +14,8 @@ from je_auto_control.utils.agent_runtime.semantic_target import (
 
 class NativeSemanticTarget(NativeDesktopTarget, SemanticTarget):
     """Trusted host code supplies the reviewed helper and its explicit resource lock."""
+
+    _display_helper: ClassVar[bool] = False
 
     def __init__(self, *, argv: Sequence[str], resource_path: Path) -> None:
         super().__init__(argv=argv, resource_path=resource_path, recovery_probe=lambda: None)

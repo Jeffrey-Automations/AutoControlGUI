@@ -346,8 +346,20 @@ owners retain the existing deferred-authorization semantics.
 
 These checks use real temporary user stores and injected memory. They cannot make
 revocation atomic with a read or interrupt a blocked syscall. The host still owns
-cancellation, live profile checks and helper retirement. Reviewed source delivery
-and Linux non-display owner-service routing remain production prerequisites.
+cancellation, live profile checks and helper retirement.
+
+`NativeSemanticTarget` selects the existing non-display channel route through a
+fixed host-class property. Task options cannot select display routing. On Linux,
+a configured owner-service binding must list the exact helper argv; policy or
+service failures cannot fall back locally. Without a binding, the existing local
+route remains available and carries no owner-service containment claim. Desktop
+and browser proxies retain their display route. Bootstrap validation and retained
+cleanup ownership use the same proxy implementation for both channel types.
+
+Injected routing tests do not prove Linux containment. Reviewed helper source,
+imports and authority-store access under the service's separate identity and empty
+environment still need provisioning. A child fixture also needs nested-grant
+integration. These remain production prerequisites, with native execution paused.
 
 The assembly selects a read budget of the complete image plan plus the fixture's
 72 bytes, capped at 1 MiB, with at most 1,024 region checks. The host chooses a
