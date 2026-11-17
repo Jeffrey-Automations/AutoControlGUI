@@ -644,7 +644,7 @@ browser adapter 從受管頁面取得欄位、透過 DOM 提交，再驗證新�
 
 `WIP` — 內部 `utils/process_memory/` 已有不可變身分／probe、區段與位元組預算、
 序號一致性檢查、語意欄位白名單及失敗 handle 保留重試。契約與 fixture 協定見
-[process_memory_contract.md](docs/process_memory_contract.md)。M0 的 profile、結果型別與禁用桌面輸入的路由規則已完成（U-20261116-12，`utils/process_memory/background_profile.py`）；M1 尚未完成，
+[process_memory_contract.md](docs/process_memory_contract.md)。M0 已完成（profile、結果型別與禁用桌面輸入的路由規則 U-20261116-12，`utils/process_memory/background_profile.py`；第一個目標為自有 fixture，U-20261117-01）；M1 尚未完成，
 已有自有 fixture 的固定緩衝區與有界管線控制協定，測試僅驗證本機資料配置及背景子程序通訊。
 bootstrap 的 PID、位址、來源雜湊與 launch nonce 都是未驗證自報資訊，不能充當 OS 出生身分或可信 resolver。
 typed Windows provider 已有有界查詢／讀取、原生身分事實與保留 handle 的注入測試；
@@ -655,7 +655,7 @@ resolver 已能透過保留 handle 取得主映像基址與大小並做有預算
 fixture 的原生身分核對（標頭挑戰已有，U-20261115-18，只在本行程內驗過）與頁面故障注入、runtime grant／helper
 生命週期及公開入口；M2 也仍缺實際應用版本 adapter。原生驗收固定列於本檔上方。
 
-1. **M0：能力盤點與範圍契約。**（profile／路由規則已完成，U-20261116-12；之後選定提供正式背景介面的應用仍待決定）先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
+1. **M0：能力盤點與範圍契約。**（已完成：profile／路由規則 U-20261116-12；維護者 2026-11-17 決定第一個目標只用自有 fixture，真實應用待 M1 原生驗收跑通後再選，U-20261117-01）先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
    讀取來源、執行介面、權限、是否全背景、支援版本、驗證方式與不支援原因。
    第一個目標採自有 fixture 程序，之後選一個提供正式背景介面的應用；不能先承諾任意軟體。
    完成條件：profile、上述結果型別及禁用桌面輸入的路由規則具體可審閱，既有桌面路徑不被暗中改寫。
