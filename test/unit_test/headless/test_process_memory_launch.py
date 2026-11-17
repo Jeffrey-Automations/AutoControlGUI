@@ -213,3 +213,14 @@ def test_an_owned_launch_through_the_popen_launcher_is_attested():
     launch, *_ = attest(kernel, launcher=launcher)
     assert launch.identity.pid == 42
     assert launch.record == LaunchRecord(42, kernel.birth)
+
+
+def test_attested_launch_exposes_the_checked_image_pin_not_a_recomputed_file_hash():
+    kernel = LaunchKernel()
+    expected = pin(kernel).sha256
+    launch, *_ = attest(kernel)
+    try:
+        kernel.data = b"changed after measurement"
+        assert launch.image_sha256 == expected
+    finally:
+        launch.close()

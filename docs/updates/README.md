@@ -898,3 +898,4 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 | U-20261025-15 | 2026-10-25 | Hand renewed read-only completion to its original local DAG | #done #agent #handoff #recovery #authorization | [2026-10-c](2026-10-c.md) |
 | U-20261025-16 | 2026-10-25 | Adopt explicit non-DAG completion evidence without widening task access | #done #agent #handoff #recovery #authorization | [2026-10-c](2026-10-c.md) |
 | U-20261029-03 | 2026-10-29 | Verify lazy facade delivery against the complete suite | #done #agent #startup #verification | [2026-10-e](2026-10-e.md) |
+| U-20261118-09 | 2026-11-18 | Check complete pinned executable ranges through bounded reads | #done #process-memory | [2026-11-c](2026-11-c.md) |

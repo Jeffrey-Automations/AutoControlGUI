@@ -679,6 +679,9 @@ OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLa
 另有 `test/fixtures/native_memory/` 的 x64 靜態 CRT fixture 原始碼與僅建置工具；
 已編譯、靜態盤點直接 OS DLL 匯入並記錄來源／產物雜湊，未執行該原生產物。
 原生程式行為、DLL 解析信任、載入位元組核對與故障驗收仍未驗證。
+已有從固定雜湊 PE32+ x64 產物推導完整可執行區段的 planner 與 reader guard；
+拒絕可寫入／重定位程式碼，核對原啟動 pin，且不擴大 probe 預算。測試僅使用合成映像及靜態產物；
+區段 padding 的原生相容性、實際頁面保護與 DLL 信任仍未驗證，不能當成完整 runtime attestation。
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。
 內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
 並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。

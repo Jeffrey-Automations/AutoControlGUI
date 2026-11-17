@@ -129,6 +129,11 @@ class OwnedLaunchAttestor:
     def __init__(self, pin: PinnedExecutable, record: LaunchRecord, observed: ObservedImageFile) -> None:
         self._pin, self._record, self._observed = pin, record, observed
 
+    @property
+    def image_sha256(self) -> str:
+        """The exact host pin checked against the retained pre/post-launch image evidence."""
+        return self._pin.sha256
+
     def __call__(self, facts: NativeProcessFacts) -> ProcessIdentity:
         if (not isinstance(facts, NativeProcessFacts) or facts != self._observed.process
                 or (facts.pid, facts.birth) != (self._record.pid, self._record.birth)):
@@ -147,6 +152,11 @@ class OwnedLaunch:
     record: LaunchRecord = field(repr=False)
     _lease: ImageLease = field(repr=False)
     _observer: ImageObserver = field(repr=False)
+
+    @property
+    def image_sha256(self) -> str:
+        """Bind a code-range plan to this launch's original image pin, not just labels."""
+        return self.attestor.image_sha256
 
     def close(self) -> None:
         """Close both leases; a failure leaves the rest to a later ``close``."""

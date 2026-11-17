@@ -425,11 +425,31 @@ This removes the Python interpreter/source chain from this candidate artifact,
 but does not establish loaded-image or OS dependency trust. Protocol behavior,
 foreground noninterference and native fault cases remain unverified.
 
-The next image-plan stage must derive executable ranges from this pinned baseline,
-not caller-selected RVAs or target-supplied headers. Loaded addresses differ from
-file offsets, and relocations may change bytes; see Microsoft's
-[PE format specification](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format).
-No range manifest or whole-runtime integrity claim is published by this build step.
+`plan_pinned_image` now derives a factory-only code plan from the full pinned
+baseline SHA-256. The supported format is bounded x64 PE32+ with all executable
+sections enumerated. The parser rejects writable executable sections, overlapping
+layouts, invalid entry points, unsupported relocation types, and relocations or
+import-address tables that touch protected bytes. Headers and complete aligned
+executable spans are included; callers cannot construct or replace a plan to omit
+coverage. File and image bounds are 64 MiB, and protected reads are capped at 1 MiB.
+
+`guard_probe_image` requires the exact `OwnedLaunch.image_sha256` as well as matching
+application/version labels. The caller must explicitly supply sufficient probe
+limits; the guard never raises those limits. Every observation checks the header
+and code hashes through the same retained, bounded resolver view as semantic data,
+then rechecks module base/size before and after the underlying resolver. A mismatch
+publishes no semantic values. Budget, cancellation and cleanup behavior stay with
+the reader. No raw executable bytes enter observations.
+
+Loaded addresses differ from file offsets, and relocations may change bytes; see
+Microsoft's [PE format specification](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format).
+This implementation rejects relocation of protected bytes instead of normalizing
+it. Padding to section alignment is conservatively projected as zero after raw
+data; its compatibility still requires native acceptance. A short read or padding
+mismatch refuses the image rather than dropping coverage. Matching these ranges
+is not atomic execution integrity, live page-protection evidence, DLL/source trust,
+or proof that no other executable mappings exist. x86/ARM64 image plans remain
+unsupported. Tests use synthetic mappings and static build-artifact inspection.
 
 ### Owned fixture preparation
 
