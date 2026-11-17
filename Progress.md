@@ -663,7 +663,7 @@ fixture 的原生身分核對（標頭挑戰已有，U-20261115-18，只在本�
 M2 的自有 fixture schema-one adapter 已有嚴格版本／布局驗證、不可變 challenge binding、
 標準補零狀態解碼及共用 72-byte 讀取上限；僅驗證 injected provider，並未完成應用 attestation 或原生驗收。
 成功的序號觀察保留 `revision`，供後續 runtime grounding 區分相同欄位值但已更新的狀態；
-best-effort 觀察沒有 revision，也不承諾後續操作具原子性。受管 profile／helper 接線仍待實作。
+best-effort 觀察沒有 revision，也不承諾後續操作具原子性。原生語意閉環驗收仍待完成。
 
 M3 已加入內部受信任 `SemanticTarget` runtime 接點：封閉語意快照驗證、排除擷取時間的狀態比較、
 傳遞原始快照及 journal action ID 的提交介面、具 atomic／non_atomic 標記的回條，以及未知效果的
@@ -680,7 +680,7 @@ IPC fixture 已驗證成功回條但未生效及 helper 重啟；程序內 targe
 嚴格比對回條身分、版本與欄位；以自有緩衝區及真實 reader 邏輯驗證 runtime 閉環，
 OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLauncher 已將映像檔核對
 接到同一受管 channel 的啟動 handle，並拒絕 bootstrap PID／位元寬度不符（只有注入測試）。
-正式 runtime／來源交付、載入映像綁定、profile 與原生 attestation 驗收尚未完成。
+可信來源交付、載入映像綁定的原生相容性與 attestation 驗收尚未完成。
 另有 `test/fixtures/native_memory/` 的 x64 靜態 CRT fixture 原始碼與僅建置工具；
 已編譯、靜態盤點直接 OS DLL 匯入並記錄來源／產物雜湊，未執行該原生產物。
 原生程式行為、DLL 解析信任、載入位元組核對與故障驗收仍未驗證。
@@ -692,7 +692,9 @@ OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLa
 `ready()` 已能在受管 scope 內先綁定固定 task／owner 再延遲取得資源，
 並防止另一個 session 在啟動發布與內部 owner 綁定之間接管。隱藏 Python helper
 已串起真實 reader 邏輯、既有語意 IPC、完成判定、失敗代碼與回收；原生呼叫及 buffer 仍為注入資料。
-目前僅有注入測試，尚未註冊到正式 profile／公開入口，原生信任與驗收仍待完成。
+已有專用 fixture profile，沿用既有主機管理 API／GUI JSON 編輯器、不可變 digest 及即時停用。
+只允許固定 fixture 命令，主機核對 bootstrap，worker 在修改 scope 前核對部署及 task pin。
+目前僅有注入測試；沒有註冊實際主機部署，原生信任與驗收仍待完成。
 自訂語意 worker 已在請求、讀取 checkpoint、命令守衛與發布前重新核對原帳號／角色／store 來源，
 並拒絕回呼替換 operation 或 worker 綁定；目前以真實暫存帳號檔及注入 buffer 驗證。
 取消與即時 profile 停用仍由主機 RPC 輪詢及 helper 退場處理，不能把 checkpoint 當成原子撤權或 syscall 中斷。
@@ -707,7 +709,8 @@ Python／helper 來源及 DLL 的可信交付、服務獨立身分／空環境�
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。
 內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
 並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。
-受管 profile、持有 reader 的原生 adapter／launcher 與公開記憶體入口尚未接上；
+fixture 的受管 profile／helper 已接合；靜態診斷 probe、可信交付及真實原生閉環仍待完成。
+不提供任意 PID／位址記憶體入口；
 記憶體失敗原因已透過封閉錯誤封包跨 helper 保留型別；未知原因與混合封包拒絕且不回顯內容。
 
 1. **M0：能力盤點與範圍契約。**（已完成：profile／路由規則 U-20261116-12；維護者 2026-11-17 決定第一個目標只用自有 fixture，真實應用待 M1 原生驗收跑通後再選，U-20261117-01）先列 Windows 的 UI／OS／應用操作矩陣，每項記錄

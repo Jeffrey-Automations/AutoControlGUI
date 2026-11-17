@@ -17,8 +17,9 @@ class NativeSemanticTarget(NativeDesktopTarget, SemanticTarget):
 
     _display_helper: ClassVar[bool] = False
 
-    def __init__(self, *, argv: Sequence[str], resource_path: Path) -> None:
-        super().__init__(argv=argv, resource_path=resource_path, recovery_probe=lambda: None)
+    def __init__(self, *, argv: Sequence[str], resource_path: Path,
+                 profile: dict[str, Any] | None = None) -> None:
+        super().__init__(argv=argv, resource_path=resource_path, recovery_probe=lambda: None, profile=profile)
 
     @property
     def supports_readonly_completion(self) -> bool:

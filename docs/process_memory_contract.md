@@ -1,10 +1,11 @@
 # Reviewed process-memory observations
 
-This is the internal M0/M1 foundation for the background-operation plan in
-[Progress.md](../Progress.md). It supplies a semantic reader and typed Windows
-read/query calls tested through injected native functions. It does not supply
-trusted executable attestation, runtime authorization wiring, a public memory
-command, an application adapter or completed native acceptance.
+This documents the background-operation work in [Progress.md](../Progress.md).
+It supplies a semantic reader, typed Windows read/query calls, an owned fixture
+assembly and a managed fixture profile. Verification uses injected native
+functions and buffers. Native acceptance, trusted runtime dependencies and real
+application integration remain incomplete. No arbitrary-address memory command
+is exposed.
 
 ## Ownership and scope
 
@@ -281,8 +282,8 @@ snapshot and operation ID to the separate command owner. Only that owner can
 claim atomic comparison at commit. Cleanup permanently retires the target and
 raises until pending reader handles are closed; repeated cleanup retries ownership.
 The host must create a dedicated target/reader/command owner per resource lifecycle.
-This internal seam has injected-provider runtime tests, not a production launcher
-or public profile registration. Memory failure reasons retain their type across
+This seam has injected-provider runtime tests and is used by the fixture profile
+described below. Memory failure reasons retain their type across
 the owned helper channel. The worker emits only a closed reason code and fixed
 message, never the memory exception text. The host requires the exact error schema
 and rejects unknown reasons, extra fields and mixed event/result packets without
@@ -301,8 +302,8 @@ expected revision plus two. Unknown replies stop further commands; cleanup retai
 transport ownership until closure succeeds. The transport must retire failed
 streams to prevent late replies from serving later requests. The runtime never
 automatically resends an unknown effect. The internal command is not registered as
-a public executor command. Production launcher and attestation integration
-remain pending. Injected tests combine the actual reader, fixture buffers and
+a standalone public executor command; it is offered only by a fixture task.
+Native launcher and attestation acceptance remain pending. Injected tests combine the actual reader, fixture buffers and
 runtime completion; they do not establish native acceptance.
 
 `OwnedFixtureControl` wraps an already host-owned `OwnedChannel`; construction
@@ -396,7 +397,7 @@ boundary. EOF or a rejected owner/task before readiness starts no fixture. The
 entry uses the existing worker protocol and guarded cleanup. Reads are bounded in
 bytes, not wall time; opening a replaced special file can block before the regular
 file check. The host-owned helper deadline and retirement remain the interruption
-boundary. No public profile is registered. Config and image pins do not establish
+boundary. Constructing the worker registers no profile by itself. Config and image pins do not establish
 interpreter, imported-source or DLL trust, and native execution remains paused.
 
 The assembly selects a read budget of the complete image plan plus the fixture's
@@ -445,11 +446,55 @@ their types across the shared channel. A blocked fixture command has been
 cancelled after entry and its actual helper process retired in a headless test.
 
 `test/fixtures/semantic_helper.py` tests this IPC path with an owned counter, not
-cross-process memory or desktop input. The profile registry, application
-attestation and reader-owning production adapter
-verification remain required before public memory commands can be enabled.
+cross-process memory or desktop input. The dedicated fixture profile uses the
+same semantic protocol; application attestation and reader-owning native adapter
+verification remain required before claiming native readiness.
 
 ## Semantic completion
+
+### Managed fixture profile
+
+The existing `manage_agent_target` / `AC_agent_target`, CLI target operation and
+GUI Host targets JSON editor accept a dedicated `fixture` kind. Registration
+requires `manage_hosts` and is inert. No fixture process starts until an authorized
+task reaches managed readiness. An example profile shape is:
+
+```json
+{
+  "name": "fixture",
+  "kind": "fixture",
+  "allowed_tools": ["AC_fixture_set_state"],
+  "roots": [],
+  "apps": [],
+  "settings": {
+    "config_path": "C:\\reviewed\\fixture.json",
+    "config_sha256": "<independently reviewed lowercase SHA-256>"
+  }
+}
+```
+
+The profile name must match the deployment's target. Only these two settings are
+accepted. Tasks cannot supply them, choose a helper interpreter or argv, grant
+filesystem roots or desktop applications, or expand the fixed tool set. The proxy
+uses the current interpreter with `-I -u -m` and the packaged fixture worker, so
+that interpreter must have the reviewed package installed. Isolation flags are
+not source attestation.
+
+The host verifies a closed bootstrap extension containing fixture contract version
+one, the loaded config digest and target ID. Before changing its scope, the worker
+requires the matching fixture profile, deployment path/digest and host-issued task
+profile pin. Omitting the profile is refused. The generic semantic worker is unchanged.
+Immutable profile identity, persistence, live disablement and explicit resume use
+the existing runtime controls. The adapter's Windows x64 gate runs before helper
+acquisition. The GUI Apply target action passes the same profile through the shared
+service; no separate GUI authority exists.
+
+Passive listings retain `readiness=not_probed` and `native_evidence=not_recorded`.
+The diagnostic `probe` operation currently reports `not_supported`; a bounded static
+artifact probe remains to be integrated. Neither registration nor the injected
+roundtrip/disable tests prove native availability. Native execution remains paused.
+
+### Completion evidence
 
 A `semantic` success criterion compares fresh completion-time observations with
 the recorded target witness for a named command. For the test-owned counter:
@@ -461,7 +506,7 @@ the recorded target witness for a named command. For the test-owned counter:
 The command must already be in the task's allowed tools. The criterion grants no
 additional fields, reader, native target or command. The Agent Tasks scope JSON
 editor and its Submit action preserve this condition through the shared task API.
-The built-in profile registry still does not enable native memory targets.
+The host must explicitly register a fixture profile; no fixture is enabled by default.
 
 Before semantic dispatch, the journal stores the validated original snapshot.
 Only a host-selected `SemanticTarget` supplies this witness. Completion uses the

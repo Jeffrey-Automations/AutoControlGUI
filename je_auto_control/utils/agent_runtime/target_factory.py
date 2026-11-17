@@ -12,6 +12,9 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 def build_target(profile: AgentTargetProfile) -> Any:
     """Bind reviewed configuration to a fixed owned helper, never a caller-selected argv."""
     from je_auto_control.utils.agent_runtime.native_target import NativeDesktopTarget
+    if profile.kind == "fixture":
+        from je_auto_control.utils.agent_runtime.fixture_native_target import NativeFixtureTarget
+        return NativeFixtureTarget(profile)
     if profile.kind == "files":
         resource = hashlib.sha256("\n".join(sorted(profile.roots)).encode("utf-8")).hexdigest()
         path = Path.home() / ".je_auto_control" / "input_ownership" / ("files-" + resource + ".lock")

@@ -20,6 +20,16 @@ from ..process_memory.windows_launch import PinnedExecutable
 _FIELDS = {"schema", "host", "target", "image", "image_sha256", "read_timeout"}
 
 
+def fixture_settings(value: Any) -> dict[str, str]:
+    """Normalize only the host's deployment reference without reading any artifact."""
+    try:
+        if not isinstance(value, dict) or set(value) != {"config_path", "config_sha256"}:
+            raise ValueError("invalid deployment reference")
+        return {"config_path": str(_path(value["config_path"])), "config_sha256": _sha256(value["config_sha256"])}
+    except (TypeError, ValueError):
+        raise AgentTaskError("fixture profile requires a pinned absolute configuration") from None
+
+
 def _sha256(value: Any) -> str:
     if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
         raise ValueError("invalid digest")

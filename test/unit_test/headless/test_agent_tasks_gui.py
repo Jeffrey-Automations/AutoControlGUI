@@ -10,6 +10,26 @@ from PySide6.QtWidgets import QApplication, QPushButton  # noqa: E402  # reason:
 from je_auto_control.gui.agent_tasks_tab import AgentTasksTab  # noqa: E402  # reason: optional Qt import
 
 
+def test_fixture_profile_uses_existing_target_editor_and_actions(monkeypatch, tmp_path):
+    import json
+    import shiboken6
+    from headless.test_agent_fixture_profiles import config
+    app = QApplication.instance() or QApplication([])
+    tab = AgentTasksTab()
+    submitted = []
+    value = config(tmp_path)
+    try:
+        monkeypatch.setattr(tab, "_dispatch", lambda *args: submitted.append(args))
+        tab._target_operation.setCurrentIndex(tab._target_operation.findData("register"))
+        tab._target_request.setPlainText(json.dumps(value))
+        dict(tab.menu_actions())["agent_target_apply"]()
+        assert submitted == [("target", {"operation": "register", "request": value})]
+    finally:
+        tab.close()
+        shiboken6.delete(tab)
+        app.processEvents()
+
+
 def test_task_scope_editor_preserves_semantic_completion_for_shared_submit(monkeypatch):
     import json
     import shiboken6

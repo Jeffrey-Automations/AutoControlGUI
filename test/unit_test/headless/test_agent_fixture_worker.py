@@ -8,12 +8,18 @@ from types import SimpleNamespace
 
 import pytest
 
-from je_auto_control.utils.agent_runtime import fixture_deployment, fixture_worker
+from je_auto_control.utils.agent_runtime import fixture_deployment, fixture_worker, target_config
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+from je_auto_control.utils.agent_runtime.target_config import AgentTargetProfile
 from je_auto_control.utils.process_memory.models import ProcessIdentity
 from headless.test_agent_fixture_readiness import spec
 from headless.test_agent_fixture_target import setup
 from headless.test_process_memory_pe_image import baseline
+
+
+@pytest.fixture(autouse=True)
+def windows_profile_host(monkeypatch):
+    monkeypatch.setattr(target_config, "sys", SimpleNamespace(platform="win32", maxsize=2**63-1))
 
 
 def deployment(tmp_path, **changes):
@@ -25,6 +31,14 @@ def deployment(tmp_path, **changes):
     path = tmp_path / "deployment.json"
     path.write_text(json.dumps(value), encoding="utf-8")
     return path, hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def profile_request(path, digest, definition=None):
+    profile = AgentTargetProfile(name="fixture", kind="fixture", allowed_tools=spec().allowed_tools,
+                                 settings={"config_path": str(path), "config_sha256": digest})
+    definition = definition or spec()
+    definition = replace(definition, options={"target_profile": {"name": profile.name, "digest": profile.digest}})
+    return {"spec": definition.to_dict(), "owner": {}, "profile": profile.to_dict()}
 
 
 def test_static_deployment_pins_bytes_and_generates_fresh_identity(tmp_path):
@@ -116,8 +130,8 @@ def test_packaged_worker_uses_managed_acquisition_and_eof_cleanup(tmp_path, mode
     if mode in {"managed", "wrong_scope", "revoked_owner"}:
         owner = ({"user_id": "missing", "role": "operator", "store_path": str(tmp_path / "users.json")}
                  if mode == "revoked_owner" else {})
-        requests.extend([{"id": "c", "operation": "configure", "payload": {
-            "spec": definition.to_dict(), "owner": owner}},
+        requests.extend([{"id": "c", "operation": "configure", "payload":
+                          profile_request(path, digest, definition) | {"owner": owner}},
             {"id": "o", "operation": "observe", "payload": {}}])
     source = BytesIO(b"".join(json.dumps(request).encode() + b"\n" for request in requests))
     sink = BytesIO()
@@ -187,7 +201,7 @@ def test_protocol_failure_after_readiness_retires_acquired_fixture(tmp_path):
         owners.append(owner)
         return owner[0]
 
-    configure = {"id": "c", "operation": "configure", "payload": {"spec": spec().to_dict(), "owner": {}}}
+    configure = {"id": "c", "operation": "configure", "payload": profile_request(path, digest)}
     source = BytesIO(json.dumps(configure).encode() + b"\n{invalid\n")
     with pytest.raises(ValueError):
         fixture_worker.serve(str(path), digest, source, BytesIO(), target_factory=factory)
