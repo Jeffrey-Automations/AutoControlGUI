@@ -20,7 +20,7 @@ from je_auto_control.utils.agent_runtime.fixture_target import FixtureImage, Own
 from je_auto_control.utils.agent_runtime.fixture_worker import create_target
 from je_auto_control.utils.agent_runtime.models import AgentTaskBudget
 from je_auto_control.utils.agent_runtime.observation_report import ObservationReport
-from je_auto_control.utils.agent_runtime.fixture_observations import FIXTURE_SOURCES
+from je_auto_control.utils.agent_runtime.fixture_observations import FIXTURE_FIELDS, FIXTURE_SOURCES
 from je_auto_control.utils.agent_runtime.semantic_snapshot import SemanticSnapshot
 from je_auto_control.utils.exception.control_signals import is_run_interruption
 from je_auto_control.utils.executor.run_control import ExecutionStopped
@@ -289,7 +289,8 @@ def _roundtrip(runtime: AgentRuntime, checks: dict[str, bool]) -> None:
         success_criteria=({"kind": "semantic", "tool": FIXTURE_COMMAND,
                            "fields": expected},))).task_id
     initial = runtime.observe(task)
-    snapshot = ObservationReport.from_dict(initial.data, required=FIXTURE_SOURCES).require_grounding()
+    snapshot = ObservationReport.from_dict(
+        initial.data, required=FIXTURE_SOURCES, fields=FIXTURE_FIELDS).require_grounding()
     _require(dict(snapshot.fields) == {"document_id": 17, "job_status": "ready"}
              and snapshot.revision == 0)
     checks["initial_state"] = True
@@ -297,7 +298,8 @@ def _roundtrip(runtime: AgentRuntime, checks: dict[str, bool]) -> None:
                                  "arguments": expected})
     _require(receipt.status == "confirmed" and receipt.result["comparison"] == "atomic")
     checks["operation_receipt"] = True
-    after = ObservationReport.from_dict(runtime.observe(task).data, required=FIXTURE_SOURCES).require_grounding()
+    after = ObservationReport.from_dict(
+        runtime.observe(task).data, required=FIXTURE_SOURCES, fields=FIXTURE_FIELDS).require_grounding()
     _require(dict(after.fields) == expected and after.revision == 2
              and after.identity_digest == snapshot.identity_digest)
     checks["independent_readback"] = True
@@ -312,7 +314,8 @@ def _page_read(runtime: AgentRuntime, checks: dict[str, bool], trace: PageTrace)
         success_criteria=({"kind": "semantic", "tool": FIXTURE_COMMAND,
                            "fields": {"job_status": "ready"}},))).task_id
     trace.begin()
-    observation = ObservationReport.from_dict(runtime.observe(task).data, required=FIXTURE_SOURCES)
+    observation = ObservationReport.from_dict(
+        runtime.observe(task).data, required=FIXTURE_SOURCES, fields=FIXTURE_FIELDS)
     protocol = dict(observation.sources)["fixture_protocol"]
     _require(isinstance(protocol, SemanticSnapshot)
              and dict(protocol.fields) == {"document_id": 17, "job_status": "ready"} and protocol.revision == 0)

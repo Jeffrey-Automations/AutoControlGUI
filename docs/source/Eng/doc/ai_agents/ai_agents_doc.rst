@@ -1213,3 +1213,12 @@ JavaScript resources. The same localhost REST routes and authentication rules ap
 installed package; serving static pages grants no task or desktop input authority.
 
 Host-selected semantic adapters may declare a fixed multi-source observation contract. Existing observe calls preserve partial/conflicting reports; actions and completion require fresh complete agreement from every source. Helper bootstrap pins the source contract and the full report crosses IPC before conversion to a command snapshot. The fixture now combines reviewed memory reads and its retained read-only IPC snapshot under one capture/commit lock, while cleanup can interrupt IPC. Injected-reader and hidden-helper tests cover source disagreement, partial memory failures and precommit agreement. UIA/DOM integration and native acceptance remain pending.
+
+Semantic observation field scopes
+--------------------------------
+
+Multi-source report version 2 requires host-defined fields in every source.
+A field omitted by all sources remains missing and cannot authorize a command
+or prove completion. Helper bootstrap and the original journal witness bind
+the same field scope. Version-one reports and out-of-scope fields are rejected.
+Injected fixture tests cover this contract; native and UIA/DOM acceptance remain pending.

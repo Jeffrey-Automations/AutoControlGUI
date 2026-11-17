@@ -667,7 +667,8 @@ best-effort 觀察沒有 revision，也不承諾後續操作具原子性。原�
 多來源報告與 runtime／helper 契約已有合成來源驗證，可保留部分缺失及型別化衝突，
 且拒絕以不完整資料執行或確認完成。自有 fixture 已接合 memory＋IPC 擷取及提交前雙來源核對，
 目前以注入原生呼叫、真實 reader 邏輯與隱藏 Python helper 驗證，仍非原生驗收；
-UIA／DOM 的來源身分、缺失欄位及 revision 正規化仍未接合，不能由報告契約推論已完成。
+UIA／DOM 的來源身分、逐欄失敗原因、受保護欄位拒絕、唯一 selector 證明、
+可退休 helper 內的 COM 期限及 revision 正規化仍未接合，不能由報告契約推論已完成。
 
 M3 已加入內部受信任 `SemanticTarget` runtime 接點：封閉語意快照驗證、排除擷取時間的狀態比較、
 傳遞原始快照及 journal action ID 的提交介面、具 atomic／non_atomic 標記的回條，以及未知效果的

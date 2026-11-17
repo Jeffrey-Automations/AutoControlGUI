@@ -9,6 +9,9 @@ Managed runtime semantic adapters opt into `SemanticTarget` through trusted host
 code. Its closed snapshot keeps provenance and revision in grounding while
 excluding only capture metadata. Grounded dispatch passes the original snapshot
 and journal action ID; only an operation-bound `SemanticReceipt` confirms a reply.
+Multi-source adapters pin the common required field scope in host code. Report v2
+checks that scope at capture, helper bootstrap and completion against the saved
+journal witness; shared omissions cannot authorize commands.
 Ordinary targets keep their existing full-payload comparison and dispatch path.
 
 `NativeSemanticTarget` transports the same contract through the existing owned

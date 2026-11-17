@@ -7,6 +7,7 @@ from typing import Any, ClassVar, Mapping, Sequence
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
 from je_auto_control.utils.agent_runtime.native_target import NativeDesktopTarget
+from je_auto_control.utils.agent_runtime.observation_report import REPORT_VERSION
 from je_auto_control.utils.agent_runtime.semantic_target import (
     SemanticReceipt, SemanticSnapshot, SemanticTarget, _report,
 )
@@ -39,9 +40,11 @@ class NativeSemanticTarget(NativeDesktopTarget, SemanticTarget):
         if type(version) is not int or version != 1:
             return False
         if self.observation_sources:
-            return (type(reply.get("semantic_report")) is int and reply["semantic_report"] == 1
-                    and reply.get("semantic_sources") == list(self.observation_sources))
-        return "semantic_report" not in reply and "semantic_sources" not in reply
+            return (type(reply.get("semantic_report")) is int and reply["semantic_report"] == REPORT_VERSION
+                    and reply.get("semantic_sources") == list(self.observation_sources)
+                    and bool(self.observation_fields)
+                    and reply.get("semantic_fields") == sorted(self.observation_fields))
+        return not {"semantic_report", "semantic_sources", "semantic_fields"}.intersection(reply)
 
     def perform(self, name: str, arguments: dict[str, Any]) -> Any:
         """Refuse legacy dispatch without an expected semantic snapshot."""

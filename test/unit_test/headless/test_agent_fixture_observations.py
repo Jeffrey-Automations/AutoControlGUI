@@ -9,7 +9,7 @@ from je_auto_control.utils.agent_runtime import AgentRuntime
 from je_auto_control.utils.agent_runtime.context import TaskOperation, operation_scope
 from je_auto_control.utils.agent_runtime.errors import AgentObservationStale, AgentTaskError
 from je_auto_control.utils.agent_runtime.fixture_commands import FIXTURE_COMMAND
-from je_auto_control.utils.agent_runtime.fixture_observations import FIXTURE_SOURCES
+from je_auto_control.utils.agent_runtime.fixture_observations import FIXTURE_FIELDS, FIXTURE_SOURCES
 from je_auto_control.utils.agent_runtime.observation_report import ObservationReport
 from je_auto_control.utils.exception.control_signals import OperationCancelledError
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -147,7 +147,8 @@ def test_completion_uses_both_new_sources_after_confirmed_command(managed):
 def test_direct_commit_rechecks_both_sources_after_original_grounding(managed):
     runtime, target, task, channel, _ = managed
     frame = runtime.observe(task)
-    expected = ObservationReport.from_dict(frame.data, required=FIXTURE_SOURCES).require_grounding()
+    expected = ObservationReport.from_dict(
+        frame.data, required=FIXTURE_SOURCES, fields=FIXTURE_FIELDS).require_grounding()
     original = channel.request
     commands = []
 
@@ -168,7 +169,8 @@ def test_direct_commit_refuses_boolean_substitution_for_integer_state(managed, a
     runtime, target, task, channel, provider = managed
     struct.pack_into("<I", provider.memory, 0x2300, 1)
     frame = runtime.observe(task)
-    expected = ObservationReport.from_dict(frame.data, required=FIXTURE_SOURCES).require_grounding()
+    expected = ObservationReport.from_dict(
+        frame.data, required=FIXTURE_SOURCES, fields=FIXTURE_FIELDS).require_grounding()
     forged = replace(expected, fields=(("document_id", True), ("job_status", "ready")))
     selected = target if adapter == "fixture" else target._target
     with runtime._scope(runtime._row(task)), pytest.raises(AgentObservationStale):
@@ -289,7 +291,8 @@ def test_capture_and_commit_cannot_interleave_sources_between_threads():
     requested = spec()
     with operation_scope(TaskOperation(requested, lambda: None, None)):
         target.ready(requested)
-        expected = ObservationReport.from_dict(target.observe(), required=FIXTURE_SOURCES).require_grounding()
+        expected = ObservationReport.from_dict(
+            target.observe(), required=FIXTURE_SOURCES, fields=FIXTURE_FIELDS).require_grounding()
     entered, release, action_started, action_done = (threading.Event() for _ in range(4))
     original = channel.request
     commands, errors = [], []

@@ -52,6 +52,7 @@ class SemanticTarget(ABC):
     """Host-selected adapter contract, never enabled by a task or observation payload."""
 
     observation_sources: ClassVar[tuple[str, ...]] = ()
+    observation_fields: ClassVar[tuple[str, ...]] = ()
 
     def perform_observed(self, name: str, arguments: Mapping[str, Any], *,
                          observation: Mapping[str, Any], operation_id: str) -> SemanticReceipt:
@@ -86,7 +87,8 @@ def fingerprint(target: Any, observation: Mapping[str, Any]) -> str:
 
 
 def _report(target: SemanticTarget, observation: Mapping[str, Any]) -> ObservationReport:
-    return ObservationReport.from_dict(observation, required=target.observation_sources)
+    return ObservationReport.from_dict(observation, required=target.observation_sources,
+                                       fields=target.observation_fields)
 
 
 def observe(target: Any) -> dict[str, Any]:
@@ -110,6 +112,7 @@ def grounding_details(target: Any, observation: Mapping[str, Any], observation_i
             report = _report(target, observation)
             result["semantic_report"] = report.to_dict()
             result["semantic_sources"] = list(target.observation_sources)
+            result["semantic_fields"] = list(report.field_scope)
             result["semantic"] = report.require_grounding().to_dict()
         else:
             result["semantic"] = SemanticSnapshot.from_dict(observation).to_dict()

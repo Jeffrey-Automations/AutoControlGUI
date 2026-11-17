@@ -9,6 +9,8 @@ from .errors import AgentObservationStale, AgentTaskError
 from .models import detached
 from .semantic_snapshot import SemanticSnapshot, _identifier
 
+REPORT_VERSION = 2
+
 _FAILURES = frozenset({"unsupported", "access_denied", "unreadable_region", "partial_read",
                        "inconsistent_snapshot", "deadline_exceeded", "budget_exceeded", "decode_failed"})
 
@@ -33,9 +35,11 @@ class ObservationReport:
     sources: tuple[tuple[str, SemanticSnapshot | str], ...] = field(repr=False)
     started: float
     finished: float
+    field_scope: tuple[str, ...]
 
     def __post_init__(self) -> None:
         _identifier(self.primary)
+        object.__setattr__(self, "field_scope", _field_scope(self.field_scope))
         sources = tuple(self.sources)
         if not 1 <= len(sources) <= 4 or len(dict(sources)) != len(sources):
             raise AgentTaskError("observation report requires unique bounded sources")
@@ -53,22 +57,24 @@ class ObservationReport:
 
     def _check_source(self, name: str, value: SemanticSnapshot | str) -> None:
         if isinstance(value, SemanticSnapshot):
+            if not set(dict(value.fields)) <= set(self.field_scope):
+                raise AgentTaskError("observation source exceeds the host field contract")
             if value.source != name or not self.started <= value.started <= value.finished <= self.finished:
                 raise AgentTaskError("observation source is outside its capture envelope")
         elif not isinstance(value, str) or value not in _FAILURES:
             raise AgentTaskError("observation source failure is invalid")
 
     def _differences(self) -> tuple[tuple[str, ...], tuple[str, ...]]:
-        grouped: dict[str, list[Any]] = {}
+        grouped: dict[str, list[Any]] = {name: [] for name in self.field_scope}
         for _, value in self.sources:
             if isinstance(value, SemanticSnapshot):
                 for name, item in value.fields:
-                    grouped.setdefault(name, []).append(item)
+                    grouped[name].append(item)
         missing, conflicts = set(), set()
         for name, present in grouped.items():
             if len(present) != len(self.sources):
                 missing.add(name)
-            if _disagrees(present):
+            if present and _disagrees(present):
                 conflicts.add(name)
         return tuple(sorted(missing)), tuple(sorted(conflicts))
 
@@ -97,36 +103,40 @@ class ObservationReport:
     def grounding(self) -> dict[str, Any]:
         """Retain all source state and provenance; omit only capture identifiers and times."""
         self.require_grounding()
-        return {"report_version": 1, "primary": self.primary,
+        return {"report_version": REPORT_VERSION, "primary": self.primary, "field_scope": list(self.field_scope),
                 "sources": {name: value.grounding() for name, value in self.sources
                             if isinstance(value, SemanticSnapshot)}}
 
     def to_dict(self) -> dict[str, Any]:
         """Publish bounded source diagnostics without converting failures into values."""
         missing, conflicts = self._differences()
-        return {"report_version": 1, "primary": self.primary, "started": self.started, "finished": self.finished,
+        return {"report_version": REPORT_VERSION, "primary": self.primary, "field_scope": list(self.field_scope),
+                "started": self.started, "finished": self.finished,
                 "sources": {name: {"snapshot": value.to_dict()} if isinstance(value, SemanticSnapshot)
                             else {"failure": value} for name, value in self.sources},
                 "status": self.status, "missing_fields": list(missing), "conflicting_fields": list(conflicts)}
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any], *, required: tuple[str, ...]) -> ObservationReport:
+    def from_dict(cls, value: Mapping[str, Any], *, required: tuple[str, ...],
+                  fields: tuple[str, ...]) -> ObservationReport:
         """Validate the closed wire schema against the host's ordered source contract."""
         data = detached(value)
         keys = {"report_version", "primary", "started", "finished", "sources", "status",
-                "missing_fields", "conflicting_fields"}
+                "missing_fields", "conflicting_fields", "field_scope"}
         if not isinstance(data, dict) or set(data) != keys or type(data["report_version"]) is not int:
             raise AgentTaskError("observation report has an unknown schema")
         _source_contract(data, required)
+        if data["field_scope"] != list(_field_scope(fields)):
+            raise AgentTaskError("observation report does not match the host field contract")
         sources = tuple((name, _source(item)) for name, item in data["sources"].items())
-        report = cls(data["primary"], sources, data["started"], data["finished"])
+        report = cls(data["primary"], sources, data["started"], data["finished"], fields)
         if report.to_dict() != data:
             raise AgentTaskError("observation report summary does not match its sources")
         return report
 
 
 def _source_contract(data: dict[str, Any], required: tuple[str, ...]) -> None:
-    if (data["report_version"] != 1 or not required or data["primary"] != required[0]
+    if (data["report_version"] != REPORT_VERSION or not required or data["primary"] != required[0]
             or not isinstance(data["sources"], dict) or set(data["sources"]) != set(required)):
         raise AgentTaskError("observation report does not match the host source contract")
 
@@ -137,3 +147,13 @@ def _source(value: Any) -> SemanticSnapshot | str:
     if isinstance(value, dict) and set(value) == {"failure"} and isinstance(value["failure"], str):
         return value["failure"]
     raise AgentTaskError("observation source has an unknown schema")
+
+
+def _field_scope(fields: tuple[str, ...]) -> tuple[str, ...]:
+    if not isinstance(fields, tuple) or not 1 <= len(fields) <= 64:
+        raise AgentTaskError("observation report requires bounded host fields")
+    for name in fields:
+        _identifier(name)
+    if len(set(fields)) != len(fields):
+        raise AgentTaskError("observation report requires unique host fields")
+    return tuple(sorted(fields))

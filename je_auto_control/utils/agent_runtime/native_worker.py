@@ -26,6 +26,7 @@ from je_auto_control.utils.agent_runtime.context import (
 from je_auto_control.utils.agent_runtime.presence_frames import presence_body
 from je_auto_control.utils.agent_runtime.presence_reader import PresenceReader
 from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
+from je_auto_control.utils.agent_runtime.observation_report import REPORT_VERSION
 from je_auto_control.utils.agent_runtime.semantic_target import SemanticTarget, observe as observe_target
 from je_auto_control.utils.agent_runtime.semantic_worker import (
     managed_semantic_scope, perform_grounded, require_empty_cleanup, refuse_cleanup_command, refuse_input,
@@ -146,8 +147,9 @@ class NativeWorker:
         if isinstance(self._target, SemanticTarget):
             result["semantic"] = 1
             if self._target.observation_sources:
-                result["semantic_report"] = 1
+                result["semantic_report"] = REPORT_VERSION
                 result["semantic_sources"] = list(self._target.observation_sources)
+                result["semantic_fields"] = sorted(self._target.observation_fields)
         # pylint: disable-next=unidiomatic-typecheck  # reason: read-only/custom worker subclasses cannot claim this API
         if type(self) is NativeWorker and self._profile_kind == "browser" and isinstance(self._target, BrowserTarget):
             result["browser_readonly"] = 1

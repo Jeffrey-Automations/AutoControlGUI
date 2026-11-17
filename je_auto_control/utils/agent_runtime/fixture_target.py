@@ -12,7 +12,7 @@ from .errors import AgentObservationStale, AgentTaskError
 from .context import TaskOperation, authorization_key, current_operation
 from .fixture_commands import FIXTURE_COMMAND, FixtureCommands
 from .fixture_launch import OwnedChannelLauncher
-from .fixture_observations import FIXTURE_SOURCES, FixtureObservations
+from .fixture_observations import FIXTURE_FIELDS, FIXTURE_SOURCES, FixtureObservations
 from .memory_target import MemoryBinding, MemorySemanticTarget
 from .models import AgentTaskSpec
 from .observation_report import ObservationReport
@@ -79,6 +79,7 @@ class OwnedFixtureTarget(SemanticTarget):
     """Internal assembly; construct before startup so failed cleanup remains reachable."""
 
     observation_sources: ClassVar[tuple[str, ...]] = FIXTURE_SOURCES
+    observation_fields: ClassVar[tuple[str, ...]] = FIXTURE_FIELDS
 
     def __init__(self, image: FixtureImage, *, launcher: OwnedChannelLauncher,
                  lease: ImageLease, observer: ImageObserver,

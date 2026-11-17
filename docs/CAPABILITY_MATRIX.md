@@ -1,5 +1,9 @@
 # Capability matrix
 
+Report version 2 requires a host-defined field scope, matching helper bootstrap
+and saved completion witness. Fields omitted by every source remain partial;
+extra fields and older report contracts are rejected.
+
 Semantic completion compares fresh sequence-checked fields with the recorded
 identity, adapter, schema and source of the last effective confirmed command.
 Missing witnesses, fields or revisions and changed identities remain unknown.

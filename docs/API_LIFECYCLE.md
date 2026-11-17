@@ -1,5 +1,9 @@
 # Public API lifecycle
 
+Report version 2 requires a host-defined field scope, matching helper bootstrap
+and saved completion witness. Fields omitted by every source remain partial;
+extra fields and older report contracts are rejected.
+
 Managed task `success_criteria` accepts `semantic` conditions with exactly `tool`
 and bounded scalar `fields`. The existing task API and GUI scope editor carry the
 same JSON contract. This requires a host-selected semantic target and a recorded

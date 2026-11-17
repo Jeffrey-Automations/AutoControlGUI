@@ -513,10 +513,18 @@ availability or loaded-code trust. Native execution remains paused.
 ### Completion evidence
 
 Host-selected semantic adapters can declare an ordered `observation_sources`
-contract. Its first source is the command's primary snapshot. Such adapters return
+contract and a nonempty `observation_fields` tuple of at most 64 unique field names.
+Every source must corroborate every declared field. The first declared source is
+the command's primary snapshot. Such adapters return
 an `ObservationReport` through the existing observation API; task JSON cannot enable
 this capability. The native proxy requires the exact source contract and report
-version in the worker bootstrap. A generic semantic proxy refuses that extension.
+version 2 and sorted `semantic_fields` in the worker bootstrap. A generic semantic
+proxy refuses that extension.
+
+The report requires `field_scope`; `from_dict` requires host `fields` as well as
+`required` sources. The wire scope must match the host scope exactly, and source
+fields outside that scope are rejected. Even a field omitted by every source
+remains missing; if every source fails, all required fields are missing.
 
 Reports retain up to four source snapshots or closed failure reasons, capture
 intervals, missing field names and typed value conflicts. All successful sources
@@ -530,8 +538,9 @@ ordinary missing-source reasons and must propagate from acquisition.
 
 Action fingerprints retain every source's state and provenance. The complete report
 crosses the helper boundary unchanged before the worker converts it to the primary
-command snapshot. The journal retains the full source report. Completion requires
-fresh compatible evidence from every original source; disagreement or missing
+command snapshot. The journal retains the full source report and original `semantic_fields`.
+Completion parses both reports against that saved scope, so later adapter changes
+cannot shrink the requirement. Completion requires fresh compatible evidence from every original source; disagreement or missing
 sources produces an unknown result. The complete-only `SemanticSnapshot` wire schema
 is unchanged and lives in `semantic_snapshot.py`, re-exported by `semantic_target.py`.
 

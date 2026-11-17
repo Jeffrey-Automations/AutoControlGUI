@@ -59,11 +59,12 @@ def _confirmed_witness(receipts: Sequence[Mapping[str, Any]], tool: str) -> Mapp
 
 
 def _report_readback(witness: Mapping[str, Any], observation: Mapping[str, Any]) -> SemanticSnapshot | None:
-    required = witness.get("semantic_sources")
-    if not isinstance(required, (list, tuple)) or not all(isinstance(name, str) for name in required):
+    required = _contract_names(witness.get("semantic_sources"))
+    fields = _contract_names(witness.get("semantic_fields"))
+    if required is None or fields is None:
         return None
-    before = ObservationReport.from_dict(witness["semantic_report"], required=tuple(required))
-    current = ObservationReport.from_dict(observation, required=tuple(required))
+    before = ObservationReport.from_dict(witness["semantic_report"], required=required, fields=fields)
+    current = ObservationReport.from_dict(observation, required=required, fields=fields)
     if before.status != "complete" or current.status != "complete":
         return None
     old_sources, new_sources = dict(before.sources), dict(current.sources)
@@ -83,3 +84,9 @@ def _same_target_readback(before: SemanticSnapshot, current: SemanticSnapshot) -
         return False
     return (current.revision >= before.revision and current.observation_id != before.observation_id
             and current.started >= before.finished)
+
+
+def _contract_names(value: Any) -> tuple[str, ...] | None:
+    if not isinstance(value, (list, tuple)) or not all(isinstance(name, str) for name in value):
+        return None
+    return tuple(value)

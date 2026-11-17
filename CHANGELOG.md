@@ -2,11 +2,13 @@
 
 ## [Unreleased]
 
-- Managed fixture observations now return a version-one multi-source report instead of a flat
+- Managed fixture observations now return a version-two multi-source report instead of a flat
   memory snapshot. Read `sources.process_memory.snapshot` only after requiring a complete report;
   partial reads and source conflicts remain diagnostic data. Both host and worker require the
   report capability, and commands/completion require agreement with the owned IPC snapshot.
-  Native acceptance remains pending.
+  Report constructors and parsers now require explicit host field scopes. Bootstrap requires
+  matching semantic_fields and report version 2; version-one reports/helpers are rejected.
+  Fields missing from all sources remain partial. Native acceptance remains pending.
 
 - Image search and OCR (`find_image` and everything on `cv2_utils.template_detection`, `visual_match`,
   `color_match`, `edge_match`, `rotated_match`, self-healing frame locators, device-frame matching,

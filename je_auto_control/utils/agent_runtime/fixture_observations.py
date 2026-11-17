@@ -13,6 +13,7 @@ from .observation_report import ObservationReport
 from .semantic_snapshot import SemanticSnapshot
 from ..process_memory.models import FailureReason, MemoryObservationError
 
+FIXTURE_FIELDS = ("document_id", "job_status")
 FIXTURE_SOURCES = ("process_memory", "fixture_protocol")
 _MISSING = frozenset({FailureReason.ACCESS_DENIED, FailureReason.UNREADABLE_REGION,
                       FailureReason.PARTIAL_READ, FailureReason.INCONSISTENT_SNAPSHOT,
@@ -39,7 +40,7 @@ class FixtureObservations:
         protocol = self._snapshot(checkpoint)
         checkpoint()
         return ObservationReport(FIXTURE_SOURCES[0], ((FIXTURE_SOURCES[0], memory),
-                                 (FIXTURE_SOURCES[1], protocol)), started, time.monotonic())
+                                 (FIXTURE_SOURCES[1], protocol)), started, time.monotonic(), FIXTURE_FIELDS)
 
     def _snapshot(self, checkpoint: Callable[[], None]) -> SemanticSnapshot:
         started = time.monotonic()

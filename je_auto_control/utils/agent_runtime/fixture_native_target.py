@@ -6,7 +6,7 @@ import sys
 from typing import Any, ClassVar
 
 from .errors import AgentTaskError
-from .fixture_observations import FIXTURE_SOURCES
+from .fixture_observations import FIXTURE_FIELDS, FIXTURE_SOURCES
 from .semantic_native_target import NativeSemanticTarget
 from .target_config import AgentTargetProfile
 
@@ -15,6 +15,7 @@ class NativeFixtureTarget(NativeSemanticTarget):
     """Inert host adapter; settings cannot choose an interpreter, worker, PID or address."""
 
     observation_sources: ClassVar[tuple[str, ...]] = FIXTURE_SOURCES
+    observation_fields: ClassVar[tuple[str, ...]] = FIXTURE_FIELDS
 
     def __init__(self, profile: AgentTargetProfile) -> None:
         if profile.kind != "fixture":

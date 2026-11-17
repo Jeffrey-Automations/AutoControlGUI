@@ -16,17 +16,19 @@ from je_auto_control.utils.agent_runtime.semantic_native_target import NativeSem
 from je_auto_control.utils.agent_runtime.semantic_target import fingerprint, observe
 from headless.test_agent_semantic_grounding import Target, snapshot, act
 
+FIELDS = ("value",)
 SOURCES = ("process_memory", "fixture_protocol")
 
 
 def report(**changes):
     first = snapshot()
     second = replace(first, source="fixture_protocol", adapter_id="fixture-ipc", **changes)
-    return ObservationReport(SOURCES[0], ((SOURCES[0], first), (SOURCES[1], second)), 1, 2)
+    return ObservationReport(SOURCES[0], ((SOURCES[0], first), (SOURCES[1], second)), 1, 2, FIELDS)
 
 
 class ReportTarget(Target):
     observation_sources = SOURCES
+    observation_fields = FIELDS
 
     def __init__(self):
         super().__init__()
@@ -39,7 +41,7 @@ class ReportTarget(Target):
         second = self.failure or replace(first, **({"source": "fixture_protocol", "adapter_id": "fixture-ipc"}
                                                    | self.second_changes))
         return ObservationReport(SOURCES[0], ((SOURCES[0], first), (SOURCES[1], second)),
-                                 started, time.monotonic()).to_dict()
+                                 started, time.monotonic(), self.observation_fields).to_dict()
 
 
 def snapshot_from(value):
@@ -67,6 +69,7 @@ def test_complete_report_retains_every_source_in_journal_and_finishes(managed):
     act(runtime, task, frame)
     grounding = runtime.store.actions(task)[0]["grounding"]
     assert grounding["semantic_sources"] == list(SOURCES)
+    assert grounding["semantic_fields"] == list(FIELDS)
     assert set(grounding["semantic_report"]["sources"]) == set(SOURCES)
     assert target.calls[0][1].source == "process_memory"
     assert runtime.finish(task).state == "succeeded"
@@ -75,7 +78,6 @@ def test_complete_report_retains_every_source_in_journal_and_finishes(managed):
 @pytest.mark.parametrize("change,status", [
     ({"fields": (("value", True),)}, "conflict"),
     ({"revision": 2}, "conflict"),
-    ({"fields": (("other", 0),)}, "partial"),
     ({"revision": None, "consistency": "best_effort"}, "conflict"),
 ])
 def test_disagreement_and_missing_fields_remain_visible_but_cannot_act(managed, change, status):
@@ -117,7 +119,7 @@ def test_partial_report_keeps_allowlisted_success_and_fixed_failure(managed):
 @pytest.mark.parametrize("failure", ["scope_denied", "cleanup_failed", "target_changed", "cancelled", "secret detail"])
 def test_control_and_ownership_failures_cannot_be_downgraded_to_missing(failure):
     with pytest.raises(AgentTaskError):
-        ObservationReport(SOURCES[0], ((SOURCES[0], snapshot()), (SOURCES[1], failure)), 1, 2)
+        ObservationReport(SOURCES[0], ((SOURCES[0], snapshot()), (SOURCES[1], failure)), 1, 2, FIELDS)
 
 
 def test_bool_integer_disagreement_is_not_equal():
@@ -130,7 +132,7 @@ def test_bool_integer_disagreement_is_not_equal():
 def test_best_effort_agreement_still_cannot_claim_a_checked_generation():
     first = snapshot(revision=None, consistency="best_effort")
     value = ObservationReport(SOURCES[0], ((SOURCES[0], first),
-        (SOURCES[1], replace(first, source=SOURCES[1]))), 1, 2)
+        (SOURCES[1], replace(first, source=SOURCES[1]))), 1, 2, FIELDS)
     assert value.status == "unverified"
     with pytest.raises(AgentObservationStale):
         value.require_grounding()
@@ -142,17 +144,17 @@ def test_mixed_target_lifetimes_are_refused(change):
         report(**change)
 
 
-@pytest.mark.parametrize("change", [{"report_version": True}, {"report_version": 2}, {"status": "partial"},
+@pytest.mark.parametrize("change", [{"report_version": True}, {"report_version": 1}, {"status": "partial"},
                                     {"missing_fields": ["value"]}, {"conflicting_fields": ["value"]},
                                     {"primary": "fixture_protocol"}, {"extra": "ignored"}])
 def test_unknown_or_forged_report_schema_is_refused(change):
     with pytest.raises(AgentTaskError):
-        ObservationReport.from_dict(report().to_dict() | change, required=SOURCES)
+        ObservationReport.from_dict(report().to_dict() | change, required=SOURCES, fields=FIELDS)
 
 
 def test_host_contract_cannot_be_widened_by_a_report():
     with pytest.raises(AgentTaskError, match="host source contract"):
-        ObservationReport.from_dict(report().to_dict(), required=(SOURCES[0],))
+        ObservationReport.from_dict(report().to_dict(), required=(SOURCES[0],), fields=FIELDS)
     target = Target()
     target.observe = lambda: report().to_dict()
     with pytest.raises(AgentTaskError, match="unknown schema"):
@@ -195,19 +197,23 @@ def test_worker_roundtrip_and_proxy_require_explicit_host_report_contract(tmp_pa
 
     class ReportProxy(NativeSemanticTarget):
         observation_sources = SOURCES
+        observation_fields = FIELDS
 
     report_proxy = ReportProxy(argv=["unused"], resource_path=tmp_path / "unused.lock")
     assert report_proxy._supports_bootstrap(bootstrap)
-    for change in ({"semantic_report": True}, {"semantic_report": 2}, {"semantic_sources": [SOURCES[0]]}):
+    for change in ({"semantic_report": True}, {"semantic_report": 1}, {"semantic_sources": [SOURCES[0]]},
+                   {"semantic_fields": []}, {"semantic_fields": ["other"]}):
         assert not report_proxy._supports_bootstrap(bootstrap | change)
     value = observe(target)
-    assert ObservationReport.from_dict(json.loads(json.dumps(value)), required=SOURCES).status == "complete"
+    assert ObservationReport.from_dict(
+        json.loads(json.dumps(value)), required=SOURCES, fields=FIELDS).status == "complete"
 
 
 @pytest.mark.parametrize("partial", [False, True])
 def test_hidden_helper_preserves_report_through_actual_runtime_protocol(tmp_path, partial):
     class ReportProxy(NativeSemanticTarget):
         observation_sources = SOURCES
+        observation_fields = FIELDS
 
     helper = Path(__file__).resolve().parents[2] / "fixtures" / "reported_semantic_helper.py"
     argv = [sys.executable, "-u", str(helper)] + (["--partial"] if partial else [])
@@ -230,3 +236,70 @@ def test_hidden_helper_preserves_report_through_actual_runtime_protocol(tmp_path
     finally:
         runtime.close()
     assert channel.retired
+
+
+def test_all_sources_omitting_required_field_cannot_authorize():
+    first = snapshot(fields=(("other", 0),))
+    value = ObservationReport(SOURCES[0], ((SOURCES[0], first),
+        (SOURCES[1], replace(first, source=SOURCES[1]))), 1, 2, ("other", "value"))
+    assert value.status == "partial"
+    assert value.to_dict()["missing_fields"] == ["value"]
+    with pytest.raises(AgentObservationStale):
+        value.require_grounding()
+
+
+@pytest.mark.parametrize("fields", [(), ("value", "value"), ("",), tuple(f"field{i}" for i in range(65))])
+def test_invalid_host_field_contract_is_refused(fields):
+    with pytest.raises(AgentTaskError):
+        replace(report(), field_scope=fields)
+
+
+def test_all_failed_sources_report_entire_missing_scope():
+    value = ObservationReport(SOURCES[0], tuple((name, "partial_read") for name in SOURCES),
+                              1, 2, ("other", "value"))
+    assert value.status == "partial"
+    assert value.to_dict()["missing_fields"] == ["other", "value"]
+
+
+def test_source_cannot_publish_unrequested_fields():
+    with pytest.raises(AgentTaskError, match="host field contract"):
+        report(fields=(("other", 0),))
+
+
+@pytest.mark.parametrize("fields", [("other",), ("value", "other"), ()])
+def test_report_cannot_change_host_field_scope(fields):
+    with pytest.raises(AgentTaskError):
+        ObservationReport.from_dict(report().to_dict(), required=SOURCES, fields=fields)
+
+
+def test_shared_omission_blocks_runtime_action(managed):
+    runtime, target, task = managed
+    target.observation_fields = ("other", "value")
+    frame = runtime.observe(task)
+    assert frame.data["missing_fields"] == ("other",)
+    with pytest.raises(AgentObservationStale):
+        act(runtime, task, frame)
+    assert not target.calls and runtime.store.actions(task) == []
+
+
+def test_shared_omission_after_action_cannot_prove_completion(managed):
+    runtime, target, task = managed
+    target.observation_fields = ("other", "value")
+    target.state = replace(target.state, fields=(("other", 0), ("value", 0)))
+    act(runtime, task, runtime.observe(task))
+    assert target.calls and dict(target.state.fields) == {"value": 1}
+    result = runtime.finish(task)
+    assert result.state == "waiting_user"
+    assert result.verification == ({"kind": "semantic", "status": "unknown"},)
+
+
+def test_completion_preserves_original_field_scope_if_target_changes(managed):
+    runtime, target, task = managed
+    target.observation_fields = ("other", "value")
+    target.state = replace(target.state, fields=(("other", 0), ("value", 0)))
+    act(runtime, task, runtime.observe(task))
+    target.observation_fields = FIELDS
+    result = runtime.finish(task)
+    assert result.state == "waiting_user"
+    assert result.verification[0]["status"] == "unknown"
+    assert result.verification[0]["reason"] == "AgentTaskError"

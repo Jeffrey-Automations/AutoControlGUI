@@ -10,7 +10,7 @@ from je_auto_control.utils.agent_runtime import AgentRuntime, AgentTaskSpec
 from je_auto_control.utils.agent_runtime.context import TaskOperation, operation_scope
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.fixture_commands import FIXTURE_COMMAND
-from je_auto_control.utils.agent_runtime.fixture_observations import FIXTURE_SOURCES
+from je_auto_control.utils.agent_runtime.fixture_observations import FIXTURE_FIELDS, FIXTURE_SOURCES
 from je_auto_control.utils.agent_runtime.observation_report import ObservationReport
 from je_auto_control.utils.agent_runtime.semantic_native_target import NativeSemanticTarget
 from je_auto_control.utils.exception.control_signals import OperationCancelledError
@@ -50,7 +50,7 @@ def test_lazy_readiness_binds_owner_before_launch_and_is_idempotent():
     with operation_scope(TaskOperation(requested, lambda: None, owner)):
         assert target.ready(requested) == (True, "")
         assert target.ready(requested) == (True, "")
-        captured = ObservationReport.from_dict(target.observe(), required=FIXTURE_SOURCES)
+        captured = ObservationReport.from_dict(target.observe(), required=FIXTURE_SOURCES, fields=FIXTURE_FIELDS)
         assert dict(captured.require_grounding().fields) == {"document_id": 7, "job_status": "ready"}
     assert len(calls) == 1
     for other in (AuthorizationContext("bob", "admin", "alice-store"),
@@ -137,6 +137,7 @@ def test_scope_change_during_startup_retires_the_acquired_fixture():
 def helper(tmp_path, *, partial=False):
     class FixtureProxy(NativeSemanticTarget):
         observation_sources = FIXTURE_SOURCES
+        observation_fields = FIXTURE_FIELDS
 
     argv = [sys.executable, "-u", str(HELPER)] + (["--partial-read"] if partial else [])
     target = FixtureProxy(argv=argv, resource_path=tmp_path / "fixture.lock")
@@ -149,7 +150,7 @@ def test_actual_helper_carries_guarded_memory_read_command_completion_and_retire
         task = runtime.submit(spec()).task_id
         frame = runtime.observe(task)
         channel = proxy._channel
-        captured = ObservationReport.from_dict(frame.data, required=FIXTURE_SOURCES)
+        captured = ObservationReport.from_dict(frame.data, required=FIXTURE_SOURCES, fields=FIXTURE_FIELDS)
         assert dict(captured.require_grounding().fields) == {"document_id": 7, "job_status": "ready"}
         assert len(captured.sources) == 2
         assert "header_address" not in str(frame.data)
@@ -185,8 +186,10 @@ def test_helper_restart_cannot_reuse_synthetic_memory_identity(tmp_path):
         runtime.cancel(first)
         second = runtime.submit(spec()).task_id
         after = runtime.observe(second)
-        first_snapshot = ObservationReport.from_dict(before.data, required=FIXTURE_SOURCES).require_grounding()
-        second_snapshot = ObservationReport.from_dict(after.data, required=FIXTURE_SOURCES).require_grounding()
+        first_snapshot = ObservationReport.from_dict(
+            before.data, required=FIXTURE_SOURCES, fields=FIXTURE_FIELDS).require_grounding()
+        second_snapshot = ObservationReport.from_dict(
+            after.data, required=FIXTURE_SOURCES, fields=FIXTURE_FIELDS).require_grounding()
         assert first_snapshot.identity_digest != second_snapshot.identity_digest
         assert dict(second_snapshot.fields) == {"document_id": 7, "job_status": "ready"}
         runtime.cancel(second)
