@@ -255,7 +255,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
    - 核對既有瀏覽器呼叫者各自的環境是否已安裝相容 `je_web_runner`。舊 bridge 依賴呼叫環境的
      SDK，不會自動使用受管 helper；缺套件時應保留明確失敗，不能退回其他瀏覽器引擎。
    - `DECIDE`：部署／回復計畫已寫成 `docs/superpowers/plans/2026-11-01-deployment-rollback.md`（未執行）；
-     其中標「待決定」的回復方式、helper 直譯器、套件鎖、Chromium 與主機 profile 待維護者批准。
+     回復方式已決定（建回復分支再切換，U-20261117-02）；其餘標「待決定」的 helper 直譯器、套件鎖、Chromium、主機 profile 與多主機名冊待維護者提供並批准。
      正式變更前仍須依該計畫安排主工作樹、既有 Jeffrey_RPA 批次與服務的部署／回復；不能直接將
      功能工作樹當作已部署版本，也不能替換共用 `.venv` 或自動重啟正式服務。
      舊版回復須先取得輸入退場確證，審閱相符的升級前狀態及原位置，並從全部舊版任務根目錄
