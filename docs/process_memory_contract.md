@@ -335,11 +335,19 @@ resources; unrelated scope refusals do not retire an existing owner's target.
 The hidden `memory_target_helper.py` test fixture serves this path through the real
 semantic worker/proxy with injected launch calls and buffers. It uses a fresh
 synthetic identity per helper process, not OS attestation. Tests cover semantic
-completion, typed read failures and process retirement. The worker's custom-target
-checkpoint currently checks activity rather than refreshing authorization locally;
-the host proxy polls live authority and retires the helper on cancellation/revocation.
-Worker-local refresh, reviewed source delivery and Linux non-display owner-service
-routing remain separate prerequisites for production registration.
+completion, typed read failures and process retirement. Semantic worker requests
+pin task, owner/store provenance, target and profile kind. Dispatch, reader checkpoints,
+command guards and result publication refresh the original owner's stored authority.
+Any role change, including an upgrade, requires a new host-reviewed session. Missing
+or damaged stores fail closed with fixed wire errors. Command guards retain the
+original request checkpoint even inside a temporarily replaced operation scope.
+Cleanup remains available after revocation. Trusted local and explicit storeless
+owners retain the existing deferred-authorization semantics.
+
+These checks use real temporary user stores and injected memory. They cannot make
+revocation atomic with a read or interrupt a blocked syscall. The host still owns
+cancellation, live profile checks and helper retirement. Reviewed source delivery
+and Linux non-display owner-service routing remain production prerequisites.
 
 The assembly selects a read budget of the complete image plan plus the fixture's
 72 bytes, capped at 1 MiB, with at most 1,024 region checks. The host chooses a

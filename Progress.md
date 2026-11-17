@@ -693,8 +693,11 @@ OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLa
 並防止另一個 session 在啟動發布與內部 owner 綁定之間接管。隱藏 Python helper
 已串起真實 reader 邏輯、既有語意 IPC、完成判定、失敗代碼與回收；原生呼叫及 buffer 仍為注入資料。
 目前僅有注入測試，尚未註冊到正式 profile／公開入口，原生信任與驗收仍待完成。
-自訂語意 worker 的本地 checkpoint 目前只有活動檢查；即時撤權／取消由主機 RPC 輪詢與 helper 退場處理。
-worker 逐次讀取的本地權限更新、正式 helper 來源交付，以及 Linux 非顯示 helper 的 owner-service 路由仍待接合。
+自訂語意 worker 已在請求、讀取 checkpoint、命令守衛與發布前重新核對原帳號／角色／store 來源，
+並拒絕回呼替換 operation 或 worker 綁定；目前以真實暫存帳號檔及注入 buffer 驗證。
+取消與即時 profile 停用仍由主機 RPC 輪詢及 helper 退場處理，不能把 checkpoint 當成原子撤權或 syscall 中斷。
+正式 helper 來源交付與 Linux 非顯示 helper 的 owner-service 路由仍待接合。
+型別檢查另有既存缺口：`native_worker.close` 呼叫的 cleanup 尚未在 SemanticTarget 名義契約宣告。
 原生 smoke 工具已有初始讀值、操作回條、新讀回、runtime 完成及回收的分項報告；
 目前只跑過靜態產物預檢與注入測試，不代表原生驗收或完整故障矩陣通過。
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。

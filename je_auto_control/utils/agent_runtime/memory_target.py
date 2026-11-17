@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import threading
 from typing import Any, Mapping, Protocol
 
-from je_auto_control.utils.agent_runtime.context import current_operation
+from je_auto_control.utils.agent_runtime.context import authorization_key, current_operation
 from je_auto_control.utils.agent_runtime.errors import AgentObservationStale, AgentTaskError
 from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
 from je_auto_control.utils.agent_runtime.policy import TaskPolicy
@@ -16,11 +16,6 @@ from je_auto_control.utils.process_memory.models import (
     FailureReason, MemoryObservationError, ObservationFailure, ProcessIdentity, ReviewedProbe,
 )
 from je_auto_control.utils.process_memory.reader import ProcessMemoryReader
-from je_auto_control.utils.rbac.authorization import AuthorizationContext
-
-
-def _owner_key(owner: AuthorizationContext | None) -> tuple[str, str, str | None] | None:
-    return None if owner is None else (owner.user_id, owner.role, owner.store_path)
 
 
 @dataclass(frozen=True)
@@ -74,14 +69,14 @@ class MemorySemanticTarget(SemanticTarget):
             if (self._terminal or operation is None or operation.spec != spec
                     or spec.target != self._binding.target_id):
                 raise AgentTaskError("memory target requires its bound managed task")
-            if self._spec is not None and _owner_key(operation.owner) != self._owner:
+            if self._spec is not None and authorization_key(operation.owner) != self._owner:
                 raise AgentTaskError("memory target belongs to a different owner")
             operation.checkpoint()
             result = self._commands.ready(spec)
             operation.checkpoint()
             if result[0] is True:
                 self._spec = spec
-                self._owner = _owner_key(operation.owner)
+                self._owner = authorization_key(operation.owner)
             return result
 
     def _checkpoint(self) -> None:
@@ -89,7 +84,7 @@ class MemorySemanticTarget(SemanticTarget):
         if (self._terminal or self._spec is None or operation is None
                 or operation.spec != self._spec):
             raise AgentTaskError("memory target is outside its live managed task")
-        if _owner_key(operation.owner) != self._owner:
+        if authorization_key(operation.owner) != self._owner:
             raise AgentTaskError("memory target belongs to a different owner")
         operation.checkpoint()
         if self._reader.pending_cleanup:

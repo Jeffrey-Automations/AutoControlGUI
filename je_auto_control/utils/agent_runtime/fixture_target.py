@@ -9,10 +9,10 @@ import threading
 from typing import Any, Callable, Mapping, NoReturn
 
 from .errors import AgentTaskError
-from .context import TaskOperation, current_operation
+from .context import TaskOperation, authorization_key, current_operation
 from .fixture_commands import FIXTURE_COMMAND, FixtureCommands
 from .fixture_launch import OwnedChannelLauncher
-from .memory_target import MemoryBinding, MemorySemanticTarget, _owner_key
+from .memory_target import MemoryBinding, MemorySemanticTarget
 from .models import AgentTaskSpec
 from .semantic_target import SemanticReceipt, SemanticSnapshot, SemanticTarget
 from ..exception.control_signals import is_run_interruption
@@ -174,7 +174,7 @@ class OwnedFixtureTarget(SemanticTarget):
                 or set(spec.allowed_tools) != {FIXTURE_COMMAND}):
             raise AgentTaskError("fixture startup requires its exact managed task scope")
         operation.checkpoint()
-        scope = _ManagedScope(spec, _owner_key(operation.owner))
+        scope = _ManagedScope(spec, authorization_key(operation.owner))
         with self._publication:
             self._live()
             if self._lifecycle.state is _State.STARTING:
