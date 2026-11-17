@@ -297,9 +297,23 @@ expected revision plus two. Unknown replies stop further commands; cleanup retai
 transport ownership until closure succeeds. The transport must retire failed
 streams to prevent late replies from serving later requests. The runtime never
 automatically resends an unknown effect. The internal command is not registered as
-a public executor command, and production control transport/launcher integration
-remains pending. Injected tests combine the actual reader, fixture buffers and
+a public executor command. Production launcher and attestation integration
+remain pending. Injected tests combine the actual reader, fixture buffers and
 runtime completion; they do not establish native acceptance.
+
+`OwnedFixtureControl` wraps an already host-owned `OwnedChannel`; construction
+performs no launch and transfers ownership only after challenge validation succeeds.
+The fixture's optional `--rpc` mode uses correlated request IDs and exposes only
+bootstrap, snapshot and compare-set operations; legacy fault-injection `set` is
+unavailable over RPC. Bootstrap stores only validated private locations and nonce,
+not a measured process identity. Control frames retain the fixture's 1,024-byte
+limit and one-second deadline ceiling. Typed state and receipt schemas reject
+unrecognized fields before returning data. Failed exchanges or malformed results
+retire the channel; failed retirement retains its owner for cleanup retry.
+Close can interrupt a waiting request without acquiring its lock. Hidden subprocess
+tests cover this behavior without cross-process memory reads. A Windows venv
+launcher can spawn a second interpreter, so the channel's launch PID and the
+fixture's self-reported PID must not be assumed equal or used as attestation.
 
 `NativeSemanticTarget` carries the same contract over the existing owned helper
 channel. Trusted host code supplies the reviewed helper argv and an explicit

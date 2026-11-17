@@ -189,10 +189,29 @@ def _emit(output: BinaryIO, record: dict[str, object]) -> None:
     output.flush()
 
 
-def serve(source: BinaryIO, output: BinaryIO, challenge: bytes = bytes(CHALLENGE_BYTES)) -> int:
+def _rpc(state: FixtureState, request: object) -> dict[str, object]:
+    if (not isinstance(request, dict) or set(request) != {"id", "operation", "payload"}
+            or not isinstance(request["id"], str)
+            or re.fullmatch(r"[0-9a-f]{32}", request["id"]) is None):
+        return _error("invalid_request")
+    if request["operation"] == "bootstrap" and request["payload"] == {}:
+        result = state.bootstrap()
+    elif request["operation"] == "control":
+        payload = request["payload"]
+        result = (_dispatch(state, payload)
+                  if isinstance(payload, dict) and payload.get("command") in ("snapshot", "compare_set")
+                  else _error("invalid_request"))
+    else:
+        result = _error("invalid_request")
+    return {"id": request["id"], "result": result}
+
+
+def serve(source: BinaryIO, output: BinaryIO, challenge: bytes = bytes(CHALLENGE_BYTES), *,
+          rpc: bool = False) -> int:
     """Serve inherited pipes until stop, EOF or an oversized frame."""
     state = FixtureState(challenge)
-    _emit(output, state.bootstrap())
+    if not rpc:
+        _emit(output, state.bootstrap())
     while True:
         line = source.readline(MAX_REQUEST_BYTES + 1)
         if not line:
@@ -208,16 +227,21 @@ def serve(source: BinaryIO, output: BinaryIO, challenge: bytes = bytes(CHALLENGE
         except (ValueError, RecursionError):
             _emit(output, _error("invalid_json"))
             continue
-        response = _dispatch(state, request)
+        response = _rpc(state, request) if rpc else _dispatch(state, request)
         _emit(output, response)
-        if response["kind"] == "stopped":
+        result = response.get("result", {}) if rpc else response
+        if result.get("kind") == "stopped":
             return 0
 
 
 if __name__ == "__main__":
+    arguments = sys.argv[1:]
+    rpc_mode = bool(arguments and arguments[0] == "--rpc")
+    if rpc_mode:
+        arguments = arguments[1:]
     try:
-        launch_challenge = _challenge(sys.argv[1:])
+        launch_challenge = _challenge(arguments)
     except ValueError as usage:
         print(usage, file=sys.stderr)
         raise SystemExit(2) from None
-    raise SystemExit(serve(sys.stdin.buffer, sys.stdout.buffer, launch_challenge))
+    raise SystemExit(serve(sys.stdin.buffer, sys.stdout.buffer, launch_challenge, rpc=rpc_mode))

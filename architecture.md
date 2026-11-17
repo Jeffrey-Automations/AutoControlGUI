@@ -70,6 +70,9 @@ Injected-provider tests exercise this path through AgentRuntime completion.
 FixtureCommands translates the one internal fixture operation into compare_set,
 binds strict receipts to the original revision and operation ID, and retires its
 command owner after an unknown reply. The reader remains read-only.
+OwnedFixtureControl reuses OwnedChannel for bounded fixture RPC, validates private
+bootstrap data, and retires failed exchanges while retaining failed cleanup ownership.
+Hidden IPC tests establish transport behavior only, not native memory identity.
 The helper error codec preserves fixed memory failure reasons across IPC without
 serializing exception text; malformed or mixed memory error packets are refused.
 The internal Windows provider owns read/query handles and measures native process
