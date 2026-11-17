@@ -414,6 +414,23 @@ reuse, permission denial, cancellation and failed handle retirement. Compare exa
 semantic values to fixture-owned expected values. Independently observe foreground
 window, focus, mouse and desktop-input events to establish noninterference.
 
+### Native artifact preparation
+
+The separate [native fixture source](../test/fixtures/native_memory/README.md) is
+an x64 C implementation with static CRT. Its builder compiles a captured source
+copy, rejects ambient compiler options, checks unchanged source, and inventories
+the image without executing it. Current direct imports are `bcrypt.dll` and
+`kernel32.dll`; source, image and build-tool hashes are recorded per build.
+This removes the Python interpreter/source chain from this candidate artifact,
+but does not establish loaded-image or OS dependency trust. Protocol behavior,
+foreground noninterference and native fault cases remain unverified.
+
+The next image-plan stage must derive executable ranges from this pinned baseline,
+not caller-selected RVAs or target-supplied headers. Loaded addresses differ from
+file offsets, and relocations may change bytes; see Microsoft's
+[PE format specification](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format).
+No range manifest or whole-runtime integrity claim is published by this build step.
+
 ### Owned fixture preparation
 
 `fixture_probe.py` supplies the internal schema-one adapter. `FixtureBinding`

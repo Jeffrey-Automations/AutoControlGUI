@@ -676,6 +676,9 @@ IPC fixture 已驗證成功回條但未生效及 helper 重啟；程序內 targe
 OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLauncher 已將映像檔核對
 接到同一受管 channel 的啟動 handle，並拒絕 bootstrap PID／位元寬度不符（只有注入測試）。
 正式 runtime／來源交付、載入映像綁定、profile 與原生 attestation 驗收尚未完成。
+另有 `test/fixtures/native_memory/` 的 x64 靜態 CRT fixture 原始碼與僅建置工具；
+已編譯、靜態盤點直接 OS DLL 匯入並記錄來源／產物雜湊，未執行該原生產物。
+原生程式行為、DLL 解析信任、載入位元組核對與故障驗收仍未驗證。
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。
 內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
 並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。

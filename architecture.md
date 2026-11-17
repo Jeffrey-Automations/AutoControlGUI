@@ -76,6 +76,9 @@ Hidden IPC tests establish transport behavior only, not native memory identity.
 OwnedChannelLauncher lets the pinned-image launch flow measure the retained IPC
 process handle, then refuses bootstrap PID/architecture disagreement. This seam
 has injected-call tests; loaded-code/runtime trust and native execution remain pending.
+The native_memory test fixture is an x64 C build with static CRT and a bounded RPC
+parser. Its build tool records source/image/tool hashes and static DLL imports;
+it never executes the artifact. This does not register a supported native target.
 The helper error codec preserves fixed memory failure reasons across IPC without
 serializing exception text; malformed or mixed memory error packets are refused.
 The internal Windows provider owns read/query handles and measures native process
