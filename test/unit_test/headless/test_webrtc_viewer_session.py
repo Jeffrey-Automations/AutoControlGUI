@@ -458,8 +458,9 @@ def test_a_teardown_failure_does_not_abort_the_rest_of_the_teardown():
     rest = Stoppable()
     viewer._host_voice_receiver = failing
     viewer._opus_audio_track = rest
+    stopping = viewer._async_stop()
     with pytest.raises(PeerStopFailed, match="host voice"):
-        asyncio.run(viewer._async_stop())
+        asyncio.run(stopping)
     assert viewer._host_voice_receiver is failing
     assert rest.stopped
 

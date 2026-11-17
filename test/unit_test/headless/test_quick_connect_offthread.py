@@ -55,7 +55,8 @@ def test_detach_frees_the_slot_at_once_and_returns_the_shutdown():
     registry.adopt(SLOT_VIEWER, resource, "panel", lambda slot, by: told.append((slot, by)))
     close = registry.detach(SLOT_VIEWER, "other")
     assert registry.owned(SLOT_VIEWER, "panel") is None          # free before anything was closed
-    assert resource.shut_on == [] and told == []
+    assert resource.shut_on == []
+    assert told == []
     close()
     assert len(resource.shut_on) == 1
     assert told == [(SLOT_VIEWER, "other")]                      # the displaced owner is told when it runs
@@ -103,7 +104,8 @@ def test_stopping_the_host_returns_at_once_and_says_stopping(screen):
     host.release.set()
     assert settle_op(screen._host_op)
     assert registry.host is None
-    assert host.shut_on and host.shut_on[0] != gui
+    assert host.shut_on
+    assert host.shut_on[0] != gui
     assert screen._host_badge.text() == _t("rd_quick_not_hosting")
 
 

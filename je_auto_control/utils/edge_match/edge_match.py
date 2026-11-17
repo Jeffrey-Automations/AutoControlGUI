@@ -16,6 +16,7 @@ imported lazily. Imports no ``PySide6``.
 """
 from typing import Any, List, Optional, Sequence, Tuple
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.visual_match.visual_match import (
     Match, _contain_cv2_error, _haystack_gray, _haystack_gray_with_origin, _nms,
     _resize, _to_gray, _to_screen,
@@ -44,7 +45,7 @@ def _chamfer_score_map(template_gray: Any, scene_gray: Any,
     distance = cv2.distanceTransform(cv2.bitwise_not(scene_edges),
                                      cv2.DIST_L2, 3).astype(np.float32)
     mask = (template_edges > 0).astype(np.float32)
-    total = cv2.matchTemplate(distance, mask, cv2.TM_CCORR)
+    total = stoppable_call(cv2.matchTemplate, distance, mask, cv2.TM_CCORR)
     score_map = 1.0 / (1.0 + total / edge_count)
     return score_map, (template_edges.shape[1], template_edges.shape[0])
 

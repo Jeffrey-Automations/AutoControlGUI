@@ -81,7 +81,8 @@ def test_the_callers_cancellation_scope_stops_it_by_default(transfer):
 def test_an_uncancelled_transfer_arrives_whole(transfer):
     source, inbox, receiver, outcomes = transfer
     result = send_file(_Wire(receiver), str(source), "big.bin", chunk_size=_CHUNK)
-    assert result.success and result.bytes_sent == _CHUNK * 10
+    assert result.success
+    assert result.bytes_sent == _CHUNK * 10
     assert outcomes == [(True, None)]
     assert (inbox / "big.bin").read_bytes() == source.read_bytes()
 

@@ -115,7 +115,8 @@ def test_callback_reentrant_stop_does_not_join_itself(backend):
 
     owner = discovery.HostBrowser(callback)
     notify(owner)
-    assert len(observed) == 1 and observed[0].retryable
+    assert len(observed) == 1
+    assert observed[0].retryable
     assert backend.calls == []
     owner.stop()
     assert owner.retirement_status.complete

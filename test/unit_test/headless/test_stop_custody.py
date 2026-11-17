@@ -63,7 +63,8 @@ def test_forget_retry_all_and_the_limit():
     flakies = [_Flaky(failures=0) for _ in range(3)]
     ids = [custody.hold(flaky.stop, OSError("busy")) for flaky in flakies]
     assert [held.stop_id for held in custody.snapshot()] == ids[1:]   # the oldest was let go
-    assert custody.forget(ids[1]) is True and custody.forget(ids[1]) is False
+    assert custody.forget(ids[1]) is True
+    assert custody.forget(ids[1]) is False
     assert custody.retry_all() == (1, 0)
     assert custody.snapshot() == []
 

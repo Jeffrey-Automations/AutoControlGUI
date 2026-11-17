@@ -22,7 +22,9 @@ def _tool_capabilities() -> dict:
 
 def test_every_command_has_exactly_one_decision():
     listed, operator, noted = set(COMMAND_CAPABILITIES), set(OPERATOR_COMMANDS), set(OPERATOR_NOTES)
-    assert not listed & operator and not listed & noted and not operator & noted
+    assert not listed & operator
+    assert not listed & noted
+    assert not operator & noted
     undecided = sorted(_known() - listed - operator - noted)
     assert not undecided, (
         f"{undecided}: decide each one -- COMMAND_CAPABILITIES in utils/rbac/policy.py when it reaches "

@@ -36,13 +36,15 @@ def test_a_failing_tool_reports_its_exit_code_and_stderr():
 
 def test_a_missing_tool_is_a_result_not_an_exception():
     result = usb_devices._run_capture(["je-no-such-usb-tool"], "linux")
-    assert result.devices == [] and result.error.startswith("je-no-such-usb-tool: ")
+    assert result.devices == []
+    assert result.error.startswith("je-no-such-usb-tool: ")
 
 
 def test_a_tool_past_its_timeout_is_a_result(monkeypatch):
     monkeypatch.setattr(usb_devices, "SUBPROCESS_TIMEOUT_S", 0.2)
     result = usb_devices._run_capture(_SLOW_TOOL, "linux")
-    assert result.devices == [] and "timed out" in result.error
+    assert result.devices == []
+    assert "timed out" in result.error
 
 
 def test_cancelling_the_scope_ends_the_tool_process():

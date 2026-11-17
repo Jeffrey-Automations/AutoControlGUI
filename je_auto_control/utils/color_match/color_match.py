@@ -17,6 +17,7 @@ solid colour blobs use ``color_region``. ``color_match`` is for targets with col
 """
 from typing import Any, List, Optional, Sequence
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.color_region.color_region import _grab_rgb, _origin, _to_rgb
 from je_auto_control.utils.visual_match.visual_match import (
     Match, _contain_cv2_error, _nms, _resize, _select_candidates,
@@ -68,9 +69,9 @@ def _channel_distance(template: Any, haystack: Any, channel: str, mask: Any = No
     pixels = float(mask.sum()) if mask is not None else float(t_plane.size)
     masked = {"mask": mask} if mask is not None else {}
     if channel != "h":
-        return cv2.matchTemplate(h_plane, t_plane, cv2.TM_SQDIFF, **masked) / (pixels * 255.0 ** 2)
-    direct = cv2.matchTemplate(h_plane, t_plane, cv2.TM_SQDIFF, **masked)
-    shifted = cv2.matchTemplate(np.mod(h_plane + 90.0, 180.0),
+        return stoppable_call(cv2.matchTemplate, h_plane, t_plane, cv2.TM_SQDIFF, **masked) / (pixels * 255.0 ** 2)
+    direct = stoppable_call(cv2.matchTemplate, h_plane, t_plane, cv2.TM_SQDIFF, **masked)
+    shifted = stoppable_call(cv2.matchTemplate, np.mod(h_plane + 90.0, 180.0),
                                 np.mod(t_plane + 90.0, 180.0), cv2.TM_SQDIFF, **masked)
     return np.minimum(direct, shifted) / (pixels * 90.0 ** 2)
 

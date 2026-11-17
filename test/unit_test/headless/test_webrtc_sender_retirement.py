@@ -52,7 +52,8 @@ def test_repeated_cancel_keeps_sender_and_queue_owned_until_actual_exit(failure)
             assert calls == ['first']
             release.set()
             await asyncio.wait_for(stopping, 3)
-            assert exited.is_set() and cancellation_seen.is_set()
+            assert exited.is_set()
+            assert cancellation_seen.is_set()
             assert not owned
             assert not any(queue.channel is channel for queue in requests._queues.values())
             assert failures == []

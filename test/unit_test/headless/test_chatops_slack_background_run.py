@@ -11,6 +11,7 @@ bounded and none is asserted to be short.
 """
 import json
 import threading
+import time
 
 import pytest
 
@@ -385,3 +386,31 @@ def test_a_failed_reply_from_the_worker_does_not_rerun_or_end_the_bot(bot, slack
     assert _Poll(bot).count == 1
     assert bot.last_seen_ts == "2"
     assert script.after == ["ran"]
+
+
+def test_stop_called_from_a_command_handler_returns_at_once(slack, script, root, monkeypatch):
+    """The handler holds the turn the worker needs for its reply, so stop() asks and does not wait."""
+    router = register_chatops_default_commands(CommandRouter())
+    outcome, holder = {}, []
+
+    def halt(_argv, _context):
+        started = time.monotonic()
+        outcome["stopped"] = holder[0].stop(timeout=_WAIT)
+        outcome["idle"] = holder[0].wait_idle(timeout=_WAIT)
+        outcome["elapsed"] = time.monotonic() - started
+        return CommandResult(text="halting")
+
+    router.register("halt", halt)
+    made = _make_bot(slack, monkeypatch, router)
+    holder.append(made)
+    try:
+        _start_long_run(made, slack, script)
+        slack.say(2, "/halt")
+        _Poll(made)
+        assert outcome["stopped"] is False
+        assert outcome["idle"] is False
+        assert outcome["elapsed"] < 2, "stop() from a handler waited out its timeout"
+        assert slack.wait_for_posts(2)
+        assert slack.texts() == ["halting", "run stopped. (the bot was stopped)"]
+    finally:
+        assert made.stop(timeout=_WAIT) is True

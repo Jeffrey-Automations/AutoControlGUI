@@ -20,6 +20,8 @@ command gets the same decision instead of inheriting the default unseen.
 """
 from typing import Dict, FrozenSet
 
+_AS_AC_PRESENCE_REGISTER = "as AC_presence_register"
+
 #: Reviewed candidates that stay at operator, with the reason.
 OPERATOR_NOTES: Dict[str, str] = {
     "AC_approval_approve": (
@@ -47,23 +49,29 @@ OPERATOR_NOTES: Dict[str, str] = {
         "Fernet with a caller passphrase or the per-user key; the content is the caller's own file"
     ),
     "AC_lease_active": "lists leases without values",
-    "AC_lease_secret": "a lease token carries no value; redeeming one is Python-only",
+    "AC_lease_secret": (  # nosec B105  # reason: an AC_* command name, not a credential
+        "a lease token carries no value; redeeming one is Python-only"
+    ),
     "AC_lease_valid": "as AC_lease_secret",
     "AC_list_plugins": "lists entry points; loading them needs manage_hosts",
     "AC_parallel": (
         "branches keep the caller's authorization: the executor refuses a privileged command inside a branch"
     ),
-    "AC_presence_clear": "as AC_presence_register",
+    "AC_presence_clear": _AS_AC_PRESENCE_REGISTER,
     "AC_presence_register": (
         "advisory: no host consults PresenceRegistry.can_control(); raise the presence commands to manage_hosts "
         "if one starts gating input on it"
     ),
-    "AC_presence_set_role": "as AC_presence_register",
-    "AC_presence_unregister": "as AC_presence_register",
+    "AC_presence_set_role": _AS_AC_PRESENCE_REGISTER,
+    "AC_presence_unregister": _AS_AC_PRESENCE_REGISTER,
     "AC_repair_approve": "accepts a locator-repair suggestion: workflow data, not host policy",
     "AC_revoke_lease": "as AC_lease_secret",
-    "AC_secret_list": "names only; vault administration (init, set, remove, lock, unlock) needs manage_hosts",
-    "AC_secret_status": "path and lock state only, as AC_secret_list",
+    "AC_secret_list": (  # nosec B105  # reason: an AC_* command name, not a credential
+        "names only; vault administration (init, set, remove, lock, unlock) needs manage_hosts"
+    ),
+    "AC_secret_status": (  # nosec B105  # reason: an AC_* command name, not a credential
+        "path and lock state only, as AC_secret_list"
+    ),
     "AC_usb_acl_list": "the stored ACL, read_data as ac_usb_acl_list and GET /usb/acl",
     "AC_usb_loopback_open": (
         "matches POST /usb/loopback/open (drive_input); the ACL and the passthrough switch need manage_hosts"

@@ -13,10 +13,10 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 
-from PySide6.QtCore import QCoreApplication, QEvent, QTimer  # noqa: E402
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, Signal, Slot  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox, QWidget  # noqa: E402
 
-from headless._qt_settle import settle  # noqa: E402
+from headless._qt_settle import deleting, settle  # noqa: E402
 from headless._tab_hosts import RecordHost, ScriptHost  # noqa: E402
 from je_auto_control.gui._tab_task import TabTask, stop_all_script_runs, was_stopped  # noqa: E402
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper  # noqa: E402
@@ -67,6 +67,25 @@ class _Script:
         self.calls.append("after")
 
 
+class _Owner(QWidget):
+    """A tab stand-in, its own class so :func:`deleting` can find every one a test built."""
+
+
+@pytest.fixture(autouse=True)
+def widgets_die_on_the_gui_thread():
+    """Delete what each test built, on the GUI thread, instead of leaving it for a collector.
+
+    The scripts here run long Python work on worker threads. A leaked widget
+    that a worker's collection reaches is queued by PySide and deleted later on
+    the main thread, and on Windows / Python 3.14 one such deferred delete
+    aborted the interpreter inside ``QObject::~QObject`` (``conftest.py``,
+    ``no_worker_collects_qt_garbage``, which also pauses automatic collection here).
+    """
+    from je_auto_control.gui._auto_click_tab import AutoClickTab
+    with deleting(_Owner, ScriptHost, RecordHost, AutoClickTab):
+        yield
+
+
 @pytest.fixture
 def script(monkeypatch):
     _app = QApplication.instance() or QApplication([])
@@ -86,7 +105,7 @@ def script(monkeypatch):
 # --- TabTask ---------------------------------------------------------------------------------------------
 
 def test_one_run_at_a_time_and_the_outcome_arrives_on_the_gui_thread(script):
-    owner = QWidget()
+    owner = _Owner()
     runs = TabTask(owner)
     delivered = []
     runs.result.connect(lambda value: delivered.append((threading.get_ident(), value)))
@@ -110,7 +129,7 @@ def test_one_run_at_a_time_and_the_outcome_arrives_on_the_gui_thread(script):
 
 
 def test_stop_ends_a_waiting_script_and_reports_it_once_the_worker_has_unwound(script):
-    owner = QWidget()
+    owner = _Owner()
     runs = TabTask(owner)
     errors, finished = [], []
     runs.error.connect(errors.append)
@@ -131,7 +150,7 @@ def test_stop_ends_a_waiting_script_and_reports_it_once_the_worker_has_unwound(s
 
 
 def test_destroying_the_owner_stops_its_script(script):
-    owner = QWidget()
+    owner = _Owner()
     runs = TabTask(owner)
     seen = []
 
@@ -149,7 +168,7 @@ def test_destroying_the_owner_stops_its_script(script):
 
 
 def test_ctrl_4_stops_every_running_script(script):
-    first, second = QWidget(), QWidget()
+    first, second = _Owner(), _Owner()
     runs = [TabTask(first), TabTask(second)]
     for run in runs:
         assert run.start_script(lambda: executor.execute_action([["AC_sleep", {"seconds": 60}]]))
@@ -160,7 +179,7 @@ def test_ctrl_4_stops_every_running_script(script):
 
 def test_the_auto_click_stop_also_stops_scripts(script):
     from je_auto_control.gui._auto_click_tab import AutoClickTab
-    owner = QWidget()
+    owner = _Owner()
     runs = TabTask(owner)
     errors = []
     runs.error.connect(errors.append)
@@ -176,6 +195,28 @@ def test_the_auto_click_stop_also_stops_scripts(script):
 
 # --- re-entrancy: a script that drives this window ----------------------------------------------------------
 
+class _GuiThread(QObject):
+    """Run a callable on the GUI thread, posted from the script's worker thread.
+
+    The worker is a plain ``threading.Thread``: ``QTimer.singleShot`` called there
+    makes Qt timer state on a thread Qt never started and that ends with the
+    script; it is the likeliest cause of an abort this test once hit on Windows /
+    Python 3.14, about 10 ms in. A signal
+    of an object made on the GUI thread is queued there, as the tabs themselves
+    do it (``presence_tab._registry_changed``).
+    """
+
+    posted = Signal(object)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.posted.connect(self._run)
+
+    @Slot(object)
+    def _run(self, call) -> None:
+        call()
+
+
 def test_a_script_that_clicks_this_tabs_run_does_not_deadlock_or_nest(script, monkeypatch):
     """The script asks the GUI thread to run again and waits for the answer.
 
@@ -183,6 +224,7 @@ def test_a_script_that_clicks_this_tabs_run_does_not_deadlock_or_nest(script, mo
     is free: it answers (and refuses the nested run) while the script waits.
     """
     host = ScriptHost()
+    gui = _GuiThread()
     answered = threading.Event()
     seen = []
 
@@ -191,7 +233,7 @@ def test_a_script_that_clicks_this_tabs_run_does_not_deadlock_or_nest(script, mo
             host._execute_manual_script()
             seen.append(host.script_result_text.toPlainText())
             answered.set()
-        QTimer.singleShot(0, host, on_gui_thread)
+        gui.posted.emit(on_gui_thread)
         return "answered" if answered.wait(_WAIT) else "the GUI thread never answered"
 
     monkeypatch.setitem(executor.event_dict, "AC_fake_click_run", click_run_again)
@@ -206,9 +248,10 @@ def test_a_script_that_clicks_this_tabs_run_does_not_deadlock_or_nest(script, mo
 
 def test_a_script_that_clicks_stop_stops_itself(script, monkeypatch):
     host = ScriptHost()
+    gui = _GuiThread()
 
     def click_stop() -> None:
-        QTimer.singleShot(0, host, host._stop_script)
+        gui.posted.emit(host._stop_script)
 
     monkeypatch.setitem(executor.event_dict, "AC_fake_click_stop", click_stop)
     host.script_editor.setPlainText(json.dumps(

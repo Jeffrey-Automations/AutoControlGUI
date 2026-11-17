@@ -45,7 +45,8 @@ def test_recording_releases_container_when_video_stream_cannot_be_created(monkey
     recorder = session_recorder.SessionRecorder(str(tmp_path / "recording.mp4"))
     recorder.write_frame(av.VideoFrame(64, 64))
     assert closed == [True]
-    assert not recorder.is_active and not recorder.has_output
+    assert not recorder.is_active
+    assert not recorder.has_output
     # The setup failure stays recorded, so stop reports an uncertain
     # finalization instead of a clean one (docs/media_retirement_contract.md).
     with pytest.raises(MediaRetirementError):
@@ -65,7 +66,8 @@ def test_h264_patch_encodes_and_restores_the_original_method(monkeypatch):
         for plane in frame.planes:
             plane.update(bytes(plane.buffer_size))
         encoded = list(H264Encoder()._encode_frame(frame, True))
-        assert encoded and all(isinstance(packet, bytes) and packet for packet in encoded)
+        assert encoded
+        assert all(isinstance(packet, bytes) and packet for packet in encoded)
     finally:
         hw_codec.uninstall_hardware_codec()
     assert H264Encoder._encode_frame is original

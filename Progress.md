@@ -108,9 +108,9 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
   `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
-- **stop 還叫不醒的**：已經進到後端的單一指令（一次影像搜尋、OCR、HTTP 請求；擷取輸出的 shell 指令已可停止，U-20261115-23）、單一手勢內的節奏 sleep；
+- **stop 還叫不醒的**：已經進到後端的單一指令只剩其他未接合的原生呼叫（擷取輸出的 shell 指令已可停止，U-20261115-23；共用 HTTP client 的請求連 TCP 交握都可中斷，正在進行的 DNS 查詢也不必等（查詢在背景跑完、之後不會送出請求），U-20261116-08／-10／-15；套件內每個 `cv2.matchTemplate` 與 OCR 引擎的單次原生運算都改由 `stoppable_call` 不再等待，但運算本身在背景跑完，U-20261116-11／-14）、單一手勢內的節奏 sleep；
   非腳本分頁已傳遞協作取消；尚未檢查 token 的後端呼叫仍只能丟棄晚到結果，須逐一接合。
-  ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在輪詢執行緒上的指令 handler 裡呼叫 `stop()` 也會等到逾時。沒對真的 Slack workspace 跑過。
+  ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在指令 handler 裡呼叫 `stop()`／`wait_idle()` 會立刻回 `False`、不再等到逾時（U-20261116-15）。沒對真的 Slack workspace 跑過。
   新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。
 - **WebRTC**：LAN 廣播的註冊與取消已移出 GUI 執行緒，但真的 zeroconf 的時間與名稱衝突行為只對假物件測過。
 - **切換主題後那幾個事件迴圈回合內**，以被暫存的頁面為 parent 的 `QMessageBox` 會相對於隱藏的暫存 widget 定位（只影響位置）。
@@ -139,7 +139,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   仍管不到執行動作清單的工具、`ac_launch_process`／`ac_shell` 的 `argv`／`command`、
   自由格式物件裡的路徑（`ac_run_suite` 的 `spec`、`ac_run_dag` 的 `definition`、`ac_assert_all` 的 `specs`）與沒標註的外掛工具。
   檔案 symlink 的跳脫在這台機器上建不出來（只跑了目錄 junction）；POSIX 的 `:` 分隔與 `~` 沒在 Linux／macOS 跑。
-  `roots/list` 來的根目錄要另外開 `JE_AUTOCONTROL_MCP_PATH_ROOTS_FROM_CLIENT` 才算數——這是實作時定的，請維護者確認。
 - **USB passthrough 實機驗收**：仍須對真的舊版 host、WebRTC 通道與 USB 裝置驗證長時間 transfer、
   裝置逾時、通道 ERROR、晚到回覆與重新連線。現有 fake channel／backend 測試不能代替這項驗收。
 - **變數範圍**：free-threaded 原生執行緒繼承與同時存取範圍的行為尚未實測。
@@ -216,6 +215,19 @@ Windows 3.11 在 `test_gui_offthread_sites.py::test_a_failed_upload_is_reported_
 
 ---
 
+## PySide6 6.12 跨執行緒回收的延後刪除會在 `QObject::~QObject` abort：等上游修正
+
+`BLOCKED`（上游）— 原因由本機 minidump 確認（U-20261116-04）：Python 擁有的 Qt 物件若被 worker 執行緒的循環回收收走，
+PySide6 6.12 會排進 `Shiboken::BindingManager::runDeletionInMainThread` 之後在主執行緒刪，
+其中一個被留下的頂層 `QWidget` 在 `QObject::~QObject` 裡呼叫 `abort()`；Windows 3.11／3.12／3.14 都出現過。
+現況：測試端由 conftest 的 `no_worker_collects_qt_garbage` 在用到 Qt 的模組裡暫停自動回收（U-20261116-06），
+GUI 由 `gui/_gui_thread_gc.py` 的 `GuiThreadCollector` 只在 GUI 執行緒回收（U-20261116-07），兩邊都不會讓 worker 觸發回收。
+待辦：(1) 維護者把 `docs/upstream/pyside6-6.12-deferred-deletion-abort.md` 送到 bugreports.qt.io（PYSIDE）；
+(2) 修正版 6.12.x 出來後重跑完整矩陣，乾淨就拿掉 conftest 的 `no_worker_collects_qt_garbage` 並評估是否保留 `GuiThreadCollector`，
+同時處理上一節 3.11 的固定版本。
+
+---
+
 ## Agent 電腦接管與任務自動化
 
 `WIP` — **依使用者恢復目標繼續交付；個別原生／真機／24 小時驗收仍暫緩。**
@@ -243,7 +255,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
    - 核對既有瀏覽器呼叫者各自的環境是否已安裝相容 `je_web_runner`。舊 bridge 依賴呼叫環境的
      SDK，不會自動使用受管 helper；缺套件時應保留明確失敗，不能退回其他瀏覽器引擎。
    - `DECIDE`：部署／回復計畫已寫成 `docs/superpowers/plans/2026-11-01-deployment-rollback.md`（未執行）；
-     其中標「待決定」的回復方式、helper 直譯器、套件鎖、Chromium 與主機 profile 待維護者批准。
+     回復方式已決定（建回復分支再切換，U-20261117-02）；其餘標「待決定」的 helper 直譯器、套件鎖、Chromium、主機 profile 與多主機名冊待維護者提供並批准。
      正式變更前仍須依該計畫安排主工作樹、既有 Jeffrey_RPA 批次與服務的部署／回復；不能直接將
      功能工作樹當作已部署版本，也不能替換共用 `.venv` 或自動重啟正式服務。
      舊版回復須先取得輸入退場確證，審閱相符的升級前狀態及原位置，並從全部舊版任務根目錄
@@ -632,7 +644,7 @@ browser adapter 從受管頁面取得欄位、透過 DOM 提交，再驗證新�
 
 `WIP` — 內部 `utils/process_memory/` 已有不可變身分／probe、區段與位元組預算、
 序號一致性檢查、語意欄位白名單及失敗 handle 保留重試。契約與 fixture 協定見
-[process_memory_contract.md](docs/process_memory_contract.md)。M0／M1 尚未完成，
+[process_memory_contract.md](docs/process_memory_contract.md)。M0 已完成（profile、結果型別與禁用桌面輸入的路由規則 U-20261116-12，`utils/process_memory/background_profile.py`；第一個目標為自有 fixture，U-20261117-01）；M1 尚未完成，
 已有自有 fixture 的固定緩衝區與有界管線控制協定，測試僅驗證本機資料配置及背景子程序通訊。
 bootstrap 的 PID、位址、來源雜湊與 launch nonce 都是未驗證自報資訊，不能充當 OS 出生身分或可信 resolver。
 typed Windows provider 已有有界查詢／讀取、原生身分事實與保留 handle 的注入測試；
@@ -653,7 +665,7 @@ M3 已加入內部受信任 `SemanticTarget` runtime 接點：封閉語意快照
 uncertain 紀錄。現有 target 保留完整觀察比對；task／觀察 JSON 不能自行啟用語意模式。
 目前僅隔離 target 測試通過，profile／helper／原生 adapter 與公開入口尚未接上。
 
-1. **M0：能力盤點與範圍契約。** 先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
+1. **M0：能力盤點與範圍契約。**（已完成：profile／路由規則 U-20261116-12；維護者 2026-11-17 決定第一個目標只用自有 fixture，真實應用待 M1 原生驗收跑通後再選，U-20261117-01）先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
    讀取來源、執行介面、權限、是否全背景、支援版本、驗證方式與不支援原因。
    第一個目標採自有 fixture 程序，之後選一個提供正式背景介面的應用；不能先承諾任意軟體。
    完成條件：profile、上述結果型別及禁用桌面輸入的路由規則具體可審閱，既有桌面路徑不被暗中改寫。

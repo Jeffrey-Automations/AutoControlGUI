@@ -175,7 +175,8 @@ def test_receipt_retries_original_peer_without_stopping_other_sessions():
     peer.raise_on.clear()
     first.retirement.stop()
     assert coordinator.session_count() == 1
-    assert not other.stopped and not track.stopped
+    assert not other.stopped
+    assert not track.stopped
     second.retirement.stop()
     assert track.stopped
 

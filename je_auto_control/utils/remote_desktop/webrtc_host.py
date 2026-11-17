@@ -51,9 +51,9 @@ from je_auto_control.utils.remote_desktop.webrtc_transport import (
 from je_auto_control.utils.remote_desktop.webrtc_host_auth import (
     ViewerAuthMixin,
 )
-from je_auto_control.utils.remote_desktop.webrtc_host_media import (
-    MediaNegotiationMixin,
-)
+from je_auto_control.utils.remote_desktop.webrtc_host_media import MediaNegotiationMixin
+
+_OPUS_RECEIVER, _MIC_RECEIVER = "opus receiver", "mic receiver"
 
 if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
     from pathlib import Path
@@ -293,14 +293,14 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         from je_auto_control.utils.remote_desktop.webrtc_audio import (
             OpusMicReceiver,
         )
-        self._media_owners.require_available("opus receiver")
+        self._media_owners.require_available(_OPUS_RECEIVER)
         if self._opus_audio_receiver is not None:
             return
-        receiver = self._media_owners.create("opus receiver", OpusMicReceiver)
+        receiver = self._media_owners.create(_OPUS_RECEIVER, OpusMicReceiver)
         if receiver is None:
             return
         self._opus_audio_receiver = receiver
-        self._media_owners.activate("opus receiver", lambda: receiver.consume(track), receiver)
+        self._media_owners.activate(_OPUS_RECEIVER, lambda: receiver.consume(track), receiver)
         autocontrol_logger.info("webrtc host: receiving Opus audio from viewer")
 
     async def _consume_viewer_video(self, track: Any) -> None:
@@ -440,7 +440,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         usb_host = self._usb_host
         if usb_host is not None:
             usb_host.close()
-            if self._usb_host is usb_host:
+            if self._usb_host is usb_host:  # NOSONAR  # close() may already have installed a new host
                 self._usb_host = None
 
     def set_file_received_callback(self, callback: Optional[Callable[[Path], None]]) -> None:
@@ -471,20 +471,20 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         from je_auto_control.utils.remote_desktop.webrtc_mic import (
             MicUplinkReceiver,
         )
-        with self._media_owners.operation_lock("mic receiver"):
-            self._media_owners.require_available("mic receiver")
+        with self._media_owners.operation_lock(_MIC_RECEIVER):
+            self._media_owners.require_available(_MIC_RECEIVER)
             if self._closed.is_set():
                 raise PeerStopFailed("peer is stopping")
             if self._mic_receiver is not None:
                 return
-            self._mic_receiver = self._media_owners.create("mic receiver", MicUplinkReceiver)
+            self._mic_receiver = self._media_owners.create(_MIC_RECEIVER, MicUplinkReceiver)
             if self._mic_receiver is not None:
-                self._media_owners.activate("mic receiver", self._mic_receiver.start, self._mic_receiver,
+                self._media_owners.activate(_MIC_RECEIVER, self._mic_receiver.start, self._mic_receiver,
                                             admitted=lambda: not self._closed.is_set())
 
     def disable_mic_receive(self) -> None:
-        with self._media_owners.operation_lock("mic receiver"):
-            self._media_owners.stop_field("mic receiver", self._mic_receiver)
+        with self._media_owners.operation_lock(_MIC_RECEIVER):
+            self._media_owners.stop_field(_MIC_RECEIVER, self._mic_receiver)
             self._mic_receiver = None
 
     def _wire_control_channel(self, channel: Any) -> None:

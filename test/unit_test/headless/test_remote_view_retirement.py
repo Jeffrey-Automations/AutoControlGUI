@@ -101,7 +101,8 @@ def test_close_denies_pending_future_and_late_approval(qapp, monkeypatch):
     assert announced.wait(2)
     screen.dispose()
     worker.join(2)
-    assert not worker.is_alive() and result == [False]
+    assert not worker.is_alive()
+    assert result == [False]
     requests[0].decision = "full"
     assert requests[0].decision == "denied"
     assert callback(pending) is False
@@ -123,7 +124,8 @@ def test_workspace_releases_remote_page_and_preserves_registry_host(qapp, monkey
     registry.adopt(SLOT_HOST, host, old._quick_connect._owner)
     workspace.close_tab("remote_desktop")
     assert not entry.built
-    assert registry.host is host and host.is_running
+    assert registry.host is host
+    assert host.is_running
     workspace.show_tab("remote_desktop")
     assert entry.widget is not old
     assert entry.widget._webrtc_viewer_panel is None
@@ -216,7 +218,9 @@ def test_audio_stop_runs_after_page_deletion_without_blocking_qt(qapp):
         qapp.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         assert entered.wait(2)
         qapp.processEvents()
-        assert ticks and len(threads) == 1 and threads[0] is not threading.main_thread()
+        assert ticks
+        assert len(threads) == 1
+        assert threads[0] is not threading.main_thread()
     finally:
         timer.stop()
         finish.set()
@@ -256,7 +260,9 @@ def test_retirement_serializes_concurrent_producers_with_qt_deletion(qapp):
     finish.set()
     worker.join(2)
     qapp.processEvents()
-    assert not worker.is_alive() and not errors and not calls
+    assert not worker.is_alive()
+    assert not errors
+    assert not calls
 
 
 def test_audio_replacement_finishes_old_stop_before_new_start(qapp, monkeypatch):
@@ -347,7 +353,8 @@ def test_webrtc_backend_survives_deleted_view_and_cleanup_starts_after_delete(qa
         callback(*args)
     reference = weakref.ref(panel)
     panel.dispose()
-    assert workers and not stopped
+    assert workers
+    assert not stopped
     panel.deleteLater()
     qapp.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     del panel
@@ -361,7 +368,8 @@ def test_webrtc_backend_survives_deleted_view_and_cleanup_starts_after_delete(qa
         thread.start()
         thread.join(2)
         assert not thread.is_alive()
-    assert len(stopped) == 1 and stopped[0] is not threading.main_thread()
+    assert len(stopped) == 1
+    assert stopped[0] is not threading.main_thread()
 
 
 

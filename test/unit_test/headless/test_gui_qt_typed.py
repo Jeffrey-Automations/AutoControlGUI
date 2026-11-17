@@ -69,7 +69,8 @@ def _encoded(image_format: str) -> bytes:
 @pytest.mark.parametrize("image_format", ["PNG", "JPEG"])
 def test_an_encoded_frame_decodes_to_its_image(image_format):
     image = decoded_image(_encoded(image_format), image_format)
-    assert not image.isNull() and (image.width(), image.height()) == (6, 4)
+    assert not image.isNull()
+    assert (image.width(), image.height()) == (6, 4)
 
 
 @pytest.mark.parametrize("payload", [b"", b"not an image", bytes([0xFF, 0xD8, 0xFF]) + bytes(16)])
@@ -79,5 +80,6 @@ def test_bytes_that_do_not_decode_are_a_null_image(payload):
 
 def test_the_binding_still_rejects_the_bytes_format_its_stub_asks_for():
     """When this stops raising, ``QImage.fromData`` can be called directly again."""
+    png = _encoded("PNG")
     with pytest.raises(ValueError):
-        QImage.fromData(_encoded("PNG"), b"PNG")
+        QImage.fromData(png, b"PNG")

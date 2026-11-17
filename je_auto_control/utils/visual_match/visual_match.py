@@ -17,6 +17,7 @@ import functools
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Dict, List, Optional, ParamSpec, Protocol, Sequence, Tuple, TypeVar
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.exception.exceptions import (
     AutoControlFlatTemplateException, AutoControlScreenException,
 )
@@ -267,7 +268,7 @@ def _score_map_with_origin(template: ImageSource, haystack: Optional[ImageSource
     hay, origin_x, origin_y = _haystack_gray_with_origin(haystack, region)
     if tmpl.shape[0] > hay.shape[0] or tmpl.shape[1] > hay.shape[1]:
         return None, tmpl, origin_x, origin_y
-    result = cv2.matchTemplate(hay, tmpl, _method(method))
+    result = stoppable_call(cv2.matchTemplate, hay, tmpl, _method(method))
     if method == "sqdiff_normed":
         result = 1.0 - result
     return result, tmpl, origin_x, origin_y
@@ -294,7 +295,7 @@ def match_template(template: ImageSource, *, haystack: Optional[ImageSource] = N
         scaled = _resize(tmpl, float(scale))
         if scaled.shape[0] > hay.shape[0] or scaled.shape[1] > hay.shape[1]:
             continue
-        _, max_val, _, max_loc = cv2.minMaxLoc(cv2.matchTemplate(hay, scaled,
+        _, max_val, _, max_loc = cv2.minMaxLoc(stoppable_call(cv2.matchTemplate, hay, scaled,
                                                                  metric))
         if max_val >= min_score and (best is None or max_val > best.score):
             best = Match(int(max_loc[0]) + origin_x, int(max_loc[1]) + origin_y,
@@ -397,7 +398,7 @@ def match_template_all(template: ImageSource, *,
     height, width = tmpl.shape[:2]
     if height > hay.shape[0] or width > hay.shape[1]:
         return []
-    result = cv2.matchTemplate(hay, tmpl, cv2.TM_CCOEFF_NORMED)
+    result = stoppable_call(cv2.matchTemplate, hay, tmpl, cv2.TM_CCOEFF_NORMED)
     candidates = _select_candidates(result, min_score, width, height,
                                     max_results, (origin_x, origin_y))
     return _nms(candidates, float(nms_iou))[:int(max_results)]
@@ -466,7 +467,7 @@ def _masked_scores(template: ImageSource, mask: Optional[ImageSource],
     hay, origin_x, origin_y = _haystack_gray_with_origin(haystack, region)
     if tmpl.shape[0] > hay.shape[0] or tmpl.shape[1] > hay.shape[1]:
         return None, tmpl, origin_x, origin_y
-    result = cv2.matchTemplate(hay, tmpl, cv2.TM_CCORR_NORMED, mask=msk)
+    result = stoppable_call(cv2.matchTemplate, hay, tmpl, cv2.TM_CCORR_NORMED, mask=msk)
     return np.nan_to_num(result, nan=0.0, posinf=0.0, neginf=0.0), tmpl, origin_x, origin_y
 
 

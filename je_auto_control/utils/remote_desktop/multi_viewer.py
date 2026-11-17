@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from functools import partial
 import threading
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 try:
     from aiortc.contrib.media import MediaRelay
@@ -214,7 +214,7 @@ class MultiViewerHost:
             self._session_tokens[session_id] = token
             try:
                 host = self._new_session_peer(session_id, token, source)
-            except BaseException as error:  # noqa: BLE001  # reason: re-raised below, after the source is released
+            except BaseException as error:  # NOSONAR  # noqa: BLE001  # reason: re-raised below, source freed first
                 self._session_tokens.pop(session_id, None)
                 failure = error
             else:
@@ -377,7 +377,7 @@ class MultiViewerHost:
             except (RuntimeError, OSError) as error:
                 autocontrol_logger.debug("disable accept audio: %r", error)
 
-    def broadcast_file(self, local_path: Union[str, os.PathLike[str]], remote_name: Optional[str] = None) -> int:
+    def broadcast_file(self, local_path: str | os.PathLike[str], remote_name: Optional[str] = None) -> int:
         """Push a file to every authenticated viewer; returns recipient count."""
         with self._lock:
             sessions = list(self._sessions.values())

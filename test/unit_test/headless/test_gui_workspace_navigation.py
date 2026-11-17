@@ -246,5 +246,6 @@ def test_a_small_window_gives_the_tabs_the_width_and_keeps_the_features_one_key_
     assert rail_visible
     assert workspace_width >= 560
     drawer_open, search_shown, action_checked = window["small_search"]
-    assert drawer_open and search_shown, "Ctrl+K opens the feature list as a drawer"
+    assert drawer_open, "Ctrl+K opens the feature list as a drawer"
+    assert search_shown, "Ctrl+K opens the feature list as a drawer"
     assert action_checked

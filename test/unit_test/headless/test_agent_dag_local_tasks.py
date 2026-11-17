@@ -1,5 +1,6 @@
 """Cross-owner local DAG work uses original ownership and independently revocable admitting authority."""
 import json
+import threading
 from copy import deepcopy
 from unittest.mock import Mock
 
@@ -186,6 +187,13 @@ def test_maintenance_retires_lease_when_admin_loses_cross_owner_authority(owned,
 
 def test_revocation_during_grounding_is_refused_before_the_target_input_call(owned, monkeypatch):
     _client, instance, target, users, owner, _actor, _batch = owned
+    # The service's lease watch calls maintain() every 0.25 s. Once the role is revoked below it cancels
+    # the task's token, which raced act()'s own refusal: a slow Windows runner raised CancelledError at
+    # act()'s checkpoint instead of AuthorizationError (run 43850427243). Hold the watch off for this
+    # test, and wait until it has run the stand-in once, so no pass that began before the swap is live.
+    ticked = threading.Event()
+    monkeypatch.setattr(instance.runtime, "maintain", ticked.set)
+    assert ticked.wait(5)
     started, node = begin(owned)
     monkeypatch.setattr(instance.runtime.background, "start", Mock())
     task = local(owned, started, "submit", submission(node))

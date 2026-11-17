@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+- Image search and OCR (`find_image` and everything on `cv2_utils.template_detection`, `visual_match`,
+  `color_match`, `edge_match`, `rotated_match`, self-healing frame locators, device-frame matching,
+  `find_text_matches`, `read_text_in_region` and the commands built on them): inside a stoppable run or a cancellation scope
+  the single native pass runs on a helper thread (`run_control.stoppable_call`), and a stop or cancel ends
+  the call within about 0.1 s instead of waiting for the pass. The pass itself cannot be interrupted: it
+  finishes in the background and its result is discarded. Outside a run nothing changes.
+
+- HTTP requests through the shared client (`AC_http_request`, MCP `ac_http_request`, assertions,
+  webhooks, config sync, signaling): inside a stoppable run or a cancellation scope, nothing is sent once
+  the run is stopped, and a stop, `ac_stop_execution` or `notifications/cancelled` while the request is out
+  shuts its sockets within about 0.1 s and ends the call (`ExecutionStopped`, `CancelledError`, or
+  `-32800` for an MCP client cancel), instead of waiting for the reply or the timeout. The TCP handshake
+  is waited for in the same 0.1 s slices; only a name lookup already in progress still runs on, and its
+  result is discarded. Outside a run the request is unchanged.
+
+- GUI (`start_autocontrol_gui()`): while the window is open, automatic cyclic garbage collection is
+  switched off and a GUI-thread timer collects instead (`gui/_gui_thread_gc.py`), at the interpreter's
+  thresholds; it is switched back on when the app quits. Worker threads no longer collect Qt objects,
+  which PySide6 6.12 deletes late and which has aborted the process on Windows. An explicit
+  `gc.collect()` still works; importing `je_auto_control` without the GUI is unchanged.
+
 - `AC_shell_to_var` and MCP `ac_shell`: inside a stoppable run or a cancellation scope, a stop,
   `ac_stop_execution` or `notifications/cancelled` kills the command's process tree within about
   0.1 s and ends the call (`ExecutionStopped`, or `-32800` for a client cancel), instead of waiting

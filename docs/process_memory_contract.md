@@ -37,6 +37,15 @@ process. Existing desktop foreground and input-presence gates are unchanged.
 | OS service operation | Specific approved service's management interface | Explicit service scope and independent status readback | Adapter and policy integration pending |
 | Completed background task | Fresh state or artifact verification under current runtime authority | Observation does not grant execution rights or replace a completion receipt | End-to-end M4/M5 integration pending |
 
+The same matrix is data in `utils/process_memory/background_profile.py`
+(`WINDOWS_PROFILE`), and a test keeps the two row for row. A route names one
+of a closed set of `Channel`s; desktop keyboard, mouse, focus and foreground
+switching are not channels, and a route naming one is refused when it is
+built. `route(profile, operation)` returns a route only when its state is
+`existing` or `injected_tests`; an unknown operation or a pending adapter is
+`unsupported`, never a fallback to desktop input. The module reads and opens
+nothing and imports no input, wrapper or native code.
+
 ## Retained identity and private reads
 
 `ProcessIdentity` includes host/session identifiers, PID, process birth, executable

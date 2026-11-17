@@ -58,9 +58,31 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
-| U-20261117-03 | 2026-11-17 | Ground semantic commands with operation-bound receipts | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
-| U-20261117-02 | 2026-11-17 | Preserve checked memory revisions for subsequent grounding | #done #process-memory | [2026-11-c](2026-11-c.md) |
-| U-20261117-01 | 2026-11-17 | Validate fixture schema and bind launch locations | #done #process-memory | [2026-11-c](2026-11-c.md) |
+| U-20261117-10 | 2026-11-17 | Ground semantic commands with operation-bound receipts | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261117-09 | 2026-11-17 | Preserve checked memory revisions for subsequent grounding | #done #process-memory | [2026-11-c](2026-11-c.md) |
+| U-20261117-08 | 2026-11-17 | Validate fixture schema and bind launch locations | #done #process-memory | [2026-11-c](2026-11-c.md) |
+| U-20261117-07 | 2026-11-17 | SonarCloud cleanup, tests: 202 new-code findings on main | #sonarcloud #cleanup #test | [2026-11-b](2026-11-b.md) |
+| U-20261117-06 | 2026-11-17 | SonarCloud cleanup, product code: 69 new-code findings on main | #sonarcloud #cleanup | [2026-11-b](2026-11-b.md) |
+| U-20261117-05 | 2026-11-17 | The workspace-sync example checks its generation path, clearing Sonar's blocker | #security #sonarcloud #examples | [2026-11-b](2026-11-b.md) |
+| U-20261117-04 | 2026-11-17 | Release 1.2.2: PR #552 merged into main | #release | [2026-11-b](2026-11-b.md) |
+| U-20261117-03 | 2026-11-17 | Two presence-source drain inspects retry a missed deadline | #incident #ci #test #agent | [2026-11-b](2026-11-b.md) |
+| U-20261117-02 | 2026-11-17 | The deployment plan's rollback method is decided | #decision #deployment | [2026-11-b](2026-11-b.md) |
+| U-20261117-01 | 2026-11-17 | M0 closed: the first target is the owned fixture | #done #process-memory #decision | [2026-11-b](2026-11-b.md) |
+| U-20261116-15 | 2026-11-16 | Two stop gaps in Progress.md, measured and closed | #done #http #chatops | [2026-11-b](2026-11-b.md) |
+| U-20261116-14 | 2026-11-16 | Every template match in the package is stoppable | #done #executor #image | [2026-11-b](2026-11-b.md) |
+| U-20261116-13 | 2026-11-16 | A DAG revocation test no longer races the lease watch | #incident #ci #test #agent | [2026-11-b](2026-11-b.md) |
+| U-20261116-12 | 2026-11-16 | M0 routing profile: background channels only, never desktop input | #done #process-memory #policy | [2026-11-b](2026-11-b.md) |
+| U-20261116-11 | 2026-11-16 | A stop no longer waits for an image search or OCR pass | #done #executor #ocr #image | [2026-11-b](2026-11-b.md) |
+| U-20261116-10 | 2026-11-16 | A stop also ends an HTTP request that is still connecting | #done #http #executor | [2026-11-b](2026-11-b.md) |
+| U-20261116-09 | 2026-11-16 | MCP roots from roots/list stay opt-in | #done #mcp #security #decision | [2026-11-b](2026-11-b.md) |
+| U-20261116-08 | 2026-11-16 | A stop or cancel ends an HTTP request that is already out | #done #executor #mcp #http | [2026-11-b](2026-11-b.md) |
+| U-20261116-07 | 2026-11-16 | The GUI collects cyclic garbage on its own thread only | #gui #pyside6 #done | [2026-11-b](2026-11-b.md) |
+| U-20261116-06 | 2026-11-16 | Pause automatic GC per Qt module instead of collecting after every test | #incident #ci #test #gui | [2026-11-b](2026-11-b.md) |
+| U-20261116-05 | 2026-11-16 | Collect after every Qt test, not only per module, on the GUI thread | #incident #ci #test #gui | [2026-11-b](2026-11-b.md) |
+| U-20261116-04 | 2026-11-16 | Leaked widgets are collected on the GUI thread so a deferred delete cannot abort the suite | #incident #ci #test #gui | [2026-11-b](2026-11-b.md) |
+| U-20261116-03 | 2026-11-16 | A transfer-payload test no longer passes Windows MAX_PATH on a local basetemp | #test #windows | [2026-11-b](2026-11-b.md) |
+| U-20261116-02 | 2026-11-16 | Keep Qt's fatal message when a CI test aborts the interpreter | #ci #test #diagnostics | [2026-11-b](2026-11-b.md) |
+| U-20261116-01 | 2026-11-16 | PR #552 CI: bandit B105 on three RBAC notes and two timing-sensitive tests | #incident #ci #test #security | [2026-11-b](2026-11-b.md) |
 | U-20261115-24 | 2026-11-15 | close() wakes the presence probe the watch is waiting on | #incident #agent #ci #test | [2026-11-b](2026-11-b.md) |
 | U-20261115-23 | 2026-11-15 | A stop or cancel kills a captured shell command instead of waiting for it | #done #executor #mcp | [2026-11-b](2026-11-b.md) |
 | U-20261115-22 | 2026-11-15 | ac_diagnose verifies the audit chain read-only and creates no audit database | #done #diagnostics #security | [2026-11-b](2026-11-b.md) |

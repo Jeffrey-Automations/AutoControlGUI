@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Any, List, Optional, Pattern, Sequence, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
-from je_auto_control.utils.executor.run_control import pause
+from je_auto_control.utils.executor.run_control import pause, stoppable_call
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.monitor_layout.logical_frame import grab_logical
 from je_auto_control.utils.ocr.backends import (
@@ -109,7 +109,7 @@ def find_text_matches(target: str,
     """
     engine = _resolve(backend)
     frame, offset_x, offset_y = _grab(region)
-    matches = engine.image_to_matches(frame, lang, min_confidence)
+    matches = stoppable_call(engine.image_to_matches, frame, lang, min_confidence)
     # image_to_matches returns image-local coords; translate to absolute.
     shifted = [TextMatch(
         text=m.text, x=m.x + offset_x, y=m.y + offset_y,
@@ -146,7 +146,7 @@ def read_text_in_region(region: Optional[Sequence[int]] = None,
     """Return every OCR hit in ``region`` (or whole screen) as TextMatch records."""
     engine = _resolve(backend)
     frame, offset_x, offset_y = _grab(region)
-    matches = engine.image_to_matches(frame, lang, min_confidence)
+    matches = stoppable_call(engine.image_to_matches, frame, lang, min_confidence)
     return [TextMatch(
         text=m.text, x=m.x + offset_x, y=m.y + offset_y,
         width=m.width, height=m.height, confidence=m.confidence,

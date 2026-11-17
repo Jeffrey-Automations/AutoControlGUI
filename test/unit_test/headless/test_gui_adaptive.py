@@ -148,8 +148,10 @@ def test_a_hidden_item_takes_no_room_in_a_flow(qapp):
     flow.addWidget(narrow)
     wide.hide()
     assert flow.minimumSize().width() == 80
-    assert flow.takeAt(0) is not None and flow.count() == 1
-    assert flow.itemAt(5) is None and flow.takeAt(5) is None
+    assert flow.takeAt(0) is not None
+    assert flow.count() == 1
+    assert flow.itemAt(5) is None
+    assert flow.takeAt(5) is None
     host.deleteLater()
 
 
@@ -162,9 +164,11 @@ def test_field_pairs_wrap_as_units(qapp):
     host.setLayout(flow)
     widest = max(pair.minimumSizeHint().width() for pair in pairs)
     assert flow.minimumSize().width() == widest
-    assert flow.count() == 3 and flow.spacing() == 12
+    assert flow.count() == 3
+    assert flow.spacing() == 12
     label, field = (pairs[0].layout().itemAt(i).widget() for i in range(2))
-    assert isinstance(label, QLabel) and isinstance(field, QLineEdit)
+    assert isinstance(label, QLabel)
+    assert isinstance(field, QLineEdit)
     host.deleteLater()
 
 
@@ -250,7 +254,8 @@ def test_a_page_header_is_added_once_and_only_to_a_vertical_page(qapp):
     page = QWidget()
     QVBoxLayout(page)
     first = add_page_header(page, "tab_mobile", "tab_mobile_subtitle")
-    assert first is not None and page.layout().itemAt(0).widget() is first
+    assert first is not None
+    assert page.layout().itemAt(0).widget() is first
     assert add_page_header(page, "tab_mobile") is first
     assert page_header(page) is first
     for layout_type in (QGridLayout, QHBoxLayout):
@@ -312,7 +317,8 @@ def test_indicators_are_drawn_in_the_accent_colour_when_checked(qapp, radio):
     style.drawPrimitive(element, option, painter, None)
     painter.end()
     centre = image.pixelColor(16, 16) if radio else image.pixelColor(10, 10)
-    assert abs(centre.blue() - accent.blue()) < 40 and centre.red() < 120, centre.name()
+    assert abs(centre.blue() - accent.blue()) < 40, centre.name()
+    assert centre.red() < 120, centre.name()
     assert style.pixelMetric(QStyle.PixelMetric.PM_IndicatorWidth) == 16
 
 
