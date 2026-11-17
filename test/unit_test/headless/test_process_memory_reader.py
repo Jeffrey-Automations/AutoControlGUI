@@ -99,6 +99,7 @@ def test_semantic_observation_has_exact_values_and_no_raw_identity_or_memory():
     assert result.identity_digest == IDENTITY.digest
     assert result.identity_digest != replace(IDENTITY, birth=901).digest
     assert result.consistency == "best_effort"
+    assert result.revision is None
     assert result.bytes_read == SCHEMA.size and result.regions_read == 1
     assert provider.handles[0].closed == 1
     assert "address" not in vars(result) and "pid" not in vars(result)

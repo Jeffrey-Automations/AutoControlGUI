@@ -645,6 +645,8 @@ fixture 的原生身分核對（標頭挑戰已有，U-20261115-18，只在本�
 
 M2 的自有 fixture schema-one adapter 已有嚴格版本／布局驗證、不可變 challenge binding、
 標準補零狀態解碼及共用 72-byte 讀取上限；僅驗證 injected provider，並未完成應用 attestation 或原生驗收。
+成功的序號觀察保留 `revision`，供後續 runtime grounding 區分相同欄位值但已更新的狀態；
+best-effort 觀察沒有 revision，也不承諾後續操作具原子性。受管接線仍待實作。
 
 1. **M0：能力盤點與範圍契約。** 先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
    讀取來源、執行介面、權限、是否全背景、支援版本、驗證方式與不支援原因。

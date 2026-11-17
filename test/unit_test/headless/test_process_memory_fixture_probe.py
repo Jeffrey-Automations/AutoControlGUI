@@ -60,6 +60,7 @@ def test_reviewed_probe_reads_exact_values_with_one_shared_budget():
     assert isinstance(result, Observation)
     assert result.fields == (("document_id", 17), ("job_status", "ready"))
     assert result.consistency == "sequence_checked"
+    assert result.revision == 0
     assert result.bytes_read == 72 and provider.closed == 1
 
 
@@ -103,6 +104,15 @@ def test_generation_change_rejects_mixed_state():
     provider.after_read = advance
     assert observe(provider).reason == FailureReason.INCONSISTENT_SNAPSHOT
     assert provider.closed == 1
+
+
+def test_equal_values_after_a_change_retain_distinct_revisions():
+    provider = Provider()
+    first = observe(provider)
+    provider.chunks[9000] = (4).to_bytes(8, "little")
+    second = observe(provider)
+    assert first.fields == second.fields
+    assert (first.revision, second.revision) == (0, 4)
 
 
 def test_bootstrap_copy_and_challenge_are_bound_to_each_launch():

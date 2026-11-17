@@ -218,6 +218,12 @@ does not implement that protocol. A target without it returns `best_effort`.
 Repeated equal bytes alone never imply atomicity. This increment performs one
 attempt; an inconsistent observation fails instead of retrying with a fresh budget.
 
+Successful sequence-checked observations retain the checked counter as `revision`.
+Best-effort observations have `revision=None`. Consumers can distinguish equal
+semantic values separated by a target update, instead of treating value equality
+as evidence that the target has not changed. A revision does not make a subsequent
+command atomic; the command adapter must compare it at its own commit boundary.
+
 Failures have closed reasons for unsupported probes, denied scope/access, changed
 targets, unreadable regions, partial reads, inconsistent snapshots, exhausted
 budgets/deadlines, decoding and cleanup. Provider adapters should use

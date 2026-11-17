@@ -307,4 +307,5 @@ class ProcessMemoryReader:
         return Observation(uuid4().hex, target_id, operation.expected.digest, probe.probe_id, probe.schema_version,
                            started, operation.clock(), values,
                            "sequence_checked" if before is not None else "best_effort",
-                           operation.bytes_read, operation.regions_read)
+                           operation.bytes_read, operation.regions_read,
+                           revision=int.from_bytes(before, "little") if before is not None else None)

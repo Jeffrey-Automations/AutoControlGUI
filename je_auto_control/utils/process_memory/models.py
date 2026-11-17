@@ -190,6 +190,7 @@ class Observation:
     consistency: Literal["sequence_checked", "best_effort"]
     bytes_read: int
     regions_read: int
+    revision: int | None = None
     source: str = field(default="process_memory", init=False)
     complete: bool = field(default=True, init=False)
 
