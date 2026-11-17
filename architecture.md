@@ -91,8 +91,9 @@ The native fixture acceptance CLI defaults to static inventory matching. Its
 explicit smoke path uses this assembly and reports selected checks separately
 from full native acceptance, dependency trust and foreground noninterference.
 The C fixture also prepares four fixed diagnostic page layouts in a separate
-allocation. Those modes expose bootstrap only; page-specific native validation
-and private region-query provenance are still pending.
+allocation. Those modes expose bootstrap only. The diagnostic runner attributes
+reads/refusals using private bootstrap-bound query evidence from one handle,
+including a successful prefix read; actual native page validation remains pending.
 The helper error codec preserves fixed memory failure reasons across IPC without
 serializing exception text; malformed or mixed memory error packets are refused.
 The internal Windows provider owns read/query handles and measures native process

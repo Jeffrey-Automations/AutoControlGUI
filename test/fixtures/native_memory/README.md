@@ -37,11 +37,28 @@ The ordinary mode continues to use its original static payload and command ledge
 Every exit path attempts to release the original allocation, including initialization
 and stdio failures; a failed release returns exit code 3.
 
-These layouts have been compiled and source-reviewed, not executed. The smoke CLI
-below still runs only the ordinary roundtrip. A future page runner must privately
-confirm the requested payload-page metadata before attributing a refusal to that
-page. An `unreadable_region` error alone could instead originate from executable or
-header checks. Page-specific acceptance remains unverified.
+These layouts have been compiled and source-reviewed, not executed. The CLI below
+can select one with `--page-layout <layout>`. Selection alone remains static;
+execution still requires `--execute` after the native pause is lifted.
+
+The page runner binds its private payload address only after launch/bootstrap
+validation. It observes the reader's existing region queries without adding OS
+calls, and requires both exact pages on one retained handle. The first page must
+be readable and read-only, end at the payload midpoint, and supply a successful
+eight-byte prefix read before the second page is queried. The second page must
+share the allocation and match the requested protection and commitment state.
+Metadata changes invalidate the evidence even if the original mapping returns.
+Multiple observations cannot contribute to one successful page result.
+Each runner claims a fresh evidence scope before observing and consumes it once;
+an earlier successful trace cannot be replayed against a different target.
+
+`split` also requires document 17, state `ready`, revision zero. Other layouts
+require `unreadable_region` from a read with matching payload-page evidence and no
+read of the protected second half. The same error from an image, header or sequence
+page cannot satisfy the case. Reports expose only the requested layout and closed
+check booleans, never the private locations or memory contents. Page cases issue no
+control command and do not claim runtime task completion. The overall fault matrix
+stays unverified; only injected tests have exercised this runner so far.
 
 The allocation and protection rules follow Microsoft's
 [VirtualProtect](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotect)

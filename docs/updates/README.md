@@ -902,3 +902,4 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 | U-20261118-10 | 2026-11-18 | Own fixture startup through managed completion and retirement | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-11 | 2026-11-18 | Prepare static-by-default native fixture smoke tooling | #done #process-memory #verification | [2026-11-c](2026-11-c.md) |
 | U-20261118-12 | 2026-11-18 | Prepare fixed native fixture page layouts | #done #process-memory #verification | [2026-11-c](2026-11-c.md) |
+| U-20261118-13 | 2026-11-18 | Attribute page cases to one fresh payload observation | #done #process-memory #verification | [2026-11-c](2026-11-c.md) |

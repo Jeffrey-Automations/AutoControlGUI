@@ -1609,3 +1609,6 @@ executed by ordinary tests; native behavior and loaded-image trust remain in `Pr
 The C fixture has fixed split, guard, no-access and decommitted diagnostic layouts.
 They copy the payload into a separate two-page allocation and expose bootstrap only;
 the ordinary static payload and command ledger remain separate.
+The acceptance tool can select a read-only page case. A diagnostic provider wrapper
+records only existing queries and read boundaries, requiring exact private payload
+page metadata on one handle before accepting an expected read or refusal.

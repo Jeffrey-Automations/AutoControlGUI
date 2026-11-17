@@ -545,9 +545,17 @@ dependency trust. Injected smoke tests cover initial state, receipts, fresh read
 managed completion and retryable cleanup, without running the native artifact.
 The C fixture can also prepare fixed split/guard/no-access/decommitted payload
 layouts, with bootstrap as their only operation. Source review and compilation do
-not validate native page behavior. The smoke runner does not select these layouts;
-a page runner still needs private evidence that its region query reached the
-intended payload page, rather than merely matching a generic failure reason.
+not validate native page behavior. The diagnostic page runner binds private payload
+locations through the checked bootstrap and observes the actual reader's existing
+queries. It requires exact adjacent region metadata, a successful eight-byte prefix
+read before the second-page query, and one handle for the whole observation.
+Changed mappings or evidence from multiple observations cannot pass. Each case
+claims and consumes a fresh observation scope; earlier successful traces cannot
+be replayed against another target. Split mode
+requires complete initial semantic readback; refusal modes require both the expected
+reader reason and matching payload evidence, without reading the protected half.
+These cases perform no command and do not claim runtime completion or full native
+fault coverage. Only injected tests have exercised the runner.
 Native execution stays paused under `Progress.md`; native verification of the typed calls,
 trusted bootstrap matching, page-protection fault injection, host probe configuration, runtime
 lifecycle/policy integration and application coverage remain required for M1/M3.
