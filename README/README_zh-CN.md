@@ -100,3 +100,5 @@ HostBrowser 也会拒绝晚到发布，并保留未完成的线程与关闭所�
 MultiViewerHost 可返回含原始 session 清理对象的 offer，延后清理不会停止替换后的连接或画面来源；GUI 接入仍待完成。
 
 主机选定的语义 adapter 可通过既有观察 API 返回多来源报告。缺失来源与冲突会保留显示，但不能授权操作或确认完成。fixture 已整合经审阅的内存读取与自有只读 IPC snapshot，并在提交前重新核对两者。目前以注入原生调用与隐藏 helper 测试；UIA／DOM 整合及原生验收仍待完成。 报告版本 2 由主机程序固定必要字段；即使所有来源都漏掉同一字段，仍会标示缺失。
+
+独立自有 UI 观察 fixture 可通过 `test/fixtures/native_memory/build_fixture.py --kind uia` 构建。静态编译与导入检查不代表 UIA 可读或不干扰桌面；执行验收及限定范围 reader 整合仍待完成。

@@ -179,3 +179,14 @@ def test_cleanup_retry_is_recorded_without_repeating_the_command():
     assert result["execution"] == "failed" and result["cleanup_confirmed"]
     assert result["cleanup_attempts"] == 2 and len(calls) == 2
     assert result["checks"] == {} and channel.retired
+
+
+def test_uia_manifest_cannot_enter_memory_acceptance(tmp_path):
+    digest = build(tmp_path)
+    manifest = tmp_path / "manifest.json"
+    value = json.loads(manifest.read_text())
+    value.update(schema=2, fixture_kind="uia", executable="uia_fixture.exe",
+                 imported_dlls=["kernel32.dll", "user32.dll"])
+    manifest.write_text(json.dumps(value))
+    with pytest.raises(ValueError):
+        acceptance.prepare(tmp_path, digest)

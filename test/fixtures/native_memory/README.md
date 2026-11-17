@@ -132,3 +132,45 @@ coverage, resource growth and full native acceptance remain unverified. A cleanu
 failure keeps the run failed even when the retry retires the resources. This
 script is not registered as a supported production target or included in ordinary
 native test execution.
+
+## UI observation fixture, build only
+
+The builder accepts `--kind uia` for the separate `uia_fixture.c` source and
+`uia_fixture.exe` image. The default remains `--kind memory`. UIA builds require
+exactly kernel32/user32 imports and publish a schema-2 manifest with `fixture_kind`
+and `executable`; the memory acceptance runner refuses this artifact. No builder
+path runs either executable.
+
+The UI fixture accepts only `--challenge <32 lowercase hex digits>`. A dedicated
+thread creates a parent without `WS_VISIBLE`, with `WS_EX_NOACTIVATE` and
+`WS_EX_TOOLWINDOW`, at off-screen coordinates. It never calls ShowWindow, focus
+or foreground APIs. The same thread creates, pumps and destroys these read-only
+EDIT controls:
+
+| Child ID | Fixture value / purpose |
+| --- | --- |
+| 1001 | `17`, document value |
+| 1002 | `ready`, status value |
+| 1003 | Empty string |
+| 1004 | `disabled`, disabled control |
+| 1005 | Password-style control containing synthetic fixture text |
+| 1006, twice | Different values to test ambiguous selection |
+
+Both inherited stdin and stdout must be pipes. After initialization, stdout emits one JSON line with exactly `fixture`,
+`version`, `pid`, `hwnd` and `challenge`. These private bootstrap claims still
+require retained-process and window-owner validation. No control values are sent
+through stdout. Closing stdin requests shutdown; any input byte also stops the
+fixture with a protocol error. A separate pipe waiter lets the owner also observe
+unexpected GUI-thread exit; window destruction posts quit to that thread. Startup and thread shutdown waits are five
+seconds; failed retirement exits the entire process with code 3. The parent must
+retain process ownership and enforce its own deadline, including blocked pipe I/O.
+A future launcher must use `CREATE_NO_WINDOW` for this console-subsystem image.
+
+The event-aware pump follows
+[MsgWaitForMultipleObjects](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjects).
+The parent styles follow Microsoft's
+[extended-window-style contract](https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles).
+Child IDs do not prove UIA AutomationId mapping or hidden-control exposure.
+Those properties, password behavior, cleanup and foreground noninterference remain
+unverified until native acceptance resumes. The scoped UIA reader, owner-binding
+bootstrap consumer and per-field report results are still pending in Progress.md.

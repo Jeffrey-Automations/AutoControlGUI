@@ -1474,3 +1474,7 @@ Graceful close attempts all tracked releases before teardown. An acknowledgement
 means worker emission, not application delivery; process death/reap does not prove
 compositor input release. Synthetic IPC tests cover ownership, while native
 half-open teardown and compositor release acceptance remain unexecuted here.
+
+The build-only UI fixture uses `build_fixture.py --kind uia` and a distinct
+schema-2 manifest. It is not a registered runtime target or a memory fixture.
+Native UIA exposure and scoped observation integration remain unverified.

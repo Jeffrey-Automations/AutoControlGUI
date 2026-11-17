@@ -749,3 +749,17 @@ fault coverage. Only injected tests have exercised the runner.
 Native execution stays paused under `Progress.md`; native verification of the typed calls,
 trusted bootstrap matching, page-protection fault injection, host probe configuration, runtime
 lifecycle/policy integration and application coverage remain required for M1/M3.
+
+
+### Owned UI fixture preparation
+
+`test/fixtures/native_memory/build_fixture.py --kind uia` builds a separate hidden
+window artifact with fixed read-only controls for future scoped UIA tests. Its
+schema-2 manifest and kernel32/user32 import allowlist are distinct from the memory
+fixture. The default memory build retains its existing schema and dependencies.
+The UI artifact has only a one-line private bootstrap and EOF shutdown, no state
+mutation API. A future owner must independently validate its process and HWND,
+launch with `CREATE_NO_WINDOW`, bound pipe/COM waits and retain failed retirement.
+See the fixture README for its field table and protocol. Compilation is not native
+acceptance: UIA property exposure, per-field result integration and noninterference
+remain pending in Progress.md.

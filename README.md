@@ -100,3 +100,5 @@ HostBrowser also rejects late publications and retains unfinished thread/close o
 MultiViewerHost can return an owned offer or capture an original-session retirement receipt, so delayed cleanup cannot stop a replacement peer or screen source. GUI adoption remains pending.
 
 Host-selected semantic adapters can return multi-source reports through the existing observation API. Missing sources and conflicts remain visible but cannot authorize actions or completion. The fixture now combines reviewed memory reads with its owned read-only IPC snapshot and rechecks both before commit. Injected native calls and hidden-helper tests cover this path; UIA/DOM integration and native acceptance remain pending. Report version 2 pins the required fields in host code; a field omitted by every source remains missing.
+
+A separate owned UI observation fixture can now be built with `test/fixtures/native_memory/build_fixture.py --kind uia`. Static compilation and import checks do not establish UIA exposure or desktop noninterference; execution and scoped-reader integration remain pending.

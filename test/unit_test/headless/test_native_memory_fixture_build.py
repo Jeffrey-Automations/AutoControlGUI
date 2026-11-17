@@ -108,3 +108,41 @@ def test_compile_failure_retains_diagnostic_log_and_no_manifest(configured, monk
         builder.build(msvc, sdk, "1", output)
     assert (output / "build.log").read_text() == "compile failurediagnostic"
     assert not (output / "manifest.json").exists()
+
+
+def test_uia_build_has_distinct_manifest_and_never_executes(configured, monkeypatch):
+    msvc, sdk, output, calls = configured
+    (output.parent / "uia_fixture.c").write_bytes(b"reviewed-uia-source")
+    original = builder.subprocess.run
+    def run(command, **kwargs):
+        result = original(command, **kwargs)
+        if Path(command[0]).name == "cl.exe":
+            (output / "memory_fixture.exe").rename(output / "uia_fixture.exe")
+        else:
+            result.stdout = "8664 machine (x64)\n    USER32.dll\n    KERNEL32.dll\n"
+        return result
+    monkeypatch.setattr(builder.subprocess, "run", run)
+    manifest = json.loads(builder.build(msvc, sdk, "1", output, kind="uia").read_text())
+    assert [Path(command[0]).name for command, _ in calls] == ["cl.exe", "dumpbin.exe"]
+    assert "user32.lib" in calls[0][0] and "bcrypt.lib" not in calls[0][0]
+    assert manifest["schema"] == 2 and manifest["fixture_kind"] == "uia"
+    assert manifest["executable"] == "uia_fixture.exe"
+    assert manifest["source_sha256"] == hashlib.sha256(b"reviewed-uia-source").hexdigest()
+    assert manifest["imported_dlls"] == ["kernel32.dll", "user32.dll"]
+    assert manifest["execution"] == "not_run"
+    assert manifest["uia_exposure"] == manifest["foreground_noninterference"] == "not_verified"
+
+
+def test_uia_build_refuses_memory_dependency_inventory(configured):
+    msvc, sdk, output, _ = configured
+    (output.parent / "uia_fixture.c").write_bytes(b"reviewed-uia-source")
+    with pytest.raises(RuntimeError, match="dependencies"):
+        builder.build(msvc, sdk, "1", output, kind="uia")
+    assert not (output / "manifest.json").exists()
+
+
+def test_unknown_fixture_kind_cannot_create_output(configured):
+    msvc, sdk, output, calls = configured
+    with pytest.raises(ValueError, match="unknown native fixture kind"):
+        builder.build(msvc, sdk, "1", output, kind="arbitrary")
+    assert not output.exists() and not calls

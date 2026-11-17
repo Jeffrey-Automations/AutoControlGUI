@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- The native fixture builder adds `--kind uia` for a separate owned hidden-window
+  artifact and schema-2 static manifest. The default memory artifact is unchanged.
+  This builds only; UIA runtime integration and native acceptance remain pending.
+
 - Managed fixture observations now return a version-two multi-source report instead of a flat
   memory snapshot. Read `sources.process_memory.snapshot` only after requiring a complete report;
   partial reads and source conflicts remain diagnostic data. Both host and worker require the

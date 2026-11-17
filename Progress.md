@@ -18,6 +18,14 @@
 
 ## 輸入、視窗與擷取修正：還沒在真的桌面與 Jeffrey_RPA 上驗過
 
+### 自有 UI 觀察 fixture 的限定範圍讀取
+
+`TODO` — `test/fixtures/native_memory/uia_fixture.c` 的原生執行仍暫緩。
+尚須以持有中的 process handle 核實私有 bootstrap 的 PID／HWND／challenge，
+接上僅從指定 HWND 讀取的 UIA helper、逐欄成功／失敗報告及取消／逾時退休。
+解除暫緩後才驗證 hidden controls 的 UIA 暴露與 AutomationId、空值／停用／密碼／重複 selector、
+EOF 清理及前景視窗／滑鼠不受影響。建置與靜態匯入檢查不算上述驗收。
+
 ### 行程記憶體自有 fixture 原生驗收
 
 `TODO` — 原生執行仍暫緩。須先完成 Windows provider 的可信應用身分核對、自有 fixture 與受管權限整合，

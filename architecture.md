@@ -1581,3 +1581,8 @@ installed package; serving static pages grants no task or desktop input authorit
 The owned memory fixture supports launch-bound `compare_set` with a bounded,
 non-evicting receipt ledger. Runtime adapter integration remains in `Progress.md`;
 this fixture protocol does not establish native memory acceptance.
+
+`test/fixtures/native_memory/uia_fixture.c` owns a separate hidden-window test
+artifact. The build script selects a closed memory/UIA source and dependency set;
+UIA manifests are distinct from memory acceptance inputs. No runtime owner or
+scoped UIA acquisition is registered by building it.

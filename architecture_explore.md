@@ -1623,3 +1623,7 @@ page metadata on one handle before accepting an expected read or refusal.
 the existing semantic worker using injected native calls and buffers. Hidden IPC
 tests cover lazy managed startup, semantic completion, typed read failures and
 fresh synthetic identity after helper restart; they do not attest a native process.
+
+Native fixture preparation: `test/fixtures/native_memory/build_fixture.py` selects
+`fixture.c` for memory or `uia_fixture.c` for owned hidden UI controls. Each uses
+an exact static import inventory; compilation never executes either fixture.

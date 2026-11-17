@@ -1203,3 +1203,7 @@ acceptance. This transport is not full Linux application or native input accepta
 Installed wheel and source distributions include the REST Dashboard and Swagger HTML, CSS and
 JavaScript resources. The same localhost REST routes and authentication rules apply to an
 installed package; serving static pages grants no task or desktop input authority.
+
+The build-only UI fixture uses `build_fixture.py --kind uia` and a distinct
+schema-2 manifest. It is not a registered runtime target or a memory fixture.
+Native UIA exposure and scoped observation integration remain unverified.

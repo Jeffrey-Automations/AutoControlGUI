@@ -1222,3 +1222,6 @@ A field omitted by all sources remains missing and cannot authorize a command
 or prove completion. Helper bootstrap and the original journal witness bind
 the same field scope. Version-one reports and out-of-scope fields are rejected.
 Injected fixture tests cover this contract; native and UIA/DOM acceptance remain pending.
+
+The native fixture builder accepts ``--kind uia`` for a separate owned hidden-window
+artifact. This is build-only preparation; UIA acquisition and native acceptance remain pending.
