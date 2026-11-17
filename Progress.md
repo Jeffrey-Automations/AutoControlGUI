@@ -643,7 +643,9 @@ proof = await target.verify(receipt, CompletionQuery("export_file_matches"))
 browser adapter 從受管頁面取得欄位、透過 DOM 提交，再驗證新回應或產物。
 兩者都不必知道記憶體位址，也不能只靠命令回傳成功判定完成。
 服務已有內部 SCM query-only reader、共用 session 的啟停 controller，以及程序內受管觀察與
-service_state 完成判定；受管 helper、固定服務 profile、跨 profile／資料庫的同服務鎖仍待實作，
+service_state 完成判定及自有 helper IPC；固定服務 profile、正式部署及 Unicode 服務名稱的
+鎖識別仍待實作。同一使用者／鎖目錄下的 ASCII 名稱已可跨 target／設定／資料庫協調，
+不同 Windows 帳號與外部 SCM client 不在此鎖範圍內。
 不能視為 os.service 已支援。管理操作使用同一 retained handle
 重新查詢，回條只表示接受；未知效果保留且禁止自動重送。服務相依項的影響範圍、背景不干擾及
 原生相容性仍未驗收，正式服務未操作。

@@ -24,7 +24,8 @@ def classify_reply(reply: Any, request_id: str) -> tuple[bool, Any]:
     """Return ``(True, event)`` for an input announcement or ``(False, result)``; a helper error raises its type."""
     if not isinstance(reply, dict) or reply.get("id") != request_id:
         raise AgentTaskError("native helper returned an unexpected reply")
-    if reply.get("error_type") == "MemoryObservationError" or "memory_reason" in reply:
+    if (reply.get("error_type") in ("MemoryObservationError", "ServiceQueryError")
+            or "memory_reason" in reply or "service_reason" in reply):
         raise_reply_error(reply)
     if "event" in reply:
         return True, reply["event"]

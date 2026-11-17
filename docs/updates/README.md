@@ -921,3 +921,4 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 | U-20261118-29 | 2026-11-18 | Retain query-only local service status ownership | #done #process-memory #service | [2026-11-c](2026-11-c.md) |
 | U-20261118-30 | 2026-11-18 | Keep scoped service controls and readback on one retained owner | #done #process-memory #service | [2026-11-c](2026-11-c.md) |
 | U-20261118-31 | 2026-11-18 | Verify managed service readback against its original acceptance | #done #process-memory #service #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-32 | 2026-11-18 | Bind service helper IPC to retained ownership | #done #process-memory #service #agent | [2026-11-c](2026-11-c.md) |

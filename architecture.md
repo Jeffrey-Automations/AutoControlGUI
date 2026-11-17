@@ -1642,5 +1642,12 @@ delegates all other targets to the existing semantic dispatch helpers.
 `service_verification.py` checks a confirmed journal attempt against a new report
 from the same binding after acceptance. Its `service_state` criterion describes
 reported SCM state only. The ordinary semantic revision gates are unchanged.
-Service-specific IPC guards, profiles and canonical cross-profile ownership
-remain pending; this integration is verified in-process with injected calls.
+`service_worker.py` preflights the closed service configuration and routes a
+separate observed-service operation. NativeWorker shares input/authority/retirement
+guards across explicit semantic and service targets, preserving their separate
+bootstrap and evidence contracts. `service_native_target.py` pins helper evidence
+to the original bootstrap binding and uses the existing non-display owned channel.
+`service_scope.py` derives a same-user resource lock from printable ASCII service
+keys, independent of target/configuration/database names. Typed service errors
+cross IPC before event interpretation. Native deployment, host profiles, Unicode
+key canonicalization and cross-account coordination remain pending.

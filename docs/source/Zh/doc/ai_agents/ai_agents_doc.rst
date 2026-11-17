@@ -1029,4 +1029,4 @@ wheel 與原始碼發行套件包含 REST Dashboard 和 Swagger 的 HTML、CSS�
 判定須有對應操作的確認回條，以及同一資源擁有者在接受後取得的新 SCM 查詢。
 通過只表示 SCM 回報該狀態，不證明原子完成、健康或桌面不干擾。這些工具名稱只屬於
 adapter 範圍，不是全域 executor 指令。既有任務 API 與 GUI JSON 編輯器可傳遞此條件。
-服務 helper／profile 註冊與原生驗收仍待完成。
+自有服務 helper IPC 已有注入呼叫測試；服務 profile 註冊與原生驗收仍待完成。

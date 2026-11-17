@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,590 |
-| 程式碼總行數 | 243,662 |
+| Python 模組總數（含周邊子專案） | 1,593 |
+| 程式碼總行數 | 243,900 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -516,13 +516,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 57,336 行。
+> 14 個套件、約 57,574 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,254 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 30,251 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 30,489 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 166 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1051,7 +1051,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（30,251 行／220 檔）
+#### `utils/agent_runtime/`（30,489 行／223 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1118,14 +1118,14 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `manifest_evidence.py` | 51 | Independently re-read archive manifests and their scoped files at task completion. |
 | `model_tools.py` | 65 | Local-model schemas expose observation references without changing legacy executor signatures. |
 | `models.py` | 216 | Detached JSON contracts for managed computer tasks and their evidence. |
-| `native_errors.py` | 42 | Encode helper failures without disclosing memory details and preserve closed reason codes. |
-| `native_channel.py` | 281 | Bounded JSON IPC to an owned helper, with cancellable writes, replies and retirement. |
+| `native_errors.py` | 62 | Encode helper failures without disclosing memory or service details. |
+| `native_channel.py` | 282 | Bounded JSON IPC to an owned helper, with cancellable writes, replies and retirement. |
 | `native_control.py` | 59 | Generation-bound negative-only takeover notices with retained coarse cleanup failure diagnostics. |
 | `native_job.py` | 170 | Own a Windows helper process tree through a kill-on-close Job Object. |
 | `native_recovery.py` | 36 | Host-only input recovery checks never replay persisted keys or signal persisted PIDs. |
 | `native_scope.py` | 111 | Scope native window and control targets before their existing backend performs an action. |
 | `native_target.py` | 313 | Native desktop proxy with private IPC, host input ledger and cross-database ownership. |
-| `native_worker.py` | 408 | Private native helper entry point; stdout is a bounded owner-only JSON protocol. |
+| `native_worker.py` | 416 | Private native helper entry point; stdout is a bounded owner-only JSON protocol. |
 | `observation_refs.py` | 155 | Resolve observation-local elements and thumbnail points into host-checked native coordinates. |
 | `ollama.py` | 82 | Local-only Ollama decisions over bounded HTTP, without an SDK or remote fallback. |
 | `origin_policy.py` | 193 | Live origin path ceilings remain restrictive across accepted tasks, workers and service processes. |
@@ -1190,9 +1190,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_service_session.py` | 227 | Own one retained service handle, serialized queries and non-replayed control attempts. |
 | `service_operations.py` | 80 | Bound service requests and retain acceptance receipts without claiming completion. |
 | `service_observation.py` | 121 | Bind best-effort service reports and acceptance receipts to one retained owner. |
-| `service_target.py` | 187 | Apply managed task authority to one host-selected retained service controller. |
+| `service_target.py` | 202 | Apply managed task authority to one host-selected retained service controller. |
 | `service_verification.py` | 47 | Verify a post-acceptance SCM report without inferring atomicity, health or causality. |
 | `target_dispatch.py` | 55 | Dispatch explicit service evidence separately from existing semantic and ordinary targets. |
+| `service_native_target.py` | 109 | Pin service helper evidence to one background process and same-user service lease. |
+| `service_scope.py` | 19 | Derive same-user service ownership from reviewed printable ASCII service keys. |
+| `service_worker.py` | 66 | Validate service-specific bootstrap, configuration and observed helper dispatch. |
 | `uia_target.py` | 132 | Expose scoped UI fixture observations under managed authority without granting actions. |
 | `fixture_launch.py` | 52 | Measure an owned fixture channel's launch handle before binding its private bootstrap. |
 | `fixture_target.py` | 287 | Own pinned fixture startup, guarded semantic reads and retryable resource retirement. |
@@ -1614,8 +1617,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,052 | 109,092 |
-| **總計** | **1,578** | **242,917** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,055 | 109,330 |
+| **總計** | **1,581** | **243,155** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

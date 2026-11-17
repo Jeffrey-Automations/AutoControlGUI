@@ -985,7 +985,43 @@ the requested state. It does not prove health, causation, atomic completion or
 desktop noninterference. Existing semantic revision and multi-source report
 gates remain unchanged.
 
-Tests use the real managed runtime and injected service calls. Service-specific
-helper/proxy transport, host profile registration, canonical service locking
-across profiles and databases, dependency review and native acceptance remain
-pending. Generic native workers do not yet support this service contract.
+Tests use the real managed runtime and injected service calls. Owned helper IPC
+and service locking are described below. Host profile registration, dependency
+review and native acceptance remain pending.
+
+### Owned service helper IPC
+
+The service proxy uses a host-selected helper argv and the existing owned channel
+with display acquisition disabled. Bootstrap binds version, target, configuration,
+service scope and retained-owner binding before observations or effects are
+accepted. Every report and acceptance must match that binding. A replacement
+helper cannot reuse the earlier owner's evidence. Service commands use a separate
+`perform_service` message; ordinary `perform` and semantic `perform_grounded`
+cannot dispatch them.
+
+The worker shares background request and retirement guards with semantic targets,
+while retaining separate service schemas. Service configuration accepts only the
+fixed task spec and owner. It rejects profile, presence and extra fields before
+changing worker state, and pins the original spec and authorization-store source.
+Request checkpoints refresh that authority. Request, cleanup and EOF retirement
+all refuse desktop input and new cleanup commands. Cleanup accepts only empty
+key/button collections and retains failed ownership until retirement succeeds.
+
+Service query errors cross IPC as fixed `ServiceFailure` codes. Unknown reasons,
+mixed error formats, extra fields and custom error text are rejected without
+echoing their contents. Error envelopes are checked before input events.
+
+For this helper version, service keys must be printable ASCII, at most 256
+characters, and contain no slash, backslash or NUL. Case aliases share one scope
+and resource path; whitespace is preserved. The resource key excludes target
+name, configuration digest and database path. Two owners using the same lock
+root therefore contend for the same service, even with different task/profile
+names. The default root is the current user's `.je_auto_control/service_ownership`.
+Construction computes paths without launching a helper or acquiring a service.
+
+This is coordination between framework owners using that root. Unicode key
+canonicalization, coordination across Windows users and external SCM clients
+are not provided. The lower-level SCM reader's Unicode name support is unchanged.
+Hidden Python helper tests inject service calls and check actual child retirement;
+they do not establish native SCM compatibility or desktop noninterference.
+No production service profile or native service entry point is registered here.

@@ -35,6 +35,15 @@ class ServiceController(Protocol):
 class ServiceTarget(ABC):
     """Explicit service dispatch contract, separate from revision-grounded semantic targets."""
 
+    @property
+    @abstractmethod
+    def service_binding(self) -> ServiceBinding:
+        """Return immutable retained-owner provenance without acquiring resources."""
+
+    @abstractmethod
+    def check_spec(self, spec: AgentTaskSpec) -> None:
+        """Validate host scope without changing task or resource ownership."""
+
     @abstractmethod
     def observe(self) -> dict[str, Any]:
         """Return a fresh closed service report."""
@@ -71,6 +80,11 @@ class ManagedServiceTarget(ServiceTarget):
         self._active = False
         self._receipts: dict[str, tuple[dict[str, Any], ServiceReceipt]] = {}
 
+    @property
+    def service_binding(self) -> ServiceBinding:
+        """Expose the fixed owner binding without reading a service."""
+        return self._binding
+
     @contextmanager
     def _admitted(self) -> Iterator[None]:
         with self._work:
@@ -103,7 +117,7 @@ class ManagedServiceTarget(ServiceTarget):
         """Pin the original task and authority without acquiring native resources."""
         with self._admitted():
             operation = current_operation()
-            self._validate_spec(spec)
+            self.check_spec(spec)
             if operation is None or operation.spec != spec:
                 raise AgentTaskError("service target requires its host-selected external scope")
             scope = _Scope(spec, authorization_key(operation.owner))
@@ -116,7 +130,8 @@ class ManagedServiceTarget(ServiceTarget):
             self._checkpoint(operation)
             return True, ""
 
-    def _validate_spec(self, spec: AgentTaskSpec) -> None:
+    def check_spec(self, spec: AgentTaskSpec) -> None:
+        """Validate the fixed external tool scope before worker configuration changes."""
         tools = {name for name, action in SERVICE_TOOLS.items() if action in self._allowed}
         if (spec.target != self._binding.target_id or spec.mode != "external" or spec.roots or spec.apps
                 or not set(spec.allowed_tools) <= tools):
