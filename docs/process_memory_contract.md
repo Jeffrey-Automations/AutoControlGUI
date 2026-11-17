@@ -315,6 +315,20 @@ tests cover this behavior without cross-process memory reads. A Windows venv
 launcher can spawn a second interpreter, so the channel's launch PID and the
 fixture's self-reported PID must not be assumed equal or used as attestation.
 
+`OwnedChannelLauncher` adapts the existing `PopenLauncher` to the same owned IPC
+process. `launch_attested` can lease the pinned executable, start the channel,
+measure PID/birth from its retained launch handle and observe the same image file.
+The one private process-handle seam is host code only. `bind_control` then requires
+bootstrap PID and pointer width to match that measured identity; a launcher shim's
+descendant is refused, never silently substituted. This does not prove loaded-code
+integrity, trusted interpreter dependencies or source delivery. Keep it unregistered
+until those requirements and native acceptance are satisfied.
+The caller retains launcher, lease and observer owners during attestation. An
+attestation failure after launch leaves the channel with its launcher for explicit
+cleanup; failed lease or process retirement remains retryable. Launcher close does
+not close the separately owned image leases. Tests inject native calls and channels;
+this assembly has not launched a native attested fixture.
+
 `NativeSemanticTarget` carries the same contract over the existing owned helper
 channel. Trusted host code supplies the reviewed helper argv and an explicit
 resource lock. The helper must advertise semantic protocol version one before

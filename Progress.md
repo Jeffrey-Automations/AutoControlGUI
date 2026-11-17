@@ -673,7 +673,9 @@ IPC fixture 已驗證成功回條但未生效及 helper 重啟；程序內 targe
 自有 memory fixture 已有 launch-bound compare_set 與有界、不淘汰的重送回條紀錄；
 只有序列管線命令內的比較／提交原子性。FixtureCommands 已將內部命令接到 compare_set，
 嚴格比對回條身分、版本與欄位；以自有緩衝區及真實 reader 邏輯驗證 runtime 閉環，
-OwnedFixtureControl 已接上有界背景 RPC、取消與回收；launcher／原生 attestation 尚未接入。
+OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLauncher 已將映像檔核對
+接到同一受管 channel 的啟動 handle，並拒絕 bootstrap PID／位元寬度不符（只有注入測試）。
+正式 runtime／來源交付、載入映像綁定、profile 與原生 attestation 驗收尚未完成。
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。
 內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
 並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。

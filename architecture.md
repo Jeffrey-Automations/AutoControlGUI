@@ -73,6 +73,9 @@ command owner after an unknown reply. The reader remains read-only.
 OwnedFixtureControl reuses OwnedChannel for bounded fixture RPC, validates private
 bootstrap data, and retires failed exchanges while retaining failed cleanup ownership.
 Hidden IPC tests establish transport behavior only, not native memory identity.
+OwnedChannelLauncher lets the pinned-image launch flow measure the retained IPC
+process handle, then refuses bootstrap PID/architecture disagreement. This seam
+has injected-call tests; loaded-code/runtime trust and native execution remain pending.
 The helper error codec preserves fixed memory failure reasons across IPC without
 serializing exception text; malformed or mixed memory error packets are refused.
 The internal Windows provider owns read/query handles and measures native process
