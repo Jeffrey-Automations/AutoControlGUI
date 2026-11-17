@@ -670,6 +670,8 @@ uncertain 紀錄。現有 target 保留完整觀察比對；task／觀察 JSON �
 再按型別比較期望欄位。每次擷取區間須在當次主機單調時鐘讀取請求內；操作前快取不能證明完成。
 IPC fixture 已驗證成功回條但未生效及 helper 重啟；程序內 target 測試驗證快取回放拒絕。
 未知效果仍須審閱，未自動確認。
+自有 memory fixture 已有 launch-bound compare_set 與有界、不淘汰的重送回條紀錄；
+只有序列管線命令內的比較／提交原子性，尚未接入 runtime adapter。
 受管 profile、持有 reader 的原生 adapter 與公開記憶體入口尚未接上。
 
 1. **M0：能力盤點與範圍契約。**（已完成：profile／路由規則 U-20261116-12；維護者 2026-11-17 決定第一個目標只用自有 fixture，真實應用待 M1 原生驗收跑通後再選，U-20261117-01）先列 Windows 的 UI／OS／應用操作矩陣，每項記錄

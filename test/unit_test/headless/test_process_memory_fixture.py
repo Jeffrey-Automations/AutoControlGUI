@@ -269,3 +269,100 @@ def test_the_child_writes_the_parents_challenge_into_its_own_header():
                              input=b"", capture_output=True, timeout=10, creationflags=flags)
     assert refused.returncode == 2
     assert refused.stdout == b""
+
+def _change(state, **updates):
+    return {"command": "compare_set", "operation_id": "operation-1",
+            "launch_nonce": state.bootstrap()["launch_nonce"], "expected_sequence": 0,
+            "document_id": 42, "job_status": "done", **updates}
+
+
+def test_compare_set_replay_retains_receipt_after_intervening_change():
+    state = fixture_module.FixtureState()
+    request = _change(state)
+    first = state.compare_set(request)
+    assert first["kind"] == "receipt" and first["comparison"] == "atomic"
+    assert first["sequence"] == 2
+    first["sequence"] = 999
+    state.set_state(99, "busy")
+    replay = state.compare_set(request)
+    assert replay["sequence"] == 2
+    assert state.snapshot()["sequence"] == 4
+    assert state.snapshot()["document_id"] == 99
+    assert state.compare_set({**request, "document_id": 1})["code"] == "operation_conflict"
+
+
+def test_refused_future_revision_never_becomes_an_effect_on_retry():
+    state = fixture_module.FixtureState()
+    request = _change(state, expected_sequence=2)
+    assert state.compare_set(request)["code"] == "state_changed"
+    state.set_state(18, "busy")
+    assert state.compare_set(request)["code"] == "state_changed"
+    assert state.snapshot()["sequence"] == 2
+    assert state.snapshot()["document_id"] == 18
+
+
+def test_operation_capacity_never_evicts_replay_protection():
+    state = fixture_module.FixtureState()
+    first = _change(state)
+    for index in range(fixture_module.MAX_OPERATIONS):
+        request = _change(state, operation_id=f"operation-{index}", expected_sequence=index * 2)
+        assert state.compare_set(request)["kind"] == "receipt"
+        if index == 0:
+            first = request
+    before = state.snapshot(), state.payload.raw, state.sequence.raw
+    assert state.compare_set(_change(state, operation_id="new"))["code"] == "operation_limit"
+    assert state.compare_set(first)["sequence"] == 2
+    assert (state.snapshot(), state.payload.raw, state.sequence.raw) == before
+
+
+@pytest.mark.parametrize("updates,reason", [
+    ({"expected_sequence": True}, "invalid_request"),
+    ({"expected_sequence": 1}, "invalid_request"),
+    ({"expected_sequence": 2**64}, "invalid_request"),
+    ({"operation_id": "x" * 129}, "invalid_request"),
+    ({"operation_id": []}, "invalid_request"),
+    ({"launch_nonce": "other-launch"}, "target_changed"),
+    ({"document_id": True}, "invalid_state"),
+    ({"job_status": []}, "invalid_state"),
+    ({"address": 42}, "invalid_request"),
+])
+def test_compare_set_refusals_preserve_buffers(updates, reason):
+    state = fixture_module.FixtureState()
+    before = state.snapshot(), state.payload.raw, state.sequence.raw
+    assert fixture_module._dispatch(state, _change(state, **updates))["code"] == reason
+    assert (state.snapshot(), state.payload.raw, state.sequence.raw) == before
+
+
+def test_restart_refuses_old_operation_and_launch_binding():
+    original = fixture_module.FixtureState()
+    request = _change(original)
+    assert original.compare_set(request)["kind"] == "receipt"
+    restarted = fixture_module.FixtureState()
+    assert restarted.compare_set(request)["code"] == "target_changed"
+    assert restarted.snapshot()["sequence"] == 0
+
+
+def test_hidden_child_compare_set_replay_and_readback():
+    from concurrent.futures import ThreadPoolExecutor
+    flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    child = subprocess.Popen([sys.executable, "-I", "-u", str(FIXTURE_PATH)],
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             creationflags=flags)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        try:
+            bootstrap = json.loads(pool.submit(child.stdout.readline).result(timeout=5))
+            request = {"command": "compare_set", "operation_id": "ipc-1",
+                       "launch_nonce": bootstrap["launch_nonce"], "expected_sequence": 0,
+                       "document_id": 42, "job_status": "done"}
+            wire = (json.dumps(request) + "\n").encode()
+            output, errors = child.communicate(wire * 2 + b'{"command":"snapshot"}\n', timeout=5)
+            records = [json.loads(line) for line in output.splitlines()]
+            assert child.returncode == 0 and errors == b""
+            assert records[0] == records[1]
+            assert records[0]["kind"] == "receipt" and records[0]["sequence"] == 2
+            assert records[2] == {"kind": "snapshot", "document_id": 42,
+                                  "job_status": "done", "sequence": 2}
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.communicate(timeout=5)

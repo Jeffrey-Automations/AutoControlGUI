@@ -375,6 +375,20 @@ Only the fixture changes its buffers. The parent can request expected semantic
 state, a validated state change or shutdown; it cannot request arbitrary memory
 reads or writes.
 
+The additive `compare_set` command requires an operation ID, launch nonce, expected
+even sequence, document ID and job status. The serial server compares the sequence
+and publishes the change in one command. Its receipt states `atomic` only relative
+to that server's commands. This is not a guarantee against arbitrary memory writes.
+Exact retries return the original receipt, including after later state changes;
+conflicting reuse of an ID is refused. Launch-bound refusals are also retained.
+A 128-entry fixture ledger never evicts: new IDs are refused when full, while old
+receipts remain queryable. This is a fixture resource cap, not a performance target.
+The legacy `set` command remains for fault injection; runtime adapters must use
+`compare_set`. A restart changes the nonce and refuses old requests. Receipts are
+not durable across restart, do not attest executable identity, and never replace
+independent state readback. Hidden IPC tests cover replay and fresh snapshots;
+native memory and desktop noninterference acceptance remain paused.
+
 Bootstrap reports PID, pointer width, buffer locations, fixture source digest and
 a fresh launch nonce as unverified self-reports. The nonce is not OS process birth,
 and the source digest is not measured executable identity. No reviewed probe may

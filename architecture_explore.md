@@ -1588,3 +1588,7 @@ Diagnostics 內嵌 `gui/mcp_discovery_view.py`：僅透過 Actions 搜尋摘要�
 Installed wheel and source distributions include the REST Dashboard and Swagger HTML, CSS and
 JavaScript resources. The same localhost REST routes and authentication rules apply to an
 installed package; serving static pages grants no task or desktop input authority.
+
+The owned memory fixture supports launch-bound `compare_set` with a bounded,
+non-evicting receipt ledger. Runtime adapter integration remains in `Progress.md`;
+this fixture protocol does not establish native memory acceptance.

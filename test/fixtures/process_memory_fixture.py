@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import struct
 import sys
@@ -19,6 +20,7 @@ HEADER = struct.Struct("<8s16sQQ")
 MAGIC = b"JEPMFIX1"
 CHALLENGE_BYTES = 16
 MAX_REQUEST_BYTES = 1024
+MAX_OPERATIONS = 128
 STATES = frozenset({"ready", "busy", "done"})
 
 
@@ -38,6 +40,7 @@ class FixtureState:
         self._document_id = 17
         self._job_status = "ready"
         self._launch_nonce = secrets.token_hex(16)
+        self._operations: dict[str, tuple[dict, dict]] = {}
         self.payload.raw = PAYLOAD.pack(self._document_id, b"ready")
 
     def bootstrap(self) -> dict[str, object]:
@@ -60,10 +63,9 @@ class FixtureState:
 
     def set_state(self, document_id: object, job_status: object) -> dict[str, object]:
         """Validate the complete change before publishing an odd/even sequence update."""
-        if type(document_id) is not int or not 0 <= document_id <= 0xFFFFFFFF:
-            return _error("invalid_state")
-        if not isinstance(job_status, str) or job_status not in STATES:
-            return _error("invalid_state")
+        invalid = _state_error(document_id, job_status)
+        if invalid is not None:
+            return _error(invalid)
         if self._generation > 0xFFFFFFFFFFFFFFFD:
             return _error("sequence_exhausted")
         encoded = PAYLOAD.pack(document_id, job_status.encode("ascii"))
@@ -73,6 +75,53 @@ class FixtureState:
         self._generation += 2
         self.sequence.raw = SEQUENCE.pack(self._generation)
         return self.snapshot()
+
+    def compare_set(self, request: dict[str, object]) -> dict[str, object]:
+        """Compare and publish within the serial server, retaining bounded operation receipts."""
+        invalid = _compare_request_error(request)
+        if invalid is not None:
+            return _error(invalid)
+        operation = request["operation_id"]
+        revision = request["expected_sequence"]
+        if request["launch_nonce"] != self._launch_nonce:
+            return _error("target_changed")
+        previous = self._operations.get(operation)
+        if previous is not None:
+            return dict(previous[1]) if request == previous[0] else _error("operation_conflict")
+        if len(self._operations) >= MAX_OPERATIONS:
+            return _error("operation_limit")
+        if revision != self._generation:
+            response = _error("state_changed")
+        else:
+            response = self.set_state(request["document_id"], request["job_status"])
+            if response["kind"] == "snapshot":
+                response = {**response, "kind": "receipt", "operation_id": operation,
+                            "launch_nonce": self._launch_nonce, "comparison": "atomic"}
+        self._operations[operation] = (dict(request), dict(response))
+        return response
+
+
+def _valid_revision(value: object) -> bool:
+    return type(value) is int and 0 <= value < 2**64 and value % 2 == 0
+
+
+def _compare_request_error(request: dict[str, object]) -> str | None:
+    if set(request) != {"command", "operation_id", "launch_nonce", "expected_sequence",
+                        "document_id", "job_status"} or request["command"] != "compare_set":
+        return "invalid_request"
+    operation = request["operation_id"]
+    if (not isinstance(operation, str) or re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", operation) is None
+            or not _valid_revision(request["expected_sequence"])):
+        return "invalid_request"
+    return _state_error(request["document_id"], request["job_status"])
+
+
+def _state_error(document_id: object, job_status: object) -> str | None:
+    if type(document_id) is not int or not 0 <= document_id <= 0xFFFFFFFF:
+        return "invalid_state"
+    if not isinstance(job_status, str) or job_status not in STATES:
+        return "invalid_state"
+    return None
 
 
 def challenge_resolver(challenge: bytes, bootstrap: dict[str, object]) -> Callable[[Any, Any], Any]:
@@ -129,6 +178,9 @@ def _dispatch(state: FixtureState, request: object) -> dict[str, object]:
         return {"kind": "stopped"}
     if command == "set" and set(request) == {"command", "document_id", "job_status"}:
         return state.set_state(request["document_id"], request["job_status"])
+    if command == "compare_set" and set(request) == {
+            "command", "operation_id", "launch_nonce", "expected_sequence", "document_id", "job_status"}:
+        return state.compare_set(request)
     return _error("invalid_request")
 
 
