@@ -115,12 +115,19 @@ class PopenLauncher:
             _fail(FailureReason.UNSUPPORTED)  # one launch per launcher, so ``child`` is unambiguous
         # An argv list, never a shell; ``path`` is the file the caller leased and pinned.
         self.child = self._popen([path, *self._arguments], shell=False, **self._options)
+        facts = self.facts()
+        return LaunchRecord(facts.pid, facts.birth)
+
+    def facts(self) -> NativeProcessFacts:
+        """Recheck liveness and identity using the retained launch handle, never a PID lookup."""
+        if self.child is None:
+            _fail(FailureReason.TARGET_CHANGED)
         # Popen keeps the CreateProcess handle as ``_handle`` on Windows.
         handle = int(getattr(self.child, "_handle"))
         facts = measure_process(self._kernel, handle, self._last_error, self._bits)
         if facts.pid != self.child.pid:
             _fail(FailureReason.TARGET_CHANGED)
-        return LaunchRecord(facts.pid, facts.birth)
+        return facts
 
 
 class OwnedLaunchAttestor:

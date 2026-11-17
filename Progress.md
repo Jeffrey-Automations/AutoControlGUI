@@ -21,8 +21,9 @@
 ### 自有 UI 觀察 fixture 的限定範圍讀取
 
 `TODO` — `test/fixtures/native_memory/uia_fixture.c` 的原生執行仍暫緩。
-尚須以持有中的 process handle 核實私有 bootstrap 的 PID／HWND／challenge，
-接上僅從指定 HWND 讀取的 UIA helper、逐欄成功／失敗報告及取消／逾時退休。
+尚須將 `OwnedUiaLauncher` 的保留程序／視窗 binding 接到受管 UIA helper，
+補指定 HWND 的 root runtime identity 核實、逐欄成功／失敗報告及 COM 逾時退休。
+目前 bootstrap 綁定只有注入呼叫與隱藏 Python helper 協定驗證，尚未核實原生 HWND 行為。
 解除暫緩後才驗證 hidden controls 的 UIA 暴露與 AutomationId、空值／停用／密碼／重複 selector、
 EOF 清理及前景視窗／滑鼠不受影響。建置與靜態匯入檢查不算上述驗收。
 

@@ -1586,3 +1586,9 @@ this fixture protocol does not establish native memory acceptance.
 artifact. The build script selects a closed memory/UIA source and dependency set;
 UIA manifests are distinct from memory acceptance inputs. No runtime owner or
 scoped UIA acquisition is registered by building it.
+
+`owned_channel_launch.py` centralizes pinned child measurement and retryable
+channel retirement for memory and UI fixture launchers. `uia_channel.py` receives
+only one correlated startup; `uia_launch.py` binds its HWND to retained launch
+facts and `windows_window.py` supplies the single typed owner query. The binding
+borrows the launcher and image leases; it cannot grant UIA action authority.

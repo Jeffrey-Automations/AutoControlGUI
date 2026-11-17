@@ -1003,3 +1003,6 @@ wheel 與原始碼發行套件包含 REST Dashboard 和 Swagger 的 HTML、CSS�
 
 原生 fixture 建置工具接受 ``--kind uia``，產生獨立自有隱藏視窗測試產物。
 此為僅建置的前置工作；UIA 擷取與原生驗收仍待完成。
+
+內部 UI 啟動擁有者核對 challenge、保留程序與目前 HWND 擁有者，通道不接受指令。
+注入與隱藏 helper 協定測試已涵蓋此接點，但不代表原生 UIA 擷取已完成。

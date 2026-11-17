@@ -110,8 +110,8 @@ static int serve(WindowOwner *owner, HANDLE thread, const char *challenge) {
     DWORD code = 3, outcome;
     int result = 3;
     if (WaitForMultipleObjects(2, waits, FALSE, 5000) != WAIT_OBJECT_0 || !owner->window) return 3;
-    printf("{\"fixture\":\"uia\",\"version\":1,\"pid\":%lu,\"hwnd\":%llu,\"challenge\":\"%s\"}\n",
-        GetCurrentProcessId(), (unsigned long long)(uintptr_t)owner->window, challenge);
+    printf("{\"id\":\"%s\",\"result\":{\"fixture\":\"uia\",\"version\":1,\"pid\":%lu,\"hwnd\":%llu,\"challenge\":\"%s\"}}\n",
+        challenge, GetCurrentProcessId(), (unsigned long long)(uintptr_t)owner->window, challenge);
     if (ferror(stdout)) return 2;
     input = CreateThread(NULL, 0, input_thread, NULL, 0, NULL);
     if (!input) return 3;

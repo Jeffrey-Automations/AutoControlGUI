@@ -1207,3 +1207,8 @@ installed package; serving static pages grants no task or desktop input authorit
 The build-only UI fixture uses `build_fixture.py --kind uia` and a distinct
 schema-2 manifest. It is not a registered runtime target or a memory fixture.
 Native UIA exposure and scoped observation integration remain unverified.
+
+The internal UI fixture startup channel is receive-only and one-shot. Its binding
+uses retained process facts and an explicit HWND-owner query, with final authority
+checks and retry-retained cleanup. This is injected/protocol evidence only; scoped
+UIA reading and same-process window-reuse validation remain pending.

@@ -757,9 +757,29 @@ lifecycle/policy integration and application coverage remain required for M1/M3.
 window artifact with fixed read-only controls for future scoped UIA tests. Its
 schema-2 manifest and kernel32/user32 import allowlist are distinct from the memory
 fixture. The default memory build retains its existing schema and dependencies.
-The UI artifact has only a one-line private bootstrap and EOF shutdown, no state
-mutation API. A future owner must independently validate its process and HWND,
-launch with `CREATE_NO_WINDOW`, bound pipe/COM waits and retain failed retirement.
+The UI artifact has only a correlated one-line private bootstrap and EOF shutdown,
+no state mutation API. `OwnedUiaLauncher` uses a receive-only `OwnedUiaChannel`,
+which inherits hidden process-tree ownership and bounded startup waits. Its closed
+1024-byte envelope rejects duplicates, extra fields and repeated/ended streams.
+No command or input acknowledgment can be sent through this channel.
+
+`OwnedProcessChannel` now owns the common launch/retirement lifecycle used by both
+fixture launchers. `PopenLauncher.facts()` measures the original retained launch
+handle again; bootstrap PID never selects a new process to open. Before publishing
+`BoundUiaWindow`, the owner validates the attestor and window PID on both sides of
+a checkpoint, then checks current authority again and fences retirement. Binding
+verification repeats these checks and retires on failure. File leases remain owned
+by the separate `OwnedLaunch`; callers must retain and close both owners.
+
+The binding proves only that this HWND currently belongs to the retained process.
+Same-process HWND reuse still needs scoped UIA root checks; no atomic UI revision
+is claimed. Managed acquisition, bounded COM work and per-field reports remain
+pending. Injected calls and real hidden Python helper tests do not prove native
+window or UIA behavior.
 See the fixture README for its field table and protocol. Compilation is not native
 acceptance: UIA property exposure, per-field result integration and noninterference
 remain pending in Progress.md.
+
+The typed owner query follows Microsoft's
+[GetWindowThreadProcessId](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid)
+contract: both the returned thread ID and output PID must be nonzero.

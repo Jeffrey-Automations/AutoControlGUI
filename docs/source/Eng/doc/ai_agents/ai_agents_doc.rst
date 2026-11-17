@@ -1225,3 +1225,7 @@ Injected fixture tests cover this contract; native and UIA/DOM acceptance remain
 
 The native fixture builder accepts ``--kind uia`` for a separate owned hidden-window
 artifact. This is build-only preparation; UIA acquisition and native acceptance remain pending.
+
+The internal UI startup owner validates the exact challenge, retained process and
+current HWND owner. Its channel accepts no commands. Injected and hidden-helper
+protocol tests cover it; this does not establish native UIA acquisition.

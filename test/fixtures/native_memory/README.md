@@ -156,15 +156,18 @@ EDIT controls:
 | 1005 | Password-style control containing synthetic fixture text |
 | 1006, twice | Different values to test ambiguous selection |
 
-Both inherited stdin and stdout must be pipes. After initialization, stdout emits one JSON line with exactly `fixture`,
-`version`, `pid`, `hwnd` and `challenge`. These private bootstrap claims still
+Both inherited stdin and stdout must be pipes. After initialization, stdout emits
+one JSON line with exactly `id` and `result`. The ID is the launch challenge;
+result contains exactly `fixture`, `version`, `pid`, `hwnd` and `challenge`.
+These private bootstrap claims still
 require retained-process and window-owner validation. No control values are sent
 through stdout. Closing stdin requests shutdown; any input byte also stops the
 fixture with a protocol error. A separate pipe waiter lets the owner also observe
-unexpected GUI-thread exit; window destruction posts quit to that thread. Startup and thread shutdown waits are five
+unexpected GUI-thread exit; window destruction posts quit to that thread.
+Startup and thread shutdown waits are five
 seconds; failed retirement exits the entire process with code 3. The parent must
 retain process ownership and enforce its own deadline, including blocked pipe I/O.
-A future launcher must use `CREATE_NO_WINDOW` for this console-subsystem image.
+The internal launcher uses `CREATE_NO_WINDOW` for this console-subsystem image.
 
 The event-aware pump follows
 [MsgWaitForMultipleObjects](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjects).
@@ -172,5 +175,8 @@ The parent styles follow Microsoft's
 [extended-window-style contract](https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles).
 Child IDs do not prove UIA AutomationId mapping or hidden-control exposure.
 Those properties, password behavior, cleanup and foreground noninterference remain
-unverified until native acceptance resumes. The scoped UIA reader, owner-binding
-bootstrap consumer and per-field report results are still pending in Progress.md.
+unverified until native acceptance resumes. The internal `OwnedUiaLauncher` consumes that bootstrap through a receive-only
+owned channel. It rechecks process facts through the retained launch handle and
+the window owner through GetWindowThreadProcessId. Injected native calls and hidden
+Python helpers cover this binding, not native HWND behavior. The scoped UIA reader,
+managed assembly and per-field report results remain pending in Progress.md.

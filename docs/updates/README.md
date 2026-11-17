@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261118-25 | 2026-11-18 | Bind UI startup to retained process and window ownership | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
 | U-20261118-24 | 2026-11-18 | Build a separate owned UI observation fixture | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
 | U-20261118-23 | 2026-11-18 | Pin required fields across semantic observation sources | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-22 | 2026-11-18 | Corroborate fixture memory with its owned IPC snapshot | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |

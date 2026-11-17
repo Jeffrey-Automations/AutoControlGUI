@@ -102,3 +102,5 @@ MultiViewerHost can return an owned offer or capture an original-session retirem
 Host-selected semantic adapters can return multi-source reports through the existing observation API. Missing sources and conflicts remain visible but cannot authorize actions or completion. The fixture now combines reviewed memory reads with its owned read-only IPC snapshot and rechecks both before commit. Injected native calls and hidden-helper tests cover this path; UIA/DOM integration and native acceptance remain pending. Report version 2 pins the required fields in host code; a field omitted by every source remains missing.
 
 A separate owned UI observation fixture can now be built with `test/fixtures/native_memory/build_fixture.py --kind uia`. Static compilation and import checks do not establish UIA exposure or desktop noninterference; execution and scoped-reader integration remain pending.
+
+The internal UI fixture launcher now validates its correlated bootstrap against the retained process and window owner. Injected calls and hidden Python helpers cover startup, cancellation and cleanup; scoped UIA acquisition remains pending.

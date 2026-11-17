@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- The build-only UI fixture now wraps its startup result in an exact `id`/`result`
+  envelope, correlated by launch challenge. Rebuild earlier UI artifacts for the
+  new receive-only internal launcher; the memory fixture protocol is unchanged.
+
 - The native fixture builder adds `--kind uia` for a separate owned hidden-window
   artifact and schema-2 static manifest. The default memory artifact is unchanged.
   This builds only; UIA runtime integration and native acceptance remain pending.
