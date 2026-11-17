@@ -83,6 +83,10 @@ The PE planner derives all executable ranges from the pinned x64 baseline and
 rejects writable or relocated code. Its reader guard requires the launch image
 hash, checks headers/code and mapping continuity within unchanged probe budgets.
 Evidence covers matching bytes only, not live protection flags or runtime integrity.
+OwnedFixtureTarget assembles those checks with fixture commands and managed semantic
+reads. It owns the launcher and image observers before startup, rejects late startup
+publication after retirement, and retains every failed cleanup owner for retry.
+It remains internal and unregistered pending native trust and acceptance evidence.
 The helper error codec preserves fixed memory failure reasons across IPC without
 serializing exception text; malformed or mixed memory error packets are refused.
 The internal Windows provider owns read/query handles and measures native process

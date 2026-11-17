@@ -315,6 +315,31 @@ tests cover this behavior without cross-process memory reads. A Windows venv
 launcher can spawn a second interpreter, so the channel's launch PID and the
 fixture's self-reported PID must not be assumed equal or used as attestation.
 
+`OwnedFixtureTarget` is an internal, unregistered assembly for the native fixture.
+The host constructs it with a `FixtureImage`, an owned launcher, two fresh image
+observers and a provider factory before calling `start(checkpoint=...)`. The
+provider factory must return an unopened provider using the supplied launch
+attestor. Task JSON cannot supply these objects. Startup parses the pinned baseline,
+attests the launch, checks bootstrap identity, and binds the image guard to the
+original launch hash before publishing the private semantic target.
+
+The assembly selects a read budget of the complete image plan plus the fixture's
+72 bytes, capped at 1 MiB, with at most 1,024 region checks. The host chooses a
+finite read timeout of at most 60 seconds (default 1 second). Startup image
+measurement and each bootstrap exchange separately retain their 1-second bounds;
+there is no claim of a single wall-time deadline for the whole startup sequence.
+The runtime integration test explicitly selects a 5-second read budget to include
+policy checkpoints. This is a ceiling, not a measured performance guarantee.
+
+Cleanup retires the launcher first to interrupt IPC, tries every resource even
+when one fails, and retains failed owners for later cleanup calls. Retirement
+prevents late startup publication. The public wrapper never exposes its private
+semantic target, and runtime completion uses the same cleanup path. Interruption
+signals take precedence over ordinary cleanup failures after all owners are tried.
+Injected tests prove the assembly contract; DLL trust, native loaded-image
+compatibility and desktop noninterference remain unverified. No profile or public
+command registration is enabled by this assembly.
+
 `OwnedChannelLauncher` adapts the existing `PopenLauncher` to the same owned IPC
 process. `launch_attested` can lease the pinned executable, start the channel,
 measure PID/birth from its retained launch handle and observe the same image file.

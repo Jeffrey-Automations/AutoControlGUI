@@ -48,7 +48,8 @@ def setup():
     state = fixture.FixtureState(_support.CHALLENGE)
     bootstrap = state.bootstrap()
     identity = ProcessIdentity("host", "session", bootstrap["pid"], 1, "fixture", "1", "x64", 64)
-    probe = FixtureBinding.from_bootstrap(_support.CHALLENGE, bootstrap).probe("fixture")
+    probe = replace(FixtureBinding.from_bootstrap(_support.CHALLENGE, bootstrap).probe("fixture"),
+                    timeout=5)
     binding = MemoryBinding("fixture", identity, probe, ("document_id", "job_status"))
     control = Control(state)
     commands = FixtureCommands(binding, bootstrap["launch_nonce"], control)

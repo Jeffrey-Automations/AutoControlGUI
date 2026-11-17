@@ -682,6 +682,9 @@ OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLa
 已有從固定雜湊 PE32+ x64 產物推導完整可執行區段的 planner 與 reader guard；
 拒絕可寫入／重定位程式碼，核對原啟動 pin，且不擴大 probe 預算。測試僅使用合成映像及靜態產物；
 區段 padding 的原生相容性、實際頁面保護與 DLL 信任仍未驗證，不能當成完整 runtime attestation。
+內部 OwnedFixtureTarget 已組裝啟動、映像核對、fixture 命令與受管語意讀取；
+擁有者在啟動前保留，失敗回收可重試，終止後不得發布晚到的 target。
+目前僅有注入測試，尚未註冊到正式 profile／公開入口，原生信任與驗收仍待完成。
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。
 內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
 並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。
