@@ -8,6 +8,7 @@ from je_auto_control.utils.agent_runtime.context import current_operation, opera
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.native_errors import error_reply
 from je_auto_control.utils.agent_runtime.native_worker import NativeWorker
+from je_auto_control.utils.agent_runtime.observation_report import ObservationReport
 from je_auto_control.utils.agent_runtime.fixture_commands import FIXTURE_COMMAND
 from je_auto_control.utils.executor.dispatch import dispatch_checkpoint
 from je_auto_control.utils.process_memory.models import MemoryObservationError
@@ -16,6 +17,12 @@ from je_auto_control.utils.rbac.users import UserStore
 from je_auto_control.wrapper._input_observer import input_event
 from headless.test_agent_fixture_readiness import spec
 from headless.test_agent_fixture_target import setup
+
+
+def observed_document(worker):
+    report = ObservationReport.from_dict(worker._dispatch("observe", {}),
+        required=("process_memory", "fixture_protocol"), fields=("document_id", "job_status"))
+    return dict(report.require_grounding().fields)["document_id"]
 
 
 @pytest.fixture
@@ -109,7 +116,7 @@ def test_store_provenance_cannot_change_between_requests(owned):
     replacement = payload | {"owner": payload["owner"] | {"store_path": "other-store"}}
     with pytest.raises(AgentTaskError, match="configuration is pinned"):
         worker._dispatch("configure", replacement)
-    assert worker._dispatch("observe", {})["fields"]["document_id"] == 7
+    assert observed_document(worker) == 7
     assert provider.reads
 
 
@@ -119,7 +126,7 @@ def test_trusted_local_context_replaces_unrelated_ambient_role(owned, owner):
     payload["owner"] = asdict(owner) if owner else {}
     with authorization_scope(AuthorizationContext("unrelated", "viewer")):
         assert worker._dispatch("configure", payload)["ready"]
-        assert worker._dispatch("observe", {})["fields"]["document_id"] == 7
+        assert observed_document(worker) == 7
 
 
 def test_revocation_after_target_returns_prevents_success_reply(owned):

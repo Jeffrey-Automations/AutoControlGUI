@@ -31,7 +31,7 @@ process. Existing desktop foreground and input-presence gates are unchanged.
 | Operation | Source and scope | Background requirement | Evidence and present state |
 |---|---|---|---|
 | Process/session identity | Retained OS handle, creation time, session and architecture; reviewed application attestor | Read/query/synchronize rights only; no privilege escalation | Typed calls and injected tests implemented; executable attestation and native acceptance pending |
-| UI state | UIA read-only element properties for an explicitly selected application | No Invoke, SetValue or focus change | Existing UIA implementation; new background adapter integration pending |
+| UI state | UIA read-only element properties for an explicitly selected application | No Invoke, SetValue or focus change | Scoped reader and internal read-only managed adapter have injected/helper coverage; native launcher/profile assembly and acceptance pending |
 | Browser state | Existing WebRunner managed DOM session and reviewed origins | Dedicated managed browser; no desktop input fallback | Existing browser path; this reader adds no browser access |
 | Fixture semantic state | Reviewed schema resolved for the retained fixture process identity | Bounded `VirtualQueryEx` / `ReadProcessMemory` provider; no writes | Typed provider and injected-call tests implemented; trusted resolver and native acceptance pending |
 | Application command | Each application's official API, CLI or IPC with scoped resources | Must independently prove no foreground/focus/mouse/input interference | Application selection and command adapter pending |
@@ -518,16 +518,22 @@ Every source must corroborate every declared field. The first declared source is
 the command's primary snapshot. Such adapters return
 an `ObservationReport` through the existing observation API; task JSON cannot enable
 this capability. The native proxy requires the exact source contract and report
-version 2 and sorted `semantic_fields` in the worker bootstrap. A generic semantic
-proxy refuses that extension.
+version 3 and sorted `semantic_fields` in the worker bootstrap. Versions 1 and 2
+are rejected. A generic semantic proxy refuses that extension.
 
 The report requires `field_scope`; `from_dict` requires host `fields` as well as
 `required` sources. The wire scope must match the host scope exactly, and source
 fields outside that scope are rejected. Even a field omitted by every source
 remains missing; if every source fails, all required fields are missing.
 
-Reports retain up to four source snapshots or closed failure reasons, capture
-intervals, missing field names and typed value conflicts. All successful sources
+Reports retain up to four sources, each tagged as `snapshot`, `partial` or `failure`.
+A `PartialObservation` contains validated `CaptureMetadata`, successful scalar
+fields and fixed per-field failures. Its values and failures must be disjoint and
+together cover the host field scope. The field failure reasons are `not_found`,
+`ambiguous`, `protected`, `unsupported`, `unreadable` and `budget_exceeded`.
+Valid empty strings, false booleans and null values remain values, never substitutes
+for failed reads. Reports preserve capture intervals, missing field names and typed
+value conflicts. All successful and partial captures
 must refer to the same target lifetime. The host adapter must normalize its reviewed
 fields into the same schema and revision domain before declaring this contract.
 Equal values with different revisions conflict; boolean and integer values do not
@@ -559,10 +565,11 @@ downgraded to missing sources; their retirement failures remain reachable. Check
 revalidate the captured operation and owner before and after each source boundary.
 
 Tests use injected native calls/buffers, the actual reader and real hidden Python
-helper IPC. Scoped UIA/DOM source identity, field-missing semantics and revision
-normalization remain pending; existing foreground desktop or legacy DOM dictionaries
-are not converted automatically. This work is not native observation or
-background-application acceptance.
+helper IPC. The scoped UIA reader described below preserves explicit field failures
+and best-effort capture metadata. Native UI launcher/profile assembly, DOM source
+identity and revision normalization remain pending. Existing foreground desktop or
+legacy DOM dictionaries are not converted automatically. This work is not native
+observation or background-application acceptance.
 
 A `semantic` success criterion compares fresh completion-time observations with
 the recorded target witness for a named command. For the test-owned counter:
@@ -772,13 +779,29 @@ verification repeats these checks and retires on failure. File leases remain own
 by the separate `OwnedLaunch`; callers must retain and close both owners.
 
 The binding proves only that this HWND currently belongs to the retained process.
-Same-process HWND reuse still needs scoped UIA root checks; no atomic UI revision
-is claimed. Managed acquisition, bounded COM work and per-field reports remain
-pending. Injected calls and real hidden Python helper tests do not prove native
-window or UIA behavior.
-See the fixture README for its field table and protocol. Compilation is not native
-acceptance: UIA property exposure, per-field result integration and noninterference
-remain pending in Progress.md.
+`ScopedUiaSource` additionally pins the root runtime ID across captures, checks the
+original HWND and PID, and verifies raw-tree ancestry before and after property
+reads. Host code supplies exact automation IDs and chooses only `name`, `value` or
+`enabled`. Traversal and ancestry walks have finite budgets. Text reads require
+password checks before and after reading; an unavailable protection property is
+reported as protected. COM calls remain on the source's owning thread.
+Runtime IDs are opaque and may be reused. Pinning and repeated checks detect
+observed replacement; they do not establish atomic state or permanent window identity.
+
+`UiaObservationTarget` is an internal read-only managed adapter. It pins the original
+task and owner, creates the optional native COM backend during managed readiness,
+and publishes source `uia` through report version 3. Per-field failures retain valid
+fields from the same capture. A complete UIA capture still has `revision=None` and
+`consistency=best_effort`, so it cannot authorize actions or semantic completion.
+The adapter rejects commands and grants no Invoke, SetValue, focus or input rights.
+
+The helper owner must bound blocking COM work and retain cleanup ownership.
+Injected COM tests cover scoped reads, field failures and root replacement; hidden
+Python helpers cover managed reporting and timeout retirement. Native launcher/profile
+assembly remains pending. No native UI executable was run, and native UIA property
+exposure and desktop noninterference remain unverified. The UI artifact manifest
+stays schema 2; it is independent of observation report version 3. See the fixture
+README for the field table and startup protocol.
 
 The typed owner query follows Microsoft's
 [GetWindowThreadProcessId](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid)

@@ -992,17 +992,23 @@ Linux 內部 presence_peer_linux 以不可繼承的 pidfd 保留原始 Unix stre
 wheel 與原始碼發行套件包含 REST Dashboard 和 Swagger 的 HTML、CSS、JavaScript 資源。
 安裝後的套件沿用相同的本機 REST 路由與授權規則；提供靜態頁面不授予任務或桌面輸入權限。
 
-主機選定的語意 adapter 可宣告固定的多來源觀察契約。既有 observe 呼叫保留部分缺失與衝突報告；操作及完成判定要求每個來源的新鮮完整一致證據。helper bootstrap 固定來源契約，完整報告跨 IPC 傳遞後才轉換為命令快照。fixture 已在同一把擷取／提交鎖下結合受審閱的記憶體讀取與保留的唯讀 IPC snapshot，cleanup 仍可中斷 IPC。注入 reader 與隱藏 helper 測試涵蓋來源衝突、部分記憶體失敗及提交前一致性。UIA／DOM 整合與原生驗收仍待完成。
+主機選定的語意 adapter 可宣告固定的多來源觀察契約。既有 observe 呼叫保留部分缺失與衝突報告；操作及完成判定要求每個來源的新鮮完整一致證據。helper bootstrap 固定來源契約，完整報告跨 IPC 傳遞後才轉換為命令快照。fixture 已在同一把擷取／提交鎖下結合受審閱的記憶體讀取與保留的唯讀 IPC snapshot，cleanup 仍可中斷 IPC。注入 reader 與隱藏 helper 測試涵蓋來源衝突、部分記憶體失敗及提交前一致性。原生 UI launcher／profile 組裝、DOM 整合與桌面驗收仍待完成。
 
 語意觀察欄位契約
 ----------------
 
-多來源報告版本 2 要求每個來源提供主機指定的必要欄位。即使所有來源都漏掉同一欄位，
+多來源報告版本 3 要求每個來源提供主機指定的必要欄位。即使所有來源都漏掉同一欄位，
 仍會標示缺失，不能授權動作或確認完成。helper 握手及原始 journal witness 綁定相同欄位範圍。
-版本 1 報告及範圍外欄位會被拒絕。注入式 fixture 測試已涵蓋此契約；原生及 UIA／DOM 驗收仍待完成。
+版本 1、版本 2 及範圍外欄位會被拒絕。標記為 partial 的來源分別保留有效值與固定的欄位失敗原因。
+有效空字串及 false 不會被當成無法讀取、不支援、歧義、受保護或缺失欄位。
+部分來源與完整的 best-effort 擷取都不授予操作或完成判定權限。
 
-原生 fixture 建置工具接受 ``--kind uia``，產生獨立自有隱藏視窗測試產物。
-此為僅建置的前置工作；UIA 擷取與原生驗收仍待完成。
+原生 fixture 建置工具接受 ``--kind uia``，產生獨立自有隱藏視窗產物，靜態 manifest 維持 schema 2。
+內部啟動擁有者核對 challenge、保留程序與目前 HWND 擁有者，通道不接受指令。
+``ScopedUiaSource`` 核對原始 HWND／PID，並在擷取之間固定根節點 runtime ID。
+讀取前後都驗證 raw-tree 祖先關係，限制走訪數量並保護密碼文字；COM 呼叫保留在來源擁有執行緒。
 
-內部 UI 啟動擁有者核對 challenge、保留程序與目前 HWND 擁有者，通道不接受指令。
-注入與隱藏 helper 協定測試已涵蓋此接點，但不代表原生 UIA 擷取已完成。
+``UiaObservationTarget`` 在受管 readiness 中延遲建立 COM，透過既有觀察 API 發布唯讀 UIA 結果。
+它不提供 Invoke、SetValue、焦點或輸入操作。注入 COM 與隱藏 Python helper 測試涵蓋部分欄位、
+受管報告及逾時回收。原生 launcher／profile 組裝與所有桌面驗收仍待完成。
+尚未執行原生 UI fixture，也未證明不干擾桌面。

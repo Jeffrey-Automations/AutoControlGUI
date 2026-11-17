@@ -73,7 +73,7 @@ def test_proxy_requires_exact_loaded_deployment_bootstrap(tmp_path, change):
     value = config(tmp_path)
     target = NativeFixtureTarget(AgentTargetProfile.from_dict(value))
     contract = {"version": 1, "config_sha256": value["settings"]["config_sha256"], "target": "fixture"}
-    bootstrap = {"protocol": 1, "semantic": 1, "semantic_report": 2,
+    bootstrap = {"protocol": 1, "semantic": 1, "semantic_report": 3,
                  "semantic_sources": list(FIXTURE_SOURCES), "semantic_fields": list(FIXTURE_FIELDS)}
     assert target._supports_bootstrap(bootstrap | {"fixture": contract})
     assert not target._supports_bootstrap(bootstrap | {"fixture": contract | change})
@@ -88,7 +88,7 @@ def test_wrong_bootstrap_is_retired_before_any_configure(tmp_path, monkeypatch):
 
         def request(self, operation, _payload, **_kwargs):
             requests.append(operation)
-            return {"protocol": 1, "semantic": 1, "semantic_report": 2,
+            return {"protocol": 1, "semantic": 1, "semantic_report": 3,
                     "semantic_sources": list(FIXTURE_SOURCES), "semantic_fields": list(FIXTURE_FIELDS), "fixture": {
                 "version": 1, "config_sha256": "0" * 64, "target": "fixture"}}
 

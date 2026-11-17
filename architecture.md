@@ -1592,3 +1592,12 @@ channel retirement for memory and UI fixture launchers. `uia_channel.py` receive
 only one correlated startup; `uia_launch.py` binds its HWND to retained launch
 facts and `windows_window.py` supplies the single typed owner query. The binding
 borrows the launcher and image leases; it cannot grant UIA action authority.
+
+`scoped_uia.py` reads fixed host selectors beneath that binding, verifies bounded
+ancestry around field reads and retains the first verified root runtime identity.
+`capture_metadata.py` shares capture validation with complete snapshots and
+`partial_observation.py`; report version 3 preserves successful fields beside
+closed per-field failures. Best-effort UIA observations cannot ground actions.
+`uia_target.py` binds the reader to managed scope with lazy COM acquisition and
+retryable cleanup. Native deployment/profile assembly remains in `Progress.md`;
+hidden Python helper tests establish IPC retirement, not native COM acceptance.

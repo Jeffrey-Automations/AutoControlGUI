@@ -8,15 +8,22 @@
 
 - The native fixture builder adds `--kind uia` for a separate owned hidden-window
   artifact and schema-2 static manifest. The default memory artifact is unchanged.
-  This builds only; UIA runtime integration and native acceptance remain pending.
+  This builds only; native launcher/profile assembly and acceptance remain pending.
 
-- Managed fixture observations now return a version-two multi-source report instead of a flat
+- Managed fixture observations now return a version-three multi-source report instead of a flat
   memory snapshot. Read `sources.process_memory.snapshot` only after requiring a complete report;
   partial reads and source conflicts remain diagnostic data. Both host and worker require the
   report capability, and commands/completion require agreement with the owned IPC snapshot.
   Report constructors and parsers now require explicit host field scopes. Bootstrap requires
-  matching semantic_fields and report version 2; version-one reports/helpers are rejected.
+  matching semantic_fields and report version 3; version-one and version-two reports/helpers are rejected.
+  Tagged partial sources retain valid fields separately from fixed per-field failures.
   Fields missing from all sources remain partial. Native acceptance remains pending.
+
+- Added an internal scoped UIA reader and read-only managed observation adapter. Host-selected
+  fields stay beneath the original HWND/PID and pinned root runtime ID, with bounded traversal,
+  ancestry checks and password protection. Partial fields and complete best-effort captures
+  grant no action or completion authority. Injected COM and hidden-helper tests cover this path;
+  native launcher/profile assembly and all desktop acceptance remain pending.
 
 - Image search and OCR (`find_image` and everything on `cv2_utils.template_detection`, `visual_match`,
   `color_match`, `edge_match`, `rotated_match`, self-healing frame locators, device-frame matching,

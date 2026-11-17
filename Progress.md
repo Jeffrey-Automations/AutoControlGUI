@@ -21,9 +21,9 @@
 ### 自有 UI 觀察 fixture 的限定範圍讀取
 
 `TODO` — `test/fixtures/native_memory/uia_fixture.c` 的原生執行仍暫緩。
-尚須將 `OwnedUiaLauncher` 的保留程序／視窗 binding 接到受管 UIA helper，
-補指定 HWND 的 root runtime identity 核實、逐欄成功／失敗報告及 COM 逾時退休。
-目前 bootstrap 綁定只有注入呼叫與隱藏 Python helper 協定驗證，尚未核實原生 HWND 行為。
+尚須完成 `OwnedUiaLauncher`、映像租約與原生 UIA worker 的部署／profile 組裝。
+指定 HWND 的 root／祖先核實、逐欄報告與受管唯讀 adapter 目前只有注入呼叫驗證；
+隱藏 Python helper 的阻塞退休測試不能證明原生 COM、HWND 與 provider 行為。
 解除暫緩後才驗證 hidden controls 的 UIA 暴露與 AutomationId、空值／停用／密碼／重複 selector、
 EOF 清理及前景視窗／滑鼠不受影響。建置與靜態匯入檢查不算上述驗收。
 
@@ -676,8 +676,9 @@ best-effort 觀察沒有 revision，也不承諾後續操作具原子性。原�
 多來源報告與 runtime／helper 契約已有合成來源驗證，可保留部分缺失及型別化衝突，
 且拒絕以不完整資料執行或確認完成。自有 fixture 已接合 memory＋IPC 擷取及提交前雙來源核對，
 目前以注入原生呼叫、真實 reader 邏輯與隱藏 Python helper 驗證，仍非原生驗收；
-UIA／DOM 的來源身分、逐欄失敗原因、受保護欄位拒絕、唯一 selector 證明、
-可退休 helper 內的 COM 期限及 revision 正規化仍未接合，不能由報告契約推論已完成。
+UIA 的原生部署與 profile 尚未接合；限定 root／祖先、逐欄失敗、受保護欄位及唯一 selector
+目前只有注入測試，helper 阻塞退休只有隱藏 Python 程序證據，仍須核實原生 COM 行為。
+DOM 的來源身分與逐欄報告正規化仍待接合。UIA best-effort 不提供原子 revision。
 
 M3 已加入內部受信任 `SemanticTarget` runtime 接點：封閉語意快照驗證、排除擷取時間的狀態比較、
 傳遞原始快照及 journal action ID 的提交介面、具 atomic／non_atomic 標記的回條，以及未知效果的

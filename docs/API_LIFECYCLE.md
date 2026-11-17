@@ -1,8 +1,10 @@
 # Public API lifecycle
 
-Report version 2 requires a host-defined field scope, matching helper bootstrap
-and saved completion witness. Fields omitted by every source remain partial;
-extra fields and older report contracts are rejected.
+Report version 3 requires a host-defined field scope, matching helper bootstrap
+and saved completion witness. Tagged partial sources preserve valid fields separately
+from fixed per-field failures. Empty strings and false values remain valid results.
+Fields omitted by every source remain partial; extra fields and report versions 1
+and 2 are rejected. Partial and best-effort captures grant no action or completion authority.
 
 Managed task `success_criteria` accepts `semantic` conditions with exactly `tool`
 and bounded scalar `fields`. The existing task API and GUI scope editor carry the
@@ -1477,9 +1479,14 @@ half-open teardown and compositor release acceptance remain unexecuted here.
 
 The build-only UI fixture uses `build_fixture.py --kind uia` and a distinct
 schema-2 manifest. It is not a registered runtime target or a memory fixture.
-Native UIA exposure and scoped observation integration remain unverified.
+Native UIA exposure and desktop noninterference remain unverified.
 
 The internal UI fixture startup channel is receive-only and one-shot. Its binding
 uses retained process facts and an explicit HWND-owner query, with final authority
-checks and retry-retained cleanup. This is injected/protocol evidence only; scoped
-UIA reading and same-process window-reuse validation remain pending.
+checks and retry-retained cleanup. The scoped reader verifies HWND/PID, bounded raw-tree
+ancestry and a root runtime ID pinned across captures. It preserves per-field failures
+and protects password text. COM calls stay on the source owner thread. The internal
+read-only managed adapter creates COM lazily during readiness and reports best-effort
+UIA captures through the shared task API. Injected COM and hidden-helper tests cover
+reporting and timeout retirement. Native launcher/profile assembly and all desktop
+acceptance remain pending; no native UI fixture execution is claimed.

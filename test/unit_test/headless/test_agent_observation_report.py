@@ -144,7 +144,7 @@ def test_mixed_target_lifetimes_are_refused(change):
         report(**change)
 
 
-@pytest.mark.parametrize("change", [{"report_version": True}, {"report_version": 1}, {"status": "partial"},
+@pytest.mark.parametrize("change", [{"report_version": True}, {"report_version": 1}, {"report_version": 2}, {"status": "partial"},
                                     {"missing_fields": ["value"]}, {"conflicting_fields": ["value"]},
                                     {"primary": "fixture_protocol"}, {"extra": "ignored"}])
 def test_unknown_or_forged_report_schema_is_refused(change):
@@ -201,7 +201,7 @@ def test_worker_roundtrip_and_proxy_require_explicit_host_report_contract(tmp_pa
 
     report_proxy = ReportProxy(argv=["unused"], resource_path=tmp_path / "unused.lock")
     assert report_proxy._supports_bootstrap(bootstrap)
-    for change in ({"semantic_report": True}, {"semantic_report": 1}, {"semantic_sources": [SOURCES[0]]},
+    for change in ({"semantic_report": True}, {"semantic_report": 1}, {"semantic_report": 2}, {"semantic_sources": [SOURCES[0]]},
                    {"semantic_fields": []}, {"semantic_fields": ["other"]}):
         assert not report_proxy._supports_bootstrap(bootstrap | change)
     value = observe(target)

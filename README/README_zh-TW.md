@@ -99,8 +99,8 @@ HostBrowser 亦會拒絕晚到發布，並保留未完成的執行緒與關閉�
 
 MultiViewerHost 可回傳含原始 session 清理物件的 offer，延後清理不會停止替換後的連線或畫面來源；GUI 接入仍待完成。
 
-主機選定的語意 adapter 可透過既有觀察 API 回傳多來源報告。缺失來源與衝突會保留顯示，但不能授權操作或確認完成。fixture 已整合受審閱的記憶體讀取與自有唯讀 IPC snapshot，並在提交前重新核對兩者。目前以注入原生呼叫與隱藏 helper 測試；UIA／DOM 整合及原生驗收仍待完成。 報告版本 2 由主機程式固定必要欄位；即使所有來源都漏掉同一欄位，仍會標示缺失。
+主機選定的語意 adapter 可透過既有觀察 API 回傳多來源報告。fixture 結合受審閱的記憶體讀取與自有唯讀 IPC snapshot，並在提交前重新核對兩者。報告版本 3 由主機程式固定必要欄位，分別保留有效欄位與各欄位的失敗原因。缺失來源、衝突與 best-effort 擷取不能授權操作或確認完成。版本 1 與 2 會被拒絕。
 
-獨立自有 UI 觀察 fixture 可透過 `test/fixtures/native_memory/build_fixture.py --kind uia` 建置。靜態編譯與匯入檢查不代表 UIA 可讀或不干擾桌面；執行驗收及限定範圍 reader 接合仍待完成。
+獨立自有 UI 觀察 fixture 可透過 `test/fixtures/native_memory/build_fixture.py --kind uia` 建置，靜態 manifest 維持 schema 2。內部 launcher 將啟動訊息綁定保留程序與視窗擁有者。限定範圍的 UIA reader 核對該視窗、程序與根節點身分，限制樹狀走訪並保護密碼欄位。唯讀受管 adapter 延遲建立 COM，透過共用觀察 API 保留部分欄位結果。
 
-內部 UI fixture launcher 已將啟動訊息綁定保留程序與視窗擁有者。注入呼叫及隱藏 Python helper 已涵蓋啟動、取消與清理；限定範圍的 UIA 擷取仍待完成。
+注入呼叫與隱藏 Python helper 已涵蓋限定範圍讀取、報告與逾時回收。原生 launcher／profile 組裝、DOM 整合與桌面驗收仍待完成，尚未執行原生 UI fixture，也未證明不干擾桌面。

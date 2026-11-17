@@ -3,10 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
-import re
-import sys
 from typing import Any, Literal, Mapping
 
+from .capture_metadata import CaptureMetadata, _identifier
 from .errors import AgentTaskError
 from .models import detached
 from ..process_memory.models import Observation, Scalar
@@ -14,11 +13,6 @@ from ..process_memory.models import Observation, Scalar
 _METADATA = frozenset({"observation_id", "started", "finished"})
 _KEYS = frozenset({"target_id", "identity_digest", "adapter_id", "schema_version", "source",
                    "fields", "revision", "consistency", "complete"}) | _METADATA
-
-
-def _identifier(value: object) -> None:
-    if not isinstance(value, str) or re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", value) is None:
-        raise AgentTaskError("semantic observation has an invalid identifier")
 
 
 def _fields(value: Mapping[str, Any]) -> tuple[tuple[str, Scalar], ...]:
@@ -56,31 +50,19 @@ class SemanticSnapshot:
     started: float
     finished: float
     complete: bool = True
+    capture: CaptureMetadata = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        for value in (self.target_id, self.identity_digest, self.adapter_id, self.schema_version,
-                      self.source, self.observation_id):
-            _identifier(value)
+        object.__setattr__(self, "capture", CaptureMetadata(
+            target_id=self.target_id, identity_digest=self.identity_digest, adapter_id=self.adapter_id,
+            schema_version=self.schema_version, source=self.source, revision=self.revision,
+            consistency=self.consistency, observation_id=self.observation_id,
+            started=self.started, finished=self.finished))
         if len(dict(self.fields)) != len(self.fields):
             raise AgentTaskError("semantic observation contains duplicate fields")
         object.__setattr__(self, "fields", _fields(dict(self.fields)))
         if self.complete is not True:
             raise AgentTaskError("incomplete semantic observations cannot ground actions")
-        self._check_revision()
-        for timestamp in (self.started, self.finished):
-            if (isinstance(timestamp, bool) or not isinstance(timestamp, (int, float))
-                    or not 0 <= timestamp <= sys.float_info.max):
-                raise AgentTaskError("semantic observation has an invalid capture time")
-        if not 0 <= self.started <= self.finished:
-            raise AgentTaskError("semantic observation has an invalid capture interval")
-
-    def _check_revision(self) -> None:
-        if self.consistency == "best_effort" and self.revision is None:
-            return
-        if (self.consistency != "sequence_checked" or isinstance(self.revision, bool)
-                or not isinstance(self.revision, int) or not 0 <= self.revision < 2**64
-                or self.revision % 2):
-            raise AgentTaskError("semantic observation has an invalid checked revision")
 
     @classmethod
     def from_memory(cls, value: Observation) -> SemanticSnapshot:

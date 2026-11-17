@@ -7,9 +7,10 @@ from typing import Any, Mapping
 
 from .errors import AgentObservationStale, AgentTaskError
 from .models import detached
+from .partial_observation import PartialObservation
 from .semantic_snapshot import SemanticSnapshot, _identifier
 
-REPORT_VERSION = 2
+REPORT_VERSION = 3
 
 _FAILURES = frozenset({"unsupported", "access_denied", "unreadable_region", "partial_read",
                        "inconsistent_snapshot", "deadline_exceeded", "budget_exceeded", "decode_failed"})
@@ -32,7 +33,7 @@ class ObservationReport:
     """An immutable capture envelope; source failures retain no exception text or raw bytes."""
 
     primary: str
-    sources: tuple[tuple[str, SemanticSnapshot | str], ...] = field(repr=False)
+    sources: tuple[tuple[str, SemanticSnapshot | PartialObservation | str], ...] = field(repr=False)
     started: float
     finished: float
     field_scope: tuple[str, ...]
@@ -50,24 +51,28 @@ class ObservationReport:
             _identifier(name)
             self._check_source(name, value)
         object.__setattr__(self, "sources", tuple(sorted(sources)))
-        successes = [value for _, value in sources if isinstance(value, SemanticSnapshot)]
+        successes = [value.capture for _, value in sources if isinstance(value, (SemanticSnapshot, PartialObservation))]
         if successes and any((item.target_id, item.identity_digest) !=
                              (successes[0].target_id, successes[0].identity_digest) for item in successes):
             raise AgentObservationStale("observation sources belong to different target lifetimes")
 
-    def _check_source(self, name: str, value: SemanticSnapshot | str) -> None:
-        if isinstance(value, SemanticSnapshot):
+    def _check_source(self, name: str, value: SemanticSnapshot | PartialObservation | str) -> None:
+        if isinstance(value, (SemanticSnapshot, PartialObservation)):
             if not set(dict(value.fields)) <= set(self.field_scope):
                 raise AgentTaskError("observation source exceeds the host field contract")
-            if value.source != name or not self.started <= value.started <= value.finished <= self.finished:
+            capture = value.capture
+            if capture.source != name or not self.started <= capture.started <= capture.finished <= self.finished:
                 raise AgentTaskError("observation source is outside its capture envelope")
+            if (isinstance(value, PartialObservation)
+                    and (set(dict(value.fields)) | set(dict(value.failures))) != set(self.field_scope)):
+                raise AgentTaskError("partial observation does not cover its host field contract")
         elif not isinstance(value, str) or value not in _FAILURES:
             raise AgentTaskError("observation source failure is invalid")
 
     def _differences(self) -> tuple[tuple[str, ...], tuple[str, ...]]:
         grouped: dict[str, list[Any]] = {name: [] for name in self.field_scope}
         for _, value in self.sources:
-            if isinstance(value, SemanticSnapshot):
+            if isinstance(value, (SemanticSnapshot, PartialObservation)):
                 for name, item in value.fields:
                     grouped[name].append(item)
         missing, conflicts = set(), set()
@@ -82,7 +87,8 @@ class ObservationReport:
     def status(self) -> str:
         """Derive readiness from every source, typed field comparison and checked revisions."""
         missing, conflicts = self._differences()
-        values = [value for _, value in self.sources if isinstance(value, SemanticSnapshot)]
+        values = [value.capture for _, value in self.sources
+                  if isinstance(value, (SemanticSnapshot, PartialObservation))]
         if conflicts or len({value.revision for value in values}) > 1:
             return "conflict"
         if missing or len(values) != len(self.sources):
@@ -112,8 +118,7 @@ class ObservationReport:
         missing, conflicts = self._differences()
         return {"report_version": REPORT_VERSION, "primary": self.primary, "field_scope": list(self.field_scope),
                 "started": self.started, "finished": self.finished,
-                "sources": {name: {"snapshot": value.to_dict()} if isinstance(value, SemanticSnapshot)
-                            else {"failure": value} for name, value in self.sources},
+                "sources": {name: _wire_source(value) for name, value in self.sources},
                 "status": self.status, "missing_fields": list(missing), "conflicting_fields": list(conflicts)}
 
     @classmethod
@@ -141,9 +146,11 @@ def _source_contract(data: dict[str, Any], required: tuple[str, ...]) -> None:
         raise AgentTaskError("observation report does not match the host source contract")
 
 
-def _source(value: Any) -> SemanticSnapshot | str:
+def _source(value: Any) -> SemanticSnapshot | PartialObservation | str:
     if isinstance(value, dict) and set(value) == {"snapshot"}:
         return SemanticSnapshot.from_dict(value["snapshot"])
+    if isinstance(value, dict) and set(value) == {"partial"}:
+        return PartialObservation.from_dict(value["partial"])
     if isinstance(value, dict) and set(value) == {"failure"} and isinstance(value["failure"], str):
         return value["failure"]
     raise AgentTaskError("observation source has an unknown schema")
@@ -157,3 +164,11 @@ def _field_scope(fields: tuple[str, ...]) -> tuple[str, ...]:
     if len(set(fields)) != len(fields):
         raise AgentTaskError("observation report requires unique host fields")
     return tuple(sorted(fields))
+
+
+def _wire_source(value: SemanticSnapshot | PartialObservation | str) -> dict[str, Any]:
+    if isinstance(value, SemanticSnapshot):
+        return {"snapshot": value.to_dict()}
+    if isinstance(value, PartialObservation):
+        return {"partial": value.to_dict()}
+    return {"failure": value}

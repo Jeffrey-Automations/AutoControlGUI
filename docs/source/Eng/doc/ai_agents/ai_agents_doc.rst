@@ -1212,20 +1212,30 @@ Installed wheel and source distributions include the REST Dashboard and Swagger 
 JavaScript resources. The same localhost REST routes and authentication rules apply to an
 installed package; serving static pages grants no task or desktop input authority.
 
-Host-selected semantic adapters may declare a fixed multi-source observation contract. Existing observe calls preserve partial/conflicting reports; actions and completion require fresh complete agreement from every source. Helper bootstrap pins the source contract and the full report crosses IPC before conversion to a command snapshot. The fixture now combines reviewed memory reads and its retained read-only IPC snapshot under one capture/commit lock, while cleanup can interrupt IPC. Injected-reader and hidden-helper tests cover source disagreement, partial memory failures and precommit agreement. UIA/DOM integration and native acceptance remain pending.
+Host-selected semantic adapters may declare a fixed multi-source observation contract. Existing observe calls preserve partial/conflicting reports; actions and completion require fresh complete agreement from every source. Helper bootstrap pins the source contract and the full report crosses IPC before conversion to a command snapshot. The fixture now combines reviewed memory reads and its retained read-only IPC snapshot under one capture/commit lock, while cleanup can interrupt IPC. Injected-reader and hidden-helper tests cover source disagreement, partial memory failures and precommit agreement. Native UI launcher/profile assembly, DOM integration and desktop acceptance remain pending.
 
 Semantic observation field scopes
---------------------------------
+---------------------------------
 
-Multi-source report version 2 requires host-defined fields in every source.
+Multi-source report version 3 requires host-defined fields in every source.
 A field omitted by all sources remains missing and cannot authorize a command
 or prove completion. Helper bootstrap and the original journal witness bind
-the same field scope. Version-one reports and out-of-scope fields are rejected.
-Injected fixture tests cover this contract; native and UIA/DOM acceptance remain pending.
+the same field scope. Versions 1 and 2 and out-of-scope fields are rejected.
+A tagged partial source keeps successful values separately from fixed per-field
+failures. Valid empty strings and false values remain distinct from unreadable,
+unsupported, ambiguous, protected or missing fields. Partial sources and complete
+best-effort captures grant no action or completion authority.
 
 The native fixture builder accepts ``--kind uia`` for a separate owned hidden-window
-artifact. This is build-only preparation; UIA acquisition and native acceptance remain pending.
+artifact. Its static manifest remains schema 2. The internal startup owner validates
+the exact challenge, retained process and current HWND owner; its channel accepts
+no commands. ``ScopedUiaSource`` checks the original HWND/PID and pins the root runtime
+ID across captures. It verifies raw-tree ancestry around reads, bounds traversal,
+protects password text and keeps COM calls on the source owner thread.
 
-The internal UI startup owner validates the exact challenge, retained process and
-current HWND owner. Its channel accepts no commands. Injected and hidden-helper
-protocol tests cover it; this does not establish native UIA acquisition.
+``UiaObservationTarget`` creates COM lazily during managed readiness and publishes
+read-only UIA results through the existing observation API. It has no Invoke,
+SetValue, focus or input operations. Injected COM and hidden Python helper tests
+cover partial fields, managed reporting and timeout retirement. Native launcher/profile
+assembly and all desktop acceptance remain pending. No native UI fixture execution
+or desktop noninterference is claimed.
