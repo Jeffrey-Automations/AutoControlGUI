@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261117-03 | 2026-11-17 | Ground semantic commands with operation-bound receipts | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261117-02 | 2026-11-17 | Preserve checked memory revisions for subsequent grounding | #done #process-memory | [2026-11-c](2026-11-c.md) |
 | U-20261117-01 | 2026-11-17 | Validate fixture schema and bind launch locations | #done #process-memory | [2026-11-c](2026-11-c.md) |
 | U-20261115-24 | 2026-11-15 | close() wakes the presence probe the watch is waiting on | #incident #agent #ci #test | [2026-11-b](2026-11-b.md) |

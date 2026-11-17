@@ -562,7 +562,7 @@ F 還缺：
 
 ## 下一步擴充：以記憶體觀察支援 UI、作業系統與應用程式背景操控
 
-`TODO / 規劃` — 2026-11-01 使用者要求。此節只制定擴充順序，尚未實作或完成驗收；
+`WIP` — 2026-11-01 使用者要求。已有內部 reader、fixture 解碼與語意 runtime 接點，完整交付及驗收尚未完成；
 不解除下列既有原生／真機／24 小時驗收暫緩，也不啟動服務、改動正式環境或讀取現有應用程式記憶體。
 
 ### 目標與可交付範圍
@@ -583,7 +583,7 @@ UIA 僅作必要唯讀觀測，不以 Invoke、SetValue、選單或焦點切換�
 
 ### 現有架構與擴充位置
 
-下表的程式路徑均相對於 `je_auto_control/`；新模組名稱為提案，尚不存在。
+下表的程式路徑均相對於 `je_auto_control/`；各項實作狀態以後方 M0–M6 進度為準。
 
 | 責任 | 現況／預計接點 | 擴充內容 |
 | --- | --- | --- |
@@ -646,7 +646,12 @@ fixture 的原生身分核對（標頭挑戰已有，U-20261115-18，只在本�
 M2 的自有 fixture schema-one adapter 已有嚴格版本／布局驗證、不可變 challenge binding、
 標準補零狀態解碼及共用 72-byte 讀取上限；僅驗證 injected provider，並未完成應用 attestation 或原生驗收。
 成功的序號觀察保留 `revision`，供後續 runtime grounding 區分相同欄位值但已更新的狀態；
-best-effort 觀察沒有 revision，也不承諾後續操作具原子性。受管接線仍待實作。
+best-effort 觀察沒有 revision，也不承諾後續操作具原子性。受管 profile／helper 接線仍待實作。
+
+M3 已加入內部受信任 `SemanticTarget` runtime 接點：封閉語意快照驗證、排除擷取時間的狀態比較、
+傳遞原始快照及 journal action ID 的提交介面、具 atomic／non_atomic 標記的回條，以及未知效果的
+uncertain 紀錄。現有 target 保留完整觀察比對；task／觀察 JSON 不能自行啟用語意模式。
+目前僅隔離 target 測試通過，profile／helper／原生 adapter 與公開入口尚未接上。
 
 1. **M0：能力盤點與範圍契約。** 先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
    讀取來源、執行介面、權限、是否全背景、支援版本、驗證方式與不支援原因。

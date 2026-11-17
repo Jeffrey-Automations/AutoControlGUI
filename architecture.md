@@ -5,6 +5,12 @@ Process-memory fixture decoding owns schema-one layout and challenge binding in
 adapter. Bootstrap locations remain private and require separate executable
 attestation; this adapter does not grant read authority or establish native acceptance.
 
+Managed runtime semantic adapters opt into `SemanticTarget` through trusted host
+code. Its closed snapshot keeps provenance and revision in grounding while
+excluding only capture metadata. Grounded dispatch passes the original snapshot
+and journal action ID; only an operation-bound `SemanticReceipt` confirms a reply.
+Ordinary targets keep their existing full-payload comparison and dispatch path.
+
 WebRTC statistics owns one submitted polling future. Start does not wait for
 the event loop; stop closes admission, cancels pending submission and drops
 the callback owner without acquiring a bridge. Late awaited samples are discarded.

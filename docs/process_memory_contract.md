@@ -236,6 +236,31 @@ instead of becoming ordinary failures. Live checkpoint authority errors also
 propagate unchanged; only failures raised inside provider/resolver/decoder calls
 are normalized, not the surrounding runtime authority checks.
 
+## Managed semantic grounding
+
+The runtime has an internal `SemanticTarget` contract for host-selected adapters.
+Task JSON and observation fields cannot opt an ordinary target into it. Existing
+targets retain full-payload fingerprinting and their existing `perform` calls.
+
+`SemanticSnapshot` validates the exact observation schema at runtime ingress.
+It preserves target identity, adapter/schema, source, semantic fields, consistency,
+completeness and revision in the grounding fingerprint. Only observation ID and
+capture timestamps are excluded. The runtime still expires observations after
+30 seconds and rejects replaced observation IDs. Invalid, incomplete or unknown
+helper fields fail before publication. Semantic values are omitted from repr.
+
+Grounded dispatch supplies the original snapshot and the prepared journal action
+ID to `perform_grounded`. Adapters must recheck state at their commit boundary.
+`SemanticReceipt` binds a successful result to that operation ID and declares
+`atomic` or `non_atomic` comparison. A receipt confirms the adapter's reply, not
+independent task completion or desktop noninterference. A wrong-operation receipt,
+untyped reply or `AgentEffectUnknown` follows the existing uncertain journal path;
+the consumed observation cannot be replayed. Unknown effects require readback.
+
+This runtime seam is tested with an isolated semantic target. The profile registry,
+owned-helper implementation, application attestation and native adapter remain
+required before public memory commands can be enabled.
+
 ## Cleanup ownership
 
 Each observation opens and closes its own handle. A failed close remains owned
