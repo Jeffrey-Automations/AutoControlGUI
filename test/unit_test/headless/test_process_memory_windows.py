@@ -119,10 +119,13 @@ def test_win32_layout_and_signatures_are_fixed_width_and_pointer_safe():
     kernel = Kernel()
     provider(kernel)
     assert ctypes.sizeof(FileTime) == 8
-    assert ctypes.sizeof(MemoryInfo32) == 28 and MemoryInfo32.size.offset == 12
-    assert ctypes.sizeof(MemoryInfo64) == 48 and MemoryInfo64.size.offset == 24
+    assert ctypes.sizeof(MemoryInfo32) == 28
+    assert MemoryInfo32.size.offset == 12
+    assert ctypes.sizeof(MemoryInfo64) == 48
+    assert MemoryInfo64.size.offset == 24
     assert MemoryInfo64.protection.offset == 36
-    assert kernel.OpenProcess.argtypes[0] is U32 and kernel.OpenProcess.restype is PTR
+    assert kernel.OpenProcess.argtypes[0] is U32
+    assert kernel.OpenProcess.restype is PTR
     assert kernel.VirtualQueryEx.restype is SIZE
     assert kernel.ReadProcessMemory.argtypes[3] is SIZE
     assert kernel.ReadProcessMemory.argtypes[4]._type_ is SIZE
@@ -132,10 +135,12 @@ def test_reader_reads_across_regions_and_releases_only_owned_query_handle():
     kernel = Kernel()
     reader, result = observe(kernel)
     assert isinstance(result, Observation)
-    assert result.fields == (("document_id", 17),) and result.bytes_read == 16
+    assert result.fields == (("document_id", 17),)
+    assert result.bytes_read == 16
     assert [call[3] for call in kernel.ReadProcessMemory.calls] == [8, 8]
     assert kernel.OpenProcess.calls == [(0x100410, False, 42)]
-    assert kernel.CloseHandle.calls == [(91,)] and not reader.pending_cleanup
+    assert kernel.CloseHandle.calls == [(91,)]
+    assert not reader.pending_cleanup
 
 
 @pytest.mark.parametrize("caller,target_machine,native_machine,expected_bits,layout", [
@@ -160,8 +165,9 @@ def test_query_layout_uses_caller_width_not_target_width(caller, target_machine,
 
 def test_32_bit_caller_rejects_64_bit_target_before_open():
     kernel = Kernel()
+    narrow = provider(kernel, caller_bits=32)
     with pytest.raises(MemoryObservationError, match="unsupported"):
-        provider(kernel, caller_bits=32).open_readonly(IDENTITY)
+        narrow.open_readonly(IDENTITY)
     assert not kernel.OpenProcess.calls
 
 
@@ -172,7 +178,8 @@ def test_reader_refuses_guard_unreadable_and_uncommitted_regions(protection, sta
     kernel.protection, kernel.state = protection, state
     _, result = observe(kernel)
     assert result == ObservationFailure(FailureReason.UNREADABLE_REGION)
-    assert not kernel.ReadProcessMemory.calls and kernel.CloseHandle.calls == [(91,)]
+    assert not kernel.ReadProcessMemory.calls
+    assert kernel.CloseHandle.calls == [(91,)]
 
 
 @pytest.mark.parametrize("read_ok,count,error,reason", [
@@ -196,7 +203,8 @@ def test_reused_or_exited_target_is_rejected_before_memory_read(attribute, value
     setattr(kernel, attribute, value)
     _, result = observe(kernel)
     assert result == ObservationFailure(FailureReason.TARGET_CHANGED)
-    assert not kernel.ReadProcessMemory.calls and kernel.CloseHandle.calls == [(91,)]
+    assert not kernel.ReadProcessMemory.calls
+    assert kernel.CloseHandle.calls == [(91,)]
 
 
 @pytest.mark.parametrize("attribute,value", [("birth", IDENTITY.birth + 1), ("wait", 0), ("protection", 2)])
@@ -223,7 +231,8 @@ def test_failed_close_remains_owned_until_reader_retry():
     assert result == ObservationFailure(FailureReason.CLEANUP_FAILED, retired=False)
     assert reader.pending_cleanup
     kernel.close_ok = True
-    assert reader.close_pending() and not reader.pending_cleanup
+    assert reader.close_pending()
+    assert not reader.pending_cleanup
     assert kernel.CloseHandle.calls == [(91,), (91,)]
 
 
@@ -234,7 +243,8 @@ def test_attestor_cannot_replace_measured_birth():
     reader = ProcessMemoryReader(native)
     result = reader.observe(IDENTITY, probe(), ("document_id",), target_id="fixture")
     assert result == ObservationFailure(FailureReason.TARGET_CHANGED)
-    assert not kernel.ReadProcessMemory.calls and kernel.CloseHandle.calls == [(91,)]
+    assert not kernel.ReadProcessMemory.calls
+    assert kernel.CloseHandle.calls == [(91,)]
 
 
 def test_unknown_architecture_and_short_query_are_not_accepted():
@@ -298,9 +308,11 @@ def test_cancel_after_native_read_propagates_after_handle_close():
 
     kernel.after_read = cancel
     reader = ProcessMemoryReader(provider(kernel))
+    reviewed = probe()
     with pytest.raises(CancelledError):
-        reader.observe(IDENTITY, probe(), ("document_id",), target_id="fixture", checkpoint=checkpoint)
-    assert kernel.CloseHandle.calls == [(91,)] and not reader.pending_cleanup
+        reader.observe(IDENTITY, reviewed, ("document_id",), target_id="fixture", checkpoint=checkpoint)
+    assert kernel.CloseHandle.calls == [(91,)]
+    assert not reader.pending_cleanup
 
 
 def test_cancel_before_open_does_not_acquire_native_handle():
@@ -312,9 +324,11 @@ def test_cancel_before_open_does_not_acquire_native_handle():
         raise CancelledError()
 
     reader = ProcessMemoryReader(provider(kernel))
+    reviewed = probe()
     with pytest.raises(CancelledError):
-        reader.observe(IDENTITY, probe(), ("document_id",), target_id="fixture", checkpoint=checkpoint)
-    assert not kernel.OpenProcess.calls and not kernel.CloseHandle.calls
+        reader.observe(IDENTITY, reviewed, ("document_id",), target_id="fixture", checkpoint=checkpoint)
+    assert not kernel.OpenProcess.calls
+    assert not kernel.CloseHandle.calls
 
 
 def test_the_main_module_is_the_first_psapi_entry_measured_through_the_retained_handle():
@@ -322,7 +336,9 @@ def test_the_main_module_is_the_first_psapi_entry_measured_through_the_retained_
     handle = provider(kernel).open_readonly(IDENTITY)
     assert handle.main_module() == ModuleSpan(0x1000, 16)
     target, _first, size, _needed, flag = kernel.K32EnumProcessModulesEx.calls[0]
-    assert target == kernel.open_value and size == ctypes.sizeof(PTR) and flag == 0x00
+    assert target == kernel.open_value
+    assert size == ctypes.sizeof(PTR)
+    assert flag == 0x00
     assert kernel.K32EnumProcessModulesEx.argtypes[2] is U32
     assert kernel.K32GetModuleInformation.argtypes[1] is PTR
 
@@ -346,8 +362,9 @@ def test_an_unmeasurable_main_module_fails_closed(change, reason):
     kernel = Kernel()
     for name, value in change.items():
         setattr(kernel, name, value)
+    handle = provider(kernel).open_readonly(IDENTITY)
     with pytest.raises(MemoryObservationError) as caught:
-        provider(kernel).open_readonly(IDENTITY).main_module()
+        handle.main_module()
     assert caught.value.reason == reason
 
 
@@ -361,4 +378,5 @@ def test_a_resolver_finds_its_plan_from_the_measured_module_base():
     reader = ProcessMemoryReader(provider(kernel))
     reviewed = replace(probe(), resolve=resolve)
     result = reader.observe(IDENTITY, reviewed, ("document_id",), target_id="fixture")
-    assert isinstance(result, Observation) and result.fields == (("document_id", 17),)
+    assert isinstance(result, Observation)
+    assert result.fields == (("document_id", 17),)

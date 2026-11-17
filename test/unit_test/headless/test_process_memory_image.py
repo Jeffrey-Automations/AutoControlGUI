@@ -73,15 +73,19 @@ def test_measures_actual_file_and_keeps_deny_write_delete_leases_until_close():
     kernel = ImageKernel()
     owner = observer(kernel)
     result = measure(owner)
-    assert result.process.pid == 42 and result.process.birth == kernel.birth
+    assert result.process.pid == 42
+    assert result.process.birth == kernel.birth
     assert (result.volume, result.file_id, result.size) == (9, b"f" * 16, len(kernel.data))
     assert result.sha256 == hashlib.sha256(kernel.data).hexdigest()
     assert kernel.OpenProcess.calls == [(0x101000, False, 42)]
     assert kernel.CreateFileW.calls == [(kernel.image_path, 0x80000000, 1, None, 3, 0, None)]
-    assert not kernel.CloseHandle.calls and not owner.pending_cleanup
+    assert not kernel.CloseHandle.calls
+    assert not owner.pending_cleanup
     assert not kernel.ReadProcessMemory.calls
-    assert kernel.image_path not in repr(result) and result.sha256 not in repr(result)
-    assert "42" not in repr(result) and "ffff" not in repr(result)
+    assert kernel.image_path not in repr(result)
+    assert result.sha256 not in repr(result)
+    assert "42" not in repr(result)
+    assert "ffff" not in repr(result)
     owner.close()
     owner.close()
     assert kernel.CloseHandle.calls == [(92,), (91,)]
@@ -140,8 +144,9 @@ def test_acquisition_and_read_failures_keep_closed_reason(attribute, value, reas
 def test_access_denial_is_distinct_and_does_not_read_file():
     kernel = ImageKernel()
     kernel.error, kernel.file_handle = 5, -1
+    owner = observer(kernel)
     with pytest.raises(MemoryObservationError, match="access_denied"):
-        measure(observer(kernel))
+        measure(owner)
     assert not kernel.ReadFile.calls
 
 
@@ -152,10 +157,12 @@ def test_failed_close_tries_other_handles_and_retains_only_failed_ownership():
     kernel.failed_closes.add(92)
     with pytest.raises(MemoryObservationError, match="cleanup_failed"):
         owner.close()
-    assert owner.pending_cleanup and kernel.CloseHandle.calls == [(92,), (91,)]
+    assert owner.pending_cleanup
+    assert kernel.CloseHandle.calls == [(92,), (91,)]
     kernel.failed_closes.clear()
     owner.close()
-    assert not owner.pending_cleanup and kernel.CloseHandle.calls[-1] == (92,)
+    assert not owner.pending_cleanup
+    assert kernel.CloseHandle.calls[-1] == (92,)
     assert kernel.CloseHandle.calls.count((91,)) == 1
 
 
@@ -195,8 +202,9 @@ def test_deadline_after_read_returns_no_evidence_and_retires():
                                               (42, 10, float("nan")), (42, 10, 0)])
 def test_invalid_bounds_make_no_native_calls(pid, limit, timeout):
     kernel = ImageKernel()
+    owner = observer(kernel)
     with pytest.raises(MemoryObservationError):
-        observer(kernel).observe(pid, max_bytes=limit, timeout=timeout, checkpoint=lambda: None)
+        owner.observe(pid, max_bytes=limit, timeout=timeout, checkpoint=lambda: None)
     assert not kernel.OpenProcess.calls
 
 
@@ -226,16 +234,19 @@ def test_reentrant_retirement_at_checkpoint_cannot_publish_evidence():
 def test_pid_mismatch_before_file_open_fails_closed():
     kernel = ImageKernel()
     kernel.pid = 43
+    owner = observer(kernel)
     with pytest.raises(MemoryObservationError, match="target_changed"):
-        measure(observer(kernel))
+        measure(owner)
     assert not kernel.CreateFileW.calls
 
 
 def test_32bit_owner_refuses_64bit_target_without_file_read():
     kernel = ImageKernel()
+    owner = observer(kernel, caller_bits=32)
     with pytest.raises(MemoryObservationError, match="unsupported"):
-        measure(observer(kernel, caller_bits=32))
-    assert not kernel.CreateFileW.calls and kernel.CloseHandle.calls == [(91,)]
+        measure(owner)
+    assert not kernel.CreateFileW.calls
+    assert kernel.CloseHandle.calls == [(91,)]
 
 
 
@@ -277,7 +288,8 @@ def test_both_failed_closes_remain_owned_after_acquisition_failure():
     owner = observer(kernel)
     with pytest.raises(MemoryObservationError, match="unsupported"):
         measure(owner)
-    assert owner.pending_cleanup and kernel.CloseHandle.calls == [(92,), (91,)]
+    assert owner.pending_cleanup
+    assert kernel.CloseHandle.calls == [(92,), (91,)]
     kernel.failed_closes.clear()
     owner.close()
     assert kernel.CloseHandle.calls == [(92,), (91,), (92,), (91,)]
@@ -298,9 +310,11 @@ def test_import_never_loads_kernel_or_registers_public_tools(monkeypatch):
 def test_unknown_architecture_is_unsupported_before_file_acquisition():
     kernel = ImageKernel()
     kernel.machine = 0xFFFF
+    owner = observer(kernel)
     with pytest.raises(MemoryObservationError, match="unsupported"):
-        measure(observer(kernel))
-    assert not kernel.CreateFileW.calls and not kernel.ReadFile.calls
+        measure(owner)
+    assert not kernel.CreateFileW.calls
+    assert not kernel.ReadFile.calls
 
 
 @pytest.mark.parametrize("operation,reason", [("CreateFileW", "unsupported"), ("ReadFile", "partial_read"),
@@ -341,7 +355,8 @@ def test_close_exceptions_try_every_handle_and_preserve_checkpoint_exception():
 
     with pytest.raises(Cancelled, match="checkpoint cancellation"):
         owner.observe(42, max_bytes=100, timeout=5, checkpoint=checkpoint)
-    assert kernel.CloseHandle.calls == [(92,), (91,)] and owner.pending_cleanup
+    assert kernel.CloseHandle.calls == [(92,), (91,)]
+    assert owner.pending_cleanup
     kernel.CloseHandle.implementation = lambda handle: True
     owner.close()
     assert not owner.pending_cleanup

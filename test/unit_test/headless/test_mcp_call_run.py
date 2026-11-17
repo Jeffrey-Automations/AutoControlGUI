@@ -55,7 +55,7 @@ def _start(server, msg_id, name, arguments):
     return thread, holder
 
 
-@pytest.fixture()
+@pytest.fixture
 def never_matching_pixel(monkeypatch):
     import je_auto_control.wrapper.auto_control_screen as screen_module
     monkeypatch.setattr(screen_module, "get_pixel", lambda x, y, hwnd=None: (0, 0, 0))

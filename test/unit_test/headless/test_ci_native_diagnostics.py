@@ -131,5 +131,7 @@ def test_ci_workflows_keep_native_diagnostics_after_failure(name):
     dumps = next(step for step in steps if step.get('name') == 'Keep native crash dumps (Windows)')
     assert dumps['if'] == "runner.os == 'Windows'"
     assert steps.index(dumps) < steps.index(runner)
-    assert r'LocalDumps\python.exe' in dumps['run'] and 'DumpFolder' in dumps['run']
-    assert r"autocontrol-native\dumps" in dumps['run'] and upload['with']['path'].endswith('autocontrol-native')
+    assert r'LocalDumps\python.exe' in dumps['run']
+    assert 'DumpFolder' in dumps['run']
+    assert r"autocontrol-native\dumps" in dumps['run']
+    assert upload['with']['path'].endswith('autocontrol-native')

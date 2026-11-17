@@ -95,7 +95,8 @@ def test_the_diagnostic_check_reports_no_log_without_making_one(monkeypatch, tmp
     monkeypatch.setattr(audit_module, "_default_audit_log", None)
     monkeypatch.setattr(audit_module, "default_audit_log_path", lambda: path)
     check = diagnostics._check_audit_chain()
-    assert (check.ok, check.severity) == (True, "info") and "does not create" in check.detail
+    assert (check.ok, check.severity) == (True, "info")
+    assert "does not create" in check.detail
     assert not (tmp_path / "home").exists()
 
 

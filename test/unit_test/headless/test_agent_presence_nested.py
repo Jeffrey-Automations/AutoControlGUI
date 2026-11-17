@@ -102,8 +102,9 @@ def test_nested_source_policy_refusal_has_no_local_fallback(monkeypatch):
     monkeypatch.setattr(native_channel, 'OwnedChannel', lambda *args, **kwargs: pytest.fail('local fallback'))
     def run(source, sink, broker=None):
         broker = broker if broker is not None else presence_broker.PresenceBroker()
+        launched = broker._launch()
         with pytest.raises(AgentTaskError, match='no policy'):
-            broker._launch().start()
+            launched.start()
     monkeypatch.setattr(presence_broker, 'run', run)
     try:
         presence_broker.main()
@@ -160,8 +161,9 @@ def test_nested_grant_without_service_never_launches_local_source(monkeypatch):
     monkeypatch.setattr(native_channel, 'OwnedChannel', lambda *args, **kwargs: pytest.fail('local fallback'))
 
     def run(source, sink, broker):
+        launched = broker._launch()
         with pytest.raises(AgentTaskError, match='needs the Linux owner service'):
-            broker._launch().start()
+            launched.start()
 
     monkeypatch.setattr(presence_broker, 'run', run)
     presence_broker.main()

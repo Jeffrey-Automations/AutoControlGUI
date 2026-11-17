@@ -113,7 +113,8 @@ def test_report_generation_runs_off_gui_thread(app, recorder, monkeypatch):
     try:
         page._gen_html()
         assert pump_until(lambda: not page._task.running)
-        assert len(threads) == 1 and threads[0] != threading.get_ident()
+        assert len(threads) == 1
+        assert threads[0] != threading.get_ident()
     finally:
         _delete(app, page)
 

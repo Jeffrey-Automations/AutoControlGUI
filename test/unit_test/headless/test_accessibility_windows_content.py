@@ -768,8 +768,9 @@ def test_scoped_focus_wait_uses_bounded_queue_polls(monkeypatch):
             token.cancel()
             raise queue.Empty
 
+    events, forever = Events(), float("inf")
     with cancellation_scope(token), pytest.raises(CancelledError):
-        wait_for_event(Events(), float("inf"))
+        wait_for_event(events, forever)
     assert len(intervals) == 1
     assert 0 < intervals[0] <= 0.1
 

@@ -126,7 +126,8 @@ def test_invalid_inputs_do_not_call_native_backends(app, fakes):
         page._get_pixel_color()
         assert pump_until(lambda: not page._task.running)
         assert page.pixel_result_label.text().startswith("Error")
-        assert fakes.captures == [] and fakes.pixels == []
+        assert fakes.captures == []
+        assert fakes.pixels == []
     finally:
         _delete(app, page)
 
@@ -162,7 +163,8 @@ def test_capture_operations_run_off_gui_thread(app, monkeypatch, operation, back
     try:
         getattr(page, operation)()
         assert pump_until(lambda: not page._task.running)
-        assert len(threads) == 1 and threads[0] != threading.get_ident()
+        assert len(threads) == 1
+        assert threads[0] != threading.get_ident()
     finally:
         _delete(app, page)
 

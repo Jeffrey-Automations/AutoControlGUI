@@ -89,7 +89,8 @@ def test_a_role_that_cannot_run_the_page_is_told_so_when_it_opens(shell):
     with authorization_scope(AuthorizationContext("viewer", Role.VIEWER)):
         shell.activate_tab("journal")
     banner = _banner(shell)
-    assert not banner.isHidden() and banner.kind == "permission"
+    assert not banner.isHidden()
+    assert banner.kind == "permission"
     assert banner.message.text() == _t("page_banner_permission").format(role="viewer", commands="AC_journal_read")
     shell.activate_tab("other")
     with authorization_scope(AuthorizationContext("admin", Role.ADMIN)):

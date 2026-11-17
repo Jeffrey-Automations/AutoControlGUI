@@ -58,7 +58,8 @@ def test_a_lan_browser_stops_reporting_at_once_and_still_stops(backend):  # noqa
     assert published == []
     assert browser.retirement_status.admission_closed
     browser.stop()
-    assert "cancel" in backend.calls and "close" in backend.calls
+    assert "cancel" in backend.calls
+    assert "close" in backend.calls
 
 
 def test_a_multi_viewer_host_takes_no_new_session_answer_or_input_once_closed():

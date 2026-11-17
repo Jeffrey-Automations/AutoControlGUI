@@ -28,7 +28,8 @@ def test_another_authenticated_user_approves():
     assert gate.get(token)["requester"] == "alice"
     with authorization_scope(_BOB):
         assert gate.approve(token, "Bob") is True  # the same person, as _principal compares
-    assert gate.get(token)["approver"] == "bob" and gate.is_approved(token)
+    assert gate.get(token)["approver"] == "bob"
+    assert gate.is_approved(token)
 
 
 def test_a_request_filed_under_another_name_is_refused():

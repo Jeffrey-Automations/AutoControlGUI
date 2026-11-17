@@ -60,7 +60,8 @@ def test_default_failed_close_retains_owner_for_explicit_retry(default_cache):
     assert not proxy.retired
     channel.fail_close = False
     cache.reset_default_backend()
-    assert proxy.retired and cache._DEFAULT_BACKEND is None
+    assert proxy.retired
+    assert cache._DEFAULT_BACKEND is None
 
 
 def test_default_optional_absence_is_probed_once(default_cache):
@@ -134,7 +135,8 @@ def envelope(operation, arguments, sequence=1):
 
 def test_probe_is_passive_and_graceful_close_releases_owned_keys_and_buttons():
     proxy, channel = client()
-    assert proxy.is_available and not proxy.is_connected
+    assert proxy.is_available
+    assert not proxy.is_connected
     assert channel.backend.calls == []
     proxy.connect()
     proxy.press_key(28)
@@ -143,9 +145,11 @@ def test_probe_is_passive_and_graceful_close_releases_owned_keys_and_buttons():
     proxy.disconnect()
     assert ("release_key", 28) in channel.backend.calls
     assert ("release_button", 272) in channel.backend.calls
-    assert proxy.retired and proxy.cleanup_confirmed
+    assert proxy.retired
+    assert proxy.cleanup_confirmed
+    events = (InputEvent("press_key", (28,)),)
     with pytest.raises(LibeiUnavailable):
-        proxy.send((InputEvent("press_key", (28,)),))
+        proxy.send(events)
 
 
 @pytest.mark.parametrize("kind,args", [("shell", (1,)), ("press_key", (True,)), ("press_key", (-1,)),
@@ -160,10 +164,12 @@ def test_entire_batch_is_validated_before_emission():
     worker = EiWorker(lambda: backend)
     events = [InputEvent("press_key", (28,)).wire(), {"kind": "press_key", "arguments": [True]}]
     reply, _ = worker.handle(envelope("send", {"events": events}))
-    assert not reply["result"]["ok"] and backend.calls == []
+    assert not reply["result"]["ok"]
+    assert backend.calls == []
     proxy, channel = client()
+    events = (InputEvent("press_key", (28,)),) * (MAX_EVENTS + 1)
     with pytest.raises(EiProtocolError):
-        proxy.send((InputEvent("press_key", (28,)),) * (MAX_EVENTS + 1))
+        proxy.send(events)
     assert channel.calls == []
 
 
@@ -179,7 +185,8 @@ def test_connect_preserves_authority_failure_and_never_retries(state, fallback):
         assert caught.value.status.fallback_allowed is fallback
         assert caught.value.state == state
         assert "private" not in str(caught.value)
-    assert channel.calls == ["connect"] and proxy.retired
+    assert channel.calls == ["connect"]
+    assert proxy.retired
 
 
 def test_failed_send_is_uncertain_and_cannot_enable_optional_fallback():
@@ -206,15 +213,18 @@ def test_malformed_reply_retires_and_latches_no_replay(change):
         proxy.connect()
     with pytest.raises(LibeiUnavailable):
         proxy.connect()
-    assert channel.calls == ["connect"] and proxy.retired
+    assert channel.calls == ["connect"]
+    assert proxy.retired
 
 
 def test_partial_acknowledgement_is_not_success():
     proxy, channel = client()
     channel.change_reply = lambda reply: {**reply, "value": {**reply["value"], "emitted": 0}}
+    events = (InputEvent("press_key", (28,)),)
     with pytest.raises(LibeiUnavailable):
-        proxy.send((InputEvent("press_key", (28,)),))
-    assert proxy.retired and not proxy.cleanup_confirmed
+        proxy.send(events)
+    assert proxy.retired
+    assert not proxy.cleanup_confirmed
 
 
 @pytest.mark.parametrize('emitted', [0, True, '1'])
@@ -267,9 +277,11 @@ def test_bad_ack_retires_before_a_queued_send_can_emit(monkeypatch, emitted):
         if second.ident is not None:
             second.join(2)
         proxy.disconnect()
-    assert not first.is_alive() and not second.is_alive()
+    assert not first.is_alive()
+    assert not second.is_alive()
     assert len(errors) == 2
-    assert channel.calls == ['send'] and proxy.retired
+    assert channel.calls == ['send']
+    assert proxy.retired
 
 
 def test_failed_close_retains_owner_for_retry():
@@ -306,8 +318,9 @@ def test_queue_time_is_inside_deadline_without_retiring_another_request():
     proxy._request_lock.acquire()
     start = time.monotonic()
     try:
+        events = (InputEvent("press_key", (28,)),)
         with pytest.raises(EiProtocolError, match="queue deadline"):
-            proxy.send((InputEvent("press_key", (28,)),), timeout_s=0.02)
+            proxy.send(events, timeout_s=0.02)
     finally:
         proxy._request_lock.release()
     assert time.monotonic() - start < 0.5
@@ -342,7 +355,10 @@ def test_close_during_startup_keeps_late_handle_owned():
     finally:
         release.set()
         thread.join(2)
-    assert not thread.is_alive() and errors and proxy.retired and channel.calls == []
+    assert not thread.is_alive()
+    assert errors
+    assert proxy.retired
+    assert channel.calls == []
 
 
 def test_duplicate_sequence_and_oversized_frames_do_not_emit():
@@ -375,13 +391,15 @@ def test_synthetic_owned_child_uses_real_ipc_and_retires_without_touching_native
         right.connect()
         assert left.send((InputEvent("press_key", (28,)),)).emitted == 1
         left.close()
-        assert left.retired and left.cleanup_confirmed
+        assert left.retired
+        assert left.cleanup_confirmed
         assert right.send((InputEvent("set_position", (10, 20)),)).emitted == 1
         assert not right.retired
     finally:
         left.close()
         right.close()
-    assert right.retired and all(channel.retired for channel in channels)
+    assert right.retired
+    assert all(channel.retired for channel in channels)
 
 
 def test_eof_releases_ledger_and_emits_bounded_reply():
@@ -407,8 +425,9 @@ def test_real_child_lost_or_stalled_reply_retires_without_replay(code):
     proxy = EiWorkerClient(factory=factory)
     try:
         proxy.connect()
+        events = (InputEvent('press_key', (code,)),)
         with pytest.raises(LibeiUnavailable) as caught:
-            proxy.send((InputEvent('press_key', (code,)),), timeout_s=0.15)
+            proxy.send(events, timeout_s=0.15)
         assert not caught.value.status.fallback_allowed
         assert proxy.retired
         with pytest.raises(LibeiUnavailable):
@@ -439,8 +458,9 @@ def test_cancelling_real_stalled_child_preserves_control_and_reaps():
     try:
         proxy.connect()
         timer.start()
+        events = (InputEvent('press_key', (998,)),)
         with cancellation_scope(token), pytest.raises(CancelledError):
-            proxy.send((InputEvent('press_key', (998,)),), timeout_s=2)
+            proxy.send(events, timeout_s=2)
         assert proxy.retired
     finally:
         timer.cancel()

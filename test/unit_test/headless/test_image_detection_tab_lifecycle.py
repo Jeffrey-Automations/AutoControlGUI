@@ -60,7 +60,8 @@ def test_lazy_panel_owns_controls_and_rebuilds_after_close(app, fakes):
     assert not hasattr(owner, "img_path_input")
     registry.close("image_detect")
     app.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
-    assert not isValid(page) and not entry.built
+    assert not isValid(page)
+    assert not entry.built
     replacement = registry.open("image_detect")
     assert replacement.img_path_input.text() == ""
     assert replacement.mouse_button_combo.currentText() == "mouse_left"
@@ -82,15 +83,17 @@ def test_actions_keep_detection_and_click_separate_with_local_button(app, fakes)
         page.mouse_button_combo.setCurrentText("mouse_right")
         actions["locate_image"]()
         assert pump_until(lambda: not page._task.running)
-        assert fakes.center == [("crop.png", 0.65, True)] and fakes.click == []
+        assert fakes.center == [("crop.png", 0.65, True)]
+        assert fakes.click == []
         actions["locate_all"]()
         assert pump_until(lambda: not page._task.running)
-        assert fakes.all == [("crop.png", 0.65, True)] and fakes.click == []
+        assert fakes.all == [("crop.png", 0.65, True)]
+        assert fakes.click == []
         assert "Found 1 matches" in page.detect_result_text.toPlainText()
         actions["locate_click"]()
         assert pump_until(lambda: not page._task.running)
         assert fakes.click == [("crop.png", "mouse_right", 0.65, True)]
-        assert "Clicked at: (3, 4)" == page.detect_result_text.toPlainText()
+        assert page.detect_result_text.toPlainText() == "Clicked at: (3, 4)"
     finally:
         _delete(app, page)
 
@@ -103,7 +106,8 @@ def test_invalid_threshold_is_rejected_without_backend_call(app, fakes, threshol
         page.threshold_input.setText(threshold)
         page._locate_click()
         assert page.detect_result_text.toPlainText().startswith("Error:")
-        assert fakes.click == [] and not page._task.running
+        assert fakes.click == []
+        assert not page._task.running
     finally:
         _delete(app, page)
 
@@ -116,7 +120,8 @@ def test_dialog_cancellation_and_retranslation_preserve_state(app, fakes, monkey
         page.img_path_input.setText("keep.png")
         page._browse_img()
         page._crop_template()
-        assert page.img_path_input.text() == "keep.png" and fakes.crop == []
+        assert page.img_path_input.text() == "keep.png"
+        assert fakes.crop == []
         page._on_error(RuntimeError("keep error"))
         page.retranslate()
         assert page.detect_result_text.toPlainText() == "Error: keep error"

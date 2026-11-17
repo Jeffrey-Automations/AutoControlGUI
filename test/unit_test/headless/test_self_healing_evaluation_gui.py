@@ -146,7 +146,8 @@ def test_cancel_keeps_the_panel_busy_until_the_comparison_unwinds(panel, app, mo
     panel.evaluate()
     assert started.wait(5)
     dict(panel.menu_actions())["healing_eval_cancel"]()
-    assert panel._task.running and panel._task.stopping
+    assert panel._task.running
+    assert panel._task.stopping
     panel.evaluate()                                    # still unwinding: no second comparison
     assert panel._state == "busy"
     release.set()

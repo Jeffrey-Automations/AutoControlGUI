@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261117-07 | 2026-11-17 | SonarCloud cleanup, tests: 202 new-code findings on main | #sonarcloud #cleanup #test | [2026-11-b](2026-11-b.md) |
 | U-20261117-06 | 2026-11-17 | SonarCloud cleanup, product code: 69 new-code findings on main | #sonarcloud #cleanup | [2026-11-b](2026-11-b.md) |
 | U-20261117-05 | 2026-11-17 | The workspace-sync example checks its generation path, clearing Sonar's blocker | #security #sonarcloud #examples | [2026-11-b](2026-11-b.md) |
 | U-20261117-04 | 2026-11-17 | Release 1.2.2: PR #552 merged into main | #release | [2026-11-b](2026-11-b.md) |

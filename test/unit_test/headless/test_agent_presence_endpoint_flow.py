@@ -136,13 +136,9 @@ def test_reader_uses_private_endpoint_before_connect_and_keeps_windows_gate(endp
     from je_auto_control.utils.agent_runtime.presence_pipe_linux import LinuxPresencePipe
     channel = EndpointChannel(endpoint)
     binding = channel.protocol.request({'request_id': 1, 'operation': 'acquire', 'body': {}})['result']
-    try:
-        monkeypatch.setattr(presence_reader.sys, 'platform', 'linux')
-        reader = presence_reader.PresenceReader(binding, noop)
-    except AgentTaskError as error:
-        assert 'owned launch endpoint' in str(error)
-    else:
-        pytest.fail('Linux reader accepted missing endpoint')
+    monkeypatch.setattr(presence_reader.sys, 'platform', 'linux')
+    with pytest.raises(AgentTaskError, match='owned launch endpoint'):
+        presence_reader.PresenceReader(binding, noop)
     try:
         reader = presence_reader.PresenceReader(binding, noop, endpoint=endpoint)
         assert isinstance(reader._wire.pipe, LinuxPresencePipe)

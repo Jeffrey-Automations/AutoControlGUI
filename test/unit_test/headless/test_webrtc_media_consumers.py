@@ -101,7 +101,8 @@ def test_constructor_failure_adopts_original_owner_before_optional_catch(monkeyp
     assert resource.calls == 1
     resource.failed = False
     owner.stop()
-    assert resource.calls == 2 and owner.media_failures == ()
+    assert resource.calls == 2
+    assert owner.media_failures == ()
 
 
 def test_one_successful_orphan_does_not_clear_another_failure():
@@ -155,11 +156,14 @@ def test_full_peer_stop_observes_receiver_task_while_closing_other_resources():
         await entered.wait()
         stop = asyncio.create_task(host._async_stop())
         await cancelled.wait()
-        assert peer.closed and mic.stopped
-        assert not stop.done() and host._opus_audio_receiver is receiver
+        assert peer.closed
+        assert mic.stopped
+        assert not stop.done()
+        assert host._opus_audio_receiver is receiver
         release.set()
         await asyncio.wait_for(stop, 1)
-        assert host._opus_audio_receiver is None and host._pc is None
+        assert host._opus_audio_receiver is None
+        assert host._pc is None
 
     asyncio.run(drive())
 
@@ -169,8 +173,9 @@ def test_closed_loop_receiver_reports_terminal_status_without_waiting():
         receiver = webrtc_audio.OpusMicReceiver()
         receiver._task = SimpleNamespace(done=lambda: False,
                                          get_loop=lambda: SimpleNamespace(is_closed=lambda: True))
+        confirmed = receiver.stop_confirmed()
         with pytest.raises(MediaRetirementError) as caught:
-            await asyncio.wait_for(receiver.stop_confirmed(), .2)
+            await asyncio.wait_for(confirmed, .2)
         assert not caught.value.status.retryable
         assert caught.value.status.resources is Completion.UNCERTAIN
 
@@ -188,7 +193,9 @@ def test_media_control_signal_does_not_skip_peer_close():
         host._mic_receiver = mic = Stoppable()
         with pytest.raises(OperationCancelledError) as caught:
             await host._async_stop()
-        assert caught.value is signal and peer.closed and mic.stopped
+        assert caught.value is signal
+        assert peer.closed
+        assert mic.stopped
         assert host._host_voice_track is not None
 
     asyncio.run(drive())
@@ -205,7 +212,8 @@ def test_queued_viewer_detach_does_not_touch_replacement(monkeypatch):
     slot = Transceiver("audio", track=replacement)
     viewer._pc.transceivers = [slot]
     queued[0]()
-    assert not replacement.stopped and slot.sender.replaced == []
+    assert not replacement.stopped
+    assert slot.sender.replaced == []
 
 
 @pytest.mark.parametrize("role", ["host", "viewer"])
@@ -264,7 +272,8 @@ def test_live_audio_disable_finishes_on_its_loop_and_allows_enable(monkeypatch):
         host.disable_accept_viewer_audio_opus()
         await asyncio.gather(*host._media_owners._tasks.values())
         await asyncio.sleep(0)
-        assert host._opus_audio_receiver is None and host.media_failures == ()
+        assert host._opus_audio_receiver is None
+        assert host.media_failures == ()
         host.enable_accept_viewer_audio_opus()
         assert host._config.accept_viewer_audio_opus
 
@@ -289,13 +298,15 @@ def test_explicit_live_disable_retry_uses_same_original_child(monkeypatch):
         host.disable_accept_viewer_audio_opus()
         await asyncio.gather(*host._media_owners._tasks.values(), return_exceptions=True)
         await asyncio.sleep(0)
-        assert host._opus_audio_receiver is child and host.media_failures
+        assert host._opus_audio_receiver is child
+        assert host.media_failures
         with pytest.raises(PeerStopFailed):
             host.enable_accept_viewer_audio_opus()
         host.disable_accept_viewer_audio_opus()
         await asyncio.gather(*host._media_owners._tasks.values())
         await asyncio.sleep(0)
-        assert child.calls == 2 and host._opus_audio_receiver is None
+        assert child.calls == 2
+        assert host._opus_audio_receiver is None
         assert host.media_failures == ()
 
     asyncio.run(drive())
@@ -326,8 +337,10 @@ def test_pending_live_video_does_not_block_independent_mic_or_peer_close(monkeyp
         stop = asyncio.create_task(host._async_stop())
         for _ in range(5):
             await asyncio.sleep(0)
-        assert peer.closed and mic.stopped
-        assert not stop.done() and host._viewer_video_task is task
+        assert peer.closed
+        assert mic.stopped
+        assert not stop.done()
+        assert host._viewer_video_task is task
         release.set()
         await asyncio.wait_for(stop, 1)
         assert host._viewer_video_task is None
@@ -347,7 +360,8 @@ def test_live_video_error_is_visible_and_observed_once(monkeypatch):
         host.disable_accept_viewer_video()
         await asyncio.gather(*host._media_owners._tasks.values(), return_exceptions=True)
         await asyncio.sleep(0)
-        assert host.media_failures and host._viewer_video_task is None
+        assert host.media_failures
+        assert host._viewer_video_task is None
         with pytest.raises(PeerStopFailed):
             await host._async_stop()
         await host._async_stop()
@@ -365,7 +379,8 @@ def test_queued_host_disable_does_not_touch_new_peer_or_receiver(monkeypatch):
     replacement = host._opus_audio_receiver = Owner(False)
     peer = host._pc = FakePeerConnection()
     queued[0]()
-    assert replacement.calls == 0 and peer.transceivers == []
+    assert replacement.calls == 0
+    assert peer.transceivers == []
 
 
 def test_closed_loop_live_task_stays_owned_with_terminal_snapshot():
@@ -415,9 +430,12 @@ def test_blocked_mic_start_does_not_block_peer_close_or_loop_progress(monkeypatc
         assert entered.wait(2)
 
         async def retire():
+            stopping = host._async_stop()
             with pytest.raises(PeerStopPending):
-                await asyncio.wait_for(host._async_stop(), .5)
-            assert peer.closed and voice.stopped and host._mic_receiver is child
+                await asyncio.wait_for(stopping, .5)
+            assert peer.closed
+            assert voice.stopped
+            assert host._mic_receiver is child
             assert host.media_failures[0].status.resources is Completion.PENDING
             assert host.media_failures[0].status.retryable
             await asyncio.sleep(0)
@@ -426,7 +444,9 @@ def test_blocked_mic_start_does_not_block_peer_close_or_loop_progress(monkeypatc
     finally:
         release.set()
         starter.join(2)
-    assert len(errors) == 1 and isinstance(errors[0], PeerStopPending)
+    assert len(errors) == 1
+    assert isinstance(errors[0], PeerStopPending)
     asyncio.run(host._async_stop())
-    assert child.stopped and host._mic_receiver is None
+    assert child.stopped
+    assert host._mic_receiver is None
     assert host.media_failures == ()

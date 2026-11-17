@@ -76,7 +76,8 @@ def test_generations_follow_the_interpreters_thresholds(qapp, collector_state, m
     monkeypatch.setattr(gc, "get_count", lambda: (701, 0, 0))
     for _ in range(100):
         collector.check()
-    assert calls.count(2) == 1 and calls[99] == 2          # every 10 * 10 young collections
+    assert calls.count(2) == 1
+    assert calls[99] == 2          # every 10 * 10 young collections
     assert calls.count(1) == 9                             # every 10th, the 100th being full
     assert calls.count(0) == 90
     assert collector.collections == [90, 9, 1]
@@ -145,7 +146,8 @@ def test_start_autocontrol_gui_installs_it_and_stops_it_on_quit(qapp, collector_
     with pytest.raises(SystemExit) as exited:
         gui_package.start_autocontrol_gui()
     assert exited.value.code == 0
-    assert len(installed) == 1 and installed[0].parent() is qapp
+    assert len(installed) == 1
+    assert installed[0].parent() is qapp
     assert not gc.isenabled()
     qapp.aboutToQuit.emit()
     assert gc.isenabled()
