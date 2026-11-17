@@ -1,5 +1,6 @@
 """Capture saved native GUI preferences and explicitly create a separate working copy from an inert generation."""
 import json
+import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -29,7 +30,8 @@ def main() -> None:
         if not generated.is_relative_to(cache):
             raise ConfigSyncError('the materialized profile is outside its cache directory')
         working_copy = root / 'explicit-workspace.ini'
-        working_copy.write_bytes(generated.read_bytes())
+        # A file copy, not read_bytes() into write_bytes(): the generation's content never passes through here.
+        shutil.copyfile(generated, working_copy)
         # A caller may explicitly pass QSettings(working_copy, IniFormat) to AutoControlGUIUI.
         # The immutable generation itself must remain read-only when the GUI later saves preferences.
         if receiver_source.exists() or b'local-only' in working_copy.read_bytes():
