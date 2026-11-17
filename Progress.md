@@ -643,6 +643,9 @@ resolver 已能透過保留 handle 取得主映像基址與大小並做有預算
 fixture 的原生身分核對（標頭挑戰已有，U-20261115-18，只在本行程內驗過）與頁面故障注入、runtime grant／helper
 生命週期及公開入口；M2 也仍缺實際應用版本 adapter。原生驗收固定列於本檔上方。
 
+M2 的自有 fixture schema-one adapter 已有嚴格版本／布局驗證、不可變 challenge binding、
+標準補零狀態解碼及共用 72-byte 讀取上限；僅驗證 injected provider，並未完成應用 attestation 或原生驗收。
+
 1. **M0：能力盤點與範圍契約。** 先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
    讀取來源、執行介面、權限、是否全背景、支援版本、驗證方式與不支援原因。
    第一個目標採自有 fixture 程序，之後選一個提供正式背景介面的應用；不能先承諾任意軟體。

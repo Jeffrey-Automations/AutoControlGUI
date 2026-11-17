@@ -1,5 +1,10 @@
 # AutoControl Architecture
 
+Process-memory fixture decoding owns schema-one layout and challenge binding in
+`utils/process_memory/fixture_probe.py`. The fixture's resolver delegates to this
+adapter. Bootstrap locations remain private and require separate executable
+attestation; this adapter does not grant read authority or establish native acceptance.
+
 WebRTC statistics owns one submitted polling future. Start does not wait for
 the event loop; stop closes admission, cancels pending submission and drops
 the callback owner without acquiring a bridge. Late awaited samples are discarded.

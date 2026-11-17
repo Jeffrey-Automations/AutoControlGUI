@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import ctypes
 import hashlib
-import hmac
 import json
 import os
 from pathlib import Path
@@ -82,28 +81,17 @@ def challenge_resolver(challenge: bytes, bootstrap: dict[str, object]) -> Callab
     The parent chose ``challenge`` and passed it at launch; the fixture wrote
     it into its own header. Reading that header through the retained handle's
     view, and finding the same locations the bootstrap reported, binds those
-    self-reported locations to the process being read. Raises ``ValueError``
-    on any mismatch, which the reader reports as an unsupported probe.
+    self-reported locations to the process being read. Invalid bootstrap data
+    raises ``ValueError``; resolution mismatches raise ``MemoryObservationError``,
+    which the reader reports as an unsupported probe.
     """
-    from je_auto_control.utils.process_memory.models import ReadPlan
+    from je_auto_control.utils.process_memory.fixture_probe import FixtureBinding
+    from je_auto_control.utils.process_memory.models import MemoryObservationError
 
-    if type(challenge) is not bytes or len(challenge) != CHALLENGE_BYTES or not any(challenge):
-        raise ValueError("challenge must be 16 bytes, not all zero")
-    locations = [bootstrap.get(name) for name in ("pid", "header_address", "payload_address", "sequence_address")]
-    if any(type(value) is not int for value in locations):
-        raise ValueError("bootstrap locations must be integers")
-    pid, header_address, payload_address, sequence_address = locations
-
-    def resolve(identity: Any, view: Any) -> Any:
-        if identity.pid != pid:
-            raise ValueError("bootstrap from another process")
-        magic, seen, payload, sequence = HEADER.unpack(view.read(header_address, HEADER.size))
-        if (magic != MAGIC or not hmac.compare_digest(seen, challenge)
-                or (payload, sequence) != (payload_address, sequence_address)):
-            raise ValueError("header does not match the launch")
-        return ReadPlan(payload, PAYLOAD.size, sequence)
-
-    return resolve
+    try:
+        return FixtureBinding.from_bootstrap(challenge, bootstrap).resolve
+    except MemoryObservationError:
+        raise ValueError("unsupported fixture bootstrap") from None
 
 
 def _challenge(argv: list[str]) -> bytes:

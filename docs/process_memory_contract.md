@@ -262,6 +262,20 @@ window, focus, mouse and desktop-input events to establish noninterference.
 
 ### Owned fixture preparation
 
+`fixture_probe.py` supplies the internal schema-one adapter. `FixtureBinding`
+copies validated bootstrap locations and the parent challenge into an immutable
+binding. It rejects unknown protocol/schema versions, incorrect structure sizes,
+invalid pointer widths, overflowing ranges and overlapping buffers before reading.
+Each resolution checks the retained process PID and pointer width, then reads and
+compares the header challenge and locations. This binding is not an attestor.
+
+Its probe accepts only application version `1` and the separately attested
+executable ID. The 72-byte ceiling covers the 40-byte header, 16-byte payload and
+two eight-byte sequence reads. The decoder requires exactly 16 bytes and canonical
+zero-padded `ready`, `busy` or `done` states, even for a query that selects only the
+document ID. Unknown fields and mixed generations publish no semantic values.
+Injected-provider tests cover this adapter; native acceptance remains paused.
+
 `test/fixtures/process_memory_fixture.py` owns fixed payload and sequence buffers
 for its process lifetime. Its bounded JSON-lines protocol uses inherited stdin and
 stdout pipes. Bootstrap and control replies have distinct message kinds on the
