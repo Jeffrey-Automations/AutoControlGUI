@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261117-03 | 2026-11-17 | Two presence-source drain inspects retry a missed deadline | #incident #ci #test #agent | [2026-11-b](2026-11-b.md) |
 | U-20261117-02 | 2026-11-17 | The deployment plan's rollback method is decided | #decision #deployment | [2026-11-b](2026-11-b.md) |
 | U-20261117-01 | 2026-11-17 | M0 closed: the first target is the owned fixture | #done #process-memory #decision | [2026-11-b](2026-11-b.md) |
 | U-20261116-15 | 2026-11-16 | Two stop gaps in Progress.md, measured and closed | #done #http #chatops | [2026-11-b](2026-11-b.md) |
