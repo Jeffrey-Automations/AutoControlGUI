@@ -1,11 +1,11 @@
 """Bound service requests and retain acceptance receipts without claiming completion."""
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from enum import Enum
 import re
 from typing import Literal
 
 from .errors import AgentEffectUnknown, AgentTaskError
-from .service_status import ServiceState, ServiceStatus
+from .service_status import ServiceStatus
 
 
 class ServiceOperation(Enum):
@@ -38,19 +38,8 @@ def request(operation: ServiceOperation, expected: ServiceStatus, operation_id: 
         raise AgentTaskError("service operation requires typed scope and status")
     if type(operation_id) is not str or re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", operation_id) is None:
         raise AgentTaskError("service operation requires a bounded journal ID")
-    _validate_status(expected)
+    expected.validate()
     return _Request(operation_id, operation, expected)
-
-
-def _validate_status(expected: ServiceStatus) -> None:
-    if type(expected.state) is not ServiceState:
-        raise AgentTaskError("service status requires a typed state")
-    for field in fields(expected):
-        value = getattr(expected, field.name)
-        if field.name == "state" or field.name == "process_id" and value is None:
-            continue
-        if type(value) is not int or not 0 <= value <= 0xFFFFFFFF:
-            raise AgentTaskError("service status requires DWORD diagnostic values")
 
 
 class _Ledger:

@@ -18,7 +18,7 @@ from je_auto_control.utils.agent_runtime.models import (
     AgentActionRequest, AgentActionResult, AgentObservation, AgentTaskHandle, AgentTaskResult,
     AgentTaskSpec, TERMINAL, freeze, thaw,
 )
-from je_auto_control.utils.agent_runtime.semantic_target import (
+from je_auto_control.utils.agent_runtime.target_dispatch import (
     fingerprint, grounding_details, observe as observe_target, perform as perform_target,
 )
 from je_auto_control.utils.agent_runtime.ownership import ControlBroker, ControlLease

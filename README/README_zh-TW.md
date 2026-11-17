@@ -115,3 +115,10 @@ MultiViewerHost 可回傳含原始 session 清理物件的 offer，延後清理�
 仍須提供完成條件，空計畫不能證明完成，UI partial／best-effort 報告仍只供診斷。
 註冊與 probe 不取得資源；probe 回傳 `not_supported` 與 `native_evidence=not_recorded`。
 既有目標 API、CLI 與 GUI JSON 編輯器可傳遞此 profile。注入及隱藏 helper 測試不代表原生信任成立。
+
+主機選定的程序內服務 adapter 可使用封閉的 `service_state` 完成條件：
+`{"kind":"service_state","tool":"AC_service_start","state":"running"}`，或 STOP／stopped。
+判定須有對應操作的確認回條，以及同一資源擁有者在接受後取得的新 SCM 查詢。
+通過只表示 SCM 回報該狀態，不證明原子完成、健康或桌面不干擾。這些工具名稱只屬於
+adapter 範圍，不是全域 executor 指令。既有任務 API 與 GUI JSON 編輯器可傳遞此條件。
+服務 helper／profile 註冊與原生驗收仍待完成。

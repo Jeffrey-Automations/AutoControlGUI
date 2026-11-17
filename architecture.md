@@ -1633,3 +1633,14 @@ cannot be cleared by a matching read. Status comparison is non-atomic and a
 receipt proves only acceptance. Timeouts bound admission and reject late output,
 but cannot interrupt native calls or cleanup. Managed profile/helper integration,
 dependency effect review and native service acceptance remain pending.
+
+`service_observation.py` defines closed service provenance, capture and acceptance
+schemas. `service_target.py` pins the retained controller to one managed spec and
+authority source, preserves original acceptance times and retires publication
+before cleanup. `target_dispatch.py` selects this explicit service contract and
+delegates all other targets to the existing semantic dispatch helpers.
+`service_verification.py` checks a confirmed journal attempt against a new report
+from the same binding after acceptance. Its `service_state` criterion describes
+reported SCM state only. The ordinary semantic revision gates are unchanged.
+Service-specific IPC guards, profiles and canonical cross-profile ownership
+remain pending; this integration is verified in-process with injected calls.

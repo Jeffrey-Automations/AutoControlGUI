@@ -120,3 +120,11 @@ cannot prove completion. UI partial/best-effort reports remain diagnostic.
 Registration and probe acquire nothing; probe reports `not_supported` and
 `native_evidence=not_recorded`. The existing target API, CLI and GUI JSON editor
 carry this profile. Injected and hidden-helper tests do not establish native trust.
+
+Host-selected in-process service adapters can use the closed `service_state` criterion:
+`{"kind":"service_state","tool":"AC_service_start","state":"running"}` or STOP/stopped.
+It requires the matching confirmed acceptance and a new SCM report from the same
+retained owner after acceptance. A passing result reports SCM state, not atomic
+completion, health or desktop noninterference. These tool names are adapter-scoped,
+not global executor commands. Existing task APIs and the GUI JSON editor carry the
+criterion. Service helper/profile registration and native acceptance remain pending.

@@ -4,7 +4,8 @@ Report version 3 requires a host-defined field scope, matching helper bootstrap
 and saved completion witness. Tagged partial sources preserve valid fields separately
 from fixed per-field failures. Empty strings and false values remain valid results.
 Fields omitted by every source remain partial; extra fields and report versions 1
-and 2 are rejected. Partial and best-effort captures grant no action or completion authority.
+and 2 are rejected. Within these semantic reports, partial and best-effort captures
+grant no action or completion authority.
 
 Managed task `success_criteria` accepts `semantic` conditions with exactly `tool`
 and bounded scalar `fields`. The existing task API and GUI scope editor carry the
@@ -1506,3 +1507,11 @@ cannot prove completion. UI partial/best-effort reports remain diagnostic.
 Registration and probe acquire nothing; probe reports `not_supported` and
 `native_evidence=not_recorded`. The existing target API, CLI and GUI JSON editor
 carry this profile. Injected and hidden-helper tests do not establish native trust.
+
+Host-selected in-process service adapters can use the closed `service_state` criterion:
+`{"kind":"service_state","tool":"AC_service_start","state":"running"}` or STOP/stopped.
+It requires the matching confirmed acceptance and a new SCM report from the same
+retained owner after acceptance. A passing result reports SCM state, not atomic
+completion, health or desktop noninterference. These tool names are adapter-scoped,
+not global executor commands. Existing task APIs and the GUI JSON editor carry the
+criterion. Service helper/profile registration and native acceptance remain pending.

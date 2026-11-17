@@ -1,6 +1,7 @@
 """Represent the latest SCM service report without granting operation authority."""
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from enum import Enum, IntEnum
+from typing import Any, Mapping
 
 from .errors import AgentTaskError
 
@@ -58,8 +59,43 @@ class ServiceStatus:
     process_id: int | None
     service_flags: int
 
+    def validate(self) -> None:
+        """Validate typed diagnostic data at request and serialization boundaries."""
+        if type(self.state) is not ServiceState:
+            raise AgentTaskError("service status requires a typed state")
+        for item in fields(self):
+            value = getattr(self, item.name)
+            if item.name == "state" or item.name == "process_id" and value is None:
+                continue
+            if type(value) is not int or not 0 <= value <= 0xFFFFFFFF:
+                raise AgentTaskError("service status requires DWORD diagnostic values")
+        self._validate_kind_pid()
+
+    def _validate_kind_pid(self) -> None:
+        if self.service_type not in (0x10, 0x20, 0x110, 0x120):
+            raise AgentTaskError("service status has an unsupported type")
+        if self.process_id is not None and (self.state.value < 4 or self.process_id == 0):
+            raise AgentTaskError("service status has an invalid diagnostic PID")
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "ServiceStatus":
+        """Parse the exact diagnostic wire schema without boolean/integer coercion."""
+        names = {item.name for item in fields(cls)} | {"consistency"}
+        if not isinstance(value, Mapping) or set(value) != names or value["consistency"] != "best_effort":
+            raise AgentTaskError("service status has an unknown schema")
+        data = dict(value)
+        del data["consistency"]
+        states = {state.name.lower(): state for state in ServiceState}
+        if type(data["state"]) is not str or data["state"] not in states:
+            raise AgentTaskError("service status has an invalid state")
+        data["state"] = states[data["state"]]
+        result = cls(**data)
+        result.validate()
+        return result
+
     def to_dict(self) -> dict[str, str | int | None]:
         """Return diagnostic fields with an explicit consistency limitation."""
+        self.validate()
         return {
             "state": self.state.name.lower(), "consistency": "best_effort",
             "service_type": self.service_type, "controls_accepted": self.controls_accepted,

@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,586 |
-| 程式碼總行數 | 243,207 |
+| Python 模組總數（含周邊子專案） | 1,590 |
+| 程式碼總行數 | 243,662 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -516,13 +516,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 56,881 行。
+> 14 個套件、約 57,336 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,254 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 29,796 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 30,251 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 166 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1051,7 +1051,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（29,796 行／216 檔）
+#### `utils/agent_runtime/`（30,251 行／220 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1137,7 +1137,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `parent_watch.py` | 25 | POSIX helpers retire their own live process group when the owning parent disappears. |
 | `readiness.py` | 83 | Passive readiness of the desktop, presence source, devices, browser and models; never a grant or evidence. |
 | `resume_gate.py` | 84 | A task's first action waits until a fresh observation passes every declared resume condition. |
-| `policy.py` | 124 | Explicit task scopes, rooted data paths and secret-safe durable payloads. |
+| `policy.py` | 132 | Explicit task scopes, rooted data paths and secret-safe durable payloads. |
 | `presence_channel_linux.py` | 434 | Own authenticated Linux packet channels, bounded leases and protected listeners. |
 | `presence_endpoint_linux.py` | 226 | Own protected Linux socket paths without stale-path reuse or recursive cleanup. |
 | `presence_frames.py` | 137 | Closed finite JSON byte frames and exact presence request/result validation. |
@@ -1184,11 +1184,15 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `uia_launch.py` | 84 | Bind a private UI-fixture HWND to the independently attested retained launch. |
 | `uia_deployment.py` | 41 | Load the fixed UI fixture deployment without granting task-selected launch settings. |
 | `uia_owner.py` | 99 | Retain pinned UI fixture resources before acquisition and through failed retirement. |
-| `service_status.py` | 70 | Represent the latest SCM service report without granting operation authority. |
+| `service_status.py` | 106 | Represent the latest SCM service report without granting operation authority. |
 | `windows_service.py` | 72 | Expose separate query-only and host-scoped control façades over retained service ownership. |
 | `windows_service_native.py` | 118 | Bind the fixed SCM query and selected control functions without acquiring handles. |
 | `windows_service_session.py` | 227 | Own one retained service handle, serialized queries and non-replayed control attempts. |
-| `service_operations.py` | 91 | Bound service requests and retain acceptance receipts without claiming completion. |
+| `service_operations.py` | 80 | Bound service requests and retain acceptance receipts without claiming completion. |
+| `service_observation.py` | 121 | Bind best-effort service reports and acceptance receipts to one retained owner. |
+| `service_target.py` | 187 | Apply managed task authority to one host-selected retained service controller. |
+| `service_verification.py` | 47 | Verify a post-acceptance SCM report without inferring atomicity, health or causality. |
+| `target_dispatch.py` | 55 | Dispatch explicit service evidence separately from existing semantic and ordinary targets. |
 | `uia_target.py` | 132 | Expose scoped UI fixture observations under managed authority without granting actions. |
 | `fixture_launch.py` | 52 | Measure an owned fixture channel's launch handle before binding its private bootstrap. |
 | `fixture_target.py` | 287 | Own pinned fixture startup, guarded semantic reads and retryable resource retirement. |
@@ -1256,7 +1260,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `trigger_history.py` | 89 | Renewed trigger lineages share accepted event tombstones and outstanding-task limits. |
 | `trigger_reauthorization.py` | 150 | Explicitly replace a trigger's unavailable origins while retaining its event history and template. |
 | `trigger_registration.py` | 21 | Insert normal and explicitly renewed trigger templates through one bounded transaction contract. |
-| `verification.py` | 165 | Deterministic completion evidence with explicit passed, failed and unknown states. |
+| `verification.py` | 177 | Deterministic completion evidence with explicit passed, failed and unknown states. |
 | `window_pixels.py` | 118 | Capture only an identified Windows window, with no desktop-pixel fallback. |
 | `workflow_desktop.py` | 70 | Reviewed semantic control and document operations within the current task's application scope. |
 | `wire_data.py` | 46 | Resource-free bounded JSON and budget primitives shared by host models and owned transports. |
@@ -1610,8 +1614,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,048 | 108,637 |
-| **總計** | **1,574** | **242,462** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,052 | 109,092 |
+| **總計** | **1,578** | **242,917** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

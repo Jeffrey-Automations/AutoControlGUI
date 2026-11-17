@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Managed task criteria accept `service_state` for a host-selected in-process
+  service adapter. START/running and STOP/stopped require confirmed acceptance
+  and fresh SCM readback from the same retained owner. This does not expose
+  global service commands or register a native service profile. Existing semantic
+  revision requirements remain unchanged.
+
 - External tasks may now declare an empty tool scope when they have no planned
   actions. Completion criteria remain required; empty plans do not prove completion.
   The new host-managed `uia_fixture` profile uses this zero-action contract, a

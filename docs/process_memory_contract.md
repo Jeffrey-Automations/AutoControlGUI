@@ -944,3 +944,48 @@ and semantic completion gates are unchanged. Native services have not been run.
 See [StartServiceW](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-startservicew),
 [ControlService](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-controlservice)
 and the [service database](https://learn.microsoft.com/en-us/windows/win32/services/database-of-installed-services).
+
+### Managed service evidence
+
+The in-process managed adapter has a separate service dispatch contract. It does
+not implement `SemanticTarget` or convert SCM progress into a revision. A service
+observation carries fixed target/configuration/scope identifiers, a retained-owner
+binding, a unique observation ID, a capture interval and strict status fields.
+The binding identifies this owner lifetime, not a Windows service incarnation or
+process identity. The outer dispatcher rejects captures outside its current read
+request and fingerprints state without capture IDs or timestamps.
+
+Readiness pins the original task specification and authorization provenance.
+Operations recheck that scope before and after checkpoints. Only the host's
+allowed `AC_service_start` and `AC_service_stop` operations with empty arguments
+can reach the retained controller. Cleanup retires publication before closing the
+controller, and failed cleanup remains owned for retry.
+
+The closed completion clauses are:
+
+```json
+{"kind": "service_state", "tool": "AC_service_start", "state": "running"}
+```
+
+```json
+{"kind": "service_state", "tool": "AC_service_stop", "state": "stopped"}
+```
+
+Only these tool/state pairs are valid. The criterion must refer to a tool in the
+task scope and cannot be used as a resume precondition. A confirmed journal
+attempt must match the acceptance's operation ID and operation, with identical
+target, configuration, scope and binding across the original observation,
+acceptance and new readback. The new capture must begin after acceptance and use
+a new observation ID. Cached acceptance retains its original timestamp.
+
+A fresh report with another state fails the condition. Missing acceptance,
+unknown effects, old captures, mismatched provenance or another owner binding
+produce unknown. Passing means the latest SCM query after acceptance reported
+the requested state. It does not prove health, causation, atomic completion or
+desktop noninterference. Existing semantic revision and multi-source report
+gates remain unchanged.
+
+Tests use the real managed runtime and injected service calls. Service-specific
+helper/proxy transport, host profile registration, canonical service locking
+across profiles and databases, dependency review and native acceptance remain
+pending. Generic native workers do not yet support this service contract.

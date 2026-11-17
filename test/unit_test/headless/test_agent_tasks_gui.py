@@ -37,14 +37,18 @@ def test_fixture_profile_uses_existing_target_editor_and_actions(monkeypatch, tm
         app.processEvents()
 
 
-@pytest.mark.parametrize("tools", [["AC_increment"], []])
-def test_task_scope_editor_preserves_semantic_completion_for_shared_submit(monkeypatch, tools):
+@pytest.mark.parametrize("tools,criterion", [
+    (["AC_increment"], {"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}),
+    ([], {"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}),
+    (["AC_service_start"], {"kind": "service_state", "tool": "AC_service_start", "state": "running"}),
+    (["AC_service_stop"], {"kind": "service_state", "tool": "AC_service_stop", "state": "stopped"}),
+])
+def test_task_scope_editor_preserves_completion_for_shared_submit(monkeypatch, tools, criterion):
     import json
     import shiboken6
     app = QApplication.instance() or QApplication([])
     tab = AgentTasksTab()
     submitted = []
-    criterion = {"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}
     try:
         monkeypatch.setattr(tab, "_dispatch", lambda *args: submitted.append(args))
         tab._goal.setText("verify reviewed fixture")

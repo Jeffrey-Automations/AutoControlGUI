@@ -115,3 +115,10 @@ MultiViewerHost 可返回含原始 session 清理对象的 offer，延后清理�
 仍须提供完成条件，空计划不能证明完成，UI partial／best-effort 报告仍只供诊断。
 注册与 probe 不取得资源；probe 返回 `not_supported` 与 `native_evidence=not_recorded`。
 既有目标 API、CLI 与 GUI JSON 编辑器可传递此 profile。注入及隐藏 helper 测试不代表原生信任成立。
+
+主机选定的进程内服务 adapter 可使用封闭的 `service_state` 完成条件：
+`{"kind":"service_state","tool":"AC_service_start","state":"running"}`，或 STOP／stopped。
+判定须有对应操作的确认回执，以及同一资源所有者在接受后取得的新 SCM 查询。
+通过只表示 SCM 报告该状态，不证明原子完成、健康或桌面无干扰。这些工具名称仅属于
+adapter 范围，不是全局 executor 指令。现有任务 API 与 GUI JSON 编辑器可传递此条件。
+服务 helper／profile 注册与原生验收仍待完成。
