@@ -52,7 +52,9 @@ class Commands:
 
 def setup_target():
     provider, commands = Provider(), Commands()
-    reviewed = probe(resolve=lambda identity, view: ReadPlan(ADDRESS, SCHEMA.size, ADDRESS - 8))
+    # Reads here run under the managed runtime, whose every checkpoint is a durable write; the
+    # reader's own 1 s default budget ran out on a loaded CI runner. Deadlines are tested elsewhere.
+    reviewed = probe(resolve=lambda identity, view: ReadPlan(ADDRESS, SCHEMA.size, ADDRESS - 8), timeout=30.0)
     binding = MemoryBinding("fixture", IDENTITY, reviewed, ("document_id", "job_status"))
     target = MemorySemanticTarget(binding, ProcessMemoryReader(provider), commands)
     spec = AgentTaskSpec(goal="update document", target="fixture", allowed_tools=("AC_update",),
