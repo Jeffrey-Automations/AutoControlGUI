@@ -807,6 +807,9 @@ and publishes source `uia` through report version 3. Per-field failures retain v
 fields from the same capture. A complete UIA capture still has `revision=None` and
 `consistency=best_effort`, so it cannot authorize actions or semantic completion.
 The adapter rejects commands and grants no Invoke, SetValue, focus or input rights.
+During a capture every COM call re-validates the pinned task and owner, while the full
+runtime checkpoint (cancellation, durable budget, live authority) runs at most every
+50 ms; the unthrottled checkpoint after the capture runs before anything is published.
 
 `owned_uia_target` retains the launcher, pre-launch lease and post-launch observer
 before acquisition. `UiaFixtureImage` requires the separate `uia-fixture` version-1

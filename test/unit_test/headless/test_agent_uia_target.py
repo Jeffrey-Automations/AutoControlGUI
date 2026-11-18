@@ -9,6 +9,7 @@ from je_auto_control.utils.agent_runtime import AgentRuntime, AgentTaskSpec
 from je_auto_control.utils.agent_runtime.context import TaskOperation, operation_scope
 from je_auto_control.utils.agent_runtime.errors import AgentObservationStale, AgentTaskError
 from je_auto_control.utils.agent_runtime.semantic_native_target import NativeSemanticTarget
+from je_auto_control.utils.agent_runtime import uia_target
 from je_auto_control.utils.agent_runtime.uia_target import UIA_FIELDS, UIA_SELECTORS, UiaObservationTarget
 from headless.test_agent_scoped_uia import Node, source
 
@@ -103,6 +104,47 @@ def test_cleanup_during_contract_check_prevents_source_publication(monkeypatch):
         with pytest.raises(AgentTaskError):
             adapter.ready(request)
     assert adapter._source is None and closed
+
+
+@pytest.mark.parametrize("interval", [0.0, 3600.0], ids=["every-call", "throttled"])
+def test_revocation_during_capture_prevents_publication(monkeypatch, interval):
+    # Full runtime checkpoints are throttled during the read-only capture, but the
+    # unthrottled one after it still runs before anything is published.
+    monkeypatch.setattr(uia_target, "_CAPTURE_CHECK_INTERVAL", interval)
+    adapter, _ = target("complete")
+    request = AgentTaskSpec.from_dict(spec())
+    state = {"checks": 0, "revoke_after": None}
+
+    def checkpoint():
+        state["checks"] += 1
+        if state["revoke_after"] is not None and state["checks"] > state["revoke_after"]:
+            raise AgentTaskError("authority revoked")
+
+    with operation_scope(TaskOperation(request, checkpoint, None)):
+        adapter.ready(request)
+        state["revoke_after"] = state["checks"] + 2
+        with pytest.raises(AgentTaskError, match="revoked"):
+            adapter.observe()
+    adapter.cleanup()
+
+
+def test_throttled_capture_still_validates_scope_on_every_call(monkeypatch):
+    monkeypatch.setattr(uia_target, "_CAPTURE_CHECK_INTERVAL", 3600.0)
+    adapter, _ = target("complete")
+    request = AgentTaskSpec.from_dict(spec())
+    full = []
+    with operation_scope(TaskOperation(request, lambda: full.append(1), None)):
+        adapter.ready(request)
+        before = len(full)
+        validated = []
+        original = adapter._validate
+        monkeypatch.setattr(adapter, "_validate", lambda operation: (validated.append(1), original(operation)))
+        adapter.observe()
+    # Start, one throttled capture check and the closing check run the full checkpoint;
+    # every COM call in between still re-validates the pinned scope.
+    assert len(full) - before == 3
+    assert len(validated) > 50
+    adapter.cleanup()
 
 
 @pytest.mark.parametrize("mode", ["partial", "complete", "hang"])

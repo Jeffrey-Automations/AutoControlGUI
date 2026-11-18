@@ -14,6 +14,8 @@ from .scoped_uia import ScopedUiaSource, UiaField
 from .semantic_target import SemanticSnapshot, SemanticTarget
 from .uia_launch import BoundUiaWindow
 
+_CAPTURE_CHECK_INTERVAL = 0.05
+
 UIA_FIELDS = ("document_id", "duplicate", "empty", "enabled", "job_status", "password")
 UIA_SELECTORS = (UiaField("document_id", "1001", "value"), UiaField("job_status", "1002", "value"),
                  UiaField("empty", "1003", "value"), UiaField("enabled", "1004", "enabled"),
@@ -77,6 +79,23 @@ class UiaObservationTarget(SemanticTarget):
         operation.checkpoint()
         self._validate(operation)
 
+    def _capture_checkpoint(self, operation: TaskOperation) -> Callable[[], None]:
+        """Check scope on every COM call and the full runtime checkpoint at most every interval.
+
+        A capture makes thousands of read-only COM calls, and each full checkpoint is a
+        durable budget write plus authority queries. Nothing is published until the
+        unthrottled checkpoint that follows the capture, so a revocation during reads is
+        still seen before publication, within one interval.
+        """
+        last = [float("-inf")]
+
+        def check() -> None:
+            self._validate(operation)
+            if time.monotonic() - last[0] >= _CAPTURE_CHECK_INTERVAL:
+                self._checkpoint(operation)
+                last[0] = time.monotonic()
+        return check
+
     def ready(self, spec: AgentTaskSpec) -> tuple[bool, str]:
         """Acquire only after pinning this managed task; retain cleanup after failed acquisition."""
         with self._work:
@@ -116,7 +135,7 @@ class UiaObservationTarget(SemanticTarget):
                 raise AgentTaskError("UI observation has no managed source")
             self._checkpoint(operation)
             started = time.perf_counter()
-            value = self._source.capture(lambda: self._checkpoint(operation))
+            value = self._source.capture(self._capture_checkpoint(operation))
             self._checkpoint(operation)
             return ObservationReport("uia", (("uia", value),), started, time.perf_counter(), UIA_FIELDS).to_dict()
 
