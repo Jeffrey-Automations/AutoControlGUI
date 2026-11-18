@@ -30,7 +30,7 @@ class FixtureTarget(SemanticTarget):
         return True, ""
 
     def observe(self):
-        now = time.monotonic()
+        now = time.perf_counter()
         return replace(self.state, observation_id=uuid4().hex, started=now, finished=now).to_dict()
 
     def perform_grounded(self, name, arguments, *, expected, operation_id):
