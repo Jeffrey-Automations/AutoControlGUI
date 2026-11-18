@@ -65,8 +65,9 @@ def test_protected_chain_is_checked_from_the_drive_root_down():
         "owner", "reparse", "file"])
 @pytest.mark.parametrize("level", ["C:\\", "C:\\Fixtures", "C:\\Fixtures\\app"])
 def test_any_directory_another_account_can_change_refuses_the_image(security, level):
+    source = Source(**{level: security})
     with pytest.raises(MemoryObservationError, match="unsupported"):
-        require_trusted_image(IMAGE, 7, Source(**{level: security}))
+        require_trusted_image(IMAGE, 7, source)
 
 
 def test_grants_that_cannot_redirect_the_path_are_accepted():
@@ -88,8 +89,9 @@ def test_the_running_user_may_own_and_write_the_deployment():
     "\\\\?\\UNC\\host\\share\\fixture.exe",  # a mapped network drive
 ])
 def test_the_leased_file_must_be_the_file_the_path_names(final):
+    source = Source(final=final)
     with pytest.raises(MemoryObservationError):
-        require_trusted_image(IMAGE, 7, Source(final=final))
+        require_trusted_image(IMAGE, 7, source)
 
 
 def test_final_path_comparison_ignores_case_only():
@@ -124,7 +126,8 @@ def test_untrusted_location_refuses_the_lease_and_closes_its_handle():
     owner = observer(kernel)
     with pytest.raises(MemoryObservationError, match="unsupported"):
         owner.lease(kernel.image_path, max_bytes=1 << 20, timeout=5, checkpoint=lambda: None)
-    assert kernel.position == 0 and not owner.pending_cleanup
+    assert kernel.position == 0
+    assert not owner.pending_cleanup
     assert (kernel.file_handle,) in kernel.CloseHandle.calls
 
 

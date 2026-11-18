@@ -288,3 +288,11 @@ def test_revocation_after_a_reply_prevents_publication_of_the_observation(tmp_pa
         reader = CompletionReader(adapter, definition)
         with pytest.raises(AuthorizationError):
             reader.observe()
+
+
+def test_read_only_guard_refuses_the_full_dispatch_signature():
+    # NativeWorker calls _guard with the request and the semantic flag as well; an
+    # override taking only three arguments failed with TypeError instead of refusing.
+    worker = ReadOnlyWorker(io.BytesIO(), io.BytesIO(), target=Mock())
+    with pytest.raises(AgentTaskError, match="read-only observation cannot dispatch"):
+        worker._guard(Mock(), "AC_click_mouse", {}, None, True)

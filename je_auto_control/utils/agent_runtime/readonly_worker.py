@@ -46,7 +46,8 @@ class ReadOnlyWorker(NativeWorker):
             return {"ready": ready, "reason": reason}
         return super()._operation(operation, payload)
 
-    def _guard(self, _policy: Any, name: str, _arguments: Any) -> None:
+    def _guard(self, _policy: Any, name: str, _arguments: Any,
+               _request: Any = None, _semantic: bool = False) -> None:
         raise AgentTaskError(f"read-only observation cannot dispatch {name!r}")
 
     def _input(self, _event: dict[str, Any]) -> None:

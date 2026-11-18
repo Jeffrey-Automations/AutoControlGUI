@@ -81,7 +81,9 @@ class ScopedUiaSource:
         return tuple(sorted(item.name for item in self._fields))
 
     def _call(self, operation: Callable[[], Any], check: Callable[[], None]) -> Any:
-        check()
+        # Every native call is followed by a check, and capture checks before the first one,
+        # so a check separates any two calls; checking again before the next call repeated
+        # the same check with no native work in between, and each one is a durable write.
         try:
             value = operation()
         except _READ_ERRORS:
@@ -212,6 +214,7 @@ class ScopedUiaSource:
         started = time.monotonic()
         self._binding.verify(checkpoint)
         identity = None
+        checkpoint()
         try:
             root = self._call(lambda: self._automation.ElementFromHandle(self._binding.hwnd), checkpoint)
             identity = self._root_identity(root, checkpoint)

@@ -41,6 +41,8 @@ _WELL_KNOWN_TRUSTED = frozenset({
     "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464",  # TrustedInstaller
 })
 _DRIVE = re.compile(r"[A-Za-z]:")
+_SE_FILE_OBJECT = 1
+_OWNER_AND_DACL = 0x1 | 0x4  # the owner and DACL parts of a security descriptor
 _PATH_CHARACTERS = 32768
 
 
@@ -219,8 +221,7 @@ class NativeSecuritySource:
         if attributes == 0xFFFFFFFF:
             _fail(FailureReason.UNSUPPORTED)
         owner, dacl, descriptor = _PVOID(), _PVOID(), _PVOID()
-        # SE_FILE_OBJECT; OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION
-        if self._advapi.GetNamedSecurityInfoW(path, 1, 0x1 | 0x4, ctypes.byref(owner), None,
+        if self._advapi.GetNamedSecurityInfoW(path, _SE_FILE_OBJECT, _OWNER_AND_DACL, ctypes.byref(owner), None,
                                               ctypes.byref(dacl), None, ctypes.byref(descriptor)):
             _fail(FailureReason.UNSUPPORTED)
         try:

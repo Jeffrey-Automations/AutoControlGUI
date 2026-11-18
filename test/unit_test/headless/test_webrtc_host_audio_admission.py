@@ -46,7 +46,8 @@ def test_opus_receive_is_started_with_the_audio_admission_gate():
     host._start_opus_audio_receive(object())
     host._media_owners.started()
     admit = host._opus_audio_receiver.admit
-    assert admit is not None and admit() is False
+    assert admit is not None
+    assert admit() is False
     host._authenticated = True
     assert admit() is True
     host._permissions.allow_audio = False

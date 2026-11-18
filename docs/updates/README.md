@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261119-01 | 2026-11-19 | Repair PR #556 CI: read-only guard, UIA checkpoint cost, Docker helper imports | #incident #ci #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-36 | 2026-11-18 | Launch pinned fixtures only from paths nobody else can redirect | #incident #security #process-memory | [2026-11-c](2026-11-c.md) |
 | U-20261118-35 | 2026-11-18 | Refuse UNC, pipe and device paths as pinned artifacts | #incident #security #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-34 | 2026-11-18 | Gate viewer Opus audio on approval and allow_audio | #incident #security #remote-desktop | [2026-11-c](2026-11-c.md) |
