@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Sequence
 
 from .errors import AgentTaskError
-from .owned_channel_launch import OwnedProcessChannel
+from .owned_channel_launch import OwnedProcessChannel, pinned_child_options
 from .uia_channel import OwnedUiaChannel
 from ..process_memory.models import FailureReason, MemoryObservationError, ProcessIdentity
 from ..process_memory.windows_launch import OwnedLaunch
@@ -26,13 +26,18 @@ class BoundUiaWindow:
         self._verify(checkpoint)
 
 
+def pinned_uia_channel(argv: Sequence[str]) -> OwnedUiaChannel:
+    """The default UI-fixture channel: the pinned image, never the host's directory or secrets."""
+    return OwnedUiaChannel(argv, **pinned_child_options(argv[0]))
+
+
 class OwnedUiaLauncher(OwnedProcessChannel[OwnedUiaChannel]):
     """Own only the pinned fixture; bootstrap PID and HWND never select a process to open."""
 
     def __init__(self, challenge: bytes, *, windows: WindowOwnerQuery,
                  kernel: ProcessKernel | None = None, last_error: Callable[[], int] | None = None,
                  caller_bits: int | None = None,
-                 channel_factory: Callable[[Sequence[str]], OwnedUiaChannel] = OwnedUiaChannel) -> None:
+                 channel_factory: Callable[[Sequence[str]], OwnedUiaChannel] = pinned_uia_channel) -> None:
         if type(challenge) is not bytes or len(challenge) != 16:
             raise AgentTaskError("UI fixture requires a 16-byte challenge")
         self._challenge, self._windows = challenge, windows

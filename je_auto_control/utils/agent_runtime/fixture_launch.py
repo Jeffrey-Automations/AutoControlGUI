@@ -6,7 +6,7 @@ from typing import Callable, Sequence
 from .errors import AgentTaskError
 from .fixture_control import OwnedFixtureControl
 from .native_channel import OwnedChannel
-from .owned_channel_launch import OwnedProcessChannel
+from .owned_channel_launch import OwnedProcessChannel, pinned_channel
 from ..process_memory.models import FailureReason, MemoryObservationError
 from ..process_memory.windows_launch import OwnedLaunch
 from ..process_memory.windows_native import ProcessKernel
@@ -17,7 +17,7 @@ class OwnedChannelLauncher(OwnedProcessChannel[OwnedChannel]):
 
     def __init__(self, arguments: Sequence[str], *, kernel: ProcessKernel | None = None,
                  last_error: Callable[[], int] | None = None, caller_bits: int | None = None,
-                 channel_factory: Callable[[Sequence[str]], OwnedChannel] = OwnedChannel) -> None:
+                 channel_factory: Callable[[Sequence[str]], OwnedChannel] = pinned_channel) -> None:
         self._control: OwnedFixtureControl | None = None
         super().__init__(arguments, kernel=kernel, last_error=last_error, caller_bits=caller_bits,
                          channel_factory=channel_factory)

@@ -4,7 +4,7 @@ import hashlib
 
 import pytest
 
-from je_auto_control.utils.process_memory.models import MemoryObservationError
+from je_auto_control.utils.process_memory.models import FailureReason, MemoryObservationError
 from je_auto_control.utils.process_memory.windows_image import WindowsImageObserver
 from je_auto_control.utils.process_memory.windows_image_native import FileBasicInfo, FileIdInfo, I64
 from je_auto_control.utils.process_memory.windows_native import PTR, U32
@@ -22,6 +22,7 @@ class ImageKernel(Kernel):
         self.failed_closes = set()
         self.after_file_read = lambda: None
         self.path_failure, self.info_failure, self.size_override = False, False, None
+        self.trust_calls, self.untrusted = [], False
         for name, implementation in {
             "QueryFullProcessImageNameW": self.image_name,
             "CreateFileW": lambda *args: self.file_handle,
@@ -32,6 +33,12 @@ class ImageKernel(Kernel):
             "CloseHandle": lambda handle: handle not in self.failed_closes,
         }.items():
             setattr(self, name, Function(implementation))
+
+    def trust(self, path, handle):
+        # Stands in for windows_image_trust: the lease asks it before reading a byte.
+        self.trust_calls.append((path, handle, self.position))
+        if self.untrusted:
+            raise MemoryObservationError(FailureReason.UNSUPPORTED)
 
     def image_name(self, process, flags, buffer, length):
         buffer.value = self.image_path
@@ -62,6 +69,7 @@ class ImageKernel(Kernel):
 
 
 def observer(kernel, **options):
+    options.setdefault("trust", kernel.trust)
     return WindowsImageObserver(kernel=kernel, last_error=lambda: kernel.error, **options)
 
 

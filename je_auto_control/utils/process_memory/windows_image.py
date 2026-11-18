@@ -14,6 +14,7 @@ from typing import Callable, NoReturn, TypeVar
 from .models import FailureReason, MemoryObservationError
 from .windows_facts import NativeProcessFacts, measure_process
 from .windows_image_native import FileBasicInfo, FileIdInfo, I64, ImageKernel, bind, load
+from .windows_image_trust import native_image_trust
 from .windows_native import U32
 
 _QUERY_ACCESS = 0x00100000 | 0x1000
@@ -100,10 +101,14 @@ class WindowsImageObserver:
 
     def __init__(self, *, kernel: ImageKernel | None = None,
                  last_error: Callable[[], int] | None = None,
-                 caller_bits: int | None = None, clock: Callable[[], float] = time.monotonic) -> None:
+                 caller_bits: int | None = None, clock: Callable[[], float] = time.monotonic,
+                 trust: Callable[[str, int], None] | None = None) -> None:
         bits = ctypes.sizeof(ctypes.c_void_p) * 8 if caller_bits is None else caller_bits
         if type(bits) is not int or bits not in (32, 64):
             _fail(FailureReason.UNSUPPORTED)
+        # A lease refuses an image whose path another account could redirect. The native check
+        # binds on first lease; an injected kernel must inject its check too, or leases refuse.
+        self._trust, self._native_trust = trust, kernel is None and trust is None
         if kernel is None:
             if bits != ctypes.sizeof(ctypes.c_void_p) * 8:
                 _fail(FailureReason.UNSUPPORTED)
@@ -235,6 +240,8 @@ class WindowsImageObserver:
         self._check(deadline, checkpoint)
         image = self._file(path)
         self._check(deadline, checkpoint)
+        self._require_trusted(path, image)
+        self._check(deadline, checkpoint)
         file = self._file_facts(image)
         if file.size > max_bytes:
             _fail(FailureReason.BUDGET_EXCEEDED)
@@ -246,12 +253,22 @@ class WindowsImageObserver:
         digest = self._digest(image, file, deadline, checkpoint, unchanged)
         return LeasedImageFile(file.volume, file.file_id, file.size, digest)
 
+    def _require_trusted(self, path: str, image: int) -> None:
+        if self._trust is None and self._native_trust:
+            self._trust = _native(native_image_trust, FailureReason.UNSUPPORTED)
+        if self._trust is None:
+            _fail(FailureReason.UNSUPPORTED)
+        trust = self._trust
+        _native(lambda: trust(path, image), FailureReason.UNSUPPORTED)
+
     def lease(self, path: str, *, max_bytes: int, timeout: float,
               checkpoint: Callable[[], None]) -> LeasedImageFile:
         """Open ``path`` read-only, sharing only reads, and digest it; keep the lease until close.
 
         For an owned launch: taken before the process starts, the lease keeps
-        ordinary writers and deleters out while the image is mapped. Like
+        ordinary writers and deleters out while the image is mapped, and the
+        path is refused unless no other account can redirect it or plant a DLL
+        beside it (:mod:`.windows_image_trust`). Like
         :meth:`observe`, one acquisition per observer, and a failure retires it.
         """
         with self._lock:

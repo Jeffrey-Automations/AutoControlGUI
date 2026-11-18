@@ -39,6 +39,9 @@ EOF 清理及前景視窗／滑鼠不受影響。建置與靜態匯入檢查不�
 原生 fixture 已有固定 split／guard／noaccess／decommitted 頁面配置的建置前置能力；
 頁面 runner 已接上同一 handle 的 payload 邊界查詢、前半段實際讀回與封閉頁面屬性證據，
 並拒絕其他來源的相同錯誤；目前僅有注入測試，原生頁面配置與完整故障矩陣仍未驗收。
+解除暫緩前，`agent_runtime/native_channel.py` 的 `OwnedChannel` 要改成以 `CREATE_SUSPENDED` 啟動、
+指派 Job 後再恢復執行：目前 Job 在 `Popen` 之後才指派，子行程在那之前已開始執行，
+可在加入 Job 前產生不受 kill-on-close 約束的子行程（pinned 映像位置與最小環境已於 U-20261118-36 完成）。
 
 ### 桌面行為驗收
 

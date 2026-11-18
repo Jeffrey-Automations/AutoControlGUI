@@ -10,7 +10,7 @@ import sys
 import threading
 import time
 import uuid
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.wire_data import detached, positive
@@ -53,7 +53,8 @@ class OwnedChannel:
     reply. The stop intent is monotone, and no reply is delivered once it is set.
     """
 
-    def __init__(self, argv: Sequence[str], *, on_control: Callable[[str], None] | None = None) -> None:
+    def __init__(self, argv: Sequence[str], *, on_control: Callable[[str], None] | None = None,
+                 cwd: str | None = None, env: Mapping[str, str] | None = None) -> None:
         self._request_lock = threading.Lock()
         self._close_lock = threading.Lock()
         self._stop = threading.Event()
@@ -69,7 +70,8 @@ class OwnedChannel:
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
         self._process = subprocess.Popen(  # nosec B603  # reason: trusted host factory supplies explicit argv
             list(argv), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            bufsize=0, creationflags=flags, start_new_session=sys.platform != "win32")
+            bufsize=0, creationflags=flags, start_new_session=sys.platform != "win32",
+            cwd=cwd, env=None if env is None else dict(env))
         try:
             if sys.platform == "win32":
                 from je_auto_control.utils.agent_runtime.native_job import NativeJob

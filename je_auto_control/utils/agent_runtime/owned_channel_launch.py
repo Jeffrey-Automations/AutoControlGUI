@@ -1,8 +1,10 @@
 """Retain one pinned process channel through measurement, publication and failed retirement."""
 from __future__ import annotations
 
+import ntpath
+import os
 import threading
-from typing import Any, Callable, Generic, Sequence, TypeVar
+from typing import Any, Callable, Generic, Mapping, Sequence, TypeVar
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.native_channel import OwnedChannel
@@ -11,6 +13,39 @@ from je_auto_control.utils.process_memory.windows_launch import (
     LaunchRecord, OwnedLaunch, PopenLauncher,
 )
 from je_auto_control.utils.process_memory.windows_native import ProcessKernel
+
+
+# What a pinned fixture may inherit: where Windows, the profile and temp live, never the
+# host's tokens, keys or a PATH that reaches user-writable directories.
+_CHILD_ENVIRONMENT = (
+    "SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "COMSPEC", "PATHEXT", "TEMP", "TMP", "USERPROFILE",
+    "APPDATA", "LOCALAPPDATA", "PROGRAMDATA", "ALLUSERSPROFILE", "PUBLIC", "PROGRAMFILES",
+    "PROGRAMFILES(X86)", "PROGRAMW6432", "COMMONPROGRAMFILES", "COMMONPROGRAMFILES(X86)",
+    "COMMONPROGRAMW6432", "HOMEDRIVE", "HOMEPATH", "USERNAME", "USERDOMAIN", "COMPUTERNAME", "OS",
+    "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "PROCESSOR_IDENTIFIER", "PROCESSOR_LEVEL",
+    "PROCESSOR_REVISION",
+)
+
+
+def pinned_child_options(path: str, environ: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Start a pinned image in its own (lease-checked) directory with a minimal environment.
+
+    The working directory is on the DLL search path, so it is the image's directory,
+    which the lease already proved no other account can write. ``PATH`` holds only
+    the system directories.
+    """
+    source = os.environ if environ is None else environ
+    upper = {key.upper(): value for key, value in source.items()}
+    env = {key: upper[key] for key in _CHILD_ENVIRONMENT if upper.get(key)}
+    root = env.get("SYSTEMROOT")
+    if root:
+        env["PATH"] = ";".join((ntpath.join(root, "System32"), root, ntpath.join(root, "System32", "Wbem")))
+    return {"cwd": ntpath.dirname(path), "env": env}
+
+
+def pinned_channel(argv: Sequence[str]) -> OwnedChannel:
+    """The default memory-fixture channel: the pinned image, never the host's directory or secrets."""
+    return OwnedChannel(argv, **pinned_child_options(argv[0]))
 
 
 def _check_launch(launch: OwnedLaunch, record: LaunchRecord) -> None:

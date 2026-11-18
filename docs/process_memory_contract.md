@@ -87,7 +87,15 @@ and the SHA-256 of the image bytes (64 lowercase hex digits). `launch_attested` 
 
 1. leases the image file with a fresh `WindowsImageObserver.lease(path, ...)`: opened
    with `GENERIC_READ` and only `FILE_SHARE_READ`, digested from its actual bytes, with
-   the file facts rechecked around every chunk, and the lease kept open;
+   the file facts rechecked around every chunk, and the lease kept open. Before any byte
+   is read, `windows_image_trust.require_trusted_image` refuses the path unless every
+   directory from the drive root down is a real directory (no reparse point) that no
+   account outside SYSTEM, Administrators, TrustedInstaller and the running user may
+   rename, delete, re-link, re-ACL or add files to, and the leased handle's final path is
+   the requested path. The lease fixes the bytes; this keeps `CreateProcess`, which
+   resolves the path again by name, and the loader's search of the image's directory on
+   that same file. An observer built with an injected kernel must inject this check too,
+   or its lease refuses;
 2. requires that digest to equal the pin, in constant time, before anything is started;
 3. calls the caller's launcher, which must return a `LaunchRecord` holding the PID and
    birth it measured from the new process's own handle (the launcher owns the child and
@@ -104,7 +112,10 @@ message, and cancellation signals propagate unchanged.
 
 What it proves: the bytes on disk, held against writers from before the launch until
 the observation, are the pinned ones, and the child the host started maps that same
-file. It does not prove the code running now (in-memory patching, loaded DLLs), and it
+file. The default fixture channels (`pinned_channel`, `pinned_uia_channel`) start the
+child in the image's directory with `pinned_child_options`: a minimal environment whose
+`PATH` holds only the system directories, so neither the host's working directory nor
+its tokens and keys reach the fixture. It does not prove the code running now (in-memory patching, loaded DLLs), and it
 cannot attest a process the host did not start.
 
 `PopenLauncher(arguments, **popen_options)` is the launcher. It starts the image from an

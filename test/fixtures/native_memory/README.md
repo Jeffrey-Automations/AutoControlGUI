@@ -96,6 +96,12 @@ ordinary tests. Native execution remains subject to the explicit pause in
 `Progress.md`. Loaded-image comparison, trusted dependency binding and the native
 fault acceptance remain separate requirements.
 
+Put the build directory somewhere only you and administrators can change, such as a
+new folder under `%LOCALAPPDATA%`. Before launching, the image lease refuses a path
+with a junction in it or with any directory another account may rename, delete or
+add files to, so a secondary drive root granting Authenticated Users Modify, or a
+`%TEMP%` shared with other accounts, cannot hold a fixture that will run.
+
 ## Prepare the smoke check
 
 From the repository root, use the checkout's modules rather than a separately

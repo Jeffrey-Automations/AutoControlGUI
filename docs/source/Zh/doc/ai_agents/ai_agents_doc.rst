@@ -1034,3 +1034,8 @@ adapter 範圍，不是全域 executor 指令。既有任務 API 與 GUI JSON �
 或存取 SCM；原生驗收仍待完成。
 所有固定路徑（各 profile 的 ``config_path`` 及部署指定的映像檔）都必須是本機磁碟路徑：
 UNC 共用、``\\.\pipe\`` 名稱、``\\?\`` 裝置路徑與 ``..`` 片段一律拒絕，註冊 profile 不能讓主機把認證送到其他機器。
+fixture 映像執行前，租約還會拒絕其他帳號能變更的位置：從磁碟根目錄往下的每一層都必須是實體目錄
+（不能是 junction 或 symlink），且只有 SYSTEM、Administrators、TrustedInstaller 與目前使用者能改名、刪除、
+改 ACL 或新增檔案；租約檔案的最終路徑也必須等於設定的路徑。請把 fixture 部署在 ``%LOCALAPPDATA%`` 這類受保護目錄；
+授予 Authenticated Users 修改權限的磁碟根目錄（次要磁碟常見）或共用的 ``%TEMP%`` 會被拒絕。
+fixture 在自己的目錄啟動，只帶最小環境變數：僅含系統目錄的 ``PATH``，不帶主機的任何 token 或金鑰。

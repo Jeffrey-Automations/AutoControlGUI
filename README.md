@@ -134,3 +134,10 @@ not read the deployment or access SCM; native acceptance remains pending.
 Every pinned path (each profile's `config_path` and the image a deployment names) must be
 a local drive path: UNC shares, `\\.\pipe\` names, `\\?\` device paths and `..` segments are
 refused, so registering a profile cannot make the host send its credentials to another machine.
+Before a fixture image runs, its lease also refuses a location another account could change:
+every directory from the drive root down must be a real directory (no junction or symlink) that
+only SYSTEM, Administrators, TrustedInstaller and the running user may rename, delete, re-ACL or
+add files to, and the leased file's final path must be the configured one. Deploy fixtures under
+a protected directory such as `%LOCALAPPDATA%`; a drive root that grants Authenticated Users Modify
+(common on secondary drives) or a shared `%TEMP%` is refused. The fixture starts in its own
+directory with a minimal environment: a system-only `PATH` and none of the host's tokens or keys.

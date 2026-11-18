@@ -126,3 +126,8 @@ adapter 范围，不是全局 executor 指令。现有任务 API 与 GUI JSON �
 或访问 SCM；原生验收仍待完成。
 所有固定路径（各 profile 的 `config_path` 及部署指定的映像文件）都必须是本机磁盘路径：
 UNC 共享、`\\.\pipe\` 名称、`\\?\` 设备路径与 `..` 片段一律拒绝，注册 profile 不能让主机把凭据发送到其他机器。
+fixture 映像执行前，租约还会拒绝其他账户能更改的位置：从磁盘根目录往下的每一层都必须是实体目录
+（不能是 junction 或 symlink），且只有 SYSTEM、Administrators、TrustedInstaller 与当前用户能改名、删除、
+改 ACL 或新增文件；租约文件的最终路径也必须等于配置的路径。请把 fixture 部署在 `%LOCALAPPDATA%` 这类受保护目录；
+授予 Authenticated Users 修改权限的磁盘根目录（次要磁盘常见）或共享的 `%TEMP%` 会被拒绝。
+fixture 在自己的目录启动，只带最小环境变量：仅含系统目录的 `PATH`，不带主机的任何 token 或密钥。

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from .errors import AgentTaskError
 from .native_channel import OwnedChannel
@@ -21,10 +21,11 @@ def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 class OwnedUiaChannel(OwnedChannel):
     """Retain the existing hidden process tree and deadlines for a receive-only protocol."""
 
-    def __init__(self, argv: Sequence[str]) -> None:
+    def __init__(self, argv: Sequence[str], *, cwd: str | None = None,
+                 env: Mapping[str, str] | None = None) -> None:
         self._invalid = threading.Event()
         self._startup_taken = False
-        super().__init__(argv)
+        super().__init__(argv, cwd=cwd, env=env)
 
     def _read(self) -> None:
         stream = self._process.stdout
