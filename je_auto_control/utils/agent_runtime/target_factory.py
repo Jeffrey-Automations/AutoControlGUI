@@ -12,6 +12,16 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 def build_target(profile: AgentTargetProfile) -> Any:
     """Bind reviewed configuration to a fixed owned helper, never a caller-selected argv."""
     from je_auto_control.utils.agent_runtime.native_target import NativeDesktopTarget
+    if profile.kind == "fixture":
+        from je_auto_control.utils.agent_runtime.fixture_native_target import NativeFixtureTarget
+        return NativeFixtureTarget(profile)
+    if profile.kind == "uia_fixture":
+        # pylint: disable-next=import-outside-toplevel  # reason: construct only the selected inert adapter
+        from je_auto_control.utils.agent_runtime.uia_native_target import NativeUiaFixtureTarget
+        return NativeUiaFixtureTarget(profile)
+    if profile.kind == "service":
+        from .service_native_target import NativeServiceTarget
+        return NativeServiceTarget.from_profile(profile)
     if profile.kind == "files":
         resource = hashlib.sha256("\n".join(sorted(profile.roots)).encode("utf-8")).hexdigest()
         path = Path.home() / ".je_auto_control" / "input_ownership" / ("files-" + resource + ".lock")

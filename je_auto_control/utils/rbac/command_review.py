@@ -20,6 +20,8 @@ command gets the same decision instead of inheriting the default unseen.
 """
 from typing import Dict, FrozenSet
 
+_AS_AC_PRESENCE_REGISTER = "as AC_presence_register"
+
 #: Reviewed candidates that stay at operator, with the reason.
 OPERATOR_NOTES: Dict[str, str] = {
     "AC_approval_approve": (
@@ -55,13 +57,13 @@ OPERATOR_NOTES: Dict[str, str] = {
     "AC_parallel": (
         "branches keep the caller's authorization: the executor refuses a privileged command inside a branch"
     ),
-    "AC_presence_clear": "as AC_presence_register",
+    "AC_presence_clear": _AS_AC_PRESENCE_REGISTER,
     "AC_presence_register": (
         "advisory: no host consults PresenceRegistry.can_control(); raise the presence commands to manage_hosts "
         "if one starts gating input on it"
     ),
-    "AC_presence_set_role": "as AC_presence_register",
-    "AC_presence_unregister": "as AC_presence_register",
+    "AC_presence_set_role": _AS_AC_PRESENCE_REGISTER,
+    "AC_presence_unregister": _AS_AC_PRESENCE_REGISTER,
     "AC_repair_approve": "accepts a locator-repair suggestion: workflow data, not host policy",
     "AC_revoke_lease": "as AC_lease_secret",
     "AC_secret_list": (  # nosec B105  # reason: an AC_* command name, not a credential

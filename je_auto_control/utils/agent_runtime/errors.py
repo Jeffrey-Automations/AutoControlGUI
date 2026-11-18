@@ -16,6 +16,10 @@ class AgentObservationStale(AgentTaskError):
     """No action was dispatched because its observation is missing, expired or changed."""
 
 
+class AgentEffectUnknown(AgentTaskError):
+    """A dispatched command needs independent readback before any retry."""
+
+
 class AgentHumanReview(AgentTaskError):
     """A dialog or unsaved-content gate requires explicit human review before continuing."""
 

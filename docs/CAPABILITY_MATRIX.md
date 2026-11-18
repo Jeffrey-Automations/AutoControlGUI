@@ -1,5 +1,27 @@
 # Capability matrix
 
+Report version 3 requires a host-defined field scope, matching helper bootstrap
+and saved completion witness. Tagged partial sources preserve valid fields separately
+from fixed per-field failures. Empty strings and false values remain valid results.
+Fields omitted by every source remain partial; extra fields and report versions 1
+and 2 are rejected. Within these semantic reports, partial and best-effort captures
+grant no action or completion authority.
+
+Semantic completion compares fresh sequence-checked fields with the recorded
+identity, adapter, schema and source of the last effective confirmed command.
+Missing witnesses, fields or revisions and changed identities remain unknown.
+Typed mismatches fail even if the command returned success; uncertain effects
+remain unresolved. Capture intervals outside the current host-monotonic read
+request are rejected. Counter-fixture IPC tests cover success without effect,
+cached pre-dispatch observations and helper restart. Native memory targets,
+cross-clock helpers and desktop noninterference are not established by these tests.
+
+The managed fixture now corroborates reviewed memory fields with its retained
+read-only IPC snapshot. Partial memory reads and differing values/revisions remain
+visible but cannot ground actions; submission rechecks both sources before the
+fixture's atomic sequence comparison. Injected native calls and hidden Python helper
+tests cover this path. UIA/DOM fusion and native acceptance remain unverified.
+
 X11 package import defers display connections, server keycode resolution, RECORD listener startup
 and uinput device selection until use. Explicit key-table retrieval returns a real mutable dict
 and requires an X connection. Screen and input operations do not start recording. This startup
@@ -1184,3 +1206,44 @@ acceptance. This transport is not full Linux application or native input accepta
 Installed wheel and source distributions include the REST Dashboard and Swagger HTML, CSS and
 JavaScript resources. The same localhost REST routes and authentication rules apply to an
 installed package; serving static pages grants no task or desktop input authority.
+
+The build-only UI fixture uses `build_fixture.py --kind uia` and a distinct
+schema-2 manifest. Building it does not register a runtime target; it is not a memory fixture.
+Native UIA exposure and desktop noninterference remain unverified.
+
+The internal UI fixture startup channel is receive-only and one-shot. Its binding
+uses retained process facts and an explicit HWND-owner query, with final authority
+checks and retry-retained cleanup. The scoped reader verifies HWND/PID, bounded raw-tree
+ancestry and a root runtime ID pinned across captures. It preserves per-field failures
+and protects password text. COM calls stay on the source owner thread. The internal
+read-only managed adapter creates COM lazily during readiness and reports best-effort
+UIA captures through the shared task API. Injected COM and hidden-helper tests cover
+reporting and timeout retirement. Native deployment trust and all desktop
+acceptance remain pending; no native UI fixture execution is claimed.
+
+The internal owned UI target retains its launcher and both image leases before
+attestation, attempts every owner during cleanup, and retains failed cleanup for
+retry. A publication lock prevents late source installation after shutdown. The
+native factory only constructs owners; native deployment trust
+and native acceptance remain pending.
+
+Host management can register a `uia_fixture` profile with empty `allowed_tools`,
+`roots` and `apps`, and only `config_path`/`config_sha256` settings. It uses a fixed
+isolated worker and validates deployment, profile and target pins before acquisition.
+Both endpoints refuse commands. External tasks may use an empty tool scope only
+without planned actions; completion criteria remain required and an empty plan
+cannot prove completion. UI partial/best-effort reports remain diagnostic.
+Registration and probe acquire nothing; probe reports `not_supported` and
+`native_evidence=not_recorded`. The existing target API, CLI and GUI JSON editor
+carry this profile. Injected and hidden-helper tests do not establish native trust.
+
+Host-selected in-process service adapters can use the closed `service_state` criterion:
+`{"kind":"service_state","tool":"AC_service_start","state":"running"}` or STOP/stopped.
+It requires the matching confirmed acceptance and a new SCM report from the same
+retained owner after acceptance. A passing result reports SCM state, not atomic
+completion, health or desktop noninterference. These tool names are adapter-scoped,
+not global executor commands. Existing task APIs and the GUI JSON editor carry the
+criterion. The host-reviewed `service` profile pins `config_path`, `config_sha256`
+and an ASCII `service_key`. Its fixed worker checks the deployment's service and
+operation ceiling before accepting task scope. Registration, reload and probe do
+not read the deployment or access SCM; native acceptance remains pending.

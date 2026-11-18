@@ -55,7 +55,8 @@ def test_a_lease_digests_the_file_before_any_process_exists():
     assert leased.sha256 == hashlib.sha256(kernel.data).hexdigest()
     assert (leased.volume, leased.file_id, leased.size) == (9, b"f" * 16, len(kernel.data))
     assert kernel.CreateFileW.calls == [(kernel.image_path, 0x80000000, 1, None, 3, 0, None)]
-    assert not kernel.OpenProcess.calls and not kernel.CloseHandle.calls
+    assert not kernel.OpenProcess.calls
+    assert not kernel.CloseHandle.calls
     assert leased.sha256 not in repr(leased)
 
 
@@ -63,8 +64,9 @@ def test_a_lease_digests_the_file_before_any_process_exists():
                          ids=["empty", "nul", "none", "too-long"])
 def test_a_lease_refuses_an_unusable_path_before_opening_it(path):
     kernel = LaunchKernel()
+    owner = observer(kernel)
     with pytest.raises(MemoryObservationError, match="unsupported"):
-        observer(kernel).lease(path, max_bytes=1 << 20, timeout=5, checkpoint=lambda: None)
+        owner.lease(path, max_bytes=1 << 20, timeout=5, checkpoint=lambda: None)
     assert not kernel.CreateFileW.calls
 
 
@@ -74,7 +76,8 @@ def test_a_lease_that_sees_the_file_change_publishes_nothing():
     owner = observer(kernel)
     with pytest.raises(MemoryObservationError, match="target_changed"):
         owner.lease(kernel.image_path, max_bytes=1 << 20, timeout=5, checkpoint=lambda: None)
-    assert kernel.CloseHandle.calls == [(92,)] and not owner.pending_cleanup
+    assert kernel.CloseHandle.calls == [(92,)]
+    assert not owner.pending_cleanup
 
 
 def test_an_owned_launch_of_the_pinned_file_is_attested():
@@ -103,8 +106,9 @@ def test_the_attestor_names_only_the_launched_process():
 
 def test_a_file_that_does_not_match_the_pin_is_never_launched():
     kernel = LaunchKernel()
+    wrong = pin(kernel, sha256="0" * 64)
     with pytest.raises(MemoryObservationError, match="unsupported"):
-        attest(kernel, pinned=pin(kernel, sha256="0" * 64))
+        attest(kernel, pinned=wrong)
     assert kernel.CloseHandle.calls == [(92,)]  # the lease is closed; no process was opened
     assert not kernel.OpenProcess.calls
 
@@ -135,22 +139,25 @@ def test_launcher_failures_are_closed_and_interruptions_propagate():
 
     with pytest.raises(MemoryObservationError) as caught:
         attest(kernel, launcher=broken)
-    assert caught.value.reason == FailureReason.UNSUPPORTED and "SECRET" not in str(caught.value)
+    assert caught.value.reason == FailureReason.UNSUPPORTED
+    assert "SECRET" not in str(caught.value)
     signal = OperationCancelledError("stop")
 
     def cancelled(path):
         raise signal
 
+    fresh = LaunchKernel()
     with pytest.raises(OperationCancelledError) as interrupted:
-        attest(LaunchKernel(), launcher=cancelled)
+        attest(fresh, launcher=cancelled)
     assert interrupted.value is signal
 
 
 @pytest.mark.parametrize("changes", [{"sha256": "A" * 64}, {"sha256": "0" * 63}, {"host": "bad host"},
                                      {"version": ""}])
 def test_a_pin_must_be_a_lowercase_sha256_and_identifiers(changes):
+    kernel = LaunchKernel()
     with pytest.raises(MemoryObservationError, match="unsupported"):
-        pin(LaunchKernel(), **changes)
+        pin(kernel, **changes)
 
 
 class _Child:
@@ -204,4 +211,16 @@ def test_an_owned_launch_through_the_popen_launcher_is_attested():
     kernel = LaunchKernel()
     launcher, _ = _popen_launcher(kernel)
     launch, *_ = attest(kernel, launcher=launcher)
-    assert launch.identity.pid == 42 and launch.record == LaunchRecord(42, kernel.birth)
+    assert launch.identity.pid == 42
+    assert launch.record == LaunchRecord(42, kernel.birth)
+
+
+def test_attested_launch_exposes_the_checked_image_pin_not_a_recomputed_file_hash():
+    kernel = LaunchKernel()
+    expected = pin(kernel).sha256
+    launch, *_ = attest(kernel)
+    try:
+        kernel.data = b"changed after measurement"
+        assert launch.image_sha256 == expected
+    finally:
+        launch.close()

@@ -105,7 +105,8 @@ def test_ctrl_k_opens_the_list_wherever_it_lives(window_factory, qapp):
     window = build()
     layout = window._adaptive
     window._sidebar_action.trigger()
-    assert window._navigation_dock.isHidden() and not layout.navigation_preferred
+    assert window._navigation_dock.isHidden()
+    assert not layout.navigation_preferred
     window._search_action.trigger()
     assert not window._navigation_dock.isHidden(), "a wide window shows the docked list again"
     assert layout.navigation_preferred
@@ -174,15 +175,19 @@ def test_a_drawer_closes_on_a_click_beside_its_panel_only(qapp):
         return QMouseEvent(QMouseEvent.Type.MouseButtonPress, point, point, Qt.MouseButton.LeftButton,
                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     drawer.mousePressEvent(click(700))
-    assert drawer.is_open and not closed
+    assert drawer.is_open
+    assert not closed
     drawer.mousePressEvent(click(100))
-    assert not drawer.is_open and closed == [True]
+    assert not drawer.is_open
+    assert closed == [True]
     drawer.close_drawer()
     assert closed == [True], "closing a closed drawer reports nothing"
     narrow = drawer.panel_rect(300, 200)
-    assert narrow.width() == int(300 * 0.85) and narrow.right() == 299
+    assert narrow.width() == int(300 * 0.85)
+    assert narrow.right() == 299
     drawer.set_content(None)
-    assert drawer.content() is None and content.parent() is None
+    assert drawer.content() is None
+    assert content.parent() is None
     host.deleteLater()
     content.deleteLater()
 

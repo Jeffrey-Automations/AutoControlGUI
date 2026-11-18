@@ -20,7 +20,7 @@ from je_auto_control.utils.mcp_server._protocol import _MCPError
 from je_auto_control.utils.mcp_server.audit import AuditLogger
 from je_auto_control.utils.mcp_server.tools import MCPTool
 from je_auto_control.utils.rbac.authorization import (
-    AuthorizationContext, AuthorizationError, current_authorization, resolve_token,
+    AuthorizationContext, current_authorization, resolve_token,
 )
 from je_auto_control.utils.rbac.policy import capabilities_for_tool_call, capability_for_tool, denied_command_in
 from je_auto_control.utils.rbac.users import Capability, UserStore
@@ -83,7 +83,7 @@ def capture_error_artifact(tool: MCPTool, read_only: bool,
             if caller is not None and not caller.allows(Capability.DRIVE_INPUT):
                 return None
             return capture(tool.name)
-    except (AuthorizationError, OSError, ValueError):
+    except (OSError, ValueError):  # AuthorizationError is a PermissionError, so an OSError
         return None
 
 

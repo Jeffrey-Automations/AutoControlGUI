@@ -57,6 +57,8 @@ Wayland NORMAL 輸入透過受管理的子程序執行 libei 與 portal 呼叫�
 
 受管理的 Agent 任務與跨主機傳輸包含實驗性功能；採用前請查看實作紀錄與專案進度中的驗收狀態。
 
+主機選定的語意 target 支援 `semantic` 完成條件，以新讀回核對已記錄的目標身分及期望欄位。此條件不授予記憶體存取權，也不啟用原生 target。詳見[語意完成驗證](../docs/process_memory_contract.md#semantic-completion)。
+
 ## 文件
 
 - [安裝、平台支援與設定](../docs/guides/zh-TW/setup.md)
@@ -87,10 +89,45 @@ REST 主機資料讀取與對應 MCP 權限一致：排程、遠端 session、US
 
 主機唯讀模式對外部提供的目錄及後續註冊套用相同限制，接收請求及重新核對身分後的呼叫都檢查混合用途參數。MCP 設定的失敗截圖需要可寫入的工具及重新核對後具輸入操作權限的呼叫者；唯讀呼叫與 viewer 不會觸發截圖。這不表示所有相依套件或診斷讀取均無初始化副作用。
 
-內部 Windows 行程記憶體準備工作新增映像檔量測，透過保留的唯讀 handle 執行有界雜湊並保留失敗清理供重試。這只是觀測到的檔案證據，不是已載入程式碼或 fixture 的身分證明；原生驗收及公開記憶體工具仍未提供。詳見[契約](../docs/process_memory_contract.md)。
+內部 Windows 行程記憶體準備工作新增映像檔量測，透過保留的唯讀 handle 執行有界雜湊並保留失敗清理供重試。這只是觀測到的檔案證據，不是已載入程式碼或 fixture 的身分證明；原生驗收尚未完成，且不提供任意位址記憶體工具。詳見[契約](../docs/process_memory_contract.md)。
+
+主機管理的 fixture profile 透過既有目標管理 API 與 GUI JSON 編輯器，將固定 worker 綁定到已審閱的設定路徑與摘要。註冊不會取得資源；bootstrap 與 configure 都核對部署綁定。明確呼叫 probe 時，會由有時限的背景 helper 檢查靜態產物，回報 `static_artifacts_ready`、`fixture_execution=not_run` 與 `native_evidence=not_recorded`。runtime 關閉時，會保留所有權直到診斷 helper 完成回收。fixture 僅在受管 readiness 中取得。設定與映像檢查不證明 Python 原始碼或 DLL 可信。原生執行仍暫停；私有交付格式與限制記載於同一契約。
 
 WebRTC peer 也會保留媒體建構與清理失敗的原始資源，觀測即時停用完成，並將延後協商綁定原 peer。媒體 producer 關閉會回報待完成或不確定的清理結果，並保留原始資源。音訊與錄影不會透過不安全的 close／flush 重播宣稱成功；LAN close 可明確重試。應用程式 caretaker 與 GUI 整合仍待完成。詳見[清理契約](../docs/media_retirement_contract.md)。
 
 HostBrowser 亦會拒絕晚到發布，並保留未完成的執行緒與關閉所有權；對話框整合仍待完成。
 
 MultiViewerHost 可回傳含原始 session 清理物件的 offer，延後清理不會停止替換後的連線或畫面來源；GUI 接入仍待完成。
+
+主機選定的語意 adapter 可透過既有觀察 API 回傳多來源報告。fixture 結合受審閱的記憶體讀取與自有唯讀 IPC snapshot，並在提交前重新核對兩者。報告版本 3 由主機程式固定必要欄位，分別保留有效欄位與各欄位的失敗原因。缺失來源、衝突與 best-effort 擷取不能授權操作或確認完成。版本 1 與 2 會被拒絕。
+
+獨立自有 UI 觀察 fixture 可透過 `test/fixtures/native_memory/build_fixture.py --kind uia` 建置，靜態 manifest 維持 schema 2。內部 launcher 將啟動訊息綁定保留程序與視窗擁有者。限定範圍的 UIA reader 核對該視窗、程序與根節點身分，限制樹狀走訪並保護密碼欄位。唯讀受管 adapter 延遲建立 COM，透過共用觀察 API 保留部分欄位結果。
+
+注入呼叫與隱藏 Python helper 已涵蓋限定範圍讀取、報告與逾時回收。原生部署信任、DOM 整合與桌面驗收仍待完成，尚未執行原生 UI fixture，也未證明不干擾桌面。
+
+內部自有 UI target 在 attestation 前保留啟動器及兩個獨立映像租約擁有者；
+清理會嘗試全部資源並保留失敗項目供重試。發布鎖防止關閉後存入晚到的來源。
+原生 factory 僅建立擁有者；原生部署信任及原生驗收仍待完成。
+
+主機管理可註冊 `uia_fixture` profile，`allowed_tools`、`roots`、`apps` 都為空，
+設定只接受 `config_path`／`config_sha256`。固定隔離 worker 在取得資源前核對部署、profile
+與目標 pin，兩端都拒絕命令。外部任務只有在沒有預排動作時可使用空工具集合；
+仍須提供完成條件，空計畫不能證明完成，UI partial／best-effort 報告仍只供診斷。
+註冊與 probe 不取得資源；probe 回傳 `not_supported` 與 `native_evidence=not_recorded`。
+既有目標 API、CLI 與 GUI JSON 編輯器可傳遞此 profile。注入及隱藏 helper 測試不代表原生信任成立。
+
+主機選定的程序內服務 adapter 可使用封閉的 `service_state` 完成條件：
+`{"kind":"service_state","tool":"AC_service_start","state":"running"}`，或 STOP／stopped。
+判定須有對應操作的確認回條，以及同一資源擁有者在接受後取得的新 SCM 查詢。
+通過只表示 SCM 回報該狀態，不證明原子完成、健康或桌面不干擾。這些工具名稱只屬於
+adapter 範圍，不是全域 executor 指令。既有任務 API 與 GUI JSON 編輯器可傳遞此條件。
+主機審閱的 `service` profile 固定 `config_path`、`config_sha256` 及 ASCII `service_key`。
+固定 worker 核對部署的服務與操作上限後才接受任務範圍。註冊、重載與 probe 不讀取部署檔
+或存取 SCM；原生驗收仍待完成。
+所有固定路徑（各 profile 的 `config_path` 及部署指定的映像檔）都必須是本機磁碟路徑：
+UNC 共用、`\\.\pipe\` 名稱、`\\?\` 裝置路徑與 `..` 片段一律拒絕，註冊 profile 不能讓主機把認證送到其他機器。
+fixture 映像執行前，租約還會拒絕其他帳號能變更的位置：從磁碟根目錄往下的每一層都必須是實體目錄
+（不能是 junction 或 symlink），且只有 SYSTEM、Administrators、TrustedInstaller 與目前使用者能改名、刪除、
+改 ACL 或新增檔案；租約檔案的最終路徑也必須等於設定的路徑。請把 fixture 部署在 `%LOCALAPPDATA%` 這類受保護目錄；
+授予 Authenticated Users 修改權限的磁碟根目錄（次要磁碟常見）或共用的 `%TEMP%` 會被拒絕。
+fixture 在自己的目錄啟動，只帶最小環境變數：僅含系統目錄的 `PATH`，不帶主機的任何 token 或金鑰。

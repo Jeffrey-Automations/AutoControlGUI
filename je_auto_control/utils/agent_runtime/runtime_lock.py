@@ -34,7 +34,8 @@ class RuntimeLock:
 
 @contextmanager
 def close_runtime_ownership(mutex: Any, owner: Any, history: Any,
-                            snapshot: Callable[[], tuple[bool, Any]], presence: Any = None) -> Iterator[bool]:
+                            snapshot: Callable[[], tuple[bool, Any]], presence: Any = None,
+                            diagnostics: Any = None) -> Iterator[bool]:
     """Serialize final owner release with lazy construction after inputs have already retired."""
     if not mutex.acquire(blocking=False):
         raise AgentControlBusy('runtime construction or mutation is still active')
@@ -47,6 +48,8 @@ def close_runtime_ownership(mutex: Any, owner: Any, history: Any,
             controller.close()
         if presence is not None:
             presence.close()
+        if diagnostics is not None:
+            diagnostics.close()
         yield True
         history.close()
         owner.close()

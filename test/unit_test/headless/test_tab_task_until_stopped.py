@@ -54,7 +54,8 @@ def test_stop_sets_the_event_and_the_task_stays_busy_until_the_work_returns(owne
     assert task.start_until_stopped(work)
     assert task.stop() is True
     assert work.stopped.wait(10.0)
-    assert task.running and task.stopping
+    assert task.running
+    assert task.stopping
     assert task.start_until_stopped(_Step()) is False       # no second run while the first unwinds
     work.finish.set()
     assert pump_until(lambda: not task.running)

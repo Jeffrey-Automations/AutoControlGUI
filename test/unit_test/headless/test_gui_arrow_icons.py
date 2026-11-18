@@ -16,7 +16,8 @@ def test_a_chevron_is_drawn_once_at_three_scales_in_the_given_colour(qapp, tmp_p
     from PySide6.QtGui import QImage
     from je_auto_control.gui._arrow_icons import arrow_file
     path = arrow_file("chevron_down", "#9AA1AE", tmp_path)
-    assert path is not None and path.is_file()
+    assert path is not None
+    assert path.is_file()
     assert sorted(p.name for p in tmp_path.iterdir()) == [
         path.name, f"{path.stem}@2x.png", f"{path.stem}@3x.png"]
     image = QImage(str(path.with_name(f"{path.stem}@3x.png")))
@@ -24,7 +25,8 @@ def test_a_chevron_is_drawn_once_at_three_scales_in_the_given_colour(qapp, tmp_p
              if image.pixelColor(x, y).alpha() == 255}
     assert inked == {"#9aa1ae"}, "the stroke is the theme colour, nothing else"
     stamp = path.stat().st_mtime_ns
-    assert arrow_file("chevron_down", "#9aa1ae", tmp_path) == path and path.stat().st_mtime_ns == stamp
+    assert arrow_file("chevron_down", "#9aa1ae", tmp_path) == path
+    assert path.stat().st_mtime_ns == stamp
 
 
 def test_rules_place_both_controls_and_point_at_the_drawn_files(qapp, tmp_path):

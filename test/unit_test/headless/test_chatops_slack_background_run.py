@@ -407,7 +407,8 @@ def test_stop_called_from_a_command_handler_returns_at_once(slack, script, root,
         _start_long_run(made, slack, script)
         slack.say(2, "/halt")
         _Poll(made)
-        assert outcome["stopped"] is False and outcome["idle"] is False
+        assert outcome["stopped"] is False
+        assert outcome["idle"] is False
         assert outcome["elapsed"] < 2, "stop() from a handler waited out its timeout"
         assert slack.wait_for_posts(2)
         assert slack.texts() == ["halting", "run stopped. (the bot was stopped)"]

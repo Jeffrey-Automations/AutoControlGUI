@@ -10,6 +10,63 @@ from PySide6.QtWidgets import QApplication, QPushButton  # noqa: E402  # reason:
 from je_auto_control.gui.agent_tasks_tab import AgentTasksTab  # noqa: E402  # reason: optional Qt import
 
 
+@pytest.mark.parametrize("kind", ["fixture", "uia_fixture", "service"])
+def test_fixture_profile_uses_existing_target_editor_and_actions(monkeypatch, tmp_path, kind):
+    import json
+    import shiboken6
+    from headless.test_agent_fixture_profiles import config
+    if kind == "uia_fixture":
+        from headless.test_agent_uia_profiles import config
+    elif kind == "service":
+        from headless.test_agent_service_profiles import config
+    app = QApplication.instance() or QApplication([])
+    tab = AgentTasksTab()
+    submitted = []
+    value = config(tmp_path)
+    try:
+        monkeypatch.setattr(tab, "_dispatch", lambda *args: submitted.append(args))
+        tab._target_operation.setCurrentIndex(tab._target_operation.findData("register"))
+        tab._target_request.setPlainText(json.dumps(value))
+        dict(tab.menu_actions())["agent_target_apply"]()
+        assert submitted == [("target", {"operation": "register", "request": value})]
+        tab._target_operation.setCurrentIndex(tab._target_operation.findData("probe"))
+        tab._target_request.setPlainText(json.dumps({"name": value["name"]}))
+        dict(tab.menu_actions())["agent_target_apply"]()
+        assert submitted[-1] == ("target", {"operation": "probe", "request": {"name": value["name"]}})
+    finally:
+        tab.close()
+        shiboken6.delete(tab)
+        app.processEvents()
+
+
+@pytest.mark.parametrize("tools,criterion", [
+    (["AC_increment"], {"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}),
+    ([], {"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}),
+    (["AC_service_start"], {"kind": "service_state", "tool": "AC_service_start", "state": "running"}),
+    (["AC_service_stop"], {"kind": "service_state", "tool": "AC_service_stop", "state": "stopped"}),
+])
+def test_task_scope_editor_preserves_completion_for_shared_submit(monkeypatch, tools, criterion):
+    import json
+    import shiboken6
+    app = QApplication.instance() or QApplication([])
+    tab = AgentTasksTab()
+    submitted = []
+    try:
+        monkeypatch.setattr(tab, "_dispatch", lambda *args: submitted.append(args))
+        tab._goal.setText("verify reviewed fixture")
+        tab._target.setText("fixture")
+        tab._scope.setPlainText(json.dumps({"allowed_tools": tools, "success_criteria": [criterion]}))
+        dict(tab.menu_actions())["agent_submit"]()
+        operation, payload = submitted[0]
+        assert operation == "submit" and payload["spec"]["success_criteria"] == [criterion]
+        assert payload["spec"]["target"] == "fixture"
+        assert payload["spec"]["allowed_tools"] == tools
+    finally:
+        tab.close()
+        shiboken6.delete(tab)
+        app.processEvents()
+
+
 def test_task_workspace_is_idle_and_uses_actions(monkeypatch):
     app = QApplication.instance() or QApplication([])
     calls = []

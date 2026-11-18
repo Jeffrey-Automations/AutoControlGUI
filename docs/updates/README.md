@@ -58,6 +58,37 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261119-03 | 2026-11-19 | Throttle full checkpoints inside read-only UIA captures | #incident #ci #agent #uia | [2026-11-c](2026-11-c.md) |
+| U-20261119-02 | 2026-11-19 | Order captures with a fine clock; keep Docker helpers on the full package | #incident #ci #agent | [2026-11-c](2026-11-c.md) |
+| U-20261119-01 | 2026-11-19 | Repair PR #556 CI: read-only guard, UIA checkpoint cost, Docker helper imports | #incident #ci #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-36 | 2026-11-18 | Launch pinned fixtures only from paths nobody else can redirect | #incident #security #process-memory | [2026-11-c](2026-11-c.md) |
+| U-20261118-35 | 2026-11-18 | Refuse UNC, pipe and device paths as pinned artifacts | #incident #security #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-34 | 2026-11-18 | Gate viewer Opus audio on approval and allow_audio | #incident #security #remote-desktop | [2026-11-c](2026-11-c.md) |
+| U-20261118-28 | 2026-11-18 | Bind zero-action UI profiles to a fixed pinned worker | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
+| U-20261118-27 | 2026-11-18 | Retain UI fixture resources through managed startup and cleanup | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
+| U-20261118-26 | 2026-11-18 | Preserve partial fields from scoped read-only UI observations | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
+| U-20261118-25 | 2026-11-18 | Bind UI startup to retained process and window ownership | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
+| U-20261118-24 | 2026-11-18 | Build a separate owned UI observation fixture | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
+| U-20261118-23 | 2026-11-18 | Pin required fields across semantic observation sources | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-22 | 2026-11-18 | Corroborate fixture memory with its owned IPC snapshot | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-21 | 2026-11-18 | Preserve multi-source diagnostics through semantic runtime gates | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-20 | 2026-11-18 | Bound static fixture diagnostics to retained helper ownership | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-08 | 2026-11-18 | Prepare a native fixture artifact without executing it | #done #process-memory | [2026-11-c](2026-11-c.md) |
+| U-20261118-07 | 2026-11-18 | Bind fixture IPC to its measured launch handle | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-06 | 2026-11-18 | Carry fixture control over owned cancellable RPC | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-05 | 2026-11-18 | Ground fixture commands in reviewed memory observations | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-04 | 2026-11-18 | Preserve closed memory failure reasons across helpers | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-03 | 2026-11-18 | Bind semantic tasks to reviewed memory readers | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-02 | 2026-11-18 | Fence fixture changes and retain operation receipts | #done #process-memory | [2026-11-c](2026-11-c.md) |
+| U-20261118-01 | 2026-11-18 | Verify semantic completion from fresh target state | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261117-11 | 2026-11-17 | Guard owned semantic helpers through dispatch and cleanup | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261117-10 | 2026-11-17 | Ground semantic commands with operation-bound receipts | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261117-09 | 2026-11-17 | Preserve checked memory revisions for subsequent grounding | #done #process-memory | [2026-11-c](2026-11-c.md) |
+| U-20261117-08 | 2026-11-17 | Validate fixture schema and bind launch locations | #done #process-memory | [2026-11-c](2026-11-c.md) |
+| U-20261117-07 | 2026-11-17 | SonarCloud cleanup, tests: 202 new-code findings on main | #sonarcloud #cleanup #test | [2026-11-b](2026-11-b.md) |
+| U-20261117-06 | 2026-11-17 | SonarCloud cleanup, product code: 69 new-code findings on main | #sonarcloud #cleanup | [2026-11-b](2026-11-b.md) |
+| U-20261117-05 | 2026-11-17 | The workspace-sync example checks its generation path, clearing Sonar's blocker | #security #sonarcloud #examples | [2026-11-b](2026-11-b.md) |
+| U-20261117-04 | 2026-11-17 | Release 1.2.2: PR #552 merged into main | #release | [2026-11-b](2026-11-b.md) |
 | U-20261117-03 | 2026-11-17 | Two presence-source drain inspects retry a missed deadline | #incident #ci #test #agent | [2026-11-b](2026-11-b.md) |
 | U-20261117-02 | 2026-11-17 | The deployment plan's rollback method is decided | #decision #deployment | [2026-11-b](2026-11-b.md) |
 | U-20261117-01 | 2026-11-17 | M0 closed: the first target is the owned fixture | #done #process-memory #decision | [2026-11-b](2026-11-b.md) |
@@ -882,3 +913,19 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 | U-20261025-15 | 2026-10-25 | Hand renewed read-only completion to its original local DAG | #done #agent #handoff #recovery #authorization | [2026-10-c](2026-10-c.md) |
 | U-20261025-16 | 2026-10-25 | Adopt explicit non-DAG completion evidence without widening task access | #done #agent #handoff #recovery #authorization | [2026-10-c](2026-10-c.md) |
 | U-20261029-03 | 2026-10-29 | Verify lazy facade delivery against the complete suite | #done #agent #startup #verification | [2026-10-e](2026-10-e.md) |
+| U-20261118-09 | 2026-11-18 | Check complete pinned executable ranges through bounded reads | #done #process-memory | [2026-11-c](2026-11-c.md) |
+| U-20261118-10 | 2026-11-18 | Own fixture startup through managed completion and retirement | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-11 | 2026-11-18 | Prepare static-by-default native fixture smoke tooling | #done #process-memory #verification | [2026-11-c](2026-11-c.md) |
+| U-20261118-12 | 2026-11-18 | Prepare fixed native fixture page layouts | #done #process-memory #verification | [2026-11-c](2026-11-c.md) |
+| U-20261118-13 | 2026-11-18 | Attribute page cases to one fresh payload observation | #done #process-memory #verification | [2026-11-c](2026-11-c.md) |
+| U-20261118-14 | 2026-11-18 | Acquire fixture resources inside pinned managed readiness | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-15 | 2026-11-18 | Refresh pinned semantic worker authority at access boundaries | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-16 | 2026-11-18 | Route semantic helpers through non-display ownership | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-17 | 2026-11-18 | Require cleanup in the semantic target contract | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-18 | 2026-11-18 | Package a pinned host-configured fixture worker | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-19 | 2026-11-18 | Bind managed fixture profiles to the loaded deployment | #done #process-memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-29 | 2026-11-18 | Retain query-only local service status ownership | #done #process-memory #service | [2026-11-c](2026-11-c.md) |
+| U-20261118-30 | 2026-11-18 | Keep scoped service controls and readback on one retained owner | #done #process-memory #service | [2026-11-c](2026-11-c.md) |
+| U-20261118-31 | 2026-11-18 | Verify managed service readback against its original acceptance | #done #process-memory #service #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-32 | 2026-11-18 | Bind service helper IPC to retained ownership | #done #process-memory #service #agent | [2026-11-c](2026-11-c.md) |
+| U-20261118-33 | 2026-11-18 | Pin service profiles to a fixed deployment and operation ceiling | #done #process-memory #service #agent | [2026-11-c](2026-11-c.md) |

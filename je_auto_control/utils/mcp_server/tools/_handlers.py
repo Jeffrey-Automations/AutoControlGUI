@@ -6,7 +6,7 @@ survive the JSON-RPC boundary. Wrapper imports are lazy to keep the
 top-level MCP server boot cheap.
 """
 import os
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from je_auto_control.utils.mcp_server.tools._handlers_vision_executor import (
     anchor_locate,
@@ -330,17 +330,17 @@ def parse_number(text: str, locale: str = "en_US") -> Dict[str, int]:
     return {"value": _parse(text, locale)}
 
 
-def format_decimal(value: Union[int, float], locale: str = "en_US") -> Dict[str, str]:
+def format_decimal(value: int | float, locale: str = "en_US") -> Dict[str, str]:
     from je_auto_control.utils.locale_parse import format_decimal as _fmt
     return {"text": _fmt(value, locale)}
 
 
-def format_currency(value: Union[int, float], currency: str, locale: str = "en_US") -> Dict[str, str]:
+def format_currency(value: int | float, currency: str, locale: str = "en_US") -> Dict[str, str]:
     from je_auto_control.utils.locale_parse import format_currency as _fmt
     return {"text": _fmt(value, currency, locale)}
 
 
-def format_date(value: Union[str, "date"], locale: str = "en_US", fmt: str = "medium") -> Dict[str, str]:
+def format_date(value: "str | date", locale: str = "en_US", fmt: str = "medium") -> Dict[str, str]:
     from je_auto_control.utils.locale_parse import format_date as _fmt
     return {"text": _fmt(value, locale, fmt)}
 
@@ -378,7 +378,7 @@ def json_extract(data: Any, mapping: Mapping[str, str]) -> Dict[str, Dict[str, A
     return {"result": _x(data, mapping)}
 
 
-def validate_json(data: Any, schema: Union[Dict[str, Any], bool]) -> Dict[str, Any]:
+def validate_json(data: Any, schema: Dict[str, Any] | bool) -> Dict[str, Any]:
     from je_auto_control.utils.json_schema import validate_json as _v
     return _v(data, schema).to_dict()
 
@@ -403,7 +403,7 @@ def merge_patch(doc: Any, patch: Any) -> Dict[str, Any]:
     return {"result": _merge(doc, patch)}
 
 
-def search_documents(docs: Union[Dict[str, str], Iterable[Tuple[str, str]]], query: str,
+def search_documents(docs: Dict[str, str] | Iterable[Tuple[str, str]], query: str,
                      top_k: int = 10, mode: str = "bm25") -> Dict[str, List[Dict[str, Any]]]:
     from je_auto_control.utils.search_index import search_documents as _search
     hits = _search(docs, query, top_k=int(top_k), mode=mode)

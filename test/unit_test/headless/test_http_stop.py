@@ -126,7 +126,8 @@ def test_a_stopped_run_sends_nothing(silent):
 def test_inside_a_run_a_reply_still_arrives_whole(answering):
     with stoppable_run(token=StopToken("http-answer")):
         response = _call(answering.url)
-    assert response["status"] == 200 and response["json"] == {"ok": True}
+    assert response["status"] == 200
+    assert response["json"] == {"ok": True}
 
 
 def test_inside_a_run_the_timeout_still_applies(silent):

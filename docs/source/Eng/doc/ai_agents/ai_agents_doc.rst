@@ -1,6 +1,18 @@
 AI agents and computer use
 ===========================
 
+Host-selected semantic targets accept a success criterion such as
+``{"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}``
+for the test-owned counter. The command must already be allowed by the task.
+Completion reads fresh state and matches the original recorded target identity,
+adapter, schema and source before comparing fields without type coercion.
+The complete capture interval must fall inside the current read request using
+the same host monotonic clock. Cached observations are rejected; changed identity,
+missing fields and uncertain effects cannot prove success.
+The Agent Tasks scope JSON editor preserves this criterion through Submit.
+This adds no memory permission or native target registration. Native memory
+adapter integration and acceptance remain tracked in Progress.md.
+
 Transfer management now shares ``manage_agent_transfer(operation, request)``, ``AC_agent_transfer``,
 ``ac_agent_transfer``, authenticated ``POST /agent/transfer``, and Script Builder metadata. The CLI uses
 ``agent-task transfer --operation review_export --request request.json``. Review returns an approval
@@ -491,7 +503,7 @@ Managed workflow waits (workflow_wait / AC_workflow_wait) poll only exact scoped
 
 AgentHumanReview identifies an unsaved-content or unknown-dialog gate. It persists waiting_user and retires input ownership, including for external observe requests; explicit resume still rechecks the gate. Windows detection uses native dialog/disabled-owner evidence and known English/Chinese/Japanese unsaved labels. Workspace tasks also pause for leading/trailing asterisks in document titles; a window entry may supply unsaved_selector and unsaved_value for an application-specific indicator before layout changes. These checks do not infer every application's dirty state. Recognized standard file pickers use a context-local driver on the existing AC_handle_file_dialog executor: exact unique title, same PID, confirmed foreground and canonical rooted absolute paths. UIA control patterns must belong to the actual owned root window, even when another window shares its PID. All behavior has fake-native/loopback coverage; actual platform acceptance remains unverified.
 
-Host-reviewed targets use AgentTargetProfile and manage_agent_target (AC_agent_target; register/get/disable/enable/probe). Names and configuration are immutable; desktop/file/browser adapters are currently supported; unimplemented kinds are rejected and optional browser helper_python is host-reviewed. Tasks pin the host profile digest and cannot expand its tools, applications, roots or network origins. Availability persists across restart and is checked at dispatch; disabling requests pause/cleanup, while enabling requires explicit task resume. list_agent_targets / AC_agent_target_list / CLI agent-task targets expose passive metadata with readiness=not_probed and native_evidence=not_recorded. Full configuration requires manage_hosts; CLI agent-task target and the GUI Host targets page use the same service. Live anonymous MCP tool sessions have operator authority across direct and legacy wrapper calls; MCP host management requires an authenticated administrator. Trusted direct Python callers remain unchanged. Browser automation belongs to WebRunner (je_web_runner), with D:/Codes/WebRunner as the development source; browser profiles use the managed je_web_runner SDK contract, and dependency probes do not establish native readiness.
+Host-reviewed targets use AgentTargetProfile and manage_agent_target (AC_agent_target; register/get/disable/enable/probe). Names and configuration are immutable; desktop/file/browser/fixture adapters are configured; unimplemented kinds are rejected and optional browser helper_python is host-reviewed. Tasks pin the host profile digest and cannot expand its tools, applications, roots or network origins. Availability persists across restart and is checked at dispatch; disabling requests pause/cleanup, while enabling requires explicit task resume. list_agent_targets / AC_agent_target_list / CLI agent-task targets expose passive metadata with readiness=not_probed and native_evidence=not_recorded. Full configuration requires manage_hosts; CLI agent-task target and the GUI Host targets page use the same service. Live anonymous MCP tool sessions have operator authority across direct and legacy wrapper calls; MCP host management requires an authenticated administrator. Trusted direct Python callers remain unchanged. Fixture profiles accept only config_path/config_sha256 and AC_fixture_set_state, with no roots or applications. They use the fixed isolated packaged worker and require matching bootstrap/configure deployment bindings. Registration remains inert. Explicit fixture probes inspect pinned static artifacts in a separate background helper with bootstrap/inspection deadlines, live management checks and retry-retained shutdown ownership. Success reports static_artifacts_ready, fixture_execution=not_run and native_evidence=not_recorded; it does not attest loaded code. Native fixture execution remains paused. Browser automation belongs to WebRunner (je_web_runner), with D:/Codes/WebRunner as the development source; browser profiles use the managed je_web_runner SDK contract, and dependency probes do not establish native readiness.
 
 Existing browser automation, including open_path(URL) and AC_open_path, delegates to WebRunner (Python package je_web_runner). URL plans now report backend=je_web_runner; callers inspecting the previous webbrowser descriptor should use the new value. Signatures and local-file opening stay compatible. URL execution requires the configured WebRunner project and propagates WebRunnerBridgeError when unavailable, without opening an OS browser as a fallback. The development source is D:/Codes/WebRunner. Planning and injected-opener tests remain usable without that package; browser protocol support is determined by WebRunner and its selected browser. Existing dedicated browser GUI/MCP/AC paths and recorded WR_* actions share the same bridge.
 
@@ -1199,3 +1211,68 @@ Installed dashboard resources
 Installed wheel and source distributions include the REST Dashboard and Swagger HTML, CSS and
 JavaScript resources. The same localhost REST routes and authentication rules apply to an
 installed package; serving static pages grants no task or desktop input authority.
+
+Host-selected semantic adapters may declare a fixed multi-source observation contract. Existing observe calls preserve partial/conflicting reports; actions and completion require fresh complete agreement from every source. Helper bootstrap pins the source contract and the full report crosses IPC before conversion to a command snapshot. The fixture now combines reviewed memory reads and its retained read-only IPC snapshot under one capture/commit lock, while cleanup can interrupt IPC. Injected-reader and hidden-helper tests cover source disagreement, partial memory failures and precommit agreement. Native UI deployment trust, DOM integration and desktop acceptance remain pending.
+
+Semantic observation field scopes
+---------------------------------
+
+Multi-source report version 3 requires host-defined fields in every source.
+A field omitted by all sources remains missing and cannot authorize a command
+or prove completion. Helper bootstrap and the original journal witness bind
+the same field scope. Versions 1 and 2 and out-of-scope fields are rejected.
+A tagged partial source keeps successful values separately from fixed per-field
+failures. Valid empty strings and false values remain distinct from unreadable,
+unsupported, ambiguous, protected or missing fields. Partial sources and complete
+best-effort captures grant no action or completion authority.
+
+The native fixture builder accepts ``--kind uia`` for a separate owned hidden-window
+artifact. Its static manifest remains schema 2. The internal startup owner validates
+the exact challenge, retained process and current HWND owner; its channel accepts
+no commands. ``ScopedUiaSource`` checks the original HWND/PID and pins the root runtime
+ID across captures. It verifies raw-tree ancestry around reads, bounds traversal,
+protects password text and keeps COM calls on the source owner thread.
+
+``UiaObservationTarget`` creates COM lazily during managed readiness and publishes
+read-only UIA results through the existing observation API. It has no Invoke,
+SetValue, focus or input operations. Injected COM and hidden Python helper tests
+cover partial fields, managed reporting and timeout retirement. Native deployment
+trust and all desktop acceptance remain pending. No native UI fixture execution
+or desktop noninterference is claimed.
+
+The internal owned UI target retains its launcher and both image leases before
+attestation, attempts every owner during cleanup, and retains failed cleanup for
+retry. A publication lock prevents late source installation after shutdown. The
+native factory only constructs owners; native deployment trust
+and native acceptance remain pending.
+
+Host management can register a ``uia_fixture`` profile with empty ``allowed_tools``,
+``roots`` and ``apps``, and only ``config_path``/``config_sha256`` settings. It uses a fixed
+isolated worker and validates deployment, profile and target pins before acquisition.
+Both endpoints refuse commands. External tasks may use an empty tool scope only
+without planned actions; completion criteria remain required and an empty plan
+cannot prove completion. UI partial/best-effort reports remain diagnostic.
+Registration and probe acquire nothing; probe reports ``not_supported`` and
+``native_evidence=not_recorded``. The existing target API, CLI and GUI JSON editor
+carry this profile. Injected and hidden-helper tests do not establish native trust.
+
+Host-selected in-process service adapters can use the closed ``service_state`` criterion:
+``{"kind":"service_state","tool":"AC_service_start","state":"running"}`` or STOP/stopped.
+It requires the matching confirmed acceptance and a new SCM report from the same
+retained owner after acceptance. A passing result reports SCM state, not atomic
+completion, health or desktop noninterference. These tool names are adapter-scoped,
+not global executor commands. Existing task APIs and the GUI JSON editor carry the
+criterion. The host-reviewed ``service`` profile pins ``config_path``, ``config_sha256``
+and an ASCII ``service_key``. Its fixed worker checks deployment identity and the
+operation ceiling before task scope. Registration, reload and probe do not read
+the deployment or access SCM; native acceptance remains pending.
+Every pinned path (each profile's ``config_path`` and the image a deployment names) must be
+a local drive path: UNC shares, ``\\.\pipe\`` names, ``\\?\`` device paths and ``..`` segments are
+refused, so registering a profile cannot make the host send its credentials to another machine.
+Before a fixture image runs, its lease also refuses a location another account could change:
+every directory from the drive root down must be a real directory (no junction or symlink) that
+only SYSTEM, Administrators, TrustedInstaller and the running user may rename, delete, re-ACL or
+add files to, and the leased file's final path must be the configured one. Deploy fixtures under
+a protected directory such as ``%LOCALAPPDATA%``; a drive root that grants Authenticated Users Modify
+(common on secondary drives) or a shared ``%TEMP%`` is refused. The fixture starts in its own
+directory with a minimal environment: a system-only ``PATH`` and none of the host's tokens or keys.

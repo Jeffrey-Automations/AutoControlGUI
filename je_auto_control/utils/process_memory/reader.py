@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import functools
 import threading
 import time
 from typing import Callable, Mapping, NoReturn, TypeVar
@@ -111,7 +112,7 @@ class _Operation:
             count = min(size - len(collected), region.base + region.size - current)
             self.bytes_read += count
             self.regions_read += 1
-            chunk = _provider_call(lambda: handle.read(current, count))
+            chunk = _provider_call(functools.partial(handle.read, current, count))
             self.check()
             if type(chunk) is not bytes or len(chunk) != count:
                 _fail(FailureReason.PARTIAL_READ)
@@ -206,7 +207,7 @@ def _values(decoded: Mapping[str, Scalar], fields: tuple[str, ...], limit: int) 
 class ProcessMemoryReader:
     """Run reviewed queries; failed closes remain owned until an explicit cleanup retry."""
 
-    def __init__(self, provider: ProcessProvider, *, clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(self, provider: ProcessProvider, *, clock: Callable[[], float] = time.perf_counter) -> None:
         self._provider = provider
         self._clock = clock
         self._pending: list[ProcessHandle] = []
@@ -307,4 +308,5 @@ class ProcessMemoryReader:
         return Observation(uuid4().hex, target_id, operation.expected.digest, probe.probe_id, probe.schema_version,
                            started, operation.clock(), values,
                            "sequence_checked" if before is not None else "best_effort",
-                           operation.bytes_read, operation.regions_read)
+                           operation.bytes_read, operation.regions_read,
+                           revision=int.from_bytes(before, "little") if before is not None else None)

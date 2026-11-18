@@ -423,7 +423,7 @@ def _end_cancelled(channel: Any, transfer_id: str) -> None:
     try:
         channel.send_typed(MessageType.FILE_END,
                            encode_end(transfer_id, status="cancelled", error="cancelled by the sender"))
-    except (OSError, ConnectionError, RuntimeError) as error:
+    except (OSError, RuntimeError) as error:  # ConnectionError is an OSError
         autocontrol_logger.debug("file transfer %s: cancel notice not sent: %r", transfer_id, error)
 
 

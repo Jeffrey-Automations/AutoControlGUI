@@ -364,8 +364,9 @@ def test_an_advertised_audio_track_starts_an_opus_receiver(bridge,
             self.consumed = []
             receivers.append(self)
 
-        def consume(self, track):
+        def consume(self, track, *, admit):
             self.consumed.append(track)
+            self.admit = admit
 
     monkeypatch.setattr(
         "je_auto_control.utils.remote_desktop.webrtc_audio.OpusMicReceiver",
@@ -376,6 +377,8 @@ def test_an_advertised_audio_track_starts_an_opus_receiver(bridge,
     track = Track("audio")
     FakePeerConnection.instances[0].fire("track", track)
     assert receivers[0].consumed == [track]
+    # Not yet approved: the receiver drains the track but plays nothing.
+    assert receivers[0].admit() is False
 
 
 def test_a_second_audio_track_does_not_open_a_second_receiver(bridge,
@@ -384,8 +387,9 @@ def test_a_second_audio_track_does_not_open_a_second_receiver(bridge,
         def __init__(self) -> None:
             self.consumed = []
 
-        def consume(self, track):
+        def consume(self, track, *, admit):
             self.consumed.append(track)
+            self.admit = admit
 
     monkeypatch.setattr(
         "je_auto_control.utils.remote_desktop.webrtc_audio.OpusMicReceiver",
@@ -547,8 +551,9 @@ def test_a_teardown_failure_does_not_abort_the_rest_of_the_teardown():
     receiver = Stoppable()
     host._host_voice_track = voice
     host._opus_audio_receiver = receiver
+    stopping = host._async_stop()
     with pytest.raises(PeerStopFailed, match="host voice"):
-        asyncio.run(host._async_stop())
+        asyncio.run(stopping)
     assert host._host_voice_track is voice
     assert receiver.stopped, "teardown continued past the failure"
 

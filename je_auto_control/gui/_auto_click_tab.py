@@ -1,7 +1,7 @@
 """Independent auto-click controls with owned timer and cancellable background input."""
 from dataclasses import dataclass
 from functools import partial
-from typing import Callable, Optional, Sequence, Tuple, Union
+from typing import Callable, Optional, Sequence, Tuple
 
 from PySide6.QtCore import QTimer
 
@@ -38,7 +38,7 @@ class _Click:
     count: int
 
 
-def _form_panel(rows: Sequence[Tuple[Optional[QWidget], Union[QWidget, QLayout]]]) -> QWidget:
+def _form_panel(rows: Sequence[Tuple[Optional[QWidget], QWidget | QLayout]]) -> QWidget:
     """A frameless panel holding ``(label, field)`` form rows; a ``None`` label spans the row."""
     panel = QWidget()
     panel.setProperty("role", "bare")

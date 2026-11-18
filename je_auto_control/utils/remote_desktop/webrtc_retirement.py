@@ -50,7 +50,7 @@ class CleanupAttempt:
         except PeerStopPending:
             self.pending.append(label)
             return False
-        except BaseException as error:  # reason: finish independent cleanup before preserving controls
+        except BaseException as error:  # NOSONAR  # reason: finish other cleanup; controls preserved
             self._errors.append(error)
             self.failed.append(label)
             return False
@@ -62,7 +62,7 @@ class CleanupAttempt:
         except PeerStopPending:
             self.pending.append(label)
             return False
-        except BaseException as error:  # reason: retain failures until independent asynchronous cleanup has run
+        except BaseException as error:  # NOSONAR  # reason: failures kept until async cleanup has run
             self._errors.append(error)
             self.failed.append(label)
             return False
@@ -83,9 +83,14 @@ class CleanupAttempt:
 
 
 def stop_resource(resource: Stoppable | None, label: str) -> None:
-    """Return only after the resource's stop call succeeds; preserve its error."""
-    if resource is not None:
+    """Return only after the resource's stop call succeeds; its error is raised unchanged, noting ``label``."""
+    if resource is None:
+        return
+    try:
         resource.stop()
+    except BaseException as error:
+        error.add_note(f"while stopping {label}")
+        raise
 
 
 class PeerRetirement:
@@ -178,7 +183,7 @@ class PeerRetirement:
         def completed(result: Future[None]) -> None:
             try:
                 result.result()
-            except BaseException as error:  # reason: Relay every terminal outcome to the retained future.
+            except BaseException as error:  # NOSONAR  # reason: relay every outcome to the retained future
                 retained.set_exception(error)
             else:
                 retained.set_result(None)

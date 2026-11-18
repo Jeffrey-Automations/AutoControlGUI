@@ -198,7 +198,8 @@ def test_a_parallel_branch_reports_under_its_step_with_its_index_as_run(runner):
     step = StepPosition(1, 1, "AC_parallel")
     assert branch == {5: (step, StepPosition(1, 1, "AC_get_var")),
                       6: (step, StepPosition(2, 1, "AC_get_var"))}
-    assert seen[-1][0] == "AC_parallel" and seen[-1][3] == (step,)
+    assert seen[-1][0] == "AC_parallel"
+    assert seen[-1][3] == (step,)
     assert seen[-1][2] is list(record.values())[0], "what the branches answered is in the block's result"
 
 

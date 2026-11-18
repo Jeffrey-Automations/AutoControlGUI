@@ -41,7 +41,8 @@ def test_a_closed_section_is_only_as_tall_as_its_title_padding(qapp):
         assert section.property("collapsed") is True
         section.setChecked(True)
         qapp.processEvents()
-        assert section.body.isVisible() and section.property("collapsed") is False
+        assert section.body.isVisible()
+        assert section.property("collapsed") is False
         assert section.height() > margins.top() + margins.bottom() + section.body.sizeHint().height() - 1
     finally:
         window.hide()
@@ -78,5 +79,6 @@ def test_a_language_switch_does_not_give_the_wrapped_group_its_title_back(qapp):
     inner = host._tr(QGroupBox(), "rd_webrtc_sync_group")
     section = host._wrap_collapsed(inner, "rd_webrtc_sync_group")
     host.retranslate()
-    assert inner.title() == "" and section.title() != ""
+    assert inner.title() == ""
+    assert section.title() != ""
     host.deleteLater()

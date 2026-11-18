@@ -5,7 +5,7 @@ they survive the JSON-RPC boundary, with every project import lazy -- split out
 by theme because ``_handlers.py`` is over the 750-line limit.
 """
 import os
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence
 
 if TYPE_CHECKING:
     from je_auto_control.utils.agent_memory import AgentMemory
@@ -277,8 +277,8 @@ def user_list() -> Dict[str, List[Dict[str, Any]]]:
     return {"users": list_users()}
 
 
-def egress_allow(allow: Union[str, Sequence[str], None] = None,
-                 deny: Union[str, Sequence[str], None] = None) -> Dict[str, Any]:
+def egress_allow(allow: str | Sequence[str] | None = None,
+                 deny: str | Sequence[str] | None = None) -> Dict[str, Any]:
     from je_auto_control.utils.egress import set_egress_policy
     policy = set_egress_policy(allow, deny)
     return {"allow": policy.allow, "deny": policy.deny}
@@ -475,12 +475,12 @@ def check_licenses(components: Any,
     return {"violations": violations, "count": len(violations)}
 
 
-def jwt_encode(claims: Mapping[str, Any], key: Union[str, bytes], alg: str = "HS256") -> Dict[str, str]:
+def jwt_encode(claims: Mapping[str, Any], key: str | bytes, alg: str = "HS256") -> Dict[str, str]:
     from je_auto_control.utils.jwt import encode_jwt
     return {"token": encode_jwt(claims, key, alg=alg)}
 
 
-def jwt_decode(token: str, key: Union[str, bytes], algorithms: Optional[Sequence[str]] = None,
+def jwt_decode(token: str, key: str | bytes, algorithms: Optional[Sequence[str]] = None,
                audience: Any = None, leeway: float = 0.0) -> Dict[str, Any]:
     from je_auto_control.utils.jwt import ClaimsPolicy, JwtError, decode_jwt
     policy = ClaimsPolicy(algorithms=tuple(algorithms) if algorithms
@@ -531,7 +531,7 @@ def retry_after(response: Mapping[str, Any]) -> Dict[str, float]:
     return {"delay": next_delay(response)}
 
 
-def http_replay(cassette: Union[Dict[str, Any], Sequence[Mapping[str, Any]]], url: str,
+def http_replay(cassette: Dict[str, Any] | Sequence[Mapping[str, Any]], url: str,
                 method: str = "GET") -> Dict[str, Dict[str, Any]]:
     from je_auto_control.utils.http_cassette import Cassette
     interactions = (cassette.get("interactions", [])
@@ -554,7 +554,7 @@ def verify_provenance(statement: Mapping[str, Any], files: Mapping[str, str]) ->
     return {"ok": not mismatches, "mismatches": mismatches}
 
 
-def evaluate_flag(flags: Union[Dict[str, Any], "FlagStore"], key: str,
+def evaluate_flag(flags: "Dict[str, Any] | FlagStore", key: str,
                   context: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
     from je_auto_control.utils.feature_flags import (
         FlagStore, evaluate_flag as _ev)
@@ -562,7 +562,7 @@ def evaluate_flag(flags: Union[Dict[str, Any], "FlagStore"], key: str,
     return _ev(store, key, context or {})
 
 
-def flag_enabled(flags: Union[Dict[str, Any], "FlagStore"], key: str,
+def flag_enabled(flags: "Dict[str, Any] | FlagStore", key: str,
                  context: Optional[Mapping[str, Any]] = None,
                  default: bool = False) -> Dict[str, bool]:
     from je_auto_control.utils.feature_flags import FlagStore, is_enabled

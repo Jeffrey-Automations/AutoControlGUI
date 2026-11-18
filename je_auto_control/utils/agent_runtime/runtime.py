@@ -1,7 +1,6 @@
 """Shared managed-task lifecycle with fenced dispatch and evidence-based completion."""
 from __future__ import annotations
 
-import hashlib
 import json
 import threading
 import time
@@ -17,7 +16,10 @@ from je_auto_control.utils.agent_runtime.context import (
 )
 from je_auto_control.utils.agent_runtime.models import (
     AgentActionRequest, AgentActionResult, AgentObservation, AgentTaskHandle, AgentTaskResult,
-    AgentTaskSpec, TERMINAL, detached, freeze, thaw,
+    AgentTaskSpec, TERMINAL, freeze, thaw,
+)
+from je_auto_control.utils.agent_runtime.target_dispatch import (
+    fingerprint, grounding_details, observe as observe_target, perform as perform_target,
 )
 from je_auto_control.utils.agent_runtime.ownership import ControlBroker, ControlLease
 from je_auto_control.utils.agent_runtime.policy import (
@@ -59,10 +61,6 @@ from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 from je_auto_control.utils.script_vars.execution import execution_scope
 
 _ERRORS = (AutoControlException, OSError, RuntimeError, TypeError, ValueError, LookupError)
-
-
-def _fingerprint(observation: Mapping[str, Any]) -> str:
-    return hashlib.sha256(json.dumps(detached(observation), sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def _identity_dict() -> dict[str, Any]:
@@ -387,7 +385,7 @@ class AgentRuntime:
                 row = self._activate(row)
                 try:
                     with self.broker.dispatch(self._leases[task_id]):
-                        data = detached(self._target(row).observe())
+                        data = observe_target(self._target(row))
                         self._token(task_id).checkpoint()
                         observation = AgentObservation(uuid.uuid4().hex, task_id, time.time(), freeze(data))
                         self._resume.record(row, observation, self._target(row))
@@ -406,8 +404,8 @@ class AgentRuntime:
         age = time.monotonic() - self._observation_times.get(row["id"], float("-inf"))
         if not 0 <= age <= 30 or time.time() - observation.captured_at > 30:
             raise AgentObservationStale("observation has expired")
-        current = self._target(row).observe()
-        if _fingerprint(current) != _fingerprint(observation.data):
+        target = self._target(row)
+        if fingerprint(target, observe_target(target)) != fingerprint(target, observation.data):
             self._observations.pop(row["id"], None)
             raise AgentObservationStale("observation changed; observe again before acting")
 
@@ -433,7 +431,8 @@ class AgentRuntime:
         observation = self._observations[task_id]
         arguments, grounding = resolve_action(request.tool, request.arguments, request.reference, observation.data)
         TaskPolicy(AgentTaskSpec.from_dict(row["spec"])).check(request.tool, arguments)
-        grounding.update(observation_id=observation.observation_id, fingerprint=_fingerprint(observation.data))
+        target = self._target(row)
+        grounding.update(grounding_details(target, observation.data, observation.observation_id))
         self._observations.pop(task_id, None)
         self._observation_times.pop(task_id, None)
         action_id = self.store.prepare(task_id, request.tool, durable_payload(arguments),
@@ -443,7 +442,8 @@ class AgentRuntime:
             check_task_authority(self, task_id)
             self.evidence.action(task_id, self.store.actions(task_id)[-1])
             self.store.settle(action_id, "dispatched")
-            result = self._target(row).perform(request.tool, arguments)
+            result = perform_target(target, request.tool, arguments,
+                                    observation=observation.data, operation_id=action_id)
             result = durable_payload(result)
             self.store.settle(action_id, "confirmed", result)
             self.evidence.action(task_id, self.store.actions(task_id)[-1], finished=True)
@@ -471,7 +471,7 @@ class AgentRuntime:
                     if not self.store.transition(task_id, "running", "verifying"):
                         return self.get(task_id)
                     with self.broker.dispatch(self._leases[task_id]):
-                        observations = detached(self._target(row).observe())
+                        observations = observe_target(self._target(row))
                         evidence_policy, receipts = completion_evidence(self, row)
                         reports = verify(evidence_policy, receipts, observations,
                                          browser_read=getattr(self._target(row), "verify_browser", None))
@@ -663,7 +663,7 @@ class AgentRuntime:
             return
         retire_runtime_inputs(self._transfers, list(self._leases), self._token, self._retire, self._retained_browsers)
         with close_runtime_ownership(self._mutex, self._owner_lock, self.evidence.history,
-                                     lambda: (self._closed, self._transfers), self._presence) as retiring:
+                            lambda: (self._closed, self._transfers), self._presence, self.target_profiles) as retiring:
             if retiring:
                 self._closed = True
 

@@ -31,6 +31,7 @@ class TaskPolicy:
         if set(spec.allowed_tools) & {"AC_browser_upload", "AC_browser_download"} and not spec.roots:
             raise AgentTaskError("browser file transfers require explicit task roots")
         for criterion in spec.success_criteria:
+            self._check_observed_criterion(criterion)
             if criterion.get("kind") == "browser":
                 from je_auto_control.utils.agent_runtime.browser_verification import validate_browser_scope
                 validate_browser_scope(spec, criterion)
@@ -38,6 +39,17 @@ class TaskPolicy:
                 self.path(criterion.get("path"))
         for action in spec.actions:
             self.check(action.get("tool", ""), action.get("arguments", {}))
+
+    def _check_observed_criterion(self, criterion: Mapping[str, Any]) -> None:
+        kind = criterion.get("kind")
+        if kind == "service_state":
+            from je_auto_control.utils.agent_runtime.service_verification import validate_service_clause
+            validate_service_clause(criterion)
+            self.check(criterion["tool"], {})
+        elif kind == "semantic":
+            from je_auto_control.utils.agent_runtime.semantic_verification import validate_semantic_clause
+            validate_semantic_clause(criterion)
+            self.check(criterion["tool"], {})
 
     def path(self, value: Any) -> str:
         """Canonicalize a task data path, refusing unrestricted or escaped paths."""

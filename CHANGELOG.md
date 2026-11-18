@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+- Host-reviewed service profiles now bind a fixed worker to pinned configuration,
+  an ASCII service key and bounded START/STOP permissions. Registration, reload
+  and probe remain passive; native service acceptance is still pending.
+
+- Internal service helpers now pin bootstrap and evidence to the same retained
+  owner, preserve typed query failures and refuse desktop input during requests
+  and retirement. ASCII service-name aliases share ownership across configurations
+  under the same lock root. No production host configuration is changed.
+
+- Managed task criteria accept `service_state` for a host-selected in-process
+  service adapter. START/running and STOP/stopped require confirmed acceptance
+  and fresh SCM readback from the same retained owner. This does not expose
+  global service commands or register a native service profile. Existing semantic
+  revision requirements remain unchanged.
+
+- External tasks may now declare an empty tool scope when they have no planned
+  actions. Completion criteria remain required; empty plans do not prove completion.
+  The new host-managed `uia_fixture` profile uses this zero-action contract, a
+  fixed isolated worker and pinned configuration/image bytes. Both IPC endpoints
+  reject commands. Registration/probe remain inert; native UI acceptance is pending.
+
+- The build-only UI fixture now wraps its startup result in an exact `id`/`result`
+  envelope, correlated by launch challenge. Rebuild earlier UI artifacts for the
+  new receive-only internal launcher; the memory fixture protocol is unchanged.
+
+- The native fixture builder adds `--kind uia` for a separate owned hidden-window
+  artifact and schema-2 static manifest. The default memory artifact is unchanged.
+  This builds only; native deployment trust and acceptance remain pending.
+
+- Managed fixture observations now return a version-three multi-source report instead of a flat
+  memory snapshot. Read `sources.process_memory.snapshot` only after requiring a complete report;
+  partial reads and source conflicts remain diagnostic data. Both host and worker require the
+  report capability, and commands/completion require agreement with the owned IPC snapshot.
+  Report constructors and parsers now require explicit host field scopes. Bootstrap requires
+  matching semantic_fields and report version 3; version-one and version-two reports/helpers are rejected.
+  Tagged partial sources retain valid fields separately from fixed per-field failures.
+  Fields missing from all sources remain partial. Native acceptance remains pending.
+
+- Added an internal scoped UIA reader and read-only managed observation adapter. Host-selected
+  fields stay beneath the original HWND/PID and pinned root runtime ID, with bounded traversal,
+  ancestry checks and password protection. Partial fields and complete best-effort captures
+  grant no action or completion authority. Injected COM and hidden-helper tests cover this path;
+  native deployment trust and all desktop acceptance remain pending.
+
 - Image search and OCR (`find_image` and everything on `cv2_utils.template_detection`, `visual_match`,
   `color_match`, `edge_match`, `rotated_match`, self-healing frame locators, device-frame matching,
   `find_text_matches`, `read_text_in_region` and the commands built on them): inside a stoppable run or a cancellation scope

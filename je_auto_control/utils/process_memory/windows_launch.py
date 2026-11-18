@@ -115,12 +115,19 @@ class PopenLauncher:
             _fail(FailureReason.UNSUPPORTED)  # one launch per launcher, so ``child`` is unambiguous
         # An argv list, never a shell; ``path`` is the file the caller leased and pinned.
         self.child = self._popen([path, *self._arguments], shell=False, **self._options)
+        facts = self.facts()
+        return LaunchRecord(facts.pid, facts.birth)
+
+    def facts(self) -> NativeProcessFacts:
+        """Recheck liveness and identity using the retained launch handle, never a PID lookup."""
+        if self.child is None:
+            _fail(FailureReason.TARGET_CHANGED)
         # Popen keeps the CreateProcess handle as ``_handle`` on Windows.
         handle = int(getattr(self.child, "_handle"))
         facts = measure_process(self._kernel, handle, self._last_error, self._bits)
         if facts.pid != self.child.pid:
             _fail(FailureReason.TARGET_CHANGED)
-        return LaunchRecord(facts.pid, facts.birth)
+        return facts
 
 
 class OwnedLaunchAttestor:
@@ -128,6 +135,11 @@ class OwnedLaunchAttestor:
 
     def __init__(self, pin: PinnedExecutable, record: LaunchRecord, observed: ObservedImageFile) -> None:
         self._pin, self._record, self._observed = pin, record, observed
+
+    @property
+    def image_sha256(self) -> str:
+        """The exact host pin checked against the retained pre/post-launch image evidence."""
+        return self._pin.sha256
 
     def __call__(self, facts: NativeProcessFacts) -> ProcessIdentity:
         if (not isinstance(facts, NativeProcessFacts) or facts != self._observed.process
@@ -147,6 +159,11 @@ class OwnedLaunch:
     record: LaunchRecord = field(repr=False)
     _lease: ImageLease = field(repr=False)
     _observer: ImageObserver = field(repr=False)
+
+    @property
+    def image_sha256(self) -> str:
+        """Bind a code-range plan to this launch's original image pin, not just labels."""
+        return self.attestor.image_sha256
 
     def close(self) -> None:
         """Close both leases; a failure leaves the rest to a later ``close``."""

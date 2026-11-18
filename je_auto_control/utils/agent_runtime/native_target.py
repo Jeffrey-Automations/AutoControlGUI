@@ -8,7 +8,7 @@ import socket
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Sequence, Mapping
+from typing import Any, Callable, ClassVar, Sequence, Mapping
 
 from je_auto_control.utils.agent_runtime.context import current_operation, current_takeover
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
@@ -45,6 +45,7 @@ class NativeDesktopTarget:
     """Only trusted host code may select an argv/resource path; neither is task/model input."""
 
     _worker_module = "je_auto_control.utils.agent_runtime.native_worker"
+    _display_helper: ClassVar[bool] = True
 
     def __init__(self, *, argv: Sequence[str] | None = None, resource_path: Path | None = None,
                  recovery_probe: Callable[[], None] = no_held_input, profile: dict[str, Any] | None = None) -> None:
@@ -135,13 +136,15 @@ class NativeDesktopTarget:
         return probe_browser_helper(self._argv, transfer=transfers)
 
     def _launch(self, check: Callable[[], None], control: Callable[[str], None] | None = None) -> HelperChannel:
-        # It drives the user's desktop or browser session, which a protected helper cannot reach.
-        self._channel = owned_channel(self._argv, on_control=control, display=True)
+        self._channel = owned_channel(self._argv, on_control=control, display=self._display_helper)
         reply = self._channel.request("bootstrap", {}, timeout=15, check=check)
-        if not isinstance(reply, dict) or type(reply.get("protocol")) is not int or reply["protocol"] != 1:
+        if not self._supports_bootstrap(reply):
             self._channel.close()
             raise AgentTaskError("native helper bootstrap protocol is incompatible")
         return self._channel
+
+    def _supports_bootstrap(self, reply: Any) -> bool:
+        return isinstance(reply, dict) and type(reply.get("protocol")) is int and reply["protocol"] == 1
 
     @property
     def can_reobserve(self) -> bool:

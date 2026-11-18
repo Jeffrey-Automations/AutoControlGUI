@@ -57,6 +57,8 @@ Wayland NORMAL input runs libei and portal calls in an owned helper process. Tim
 
 Managed agent tasks and cross-host transfers include experimental features. See the implementation notes and project progress before relying on them in production.
 
+Host-selected semantic targets support a `semantic` completion condition that compares fresh state with the recorded target identity and expected fields. It does not grant memory access or enable a native target. See [semantic completion](docs/process_memory_contract.md#semantic-completion).
+
 ## Documentation
 
 - [Installation, platform support and configuration](docs/guides/en/setup.md)
@@ -87,10 +89,55 @@ REST host-data reads now follow the matching MCP authority: jobs, remote session
 
 Host read-only mode applies the same restrictions to explicitly supplied registries and later registrations. Both admission and refreshed invocation check mixed arguments. Configured MCP failure screenshots require a writable tool and a refreshed caller with drive authority; readonly calls and viewers never trigger them. This does not promise that every dependency or diagnostic read has no initialization side effects.
 
-Internal Windows process-memory preparation can now measure a selected process image file through retained read-only handles, with bounded hashing and retryable cleanup. This is observed file evidence, not loaded-code or fixture attestation; native acceptance and public memory tools remain unavailable. See [the contract](docs/process_memory_contract.md).
+Internal Windows process-memory preparation can now measure a selected process image file through retained read-only handles, with bounded hashing and retryable cleanup. This is observed file evidence, not loaded-code or fixture attestation; native acceptance remains incomplete and arbitrary-address memory tools remain unavailable. See [the contract](docs/process_memory_contract.md).
+
+A host-managed fixture profile binds a fixed packaged worker to a reviewed config path and digest through the existing target-management API and GUI JSON editor. Registration is inert; bootstrap and configure both verify the deployment binding. The explicit probe checks static artifacts in a bounded background helper and reports `static_artifacts_ready`, `fixture_execution=not_run` and `native_evidence=not_recorded`. Runtime shutdown retains ownership until inspection helpers retire. The fixture is acquired only during managed readiness. Config/image checks do not attest Python source or DLLs. Native execution remains paused; the private delivery format and limits are documented in the same contract.
 
 WebRTC peers also retain failed media constructors and children, observe live disable completion, and bind deferred renegotiation to its original peer. Media producer shutdown now reports pending or uncertain cleanup and retains original resources. Audio and recorder failures are never turned into success by unsafe close or flush replay. LAN close supports explicit retry; application caretaker and GUI integration remain pending. See [the retirement contract](docs/media_retirement_contract.md).
 
 HostBrowser also rejects late publications and retains unfinished thread/close ownership; dialog integration remains pending.
 
 MultiViewerHost can return an owned offer or capture an original-session retirement receipt, so delayed cleanup cannot stop a replacement peer or screen source. GUI adoption remains pending.
+
+Host-selected semantic adapters can return multi-source reports through the existing observation API. The fixture combines reviewed memory reads with its owned read-only IPC snapshot and rechecks both before commit. Report version 3 fixes the required fields in host code and preserves valid fields separately from per-field failures. Missing sources, conflicts and best-effort captures cannot authorize actions or completion. Versions 1 and 2 are rejected.
+
+A separate owned UI observation fixture can be built with `test/fixtures/native_memory/build_fixture.py --kind uia`; its static manifest remains schema 2. The internal launcher binds startup to the retained process and window owner. The scoped UIA reader checks that window, process and root identity, limits tree traversal, and protects password fields. Its read-only managed adapter creates COM lazily and preserves partial fields through the shared observation API.
+
+Injected calls and hidden Python helpers cover scoped reads, reporting and timeout retirement. Native deployment trust, DOM integration and desktop acceptance remain pending. No native UI fixture execution or desktop noninterference is claimed.
+
+The internal owned UI target retains its launcher and both image leases before
+attestation, attempts every owner during cleanup, and retains failed cleanup for
+retry. A publication lock prevents late source installation after shutdown. The
+native factory only constructs owners; native deployment trust
+and native acceptance remain pending.
+
+Host management can register a `uia_fixture` profile with empty `allowed_tools`,
+`roots` and `apps`, and only `config_path`/`config_sha256` settings. It uses a fixed
+isolated worker and validates deployment, profile and target pins before acquisition.
+Both endpoints refuse commands. External tasks may use an empty tool scope only
+without planned actions; completion criteria remain required and an empty plan
+cannot prove completion. UI partial/best-effort reports remain diagnostic.
+Registration and probe acquire nothing; probe reports `not_supported` and
+`native_evidence=not_recorded`. The existing target API, CLI and GUI JSON editor
+carry this profile. Injected and hidden-helper tests do not establish native trust.
+
+Host-selected in-process service adapters can use the closed `service_state` criterion:
+`{"kind":"service_state","tool":"AC_service_start","state":"running"}` or STOP/stopped.
+It requires the matching confirmed acceptance and a new SCM report from the same
+retained owner after acceptance. A passing result reports SCM state, not atomic
+completion, health or desktop noninterference. These tool names are adapter-scoped,
+not global executor commands. Existing task APIs and the GUI JSON editor carry the
+criterion. The host-reviewed `service` profile pins `config_path`, `config_sha256`
+and an ASCII `service_key`. Its fixed worker checks the deployment's service and
+operation ceiling before accepting task scope. Registration, reload and probe do
+not read the deployment or access SCM; native acceptance remains pending.
+Every pinned path (each profile's `config_path` and the image a deployment names) must be
+a local drive path: UNC shares, `\\.\pipe\` names, `\\?\` device paths and `..` segments are
+refused, so registering a profile cannot make the host send its credentials to another machine.
+Before a fixture image runs, its lease also refuses a location another account could change:
+every directory from the drive root down must be a real directory (no junction or symlink) that
+only SYSTEM, Administrators, TrustedInstaller and the running user may rename, delete, re-ACL or
+add files to, and the leased file's final path must be the configured one. Deploy fixtures under
+a protected directory such as `%LOCALAPPDATA%`; a drive root that grants Authenticated Users Modify
+(common on secondary drives) or a shared `%TEMP%` is refused. The fixture starts in its own
+directory with a minimal environment: a system-only `PATH` and none of the host's tokens or keys.

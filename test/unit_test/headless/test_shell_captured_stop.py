@@ -46,7 +46,8 @@ def test_a_stop_ends_the_command_and_kills_it(monkeypatch):
         with pytest.raises(ExecutionStopped):
             run_captured(_SLEEPER, 60)
     assert time.monotonic() - started < 15
-    assert len(killed) == 1 and killed[0].poll() is not None
+    assert len(killed) == 1
+    assert killed[0].poll() is not None
 
 
 def test_a_cancellation_ends_the_command_and_kills_it(monkeypatch):
@@ -58,14 +59,16 @@ def test_a_cancellation_ends_the_command_and_kills_it(monkeypatch):
         with pytest.raises(CancelledError):
             run_captured(_SLEEPER, 60)
     assert time.monotonic() - started < 15
-    assert len(killed) == 1 and killed[0].poll() is not None
+    assert len(killed) == 1
+    assert killed[0].poll() is not None
 
 
 def test_inside_a_run_output_and_input_still_arrive_whole():
     echo = [sys.executable, "-c", "import sys; data = sys.stdin.buffer.read(); sys.stdout.buffer.write(data[::-1])"]
     with stoppable_run(token=StopToken("captured-echo")):
         done = run_captured(echo, 30, input_bytes=b"abc" * 1000)
-    assert done.returncode == 0 and done.stdout == (b"abc" * 1000)[::-1]
+    assert done.returncode == 0
+    assert done.stdout == (b"abc" * 1000)[::-1]
 
 
 def test_inside_a_run_the_timeout_still_applies(monkeypatch):
@@ -86,7 +89,8 @@ def test_outside_any_run_one_wait_is_used(monkeypatch):
 
     monkeypatch.setattr(subprocess.Popen, "communicate", spy)
     done = run_captured([sys.executable, "-c", "print('ok')"], 30)
-    assert done.stdout.strip() == b"ok" and waits == [30]
+    assert done.stdout.strip() == b"ok"
+    assert waits == [30]
 
 
 def test_a_stopped_ac_shell_to_var_ends_the_script_promptly():

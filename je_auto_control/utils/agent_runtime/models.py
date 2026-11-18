@@ -76,9 +76,11 @@ class AgentTaskSpec:
     def __post_init__(self) -> None:
         self._validate_identity()
         self._freeze_names()
-        if not self.allowed_tools or not self.success_criteria:
-            raise AgentTaskError("a task requires allowed tools and real completion conditions")
+        if not self.success_criteria:
+            raise AgentTaskError("a task requires real completion conditions")
         self._freeze_payload()
+        if not self.allowed_tools and (self.mode != "external" or self.actions):
+            raise AgentTaskError("an empty tool scope requires external observation without planned actions")
         if not isinstance(self.budget, AgentTaskBudget):
             raise AgentTaskError("invalid task budget")
 

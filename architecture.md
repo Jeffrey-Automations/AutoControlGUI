@@ -1,5 +1,29 @@
 # AutoControl Architecture
 
+Process-memory fixture decoding owns schema-one layout and challenge binding in
+`utils/process_memory/fixture_probe.py`. The fixture's resolver delegates to this
+adapter. Bootstrap locations remain private and require separate executable
+attestation; this adapter does not grant read authority or establish native acceptance.
+
+Managed runtime semantic adapters opt into `SemanticTarget` through trusted host
+code. Its closed snapshot keeps provenance and revision in grounding while
+excluding only capture metadata. Grounded dispatch passes the original snapshot
+and journal action ID; only an operation-bound `SemanticReceipt` confirms a reply.
+Multi-source adapters pin the common required field scope in host code. Report v2
+checks that scope at capture, helper bootstrap and completion against the saved
+journal witness; shared omissions cannot authorize commands.
+Ordinary targets keep their existing full-payload comparison and dispatch path.
+
+`NativeSemanticTarget` transports the same contract through the existing owned
+helper channel and resource lock. It requires a semantic handshake before target
+configuration. The worker rechecks tool scope; both peers refuse input events.
+Semantic cleanup keeps input and executor guards active through EOF retirement.
+
+Semantic completion stores the original validated snapshot in action grounding.
+Fresh readback must match its target provenance and checked revision before
+comparing expected fields. Every semantic capture interval must lie inside the
+current host-monotonic read request, including pre-dispatch grounding reads.
+
 WebRTC statistics owns one submitted polling future. Start does not wait for
 the event loop; stop closes admission, cancels pending submission and drops
 the callback owner without acquiring a bridge. Late awaited samples are discarded.
@@ -42,6 +66,42 @@ The process-memory test fixture owns fixed payload and sequence buffers in a hid
 child process. Bounded inherited pipes expose expected state and validated fixture
 updates. Bootstrap facts remain unverified until a native provider independently
 matches the retained process identity. This tooling adds no public memory API.
+The internal MemorySemanticTarget composes a fixed host reader binding and a
+reviewed background command owner. Managed scope checks gate reads and commands;
+cleanup makes the target terminal and retains failed handle retirement for retry.
+Injected-provider tests exercise this path through AgentRuntime completion.
+FixtureCommands translates the one internal fixture operation into compare_set,
+binds strict receipts to the original revision and operation ID, and retires its
+command owner after an unknown reply. The reader remains read-only.
+OwnedFixtureControl reuses OwnedChannel for bounded fixture RPC, validates private
+bootstrap data, and retires failed exchanges while retaining failed cleanup ownership.
+Hidden IPC tests establish transport behavior only, not native memory identity.
+OwnedChannelLauncher lets the pinned-image launch flow measure the retained IPC
+process handle, then refuses bootstrap PID/architecture disagreement. This seam
+has injected-call tests; loaded-code/runtime trust and native execution remain pending.
+The native_memory test fixture is an x64 C build with static CRT and a bounded RPC
+parser. Its build tool records source/image/tool hashes and static DLL imports;
+it never executes the artifact. This does not register a supported native target.
+The PE planner derives all executable ranges from the pinned x64 baseline and
+rejects writable or relocated code. Its reader guard requires the launch image
+hash, checks headers/code and mapping continuity within unchanged probe budgets.
+Evidence covers matching bytes only, not live protection flags or runtime integrity.
+OwnedFixtureTarget assembles those checks with fixture commands and managed semantic
+reads. It owns the launcher and image observers before startup, rejects late startup
+publication after retirement, and retains every failed cleanup owner for retry.
+Managed readiness claims the exact task and owner before lazy acquisition and
+rechecks the original operation after callbacks. Competing readiness cannot bind
+the inner target between startup publication and owner configuration.
+It remains internal and unregistered pending native trust and acceptance evidence.
+The native fixture acceptance CLI defaults to static inventory matching. Its
+explicit smoke path uses this assembly and reports selected checks separately
+from full native acceptance, dependency trust and foreground noninterference.
+The C fixture also prepares four fixed diagnostic page layouts in a separate
+allocation. Those modes expose bootstrap only. The diagnostic runner attributes
+reads/refusals using private bootstrap-bound query evidence from one handle,
+including a successful prefix read; actual native page validation remains pending.
+The helper error codec preserves fixed memory failure reasons across IPC without
+serializing exception text; malformed or mixed memory error packets are refused.
 The internal Windows provider owns read/query handles and measures native process
 facts before asking an explicit reviewed attestor for application identity. Its
 bindings are tested through injected calls; trusted attestation and native acceptance
@@ -1517,3 +1577,82 @@ desktop tasks remain unavailable. This transport is not full Linux application o
 Installed wheel and source distributions include the REST Dashboard and Swagger HTML, CSS and
 JavaScript resources. The same localhost REST routes and authentication rules apply to an
 installed package; serving static pages grants no task or desktop input authority.
+
+The owned memory fixture supports launch-bound `compare_set` with a bounded,
+non-evicting receipt ledger. Runtime adapter integration remains in `Progress.md`;
+this fixture protocol does not establish native memory acceptance.
+
+`test/fixtures/native_memory/uia_fixture.c` owns a separate hidden-window test
+artifact. The build script selects a closed memory/UIA source and dependency set;
+UIA manifests are distinct from memory acceptance inputs. No runtime owner or
+scoped UIA acquisition is registered by building it.
+
+`owned_channel_launch.py` centralizes pinned child measurement and retryable
+channel retirement for memory and UI fixture launchers. `uia_channel.py` receives
+only one correlated startup; `uia_launch.py` binds its HWND to retained launch
+facts and `windows_window.py` supplies the single typed owner query. The binding
+borrows the launcher and image leases; it cannot grant UIA action authority.
+
+`scoped_uia.py` reads fixed host selectors beneath that binding, verifies bounded
+ancestry around field reads and retains the first verified root runtime identity.
+`capture_metadata.py` shares capture validation with complete snapshots and
+`partial_observation.py`; report version 3 preserves successful fields beside
+closed per-field failures. Best-effort UIA observations cannot ground actions.
+`uia_target.py` binds the reader to managed scope with lazy COM acquisition and
+retryable cleanup. Native deployment trust and acceptance remain in `Progress.md`;
+hidden Python helper tests establish IPC retirement, not native COM acceptance.
+
+`uia_owner.py` retains the launcher and two independent image owners before
+attestation starts. A private owner bundle supplies the managed adapter callbacks;
+the adapter remains the sole lifecycle owner. Its publication lock excludes source
+installation after cleanup. The native factory constructs inert owners only;
+fixed worker deployment and zero-action profile registration are described below.
+
+`pinned_deployment.py` checks bounded configuration bytes before any artifact path
+is followed; memory and UI loaders retain their distinct closed schemas.
+`uia_deployment.py` checks the UI image hash and bounds before owner construction.
+`uia_worker.py` validates the original deployment/profile/target before scope
+mutation and refuses effects. `uia_native_target.py` fixes the worker argv and
+binds its bootstrap to the configuration digest, target and UI report contract.
+The `uia_fixture` profile grants no tools, roots or desktop applications and uses
+the existing host management and task editor surfaces. Empty tool scopes require
+external mode and no planned actions. They do not make an empty plan complete.
+Native execution and trusted Python/COM/DLL delivery remain unverified.
+
+`service_status.py` models the latest SCM report as diagnostic best-effort data.
+`windows_service.py` exposes separate query-only and explicitly scoped control
+façades. `windows_service_session.py` owns their retained handles, serialized
+admission, retirement and pending operation state; `windows_service_native.py`
+binds only the native functions their host scope needs. Failed closes remain
+owned for retry. Query failures retire the session. Unknown control outcomes
+block further controls while allowing diagnostic reads.
+`service_operations.py` validates exact requests and retains bounded acceptance
+receipts without replaying effects. Accepted commands await an independent read
+of their desired state before another command is admitted; unknown outcomes
+cannot be cleared by a matching read. Status comparison is non-atomic and a
+receipt proves only acceptance. Timeouts bound admission and reject late output,
+but cannot interrupt native calls or cleanup. Trusted native deployment,
+dependency effect review and native service acceptance remain pending.
+
+`service_observation.py` defines closed service provenance, capture and acceptance
+schemas. `service_target.py` pins the retained controller to one managed spec and
+authority source, preserves original acceptance times and retires publication
+before cleanup. `target_dispatch.py` selects this explicit service contract and
+delegates all other targets to the existing semantic dispatch helpers.
+`service_verification.py` checks a confirmed journal attempt against a new report
+from the same binding after acceptance. Its `service_state` criterion describes
+reported SCM state only. The ordinary semantic revision gates are unchanged.
+`service_worker.py` preflights the closed service configuration and routes a
+separate observed-service operation. NativeWorker shares input/authority/retirement
+guards across explicit semantic and service targets, preserving their separate
+bootstrap and evidence contracts. `service_native_target.py` pins helper evidence
+to the original bootstrap binding and uses the existing non-display owned channel.
+`service_scope.py` derives a same-user resource lock from printable ASCII service
+keys, independent of target/configuration/database names. Typed service errors
+cross IPC before event interpretation. The service profile carries its ASCII key
+so registration/reload can remain independent of deployment-file availability.
+`service_deployment.py` validates bounded pinned config and the operation ceiling;
+`service_entrypoint.py` validates profile/task/deployment identity before the shared
+worker accepts scope. The config digest and task profile digest remain distinct.
+Native deployment, Unicode key canonicalization and cross-account coordination
+remain pending.

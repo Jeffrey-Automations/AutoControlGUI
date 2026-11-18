@@ -96,7 +96,8 @@ def test_stop_during_submission_does_not_wait_and_cancels_arriving_future(bridge
     finally:
         finish.set()
         worker.join(2)
-    assert not worker.is_alive() and not errors
+    assert not worker.is_alive()
+    assert not errors
     assert bridge.future.cancelled()
     poller.start()
     assert len(bridge.calls) == 1
@@ -134,7 +135,8 @@ def test_submission_failure_closes_coroutine_and_reports_error(bridge, monkeypat
     poller = webrtc_stats.StatsPoller(None, lambda snapshot: None)
     poller.start()
     assert captured[0].cr_frame is None
-    assert warnings and "bridge closed" in str(warnings)
+    assert warnings
+    assert "bridge closed" in str(warnings)
     poller.stop()
 
 
@@ -154,7 +156,8 @@ def test_async_failure_is_observed_without_waiting(bridge, monkeypatch):
     poller = webrtc_stats.StatsPoller(None, lambda snapshot: None)
     poller.start()
     bridge.future.set_exception(RuntimeError("peer closed"))
-    assert warnings and "peer closed" in str(warnings)
+    assert warnings
+    assert "peer closed" in str(warnings)
     poller.stop()
 
 

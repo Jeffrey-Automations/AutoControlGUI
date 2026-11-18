@@ -95,14 +95,19 @@ def test_semantic_observation_has_exact_values_and_no_raw_identity_or_memory():
     result = observe(provider)
     assert isinstance(result, Observation)
     assert result.fields == (("document_id", 17), ("job_status", "ready"))
-    assert result.source == "process_memory" and result.complete
+    assert result.source == "process_memory"
+    assert result.complete
     assert result.identity_digest == IDENTITY.digest
     assert result.identity_digest != replace(IDENTITY, birth=901).digest
     assert result.consistency == "best_effort"
-    assert result.bytes_read == SCHEMA.size and result.regions_read == 1
+    assert result.revision is None
+    assert result.bytes_read == SCHEMA.size
+    assert result.regions_read == 1
     assert provider.handles[0].closed == 1
-    assert "address" not in vars(result) and "pid" not in vars(result)
-    assert "ready" not in repr(result) and "fixture-sha256" not in repr(IDENTITY)
+    assert "address" not in vars(result)
+    assert "pid" not in vars(result)
+    assert "ready" not in repr(result)
+    assert "fixture-sha256" not in repr(IDENTITY)
 
 
 @pytest.mark.parametrize("fields", [("secret",), ("job_status", "job_status"), ()])
@@ -126,7 +131,8 @@ def test_retained_process_identity_must_match_before_read(changes):
     handle = Handle()
     handle.current_identity = replace(IDENTITY, **changes)
     assert observe(Provider(handle)).reason == FailureReason.TARGET_CHANGED
-    assert not handle.reads and handle.closed == 1
+    assert not handle.reads
+    assert handle.closed == 1
 
 
 def test_reviewed_versions_reject_before_open():
@@ -150,7 +156,8 @@ def test_invalid_regions_cannot_be_read(changes):
     region = replace(handle.regions[0], **changes)
     handle.query_region = lambda address: region
     assert observe(Provider(handle)).reason == FailureReason.UNREADABLE_REGION
-    assert not handle.reads and handle.closed == 1
+    assert not handle.reads
+    assert handle.closed == 1
 
 
 def test_cross_region_reads_preserve_exact_data_and_charge_both_regions():
@@ -159,7 +166,8 @@ def test_cross_region_reads_preserve_exact_data_and_charge_both_regions():
                       MemoryRegion(ADDRESS + 4, 12, ADDRESS + 4, 4, True, True, False)]
     result = observe(Provider(handle))
     assert result.fields == (("document_id", 17), ("job_status", "ready"))
-    assert result.regions_read == 2 and result.bytes_read == 16
+    assert result.regions_read == 2
+    assert result.bytes_read == 16
 
 
 @pytest.mark.parametrize("limits", [{"max_bytes": 15}, {"max_regions": 1}])
@@ -196,7 +204,8 @@ def test_stable_even_sequence_is_required_and_charged():
     reviewed = probe(resolve=lambda identity, view: ReadPlan(ADDRESS, SCHEMA.size, ADDRESS - 8))
     handle = Handle()
     result = observe(Provider(handle), reviewed)
-    assert result.consistency == "sequence_checked" and result.bytes_read == 32
+    assert result.consistency == "sequence_checked"
+    assert result.bytes_read == 32
     handle = Handle()
     handle.after_read = lambda: handle.memory.update({ADDRESS - 8: 4})
     assert observe(Provider(handle), reviewed).reason == FailureReason.INCONSISTENT_SNAPSHOT
@@ -243,8 +252,9 @@ def test_cancellation_propagates_and_closes_owned_handle(stage):
 
     if stage == "after_read":
         handle.after_read = lambda: cancelled.__setitem__(0, True)
+    reviewed = probe(decode=cancel_decode if stage == "decode" else decode)
     with pytest.raises(CancelledError):
-        observe(provider, probe(decode=cancel_decode if stage == "decode" else decode), checkpoint=checkpoint)
+        observe(provider, reviewed, checkpoint=checkpoint)
     assert handle.closed == (0 if stage == "before_open" else 1)
 
 
@@ -281,9 +291,11 @@ def test_failed_close_retains_ownership_for_retry_without_reporting_success():
     reader = ProcessMemoryReader(Provider(handle))
     result = reader.observe(IDENTITY, probe(), ("job_status",), target_id="document")
     assert result == ObservationFailure(FailureReason.CLEANUP_FAILED, retired=False)
-    assert reader.pending_cleanup and not reader.close_pending()
+    assert reader.pending_cleanup
+    assert not reader.close_pending()
     handle.fail_close = False
-    assert reader.close_pending() and not reader.pending_cleanup
+    assert reader.close_pending()
+    assert not reader.pending_cleanup
 
 
 def test_cancellation_with_failed_close_retains_cleanup_for_retry():
@@ -291,8 +303,9 @@ def test_cancellation_with_failed_close_retains_cleanup_for_retry():
     handle.fail_close = True
     handle.after_read = lambda: (_ for _ in ()).throw(CancelledError())
     reader = ProcessMemoryReader(Provider(handle))
+    reviewed = probe()
     with pytest.raises(CancelledError):
-        reader.observe(IDENTITY, probe(), ("job_status",), target_id="document")
+        reader.observe(IDENTITY, reviewed, ("job_status",), target_id="document")
     assert reader.pending_cleanup
     handle.fail_close = False
     assert reader.close_pending()
@@ -304,9 +317,12 @@ def test_independent_readers_do_not_share_handles_or_cleanup():
     a, b = ProcessMemoryReader(Provider(first)), ProcessMemoryReader(Provider(second))
     assert a.observe(IDENTITY, probe(), ("job_status",), target_id="a").reason == FailureReason.CLEANUP_FAILED
     assert isinstance(b.observe(IDENTITY, probe(), ("job_status",), target_id="b"), Observation)
-    assert a.pending_cleanup and not b.pending_cleanup and second.closed == 1
+    assert a.pending_cleanup
+    assert not b.pending_cleanup
+    assert second.closed == 1
     first.fail_close = False
-    assert a.close_pending() and second.closed == 1
+    assert a.close_pending()
+    assert second.closed == 1
 
 
 @pytest.mark.parametrize("changes", [{"max_bytes": True}, {"max_regions": 0}, {"timeout": float("nan")},
@@ -340,7 +356,8 @@ def test_provider_failure_is_sanitized_and_handle_closed(kind, reason):
     handle.after_read = fail
     result = observe(Provider(handle))
     assert result.reason == reason
-    assert "SECRET" not in repr(result) and "0xfeed" not in repr(result)
+    assert "SECRET" not in repr(result)
+    assert "0xfeed" not in repr(result)
     assert handle.closed == 1
 
 
@@ -358,8 +375,9 @@ def test_cancellation_during_close_cannot_deliver_success():
             raise CancelledError()
 
     handle.close = close
+    source = Provider(handle)
     with pytest.raises(CancelledError):
-        observe(Provider(handle), checkpoint=checkpoint)
+        observe(source, checkpoint=checkpoint)
     assert handle.closed == 1
 
 
@@ -405,12 +423,15 @@ def test_concurrent_operations_keep_separate_cancellation_and_handles():
         assert entered.wait(3)
         result = reader.observe(IDENTITY, probe(), ("job_status",), target_id="second")
         assert isinstance(result, Observation)
-        assert first.closed == 0 and second.closed == 1
+        assert first.closed == 0
+        assert second.closed == 1
     finally:
         release.set()
         thread.join(3)
-    assert not thread.is_alive() and interrupted == [True]
-    assert first.closed == 1 and second.closed == 1
+    assert not thread.is_alive()
+    assert interrupted == [True]
+    assert first.closed == 1
+    assert second.closed == 1
 
 
 @pytest.mark.parametrize("boundary,reason", [("resolve", FailureReason.UNSUPPORTED),
@@ -422,7 +443,8 @@ def test_callback_runtime_errors_cannot_escape_private_details(boundary, reason)
     handle = Handle()
     result = observe(Provider(handle), probe(**{boundary: fail}))
     assert result.reason == reason
-    assert "SECRET" not in repr(result) and "0xfeed" not in repr(result)
+    assert "SECRET" not in repr(result)
+    assert "0xfeed" not in repr(result)
     assert handle.closed == 1
 
 
@@ -437,8 +459,9 @@ def test_checkpoint_authority_failure_propagates_unchanged(failure):
         if len(calls) == 2:
             raise failure
 
+    source = Provider(handle)
     with pytest.raises(type(failure)) as caught:
-        observe(Provider(handle), checkpoint=checkpoint)
+        observe(source, checkpoint=checkpoint)
     assert caught.value is failure
     assert handle.closed == 1
 
@@ -456,8 +479,9 @@ def test_callback_interruptions_propagate_with_original_identity(boundary, signa
         handle.read = interrupt
     else:
         reviewed = probe(**{boundary: interrupt})
+    source = Provider(handle)
     with pytest.raises(type(signal)) as caught:
-        observe(Provider(handle), reviewed)
+        observe(source, reviewed)
     assert caught.value is signal
     assert handle.closed == 1
 
@@ -476,7 +500,8 @@ def test_unexpected_provider_failures_are_sanitized(boundary):
     reader = ProcessMemoryReader(provider)
     result = reader.observe(IDENTITY, probe(), ("job_status",), target_id="document")
     assert isinstance(result, ObservationFailure)
-    assert "SECRET" not in repr(result) and "0xfeed" not in repr(result)
+    assert "SECRET" not in repr(result)
+    assert "0xfeed" not in repr(result)
     assert result.reason == (FailureReason.CLEANUP_FAILED if boundary == "close" else FailureReason.TARGET_CHANGED)
     assert reader.pending_cleanup == (boundary == "close")
     if boundary == "close":
@@ -498,10 +523,12 @@ def test_interrupted_cleanup_retry_keeps_all_unretired_handles():
     first.close = interrupt
     with pytest.raises(CancelledError) as caught:
         reader.close_pending()
-    assert caught.value is signal and reader.pending_cleanup
+    assert caught.value is signal
+    assert reader.pending_cleanup
     first.close = lambda: None
     second.fail_close = False
-    assert reader.close_pending() and not reader.pending_cleanup
+    assert reader.close_pending()
+    assert not reader.pending_cleanup
     assert second.closed == 2
 
 
@@ -527,7 +554,9 @@ def test_cleanup_in_progress_still_reports_retained_ownership():
     finally:
         release.set()
         thread.join(3)
-    assert not thread.is_alive() and results == [True] and not reader.pending_cleanup
+    assert not thread.is_alive()
+    assert results == [True]
+    assert not reader.pending_cleanup
 
 
 HEADER = (2).to_bytes(8, "little")  # the eight bytes the fake maps at ADDRESS - 8
@@ -544,7 +573,8 @@ def test_a_resolver_reads_through_the_view_under_the_probe_budget():
     handle = Handle()
     result = observe(Provider(handle), probe(resolve=resolve))
     assert seen == [HEADER]
-    assert result.bytes_read == 8 + SCHEMA.size and result.regions_read == 2
+    assert result.bytes_read == 8 + SCHEMA.size
+    assert result.regions_read == 2
     assert handle.reads == [(ADDRESS - 8, 8), (ADDRESS, SCHEMA.size)]
 
 
@@ -558,7 +588,8 @@ def test_a_resolver_cannot_swallow_a_budget_failure():
 
     handle = Handle()
     assert observe(Provider(handle), probe(max_bytes=16, resolve=resolve)).reason == FailureReason.BUDGET_EXCEEDED
-    assert handle.reads == [] and handle.closed == 1
+    assert handle.reads == []
+    assert handle.closed == 1
 
 
 def test_a_checkpoint_failure_inside_the_view_propagates_even_when_the_resolver_catches_it():
@@ -578,9 +609,11 @@ def test_a_checkpoint_failure_inside_the_view_propagates_even_when_the_resolver_
         return ReadPlan(ADDRESS, SCHEMA.size)
 
     handle = Handle()
+    source, reviewed = Provider(handle), probe(resolve=resolve)
     with pytest.raises(PermissionError) as caught:
-        observe(Provider(handle), probe(resolve=resolve), checkpoint=checkpoint)
-    assert caught.value is failure and handle.closed == 1
+        observe(source, reviewed, checkpoint=checkpoint)
+    assert caught.value is failure
+    assert handle.closed == 1
 
 
 def test_the_main_module_is_bound_to_the_allocation_it_claims():

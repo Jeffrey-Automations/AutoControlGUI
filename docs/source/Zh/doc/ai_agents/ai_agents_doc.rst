@@ -1,6 +1,15 @@
 AI Agent 與 Computer Use
 ===========================
 
+主機選定的語意 target 可使用完成條件，例如自有 counter 測試的
+``{"kind": "semantic", "tool": "AC_increment", "fields": {"value": 1}}``。
+命令必須已在任務允許清單中。完成驗證重新讀取狀態，核對記錄中的目標身分、
+adapter、schema 與來源，再比較欄位，不進行型別轉換。
+完整擷取區間必須落在當次讀取請求內，並使用同一主機的單調時鐘。
+快取觀察會遭拒絕；身分改變、欄位缺失及效果未知均不能證明成功。
+Agent Tasks 的 scope JSON 編輯器透過 Submit 保留此條件。
+這不授予記憶體權限，也不登記原生 target；原生 adapter 整合與驗收仍列於 Progress.md。
+
 成果移交管理已共用 ``manage_agent_transfer(operation, request)``、``AC_agent_transfer``、
 ``ac_agent_transfer``、具授權的 ``POST /agent/transfer`` 與 Script Builder metadata。CLI 使用
 ``agent-task transfer --operation review_export --request request.json``。審閱回傳批准 token；
@@ -335,7 +344,7 @@ Agent 任務介面將任務範圍、工作流程設定、觸發器、技能及�
 
 AgentHumanReview 表示未儲存內容或未知對話框需人工審閱；包含外部觀察請求都會記錄 waiting_user 並釋放輸入控制權，明確恢復後仍會重新檢查。Windows 依原生對話框／停用擁有者及英中日已知未儲存文字判定。Workspace 也會拒絕標題首尾帶星號的文件，並可在視窗設定加入 unsaved_selector 與 unsaved_value，於改變排列前檢查應用特有指示；不宣稱能推斷所有程式的未儲存狀態。標準檔案對話框沿用 AC_handle_file_dialog 執行器，受管 driver 只接受唯一精確標題、相同 PID、已確認前景，以及授權根目錄內的絕對路徑。UIA 控制項須屬於實際指定的根視窗，同 PID 的其他視窗也會拒絕。模擬原生與本機 HTTP 測試已有覆蓋，實際平台驗收仍未驗證。
 
-主機目標以 AgentTargetProfile 與 manage_agent_target（AC_agent_target，register/get/disable/enable/probe）設定。名稱及設定固定不可替換，目前提供 desktop／files／browser adapter，未實作類型會被拒絕；瀏覽器可使用主機審閱的 helper_python。任務固定主機設定摘要，不能擴大工具、應用、根目錄或網路來源。啟停狀態會跨重啟保存並於分派時檢查；停用會要求暫停及清理，重新啟用仍須明確恢復任務。list_agent_targets／AC_agent_target_list／CLI agent-task targets 只提供被動資訊，readiness=not_probed、native_evidence=not_recorded；完整設定需要 manage_hosts。CLI agent-task target 及 GUI「主機目標」頁使用同一服務。匿名有效 MCP 工具 session 的直接及舊式包裝呼叫都以 operator 權限執行；MCP 主機管理需要已驗證的管理員，可信任的直接 Python 呼叫維持原行為。瀏覽器自動化統一由 WebRunner（je_web_runner）提供，本機開發來源為 D:/Codes/WebRunner；browser profile 使用受管 je_web_runner SDK 契約，依賴診斷不代表原生可用。
+主機目標以 AgentTargetProfile 與 manage_agent_target（AC_agent_target，register/get/disable/enable/probe）設定。名稱及設定固定不可替換，目前可設定 desktop／files／browser／fixture／uia_fixture／service adapter，未實作類型會被拒絕；瀏覽器可使用主機審閱的 helper_python。任務固定主機設定摘要，不能擴大工具、應用、根目錄或網路來源。啟停狀態會跨重啟保存並於分派時檢查；停用會要求暫停及清理，重新啟用仍須明確恢復任務。list_agent_targets／AC_agent_target_list／CLI agent-task targets 只提供被動資訊，readiness=not_probed、native_evidence=not_recorded；完整設定需要 manage_hosts。CLI agent-task target 及 GUI「主機目標」頁使用同一服務。匿名有效 MCP 工具 session 的直接及舊式包裝呼叫都以 operator 權限執行；MCP 主機管理需要已驗證的管理員，可信任的直接 Python 呼叫維持原行為。fixture profile 只接受 config_path／config_sha256 與 AC_fixture_set_state，不能授予根目錄或桌面應用。固定隔離 worker 的 bootstrap／configure 均須符合部署綁定；註冊不取得資源。明確呼叫 fixture probe 時，會由獨立背景 helper 檢查固定的靜態產物，並具備 bootstrap／檢查時限、即時管理權限核對及可重試的關閉所有權。成功回報 static_artifacts_ready、fixture_execution=not_run 與 native_evidence=not_recorded，不證明已載入程式碼可信。原生 fixture 執行仍暫停。瀏覽器自動化統一由 WebRunner（je_web_runner）提供，本機開發來源為 D:/Codes/WebRunner；browser profile 使用受管 je_web_runner SDK 契約，依賴診斷不代表原生可用。
 
 既有瀏覽器自動化（包含 open_path(URL) 與 AC_open_path）統一交由 WebRunner，Python 套件名稱為 je_web_runner。URL 計畫的 backend 現為 je_web_runner，原本比較 webbrowser 描述值的呼叫端需改用新值；函式介面與本機檔案開啟維持相容。實際 URL 執行需要設定的 WebRunner 專案，缺少時傳出 WebRunnerBridgeError，不改用 OS 瀏覽器。本機開發來源為 D:/Codes/WebRunner；純計畫及注入 opener 測試不需要該套件。協定支援由 WebRunner 與其選用的瀏覽器決定。既有瀏覽器 GUI／MCP／AC 及錄製的 WR_* 動作都使用同一橋接。
 
@@ -982,3 +991,51 @@ Linux 內部 presence_peer_linux 以不可繼承的 pidfd 保留原始 Unix stre
 
 wheel 與原始碼發行套件包含 REST Dashboard 和 Swagger 的 HTML、CSS、JavaScript 資源。
 安裝後的套件沿用相同的本機 REST 路由與授權規則；提供靜態頁面不授予任務或桌面輸入權限。
+
+主機選定的語意 adapter 可宣告固定的多來源觀察契約。既有 observe 呼叫保留部分缺失與衝突報告；操作及完成判定要求每個來源的新鮮完整一致證據。helper bootstrap 固定來源契約，完整報告跨 IPC 傳遞後才轉換為命令快照。fixture 已在同一把擷取／提交鎖下結合受審閱的記憶體讀取與保留的唯讀 IPC snapshot，cleanup 仍可中斷 IPC。注入 reader 與隱藏 helper 測試涵蓋來源衝突、部分記憶體失敗及提交前一致性。原生 UI 部署信任、DOM 整合與桌面驗收仍待完成。
+
+語意觀察欄位契約
+----------------
+
+多來源報告版本 3 要求每個來源提供主機指定的必要欄位。即使所有來源都漏掉同一欄位，
+仍會標示缺失，不能授權動作或確認完成。helper 握手及原始 journal witness 綁定相同欄位範圍。
+版本 1、版本 2 及範圍外欄位會被拒絕。標記為 partial 的來源分別保留有效值與固定的欄位失敗原因。
+有效空字串及 false 不會被當成無法讀取、不支援、歧義、受保護或缺失欄位。
+部分來源與完整的 best-effort 擷取都不授予操作或完成判定權限。
+
+原生 fixture 建置工具接受 ``--kind uia``，產生獨立自有隱藏視窗產物，靜態 manifest 維持 schema 2。
+內部啟動擁有者核對 challenge、保留程序與目前 HWND 擁有者，通道不接受指令。
+``ScopedUiaSource`` 核對原始 HWND／PID，並在擷取之間固定根節點 runtime ID。
+讀取前後都驗證 raw-tree 祖先關係，限制走訪數量並保護密碼文字；COM 呼叫保留在來源擁有執行緒。
+
+``UiaObservationTarget`` 在受管 readiness 中延遲建立 COM，透過既有觀察 API 發布唯讀 UIA 結果。
+它不提供 Invoke、SetValue、焦點或輸入操作。注入 COM 與隱藏 Python helper 測試涵蓋部分欄位、
+受管報告及逾時回收。原生部署信任與所有桌面驗收仍待完成。
+尚未執行原生 UI fixture，也未證明不干擾桌面。
+
+內部自有 UI target 在 attestation 前保留啟動器及兩個獨立映像租約擁有者；
+清理會嘗試全部資源並保留失敗項目供重試。發布鎖防止關閉後存入晚到的來源。
+原生 factory 僅建立擁有者；原生部署信任及原生驗收仍待完成。
+
+主機管理可註冊 ``uia_fixture`` profile，``allowed_tools``、``roots``、``apps`` 都為空，
+設定只接受 ``config_path``／``config_sha256``。固定隔離 worker 在取得資源前核對部署、profile
+與目標 pin，兩端都拒絕命令。外部任務只有在沒有預排動作時可使用空工具集合；
+仍須提供完成條件，空計畫不能證明完成，UI partial／best-effort 報告仍只供診斷。
+註冊與 probe 不取得資源；probe 回傳 ``not_supported`` 與 ``native_evidence=not_recorded``。
+既有目標 API、CLI 與 GUI JSON 編輯器可傳遞此 profile。注入及隱藏 helper 測試不代表原生信任成立。
+
+主機選定的程序內服務 adapter 可使用封閉的 ``service_state`` 完成條件：
+``{"kind":"service_state","tool":"AC_service_start","state":"running"}``，或 STOP／stopped。
+判定須有對應操作的確認回條，以及同一資源擁有者在接受後取得的新 SCM 查詢。
+通過只表示 SCM 回報該狀態，不證明原子完成、健康或桌面不干擾。這些工具名稱只屬於
+adapter 範圍，不是全域 executor 指令。既有任務 API 與 GUI JSON 編輯器可傳遞此條件。
+主機審閱的 ``service`` profile 固定 ``config_path``、``config_sha256`` 及 ASCII ``service_key``。
+固定 worker 核對部署的服務與操作上限後才接受任務範圍。註冊、重載與 probe 不讀取部署檔
+或存取 SCM；原生驗收仍待完成。
+所有固定路徑（各 profile 的 ``config_path`` 及部署指定的映像檔）都必須是本機磁碟路徑：
+UNC 共用、``\\.\pipe\`` 名稱、``\\?\`` 裝置路徑與 ``..`` 片段一律拒絕，註冊 profile 不能讓主機把認證送到其他機器。
+fixture 映像執行前，租約還會拒絕其他帳號能變更的位置：從磁碟根目錄往下的每一層都必須是實體目錄
+（不能是 junction 或 symlink），且只有 SYSTEM、Administrators、TrustedInstaller 與目前使用者能改名、刪除、
+改 ACL 或新增檔案；租約檔案的最終路徑也必須等於設定的路徑。請把 fixture 部署在 ``%LOCALAPPDATA%`` 這類受保護目錄；
+授予 Authenticated Users 修改權限的磁碟根目錄（次要磁碟常見）或共用的 ``%TEMP%`` 會被拒絕。
+fixture 在自己的目錄啟動，只帶最小環境變數：僅含系統目錄的 ``PATH``，不帶主機的任何 token 或金鑰。

@@ -18,12 +18,30 @@
 
 ## 輸入、視窗與擷取修正：還沒在真的桌面與 Jeffrey_RPA 上驗過
 
+### 自有 UI 觀察 fixture 的限定範圍讀取
+
+`TODO` — `test/fixtures/native_memory/uia_fixture.c` 的原生執行仍暫緩。
+尚須核實固定 UIA worker 的可信交付、Python／COM／DLL 相依與原生啟動環境。
+部署 pin、零動作 profile 與受管 worker 已有注入／隱藏 Python helper 證據，不能據此宣告原生信任成立。
+指定 HWND 的 root／祖先核實、逐欄報告與受管唯讀 adapter 目前只有注入呼叫驗證；
+隱藏 Python helper 的阻塞退休測試不能證明原生 COM、HWND 與 provider 行為。
+解除暫緩後才驗證 hidden controls 的 UIA 暴露與 AutomationId、空值／停用／密碼／重複 selector、
+EOF 清理及前景視窗／滑鼠不受影響。建置與靜態匯入檢查不算上述驗收。
+
 ### 行程記憶體自有 fixture 原生驗收
 
 `TODO` — 原生執行仍暫緩。須先完成 Windows provider 的可信應用身分核對、自有 fixture 與受管權限整合，
 再驗證 ASLR、32／64 位配置、跨區段／guard／不可讀頁、程序退出、PID 重用、權限拒絕、
 取消及 handle 回收。以 fixture 的已知狀態比對語意結果，獨立觀測前景、焦點、滑鼠與輸入事件。
 目前 injected-provider 測試不算原生通過；設計見 [記憶體觀察契約](docs/process_memory_contract.md)。
+已有 `test/fixtures/native_memory/acceptance.py` 的靜態預檢與明確選用的 smoke 執行路徑，
+但原生執行尚未啟用；頁面故障、權限、PID 重用、背景不干擾及長時間資源驗收仍待完成。
+原生 fixture 已有固定 split／guard／noaccess／decommitted 頁面配置的建置前置能力；
+頁面 runner 已接上同一 handle 的 payload 邊界查詢、前半段實際讀回與封閉頁面屬性證據，
+並拒絕其他來源的相同錯誤；目前僅有注入測試，原生頁面配置與完整故障矩陣仍未驗收。
+解除暫緩前，`agent_runtime/native_channel.py` 的 `OwnedChannel` 要改成以 `CREATE_SUSPENDED` 啟動、
+指派 Job 後再恢復執行：目前 Job 在 `Popen` 之後才指派，子行程在那之前已開始執行，
+可在加入 Job 前產生不受 kill-on-close 約束的子行程（pinned 映像位置與最小環境已於 U-20261118-36 完成）。
 
 ### 桌面行為驗收
 
@@ -574,7 +592,7 @@ F 還缺：
 
 ## 下一步擴充：以記憶體觀察支援 UI、作業系統與應用程式背景操控
 
-`TODO / 規劃` — 2026-11-01 使用者要求。此節只制定擴充順序，尚未實作或完成驗收；
+`WIP` — 2026-11-01 使用者要求。已有內部 reader、fixture 解碼與語意 runtime 接點，完整交付及驗收尚未完成；
 不解除下列既有原生／真機／24 小時驗收暫緩，也不啟動服務、改動正式環境或讀取現有應用程式記憶體。
 
 ### 目標與可交付範圍
@@ -595,7 +613,7 @@ UIA 僅作必要唯讀觀測，不以 Invoke、SetValue、選單或焦點切換�
 
 ### 現有架構與擴充位置
 
-下表的程式路徑均相對於 `je_auto_control/`；新模組名稱為提案，尚不存在。
+下表的程式路徑均相對於 `je_auto_control/`；各項實作狀態以後方 M0–M6 進度為準。
 
 | 責任 | 現況／預計接點 | 擴充內容 |
 | --- | --- | --- |
@@ -627,6 +645,13 @@ proof = await target.verify(receipt, CompletionQuery("export_file_matches"))
 另外兩個使用情境：OS adapter 讀取指定服務狀態後執行該服務支援的管理操作，並重新查詢；
 browser adapter 從受管頁面取得欄位、透過 DOM 提交，再驗證新回應或產物。
 兩者都不必知道記憶體位址，也不能只靠命令回傳成功判定完成。
+服務已有內部 SCM query-only reader、共用 session 的啟停 controller，以及程序內受管觀察與
+service_state 完成判定、自有 helper IPC 與固定服務 profile；正式可信部署及 Unicode 服務名稱的
+鎖識別仍待實作。同一使用者／鎖目錄下的 ASCII 名稱已可跨 target／設定／資料庫協調，
+不同 Windows 帳號與外部 SCM client 不在此鎖範圍內。
+不能視為 os.service 已支援。管理操作使用同一 retained handle
+重新查詢，回條只表示接受；未知效果保留且禁止自動重送。服務相依項的影響範圍、背景不干擾及
+原生相容性仍未驗收，正式服務未操作。
 
 - `TargetIdentity`：主機／登入 session、PID、程序建立時間、執行檔身分與架構；視窗／文件／瀏覽器
   context 另帶各自身分。PID 或 HWND 相同不能單獨證明還是同一目標。
@@ -654,6 +679,65 @@ resolver 已能透過保留 handle 取得主映像基址與大小並做有預算
 仍缺實際載入映像綁定（目前證明的是映射期間磁碟上的位元組，不是正在執行的程式碼）、`PopenLauncher`（U-20261115-20）的原生執行、受審 runtime／固定程式碼交付、非自有啟動程序的 attestor、
 fixture 的原生身分核對（標頭挑戰已有，U-20261115-18，只在本行程內驗過）與頁面故障注入、runtime grant／helper
 生命週期及公開入口；M2 也仍缺實際應用版本 adapter。原生驗收固定列於本檔上方。
+
+M2 的自有 fixture schema-one adapter 已有嚴格版本／布局驗證、不可變 challenge binding、
+標準補零狀態解碼及共用 72-byte 讀取上限；僅驗證 injected provider，並未完成應用 attestation 或原生驗收。
+成功的序號觀察保留 `revision`，供後續 runtime grounding 區分相同欄位值但已更新的狀態；
+best-effort 觀察沒有 revision，也不承諾後續操作具原子性。原生語意閉環驗收仍待完成。
+多來源報告與 runtime／helper 契約已有合成來源驗證，可保留部分缺失及型別化衝突，
+且拒絕以不完整資料執行或確認完成。自有 fixture 已接合 memory＋IPC 擷取及提交前雙來源核對，
+目前以注入原生呼叫、真實 reader 邏輯與隱藏 Python helper 驗證，仍非原生驗收；
+UIA 的實際部署信任與原生驗收仍待完成；限定 root／祖先、逐欄失敗、受保護欄位及唯一 selector
+目前只有注入測試，helper 阻塞退休只有隱藏 Python 程序證據，仍須核實原生 COM 行為。
+DOM 的來源身分與逐欄報告正規化仍待接合。UIA best-effort 不提供原子 revision。
+
+M3 已加入內部受信任 `SemanticTarget` runtime 接點：封閉語意快照驗證、排除擷取時間的狀態比較、
+傳遞原始快照及 journal action ID 的提交介面、具 atomic／non_atomic 標記的回條，以及未知效果的
+uncertain 紀錄。現有 target 保留完整觀察比對；task／觀察 JSON 不能自行啟用語意模式。
+已有 owned helper 語意協定，主機與 worker 雙端拒絕桌面輸入，cleanup／EOF 也保留輸入及命令守衛；
+實際背景 IPC fixture 已驗證有界操作、回覆遺失、命令進入後取消及 helper 回收。
+此 fixture 只操作自有 counter，不是跨行程記憶體或桌面原生驗收。
+已有 `semantic` 完成條件，以新讀回核對 journal 中實際 target 的身分、版本、來源及 revision，
+再按型別比較期望欄位。每次擷取區間須在當次主機單調時鐘讀取請求內；操作前快取不能證明完成。
+IPC fixture 已驗證成功回條但未生效及 helper 重啟；程序內 target 測試驗證快取回放拒絕。
+未知效果仍須審閱，未自動確認。
+自有 memory fixture 已有 launch-bound compare_set 與有界、不淘汰的重送回條紀錄；
+只有序列管線命令內的比較／提交原子性。FixtureCommands 已將內部命令接到 compare_set，
+嚴格比對回條身分、版本與欄位；以自有緩衝區及真實 reader 邏輯驗證 runtime 閉環，
+OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLauncher 已將映像檔核對
+接到同一受管 channel 的啟動 handle，並拒絕 bootstrap PID／位元寬度不符（只有注入測試）。
+可信來源交付、載入映像綁定的原生相容性與 attestation 驗收尚未完成。
+另有 `test/fixtures/native_memory/` 的 x64 靜態 CRT fixture 原始碼與僅建置工具；
+已編譯、靜態盤點直接 OS DLL 匯入並記錄來源／產物雜湊，未執行該原生產物。
+原生程式行為、DLL 解析信任、載入位元組核對與故障驗收仍未驗證。
+已有從固定雜湊 PE32+ x64 產物推導完整可執行區段的 planner 與 reader guard；
+拒絕可寫入／重定位程式碼，核對原啟動 pin，且不擴大 probe 預算。測試僅使用合成映像及靜態產物；
+區段 padding 的原生相容性、實際頁面保護與 DLL 信任仍未驗證，不能當成完整 runtime attestation。
+內部 OwnedFixtureTarget 已組裝啟動、映像核對、fixture 命令與受管語意讀取；
+擁有者在啟動前保留，失敗回收可重試，終止後不得發布晚到的 target。
+`ready()` 已能在受管 scope 內先綁定固定 task／owner 再延遲取得資源，
+並防止另一個 session 在啟動發布與內部 owner 綁定之間接管。隱藏 Python helper
+已串起真實 reader 邏輯、既有語意 IPC、完成判定、失敗代碼與回收；原生呼叫及 buffer 仍為注入資料。
+已有專用 fixture profile，沿用既有主機管理 API／GUI JSON 編輯器、不可變 digest 及即時停用。
+只允許固定 fixture 命令，主機核對 bootstrap，worker 在修改 scope 前核對部署及 task pin。
+目前僅有注入測試；沒有註冊實際主機部署，原生信任與驗收仍待完成。
+自訂語意 worker 已在請求、讀取 checkpoint、命令守衛與發布前重新核對原帳號／角色／store 來源，
+並拒絕回呼替換 operation 或 worker 綁定；目前以真實暫存帳號檔及注入 buffer 驗證。
+取消與即時 profile 停用仍由主機 RPC 輪詢及 helper 退場處理，不能把 checkpoint 當成原子撤權或 syscall 中斷。
+語意 helper 已使用既有非顯示路由，Linux 有主機 binding 時只走精確 argv 的 owner service，
+政策缺失或服務失敗不得退回本機。此項僅有注入路由測試，尚未證明 Linux 原生隔離。
+套件已有私有 `fixture_worker` 入口，使用主機提供的固定設定及獨立 config SHA；
+先核對封閉 schema、映像 pin 與 PE 範圍，再交由受管 readiness 啟動。此路徑僅以靜態／注入測試驗證。
+Python／helper 來源及 DLL 的可信交付、服務獨立身分／空環境下的套件與帳號檔存取，
+以及子 fixture 的 nested grant 仍待接合；Windows fixture 入口不支援 Linux 原生讀取。
+原生 smoke 工具已有初始讀值、操作回條、新讀回、runtime 完成及回收的分項報告；
+目前只跑過靜態產物預檢與注入測試，不代表原生驗收或完整故障矩陣通過。
+Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。
+內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
+並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。
+fixture 的受管 profile／helper 及有時限的靜態診斷已接合；可信交付及真實原生閉環仍待完成。
+不提供任意 PID／位址記憶體入口；
+記憶體失敗原因已透過封閉錯誤封包跨 helper 保留型別；未知原因與混合封包拒絕且不回顯內容。
 
 1. **M0：能力盤點與範圍契約。**（已完成：profile／路由規則 U-20261116-12；維護者 2026-11-17 決定第一個目標只用自有 fixture，真實應用待 M1 原生驗收跑通後再選，U-20261117-01）先列 Windows 的 UI／OS／應用操作矩陣，每項記錄
    讀取來源、執行介面、權限、是否全背景、支援版本、驗證方式與不支援原因。

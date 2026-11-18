@@ -131,7 +131,7 @@ class PeerMediaOwners:
                 self._tasks.pop(slot)
                 try:
                     previous.result()
-                except BaseException as error:  # reason: explicit retry preserves controls and the cached failure
+                except BaseException as error:  # NOSONAR  # reason: retry keeps controls and the cached failure
                     raise_caused_run_interruption(error)
             coroutine = operation()
             try:

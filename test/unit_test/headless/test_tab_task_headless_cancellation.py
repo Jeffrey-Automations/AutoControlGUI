@@ -65,7 +65,8 @@ def test_tab_cancellation_ends_headless_wait(reason):
         assert cancelled == [True]
         assert results == []
         if reason == "timeout":
-            assert len(errors) == 1 and isinstance(errors[0], TaskTimeout)
+            assert len(errors) == 1
+            assert isinstance(errors[0], TaskTimeout)
         else:
             assert errors == []
     finally:

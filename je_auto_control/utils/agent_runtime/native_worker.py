@@ -4,10 +4,11 @@ from __future__ import annotations
 import json
 import sys
 import threading
-from contextlib import ExitStack
+from contextlib import AbstractContextManager, ExitStack
 from typing import Any
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+from je_auto_control.utils.agent_runtime.native_errors import error_reply
 from je_auto_control.utils.agent_runtime.browser_target import BrowserTarget
 from je_auto_control.utils.agent_runtime.browser_retirement import refuse_browser_tool
 from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
@@ -19,12 +20,23 @@ from je_auto_control.utils.rbac.authorization import AuthorizationContext, autho
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 from je_auto_control.utils.script_vars.execution import execution_scope
 from je_auto_control.wrapper._input_observer import input_observer
-from je_auto_control.utils.agent_runtime.context import TaskOperation, operation_scope
+from je_auto_control.utils.agent_runtime.context import (
+    TaskOperation, authorization_key, operation_scope,
+)
 from je_auto_control.utils.agent_runtime.presence_frames import presence_body
 from je_auto_control.utils.agent_runtime.presence_reader import PresenceReader
 from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
+from je_auto_control.utils.agent_runtime.observation_report import REPORT_VERSION
+from je_auto_control.utils.agent_runtime.semantic_target import SemanticTarget
+from je_auto_control.utils.agent_runtime.service_target import ServiceTarget
+from je_auto_control.utils.agent_runtime.target_dispatch import observe as observe_target
+from je_auto_control.utils.agent_runtime.service_worker import service_bootstrap, configure_service, perform_service
+from je_auto_control.utils.agent_runtime.semantic_worker import (
+    managed_semantic_scope, perform_grounded, require_empty_cleanup, refuse_cleanup_command, refuse_input,
+)
 
 _LIMIT = 1_100_000
+_OBSERVED_OPERATIONS = {"perform_service": perform_service, "perform_grounded": perform_grounded}
 
 
 class NativeWorker:
@@ -67,6 +79,8 @@ class NativeWorker:
 
     def _validate_input(self, event: dict[str, Any]) -> None:
         """Recheck live permission; cleanup may acknowledge owned release boundaries only."""
+        if isinstance(self._target, (SemanticTarget, ServiceTarget)):
+            raise AgentTaskError("semantic helpers cannot emit desktop input")
         if self._cleanup:
             if event.get("kind") not in {"key_release", "key_released", "mouse_release", "mouse_released"}:
                 raise AgentTaskError("native cleanup permits owned release events only")
@@ -113,8 +127,7 @@ class NativeWorker:
                 result = self._dispatch(request["operation"], request["payload"])
                 self._reply({"id": self._request_id, "result": durable_payload(result)})
             except (AutoControlException, OSError, RuntimeError, TypeError, ValueError, LookupError) as error:
-                self._reply(durable_payload({"id": self._request_id, "error": f"{type(error).__name__}: {error}",
-                                             "error_type": type(error).__name__}))
+                self._reply(durable_payload(error_reply(self._request_id, error)))
 
     def _dispatch(self, operation: str, payload: dict[str, Any]) -> Any:
         if self._browser_readonly:
@@ -134,7 +147,15 @@ class NativeWorker:
 
     def _bootstrap(self) -> dict[str, Any]:
         """Advertise optional retirement only on the built-in original configured browser worker."""
-        result = {"protocol": 1}
+        result: dict[str, Any] = {"protocol": 1}
+        if isinstance(self._target, ServiceTarget):
+            result["service"] = service_bootstrap(self._target)
+        if isinstance(self._target, SemanticTarget):
+            result["semantic"] = 1
+            if self._target.observation_sources:
+                result["semantic_report"] = REPORT_VERSION
+                result["semantic_sources"] = list(self._target.observation_sources)
+                result["semantic_fields"] = sorted(self._target.observation_fields)
         # pylint: disable-next=unidiomatic-typecheck  # reason: read-only/custom worker subclasses cannot claim this API
         if type(self) is NativeWorker and self._profile_kind == "browser" and isinstance(self._target, BrowserTarget):
             result["browser_readonly"] = 1
@@ -144,16 +165,36 @@ class NativeWorker:
         if self._spec is None:
             raise AgentTaskError("native worker must be configured by its owner")
         definition = self._target.readonly_spec if self._browser_readonly else self._spec
+        request: TaskOperation | None = None
+        semantic = isinstance(self._target, (SemanticTarget, ServiceTarget))
         with ExitStack() as stack:
             authority = DeferredAuthorization(self._owner).scope() if self._browser_readonly else (
                 authorization_scope(self._owner))
             stack.enter_context(authority)
             policy = TaskPolicy(definition)
-            stack.enter_context(command_guard(lambda name, arguments: self._guard(policy, name, arguments)))
+            stack.enter_context(command_guard(
+                lambda name, arguments: self._guard(policy, name, arguments, request, semantic)))
             stack.enter_context(execution_scope(dict(definition.inputs)))
-            stack.enter_context(input_observer(self._input))
-            stack.enter_context(operation_scope(TaskOperation(definition, self._check_activity, self._owner)))
+            stack.enter_context(input_observer(refuse_input if semantic else self._input))
+            scope = (self._semantic_scope(definition) if semantic else
+                     operation_scope(TaskOperation(definition, self._check_activity, self._owner)))
+            request = stack.enter_context(scope)
             return self._operation(operation, payload)
+
+    def _semantic_scope(self, definition: AgentTaskSpec) -> AbstractContextManager[TaskOperation]:
+        owner, target, kind = self._owner, self._target, self._profile_kind
+
+        def validate() -> None:
+            if (self._spec is not definition or self._target is not target or self._profile_kind != kind
+                    or authorization_key(self._owner) != authorization_key(owner)):
+                raise AgentTaskError("semantic worker configuration changed")
+
+        def check() -> None:
+            validate()
+            self._check_activity()
+            validate()
+
+        return managed_semantic_scope(definition, owner, check)
 
     def _retire_browser(self, payload: dict[str, Any]) -> dict[str, Any]:
         if payload != {} or self._profile_kind != "browser" or self._spec is None:
@@ -190,8 +231,11 @@ class NativeWorker:
         return inspect_browser_dependencies(payload["transfer"])
 
     def _configure_scope(self, payload: dict[str, Any]) -> None:
+        if isinstance(self._target, ServiceTarget):
+            configure_service(self._target, payload)
         spec = AgentTaskSpec.from_dict(payload["spec"])
         owner = AuthorizationContext(**payload["owner"]) if payload.get("owner") else None
+        self._check_semantic_pin(spec, owner)
         self._check_presence_pin(spec, owner, payload)
         self._spec, self._owner = spec, owner
         self._configure_profile(payload)
@@ -202,6 +246,11 @@ class NativeWorker:
             if not isinstance(self._target, BrowserTarget):
                 self._target = BrowserTarget()
         self._configure_presence(payload)
+
+    def _check_semantic_pin(self, spec: AgentTaskSpec, owner: AuthorizationContext | None) -> None:
+        if isinstance(self._target, (SemanticTarget, ServiceTarget)) and self._spec is not None and (
+                spec != self._spec or authorization_key(owner) != authorization_key(self._owner)):
+            raise AgentTaskError("semantic worker configuration is pinned")
 
     def _check_presence_pin(self, spec: AgentTaskSpec, owner: AuthorizationContext | None,
                             payload: dict[str, Any]) -> None:
@@ -244,10 +293,16 @@ class NativeWorker:
         if self._activity is not None:
             self._activity.check()
 
-    def _guard(self, policy: TaskPolicy, name: str, arguments: Any) -> None:
+    def _guard(self, policy: TaskPolicy, name: str, arguments: Any,
+               request: TaskOperation | None = None, semantic: bool = False) -> None:
         if self._browser_readonly and name != "AC_browser_read":
             raise AgentTaskError("read-only browser cannot dispatch tools")
-        self._check_activity()
+        if semantic:
+            if request is None:
+                raise AgentTaskError("semantic command requires a managed worker scope")
+            request.checkpoint()
+        else:
+            self._check_activity()
         policy.check(name, arguments)
 
     def _operation(self, operation: str, payload: dict[str, Any]) -> Any:
@@ -258,8 +313,12 @@ class NativeWorker:
             ready, reason = self._target.ready(self._spec)
             return {"ready": ready, "reason": reason}
         if operation == "observe":
-            return self._target.observe()
+            return observe_target(self._target)
+        if operation in _OBSERVED_OPERATIONS:
+            return _OBSERVED_OPERATIONS[operation](self._target, payload)
         if operation == "perform":
+            if isinstance(self._target, (SemanticTarget, ServiceTarget)):
+                raise AgentTaskError("semantic commands require grounded dispatch")
             return self._target.perform(payload["tool"], payload["arguments"])
         if operation == "verify_browser":
             if self._profile_kind != "browser" and not self._custom_target:
@@ -286,7 +345,10 @@ class NativeWorker:
         self._activity.ready()
 
     def close(self) -> None:
-        """Retire only this worker's reader/notice; input release remains a separate owner ACK path."""
+        """Guard semantic resource retirement, then release presence readers and notices."""
+        if isinstance(self._target, (SemanticTarget, ServiceTarget)):
+            with input_observer(refuse_input), command_guard(refuse_cleanup_command):
+                self._target.cleanup()
         if self._presence_binding is None:
             return
         self._notice_stop.set()
@@ -306,6 +368,10 @@ class NativeWorker:
             release_keyboard_key(key['keycode'], key['is_shift'], skip_record=True)
 
     def _release_owned(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if isinstance(self._target, (SemanticTarget, ServiceTarget)):
+            require_empty_cleanup(payload)
+            self.close()
+            return {"cleaned": True}
         from je_auto_control.wrapper.auto_control_mouse import release_mouse
         if set(payload) != {"keys", "buttons"}:
             raise AgentTaskError("cleanup payload is invalid")

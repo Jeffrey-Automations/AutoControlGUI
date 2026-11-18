@@ -230,7 +230,8 @@ def test_advertiser_retry_closes_original_without_repeating_unregister(monkeypat
     owner, calls, zc = advertiser(monkeypatch, close_failures=1)
     with pytest.raises(MediaRetirementError) as caught:
         owner.stop()
-    assert caught.value.owner is owner and owner._zc is zc
+    assert caught.value.owner is owner
+    assert owner._zc is zc
     assert owner.retirement_status.retryable
     owner.stop()
     owner.stop()
@@ -288,7 +289,8 @@ def test_recorder_success_is_idempotent_and_rejects_late_frames():
     recorder.write_frame(object())
     recorder.stop()
     assert recorder.retirement_status.complete
-    assert stream.calls == [None] and container.close_calls == 1
+    assert stream.calls == [None]
+    assert container.close_calls == 1
 
 
 def test_host_audio_failure_does_not_skip_socket_or_client_cleanup():
@@ -332,7 +334,8 @@ def test_opus_capture_failure_retains_child_and_wakes_recv(monkeypatch):
         child = track._capture
         with pytest.raises(MediaRetirementError):
             track.stop()
-        assert track._capture is child and track.readyState == "ended"
+        assert track._capture is child
+        assert track.readyState == "ended"
         with pytest.raises(MediaStreamError):
             await asyncio.wait_for(receive, 1)
         track._enqueue(b"late")
@@ -486,7 +489,8 @@ def test_mic_retained_failure_refuses_new_start(monkeypatch):
         sender.stop()
     with pytest.raises(MediaRetirementError):
         sender.start()
-    assert sender._capture is child and len(streams) == 1
+    assert sender._capture is child
+    assert len(streams) == 1
 
 
 def test_audio_hard_interrupt_still_attempts_close(monkeypatch):
@@ -518,7 +522,8 @@ def test_constructor_interruption_has_explicit_original_cleanup_owner(monkeypatc
         lan_discovery.HostAdvertiser(host_id="interrupted")
     assert caught.value is signal
     (owner,) = interrupted_retirement_owners(signal)
-    assert owner._zc is zc and owner.retirement_status.retryable
+    assert owner._zc is zc
+    assert owner.retirement_status.retryable
     owner.stop()
     assert owner.retirement_status.complete
 

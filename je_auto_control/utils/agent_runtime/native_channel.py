@@ -10,24 +10,27 @@ import sys
 import threading
 import time
 import uuid
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
-from je_auto_control.utils.agent_runtime.errors import AgentControlBusy, AgentTaskError, AgentHumanReview
+from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.wire_data import detached, positive
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+from je_auto_control.utils.agent_runtime.native_errors import raise_reply_error
 
 _PACKET_LIMIT = 1_100_000
-_ERROR_TYPES = {"AgentControlBusy": AgentControlBusy, "AgentHumanReview": AgentHumanReview}
 
 
 def classify_reply(reply: Any, request_id: str) -> tuple[bool, Any]:
     """Return ``(True, event)`` for an input announcement or ``(False, result)``; a helper error raises its type."""
     if not isinstance(reply, dict) or reply.get("id") != request_id:
         raise AgentTaskError("native helper returned an unexpected reply")
+    if (reply.get("error_type") in ("MemoryObservationError", "ServiceQueryError")
+            or "memory_reason" in reply or "service_reason" in reply):
+        raise_reply_error(reply)
     if "event" in reply:
         return True, reply["event"]
     if "error" in reply:
-        raise _ERROR_TYPES.get(str(reply.get("error_type")), AgentTaskError)(str(reply["error"]))
+        raise_reply_error(reply)
     return False, detached(reply.get("result"))
 
 
@@ -50,7 +53,8 @@ class OwnedChannel:
     reply. The stop intent is monotone, and no reply is delivered once it is set.
     """
 
-    def __init__(self, argv: Sequence[str], *, on_control: Callable[[str], None] | None = None) -> None:
+    def __init__(self, argv: Sequence[str], *, on_control: Callable[[str], None] | None = None,
+                 cwd: str | None = None, env: Mapping[str, str] | None = None) -> None:
         self._request_lock = threading.Lock()
         self._close_lock = threading.Lock()
         self._stop = threading.Event()
@@ -66,7 +70,8 @@ class OwnedChannel:
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
         self._process = subprocess.Popen(  # nosec B603  # reason: trusted host factory supplies explicit argv
             list(argv), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            bufsize=0, creationflags=flags, start_new_session=sys.platform != "win32")
+            bufsize=0, creationflags=flags, start_new_session=sys.platform != "win32",
+            cwd=cwd, env=None if env is None else dict(env))
         try:
             if sys.platform == "win32":
                 from je_auto_control.utils.agent_runtime.native_job import NativeJob

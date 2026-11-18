@@ -137,7 +137,7 @@ class SessionRecorder:
             if self._stream is not None and self._container is not None:
                 for packet in self._stream.encode(None):
                     self._container.mux(packet)
-        except BaseException as error:  # reason: close independently before preserving interruption
+        except BaseException as error:  # NOSONAR  # reason: close first; interruption preserved
             self._failures += ("recorder.flush",)
             return error
         self._flush = Completion.CONFIRMED
@@ -151,7 +151,7 @@ class SessionRecorder:
         try:
             if self._container is not None:
                 self._container.close()
-        except BaseException as error:  # reason: retain uncertain ownership before preserving interruption
+        except BaseException as error:  # NOSONAR  # reason: mark ownership uncertain; interruption kept
             self._release = Completion.UNCERTAIN
             self._failures += ("recorder.close",)
             return error

@@ -26,6 +26,8 @@ from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.http_headers import CREDENTIAL_HEADERS
 from typing import IO, Any, Dict, Mapping, Optional
 
+_REQUEST_STOPPED = "request stopped"
+
 # NOSONAR python:S5332 — http is allow-listed deliberately (other schemes
 # are rejected); plain http is required for internal/localhost endpoints.
 _ALLOWED_SCHEMES = ("http://", "https://")  # NOSONAR python:S5332
@@ -229,14 +231,14 @@ class _Connections:
                 connect()
                 if self._is_aborted():
                     _shut(connection)
-                    raise urllib.error.URLError("request stopped")
+                    raise urllib.error.URLError(_REQUEST_STOPPED)
 
             connection.connect = checked_connect
             # http.client opens its socket through this attribute (proxies included).
             connection._create_connection = functools.partial(_connect_in_slices, aborted=self._is_aborted)
             with self._lock:
                 if self._aborted:
-                    raise urllib.error.URLError("request stopped")
+                    raise urllib.error.URLError(_REQUEST_STOPPED)
                 self._opened.append(connection)
             return connection
         return make
@@ -297,7 +299,7 @@ def _connect_in_slices(address: Any, timeout: Any = None, source_address: Any = 
 def _await_connect(sock: Any, deadline: Optional[float], aborted: Any) -> None:
     while True:
         if aborted():
-            raise urllib.error.URLError("request stopped")
+            raise urllib.error.URLError(_REQUEST_STOPPED)
         remaining = _STOP_POLL_SECONDS if deadline is None else min(_STOP_POLL_SECONDS, deadline - time.monotonic())
         if remaining <= 0:
             raise TimeoutError("timed out")
@@ -444,7 +446,7 @@ def _stoppable_transport(call: Mapping[str, Any]) -> Dict[str, Any]:
         _recording.active = connections
         try:
             outcome["response"] = context.run(urllib_transport, call)
-        except BaseException as error:  # reason: handed to the waiting caller, which raises it
+        except BaseException as error:  # NOSONAR python:S5754  # reason: handed to the waiting caller, which raises it
             outcome["error"] = error
         finally:
             _recording.active = None

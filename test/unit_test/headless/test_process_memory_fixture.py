@@ -56,18 +56,18 @@ def test_buffers_have_exact_layout_and_retain_addresses_after_changes():
 ])
 def test_invalid_changes_leave_state_and_both_buffers_unchanged(document_id, status):
     state = fixture_module.FixtureState()
-    before = state.snapshot(), state.payload.raw, state.sequence.raw
+    expected = state.snapshot(), state.payload.raw, state.sequence.raw
     assert state.set_state(document_id, status) == {"kind": "error", "code": "invalid_state"}
-    assert (state.snapshot(), state.payload.raw, state.sequence.raw) == before
+    assert (state.snapshot(), state.payload.raw, state.sequence.raw) == expected
 
 
 def test_sequence_exhaustion_leaves_state_and_buffers_unchanged():
     state = fixture_module.FixtureState()
     state._generation = 0xFFFFFFFFFFFFFFFE
     state.sequence.raw = struct.pack("<Q", state._generation)
-    before = state.snapshot(), state.payload.raw, state.sequence.raw
+    expected = state.snapshot(), state.payload.raw, state.sequence.raw
     assert state.set_state(42, "done") == {"kind": "error", "code": "sequence_exhausted"}
-    assert (state.snapshot(), state.payload.raw, state.sequence.raw) == before
+    assert (state.snapshot(), state.payload.raw, state.sequence.raw) == expected
 
 
 def test_bootstrap_nonce_belongs_to_fixture_lifetime():
@@ -81,7 +81,8 @@ def test_child_accepts_maximum_frame_including_newline():
     command = b'{"command":"snapshot"}'
     frame = command + b" " * (fixture_module.MAX_REQUEST_BYTES - len(command) - 1) + b"\n"
     code, records, errors = _run_child(frame)
-    assert code == 0 and errors == b""
+    assert code == 0
+    assert errors == b""
     assert records[1:] == [{"kind": "snapshot", "document_id": 17, "job_status": "ready", "sequence": 0}]
 
 
@@ -93,16 +94,21 @@ def test_child_bootstrap_state_changes_and_stop():
         b'{"command":"stop"}\n'
         b'{"command":"set","document_id":1,"job_status":"done"}\n'
     )
-    assert code == 0 and errors == b""
+    assert code == 0
+    assert errors == b""
     bootstrap = records[0]
     assert bootstrap["kind"] == "bootstrap"
-    assert bootstrap["identity"] == "self_reported" and "birth" not in bootstrap
+    assert bootstrap["identity"] == "self_reported"
+    assert "birth" not in bootstrap
     assert bootstrap["protocol_version"] == bootstrap["schema_version"] == 1
-    assert bootstrap["pid"] > 0 and bootstrap["pid"] != os.getpid()
+    assert bootstrap["pid"] > 0
+    assert bootstrap["pid"] != os.getpid()
     assert bootstrap["pointer_bits"] == struct.calcsize("P") * 8
     assert bootstrap["source_sha256"] == hashlib.sha256(FIXTURE_PATH.read_bytes()).hexdigest()
-    assert bootstrap["payload_size"] == 16 and bootstrap["sequence_size"] == 8
-    assert bootstrap["payload_address"] > 0 and bootstrap["sequence_address"] > 0
+    assert bootstrap["payload_size"] == 16
+    assert bootstrap["sequence_size"] == 8
+    assert bootstrap["payload_address"] > 0
+    assert bootstrap["sequence_address"] > 0
     assert records[1] == {"kind": "snapshot", "document_id": 17, "job_status": "ready", "sequence": 0}
     assert records[2] == records[3] == {
         "kind": "snapshot", "document_id": 42, "job_status": "busy", "sequence": 2,
@@ -122,7 +128,8 @@ def test_child_bootstrap_state_changes_and_stop():
 ])
 def test_child_rejects_bad_requests_without_mutation_or_echo(frame, reason):
     code, records, errors = _run_child(frame + b'{"command":"snapshot"}\n')
-    assert code == 0 and errors == b""
+    assert code == 0
+    assert errors == b""
     assert records[1] == {"kind": "error", "code": reason}
     assert records[2:] == [{"kind": "snapshot", "document_id": 17, "job_status": "ready", "sequence": 0}]
 
@@ -134,14 +141,16 @@ def test_child_rejects_bad_requests_without_mutation_or_echo(frame, reason):
 ])
 def test_child_terminates_invalid_framing(frame, reason):
     code, records, errors = _run_child(frame)
-    assert code == 2 and errors == b""
+    assert code == 2
+    assert errors == b""
     assert records[1:] == [{"kind": "error", "code": reason}]
 
 
 def test_clean_eof_and_fresh_launch_identity():
     first_code, first, first_errors = _run_child(b"")
     second_code, second, second_errors = _run_child(b"")
-    assert first_code == second_code == 0 and first_errors == second_errors == b""
+    assert first_code == second_code == 0
+    assert first_errors == second_errors == b""
     assert len(first) == len(second) == 1
     assert first[0]["launch_nonce"] != second[0]["launch_nonce"]
     assert first[0]["source_sha256"] == second[0]["source_sha256"]
@@ -215,7 +224,8 @@ def test_a_header_that_reads_back_binds_the_bootstrap_locations():
     state.set_state(23, "busy")
     resolve = fixture_module.challenge_resolver(CHALLENGE, state.bootstrap())
     result, provider = _observe_own(state, resolve)
-    assert isinstance(result, Observation) and result.consistency == "sequence_checked"
+    assert isinstance(result, Observation)
+    assert result.consistency == "sequence_checked"
     assert result.fields == (("document_id", 23), ("job_status", "busy"))
     assert provider.reads[0] == (ctypes.addressof(state.header), 40)
 
@@ -242,8 +252,9 @@ def test_a_header_that_does_not_match_the_launch_yields_no_plan(tamper):
 
 @pytest.mark.parametrize("challenge", [bytes(16), b"short", "0" * 16])
 def test_an_unusable_challenge_is_refused_before_any_read(challenge):
+    bootstrap = fixture_module.FixtureState().bootstrap()
     with pytest.raises(ValueError):
-        fixture_module.challenge_resolver(challenge, fixture_module.FixtureState().bootstrap())
+        fixture_module.challenge_resolver(challenge, bootstrap)
 
 
 def test_the_child_writes_the_parents_challenge_into_its_own_header():
@@ -251,8 +262,107 @@ def test_the_child_writes_the_parents_challenge_into_its_own_header():
     child = subprocess.run([sys.executable, "-I", "-u", str(FIXTURE_PATH), "--challenge", CHALLENGE.hex()],
                            input=b'{"command":"stop"}\n', capture_output=True, timeout=10, creationflags=flags)
     bootstrap = json.loads(child.stdout.splitlines()[0])
-    assert child.returncode == 0 and bootstrap["header_size"] == 40
+    assert child.returncode == 0
+    assert bootstrap["header_size"] == 40
     assert type(bootstrap["header_address"]) is int
     refused = subprocess.run([sys.executable, "-I", "-u", str(FIXTURE_PATH), "--challenge", "zz"],
                              input=b"", capture_output=True, timeout=10, creationflags=flags)
-    assert refused.returncode == 2 and refused.stdout == b""
+    assert refused.returncode == 2
+    assert refused.stdout == b""
+
+def _change(state, **updates):
+    return {"command": "compare_set", "operation_id": "operation-1",
+            "launch_nonce": state.bootstrap()["launch_nonce"], "expected_sequence": 0,
+            "document_id": 42, "job_status": "done", **updates}
+
+
+def test_compare_set_replay_retains_receipt_after_intervening_change():
+    state = fixture_module.FixtureState()
+    request = _change(state)
+    first = state.compare_set(request)
+    assert first["kind"] == "receipt" and first["comparison"] == "atomic"
+    assert first["sequence"] == 2
+    first["sequence"] = 999
+    state.set_state(99, "busy")
+    replay = state.compare_set(request)
+    assert replay["sequence"] == 2
+    assert state.snapshot()["sequence"] == 4
+    assert state.snapshot()["document_id"] == 99
+    assert state.compare_set({**request, "document_id": 1})["code"] == "operation_conflict"
+
+
+def test_refused_future_revision_never_becomes_an_effect_on_retry():
+    state = fixture_module.FixtureState()
+    request = _change(state, expected_sequence=2)
+    assert state.compare_set(request)["code"] == "state_changed"
+    state.set_state(18, "busy")
+    assert state.compare_set(request)["code"] == "state_changed"
+    assert state.snapshot()["sequence"] == 2
+    assert state.snapshot()["document_id"] == 18
+
+
+def test_operation_capacity_never_evicts_replay_protection():
+    state = fixture_module.FixtureState()
+    first = _change(state)
+    for index in range(fixture_module.MAX_OPERATIONS):
+        request = _change(state, operation_id=f"operation-{index}", expected_sequence=index * 2)
+        assert state.compare_set(request)["kind"] == "receipt"
+        if index == 0:
+            first = request
+    before = state.snapshot(), state.payload.raw, state.sequence.raw
+    assert state.compare_set(_change(state, operation_id="new"))["code"] == "operation_limit"
+    assert state.compare_set(first)["sequence"] == 2
+    assert (state.snapshot(), state.payload.raw, state.sequence.raw) == before
+
+
+@pytest.mark.parametrize("updates,reason", [
+    ({"expected_sequence": True}, "invalid_request"),
+    ({"expected_sequence": 1}, "invalid_request"),
+    ({"expected_sequence": 2**64}, "invalid_request"),
+    ({"operation_id": "x" * 129}, "invalid_request"),
+    ({"operation_id": []}, "invalid_request"),
+    ({"launch_nonce": "other-launch"}, "target_changed"),
+    ({"document_id": True}, "invalid_state"),
+    ({"job_status": []}, "invalid_state"),
+    ({"address": 42}, "invalid_request"),
+])
+def test_compare_set_refusals_preserve_buffers(updates, reason):
+    state = fixture_module.FixtureState()
+    before = state.snapshot(), state.payload.raw, state.sequence.raw
+    assert fixture_module._dispatch(state, _change(state, **updates))["code"] == reason
+    assert (state.snapshot(), state.payload.raw, state.sequence.raw) == before
+
+
+def test_restart_refuses_old_operation_and_launch_binding():
+    original = fixture_module.FixtureState()
+    request = _change(original)
+    assert original.compare_set(request)["kind"] == "receipt"
+    restarted = fixture_module.FixtureState()
+    assert restarted.compare_set(request)["code"] == "target_changed"
+    assert restarted.snapshot()["sequence"] == 0
+
+
+def test_hidden_child_compare_set_replay_and_readback():
+    from concurrent.futures import ThreadPoolExecutor
+    flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    child = subprocess.Popen([sys.executable, "-I", "-u", str(FIXTURE_PATH)],
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             creationflags=flags)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        try:
+            bootstrap = json.loads(pool.submit(child.stdout.readline).result(timeout=5))
+            request = {"command": "compare_set", "operation_id": "ipc-1",
+                       "launch_nonce": bootstrap["launch_nonce"], "expected_sequence": 0,
+                       "document_id": 42, "job_status": "done"}
+            wire = (json.dumps(request) + "\n").encode()
+            output, errors = child.communicate(wire * 2 + b'{"command":"snapshot"}\n', timeout=5)
+            records = [json.loads(line) for line in output.splitlines()]
+            assert child.returncode == 0 and errors == b""
+            assert records[0] == records[1]
+            assert records[0]["kind"] == "receipt" and records[0]["sequence"] == 2
+            assert records[2] == {"kind": "snapshot", "document_id": 42,
+                                  "job_status": "done", "sequence": 2}
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.communicate(timeout=5)

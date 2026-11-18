@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import fractions
 import threading
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 try:
     import av
@@ -146,19 +146,19 @@ class OpusMicAudioTrack(MediaStreamTrack):
         failures: list[BaseException] = []
         try:
             super().stop()
-        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+        except BaseException as error:  # NOSONAR  # reason: independent child cleanup; failures re-raised
             failures.append(error)
         try:
             if not self._loop.is_closed():
                 self._loop.call_soon_threadsafe(self._end_queue)
-        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+        except BaseException as error:  # NOSONAR  # reason: independent child cleanup; failures re-raised
             failures.append(error)
         try:
             with self._lock:
                 if self._capture is not None:
                     self._capture.stop()
                     self._capture = None
-        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+        except BaseException as error:  # NOSONAR  # reason: independent child cleanup; failures re-raised
             failures.append(error)
         raise_cleanup_failures(failures)
 
@@ -184,21 +184,28 @@ class OpusMicReceiver:
         self._player_retired = False
         self._resampler: Optional[Any] = None
 
-    def consume(self, track: MediaStreamTrack) -> None:
-        """Spawn a background task that drains ``track.recv()`` into the player."""
+    def consume(self, track: MediaStreamTrack, *, admit: Optional[Callable[[], bool]] = None) -> None:
+        """Spawn a background task that drains ``track.recv()`` into the player.
+
+        ``admit`` is asked before every frame is played; a frame it refuses is
+        drained and dropped, so a peer that is not (or no longer) allowed to be
+        heard stays silent without stalling its track.
+        """
         if self._stopped:
             raise AudioBackendError("audio receiver is stopped")
         if self._task is not None:
             return
-        self._task = asyncio.ensure_future(self._loop(track))
+        self._task = asyncio.ensure_future(self._loop(track, admit))
 
-    async def _loop(self, track: MediaStreamTrack) -> None:
+    async def _loop(self, track: MediaStreamTrack, admit: Optional[Callable[[], bool]]) -> None:
         from aiortc.mediastreams import MediaStreamError
         try:
             while not self._stopped:
                 frame = await track.recv()
                 if self._stopped or not bool(self._player.is_running):
                     return
+                if admit is not None and not admit():
+                    continue
                 for chunk in self._to_player_pcm(frame):
                     self._player.play(chunk)
         except (asyncio.CancelledError, MediaStreamError):
@@ -240,14 +247,14 @@ class OpusMicReceiver:
         except MediaRetirementError as error:
             if error.owner is not self or not error.status.retryable:
                 failures.append(error)
-        except BaseException as error:  # reason: observe the task despite an independent player or scheduling failure
+        except BaseException as error:  # NOSONAR  # reason: observe the task despite other failures
             failures.append(error)
         task = self._task
         try:
             if task is not None and not task.done() and not task.get_loop().is_closed():
                 await asyncio.wait({task})
             self.stop()
-        except BaseException as error:  # reason: preserve earlier controls after observing actual task completion
+        except BaseException as error:  # NOSONAR  # reason: keep earlier controls once the task is done
             failures.append(error)
         raise_cleanup_failures(failures)
 
@@ -269,13 +276,13 @@ class OpusMicReceiver:
         failures: list[BaseException] = []
         try:
             self._cancel_task()
-        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+        except BaseException as error:  # NOSONAR  # reason: independent child cleanup; failures re-raised
             failures.append(error)
         try:
             if not self._player_retired:
                 self._player.stop()
                 self._player_retired = True
-        except BaseException as error:  # reason: attempt independent child cleanup before preserving failures
+        except BaseException as error:  # NOSONAR  # reason: independent child cleanup; failures re-raised
             failures.append(error)
         raise_cleanup_failures(failures)
         require_retired(self)

@@ -178,7 +178,8 @@ def test_progress_shows_and_cancel_keeps_the_panel_busy_until_it_unwinds(panel, 
         time.sleep(0.005)
     assert (panel._status_key, panel._status_value) == ("progress", "3")
     panel.cancel()
-    assert panel._task.running and panel._status_key == "cancelling"
+    assert panel._task.running
+    assert panel._status_key == "cancelling"
     release.set()
     until_idle(app, panel)
     assert panel._status_key == "cancelled"

@@ -29,6 +29,11 @@ _READY_TAKEOVER: ContextVar[tuple[TaskOperation, Callable[[], None]] | None] = C
     "agent_task_ready_takeover", default=None)
 
 
+def authorization_key(owner: AuthorizationContext | None) -> tuple[str, str, str | None] | None:
+    """Include the authority store provenance that role equality deliberately omits."""
+    return None if owner is None else (owner.user_id, owner.role, owner.store_path)
+
+
 def current_operation() -> TaskOperation | None:
     """Return the host-bound operation, or None outside managed dispatch."""
     return _CURRENT.get()
