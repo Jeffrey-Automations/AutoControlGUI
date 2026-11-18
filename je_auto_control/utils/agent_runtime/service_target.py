@@ -141,10 +141,10 @@ class ManagedServiceTarget(ServiceTarget):
         """Capture current SCM diagnostic status under the original live authority."""
         with self._admitted():
             operation = self._operation()
-            started = time.monotonic()
+            started = time.perf_counter()
             status = self._controller.read(timeout=1.0, checkpoint=lambda: self._checkpoint(operation))
             self._checkpoint(operation)
-            value = ServiceObservation(self._binding, status, uuid.uuid4().hex, started, time.monotonic())
+            value = ServiceObservation(self._binding, status, uuid.uuid4().hex, started, time.perf_counter())
             with self._publication:
                 self._validate(operation)
                 return value.to_dict()
@@ -171,7 +171,7 @@ class ManagedServiceTarget(ServiceTarget):
                                                 timeout=1.0, checkpoint=lambda: self._checkpoint(operation))
             self._confirm(accepted, action, operation_id)
             receipt = previous[1] if previous is not None else ServiceReceipt(
-                self._binding, operation_id, action, time.monotonic())
+                self._binding, operation_id, action, time.perf_counter())
             self._receipts[operation_id] = (expected.grounding(), receipt)
             self._checkpoint(operation)
             with self._publication:

@@ -36,12 +36,12 @@ class ReportTarget(Target):
         self.failure = None
 
     def observe(self):
-        started = time.monotonic()
+        started = time.perf_counter()
         first = snapshot_from(super().observe())
         second = self.failure or replace(first, **({"source": "fixture_protocol", "adapter_id": "fixture-ipc"}
                                                    | self.second_changes))
         return ObservationReport(SOURCES[0], ((SOURCES[0], first), (SOURCES[1], second)),
-                                 started, time.monotonic(), self.observation_fields).to_dict()
+                                 started, time.perf_counter(), self.observation_fields).to_dict()
 
 
 def snapshot_from(value):

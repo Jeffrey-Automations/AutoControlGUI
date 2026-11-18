@@ -207,7 +207,7 @@ def _values(decoded: Mapping[str, Scalar], fields: tuple[str, ...], limit: int) 
 class ProcessMemoryReader:
     """Run reviewed queries; failed closes remain owned until an explicit cleanup retry."""
 
-    def __init__(self, provider: ProcessProvider, *, clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(self, provider: ProcessProvider, *, clock: Callable[[], float] = time.perf_counter) -> None:
         self._provider = provider
         self._clock = clock
         self._pending: list[ProcessHandle] = []

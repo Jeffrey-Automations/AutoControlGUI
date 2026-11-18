@@ -28,7 +28,7 @@ class FixtureObservations:
 
     def observe(self, checkpoint: Callable[[], None]) -> ObservationReport:
         """Retain safe memory failures, but propagate scope, lifetime, transport and cleanup errors."""
-        started = time.monotonic()
+        started = time.perf_counter()
         checkpoint()
         try:
             memory: SemanticSnapshot | str = SemanticSnapshot.from_dict(self._memory.observe())
@@ -40,10 +40,10 @@ class FixtureObservations:
         protocol = self._snapshot(checkpoint)
         checkpoint()
         return ObservationReport(FIXTURE_SOURCES[0], ((FIXTURE_SOURCES[0], memory),
-                                 (FIXTURE_SOURCES[1], protocol)), started, time.monotonic(), FIXTURE_FIELDS)
+                                 (FIXTURE_SOURCES[1], protocol)), started, time.perf_counter(), FIXTURE_FIELDS)
 
     def _snapshot(self, checkpoint: Callable[[], None]) -> SemanticSnapshot:
-        started = time.monotonic()
+        started = time.perf_counter()
         reply = self._control.request({"command": "snapshot"}, timeout=1.0, checkpoint=checkpoint)
         checkpoint()
         value = _validate_reply(dict(reply), "snapshot")
@@ -54,4 +54,4 @@ class FixtureObservations:
             adapter_id="fixture-ipc", schema_version="1", source=FIXTURE_SOURCES[1],
             fields=(("document_id", value["document_id"]), ("job_status", value["job_status"])),
             revision=value["sequence"], consistency="sequence_checked", observation_id=uuid4().hex,
-            started=started, finished=time.monotonic())
+            started=started, finished=time.perf_counter())

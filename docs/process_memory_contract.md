@@ -598,8 +598,10 @@ Before semantic dispatch, the journal stores the validated original snapshot.
 Only a host-selected `SemanticTarget` supplies this witness. Completion uses the
 last effective attempt for that command; an uncertain attempt stays unknown,
 while attempts proven to have no effect do not discard earlier completed work.
-Every semantic observation must use the host's `time.monotonic()` clock domain
+Every semantic observation must use the host's `time.perf_counter()` clock domain
 and have its entire capture interval inside the current runtime read request.
+(`time.monotonic()` ticks every 15.6 ms on Windows before Python 3.13, too coarse
+to order a capture against its acceptance.)
 The runtime rejects cached pre-dispatch reads and future timestamps before
 publication or verification. A helper on another clock domain cannot use this
 contract without a separately reviewed clock/proof protocol.

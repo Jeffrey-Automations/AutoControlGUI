@@ -92,10 +92,15 @@ def _report(target: SemanticTarget, observation: Mapping[str, Any]) -> Observati
 
 
 def observe(target: Any) -> dict[str, Any]:
-    """Require a same-host monotonic capture inside this read request before publication."""
-    started = time.monotonic()
+    """Require a same-host monotonic capture inside this read request before publication.
+
+    Every capture timestamp comes from ``time.perf_counter``: on Windows before Python 3.13
+    ``time.monotonic`` ticks every 15.6 ms, so a stale capture, its acceptance and a new
+    capture could share one value and the ordering checks could not tell them apart.
+    """
+    started = time.perf_counter()
     value = target.observe()
-    finished = time.monotonic()
+    finished = time.perf_counter()
     if not isinstance(target, SemanticTarget):
         return detached(value)
     snapshot = _report(target, value) if target.observation_sources else SemanticSnapshot.from_dict(value)

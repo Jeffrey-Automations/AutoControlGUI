@@ -32,7 +32,7 @@ class Target(SemanticTarget):
 
     def observe(self):
         self.reads += 1
-        now = time.monotonic()
+        now = time.perf_counter()
         return replace(self.state, observation_id=f"read-{self.reads}",
                        started=now, finished=now).to_dict()
 

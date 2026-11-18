@@ -115,10 +115,10 @@ class UiaObservationTarget(SemanticTarget):
             if operation is None or self._source is None:
                 raise AgentTaskError("UI observation has no managed source")
             self._checkpoint(operation)
-            started = time.monotonic()
+            started = time.perf_counter()
             value = self._source.capture(lambda: self._checkpoint(operation))
             self._checkpoint(operation)
-            return ObservationReport("uia", (("uia", value),), started, time.monotonic(), UIA_FIELDS).to_dict()
+            return ObservationReport("uia", (("uia", value),), started, time.perf_counter(), UIA_FIELDS).to_dict()
 
     def perform_grounded(self, name: str, arguments: Mapping[str, Any], *,
                          expected: SemanticSnapshot, operation_id: str) -> NoReturn:

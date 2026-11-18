@@ -24,9 +24,9 @@ def observe(target: Any) -> dict[str, Any]:
     """Require service captures to be contained in the current host read request."""
     if not isinstance(target, ServiceTarget):
         return semantic_target.observe(target)
-    started = time.monotonic()
+    started = time.perf_counter()
     value = ServiceObservation.from_dict(target.observe())
-    finished = time.monotonic()
+    finished = time.perf_counter()
     if not started <= value.started <= value.finished <= finished:
         raise AgentObservationStale("service capture is outside the current read request")
     return value.to_dict()
@@ -47,7 +47,7 @@ def perform(target: Any, name: str, arguments: Mapping[str, Any], *,
         return semantic_target.perform(target, name, arguments, observation=observation, operation_id=operation_id)
     before = ServiceObservation.from_dict(observation)
     receipt = target.perform_observed(name, arguments, observation=observation, operation_id=operation_id)
-    finished = time.monotonic()
+    finished = time.perf_counter()
     if (type(receipt) is not ServiceReceipt or receipt.operation_id != operation_id
             or receipt.binding != before.binding or receipt.operation is not SERVICE_TOOLS.get(name)
             or not before.finished <= receipt.accepted_at <= finished):

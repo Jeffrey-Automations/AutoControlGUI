@@ -72,10 +72,11 @@ jobs:
       # with faulthandler on for the whole process: a crash after pytest has
       # finished (interpreter shutdown) otherwise leaves nothing but
       # "Segmentation fault" in the log. -v so a crash mid-suite names its test.
-      # dev_requirements.txt pulls je_auto_control_dev from PyPI, whose snapshot of
-      # je_auto_control/ overwrites the image's copy in site-packages. Helpers start
-      # with `python -I`, which skips the mounted checkout, so they ran that older
-      # snapshot. Replace both with an editable install of the checkout under test.
+      # dev_requirements.txt lists je_auto_control_dev, a PyPI snapshot that lacks
+      # subpackages such as utils/agent_runtime. Installed here it overwrote the
+      # image's complete je_auto_control (built from this checkout), and helpers
+      # started with `python -I` skip the mounted checkout and import that copy,
+      # so they died with ModuleNotFoundError. Install everything else instead.
       - name: Run headless tests under Xvfb
         run: |
           docker run --rm \
@@ -83,9 +84,8 @@ jobs:
             -v "$PWD:/work" -w /work \
             --entrypoint /bin/sh \
             autocontrol:ci -c "
-              pip install --no-cache-dir -r dev_requirements.txt &&
-              pip uninstall -y je_auto_control_dev je_auto_control &&
-              pip install --no-cache-dir --no-deps -e . &&
+              grep -v '^je_auto_control_dev' dev_requirements.txt > /tmp/dev_requirements.txt &&
+              pip install --no-cache-dir -r /tmp/dev_requirements.txt &&
               apt-get update && apt-get install -y --no-install-recommends gdb &&
               xvfb-run -a -s '-screen 0 1280x800x24' \
                 python scripts/ci_native_diagnostics.py --artifact-dir /tmp/autocontrol-native --native -- \

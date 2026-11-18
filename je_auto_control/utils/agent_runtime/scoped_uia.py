@@ -211,7 +211,7 @@ class ScopedUiaSource:
         """Retain partial diagnostics; UIA never supplies a checked state revision."""
         if threading.current_thread() is not self._thread:
             raise AgentTaskError("UIA source cannot cross its COM owner thread")
-        started = time.monotonic()
+        started = time.perf_counter()
         self._binding.verify(checkpoint)
         identity = None
         checkpoint()
@@ -236,7 +236,7 @@ class ScopedUiaSource:
             self._root_runtime = identity
         metadata = CaptureMetadata(target_id=self._target_id, identity_digest=self._binding.identity.digest,
             adapter_id="scoped-uia", schema_version="1", source="uia", revision=None,
-            consistency="best_effort", observation_id=uuid4().hex, started=started, finished=time.monotonic())
+            consistency="best_effort", observation_id=uuid4().hex, started=started, finished=time.perf_counter())
         if failures:
             return PartialObservation(capture=metadata, fields=tuple(values), failures=tuple(failures))
         return SemanticSnapshot(**metadata.to_dict(), fields=tuple(values))
