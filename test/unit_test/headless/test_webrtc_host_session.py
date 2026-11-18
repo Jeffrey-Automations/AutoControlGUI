@@ -364,8 +364,9 @@ def test_an_advertised_audio_track_starts_an_opus_receiver(bridge,
             self.consumed = []
             receivers.append(self)
 
-        def consume(self, track):
+        def consume(self, track, *, admit):
             self.consumed.append(track)
+            self.admit = admit
 
     monkeypatch.setattr(
         "je_auto_control.utils.remote_desktop.webrtc_audio.OpusMicReceiver",
@@ -376,6 +377,8 @@ def test_an_advertised_audio_track_starts_an_opus_receiver(bridge,
     track = Track("audio")
     FakePeerConnection.instances[0].fire("track", track)
     assert receivers[0].consumed == [track]
+    # Not yet approved: the receiver drains the track but plays nothing.
+    assert receivers[0].admit() is False
 
 
 def test_a_second_audio_track_does_not_open_a_second_receiver(bridge,
@@ -384,8 +387,9 @@ def test_a_second_audio_track_does_not_open_a_second_receiver(bridge,
         def __init__(self) -> None:
             self.consumed = []
 
-        def consume(self, track):
+        def consume(self, track, *, admit):
             self.consumed.append(track)
+            self.admit = admit
 
     monkeypatch.setattr(
         "je_auto_control.utils.remote_desktop.webrtc_audio.OpusMicReceiver",

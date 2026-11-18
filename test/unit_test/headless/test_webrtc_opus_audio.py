@@ -414,3 +414,20 @@ def test_a_player_that_fails_to_close_is_reported_and_retained(monkeypatch):
     with pytest.raises(OSError):
         receiver.stop()
     assert receiver._player is _FakePlayer.instances[0]
+
+
+def test_the_admission_gate_is_asked_before_every_frame_is_played():
+    # The host passes a gate on authentication and allow_audio; a refused
+    # frame is drained and dropped, so the track keeps flowing while silent.
+    first, second, third = (np.array([[value]], dtype=np.int16) for value in (1, 2, 3))
+    answers = iter([False, True, False])
+
+    async def _drive():
+        receiver = OpusMicReceiver()
+        receiver.consume(FrameTrack(_frame(first), _frame(second), _frame(third)),
+                         admit=lambda: next(answers))
+        await receiver._task
+
+    asyncio.run(_drive())
+    [player] = _FakePlayer.instances
+    assert player.played == [second.tobytes()]

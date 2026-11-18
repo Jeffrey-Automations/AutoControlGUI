@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import fractions
 import threading
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 try:
     import av
@@ -184,21 +184,28 @@ class OpusMicReceiver:
         self._player_retired = False
         self._resampler: Optional[Any] = None
 
-    def consume(self, track: MediaStreamTrack) -> None:
-        """Spawn a background task that drains ``track.recv()`` into the player."""
+    def consume(self, track: MediaStreamTrack, *, admit: Optional[Callable[[], bool]] = None) -> None:
+        """Spawn a background task that drains ``track.recv()`` into the player.
+
+        ``admit`` is asked before every frame is played; a frame it refuses is
+        drained and dropped, so a peer that is not (or no longer) allowed to be
+        heard stays silent without stalling its track.
+        """
         if self._stopped:
             raise AudioBackendError("audio receiver is stopped")
         if self._task is not None:
             return
-        self._task = asyncio.ensure_future(self._loop(track))
+        self._task = asyncio.ensure_future(self._loop(track, admit))
 
-    async def _loop(self, track: MediaStreamTrack) -> None:
+    async def _loop(self, track: MediaStreamTrack, admit: Optional[Callable[[], bool]]) -> None:
         from aiortc.mediastreams import MediaStreamError
         try:
             while not self._stopped:
                 frame = await track.recv()
                 if self._stopped or not bool(self._player.is_running):
                     return
+                if admit is not None and not admit():
+                    continue
                 for chunk in self._to_player_pcm(frame):
                     self._player.play(chunk)
         except (asyncio.CancelledError, MediaStreamError):

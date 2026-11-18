@@ -284,9 +284,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
                 self._viewer_video_task = self._spawn_bg(
                     self._consume_viewer_video(track),
                 )
-            elif track.kind == "audio":
-                if not self._config.accept_viewer_audio_opus:
-                    return
+            elif track.kind == "audio" and self._config.accept_viewer_audio_opus:
                 self._start_opus_audio_receive(track)
 
     def _start_opus_audio_receive(self, track: Any) -> None:
@@ -300,7 +298,8 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
         if receiver is None:
             return
         self._opus_audio_receiver = receiver
-        self._media_owners.activate(_OPUS_RECEIVER, lambda: receiver.consume(track), receiver)
+        self._media_owners.activate(_OPUS_RECEIVER, lambda: receiver.consume(track, admit=self._audio_admitted),
+                                    receiver)
         autocontrol_logger.info("webrtc host: receiving Opus audio from viewer")
 
     async def _consume_viewer_video(self, track: Any) -> None:
@@ -379,11 +378,12 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
     def _wire_mic_channel(self, channel: Any) -> None:
         @channel.on("message")
         def _on_message(message: Any) -> None:
-            if not self._authenticated or self._mic_receiver is None:
-                return
-            if not self._permissions.allow_audio:
+            if not self._audio_admitted() or self._mic_receiver is None:
                 return
             self._mic_receiver.on_chunk(message)
+
+    def _audio_admitted(self) -> bool:  # checked per frame: nothing plays before approval or with audio off
+        return self._authenticated and self._permissions.allow_audio
 
     def _wire_files_channel(self, channel: Any) -> None:
         from je_auto_control.utils.remote_desktop.webrtc_files import FileTransferReceiver
