@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261118-35 | 2026-11-18 | Refuse UNC, pipe and device paths as pinned artifacts | #incident #security #agent | [2026-11-c](2026-11-c.md) |
 | U-20261118-34 | 2026-11-18 | Gate viewer Opus audio on approval and allow_audio | #incident #security #remote-desktop | [2026-11-c](2026-11-c.md) |
 | U-20261118-28 | 2026-11-18 | Bind zero-action UI profiles to a fixed pinned worker | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |
 | U-20261118-27 | 2026-11-18 | Retain UI fixture resources through managed startup and cleanup | #done #process-memory #uia | [2026-11-c](2026-11-c.md) |

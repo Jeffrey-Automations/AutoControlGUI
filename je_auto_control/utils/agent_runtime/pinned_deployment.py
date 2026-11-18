@@ -5,12 +5,14 @@ import hashlib
 import hmac
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePath, PureWindowsPath
 import re
 import stat
 from typing import Any
 
 from .errors import AgentTaskError
+
+_DRIVE = re.compile(r"[A-Za-z]:")
 
 
 def deployment_settings(value: Any) -> dict[str, str]:
@@ -31,13 +33,24 @@ def sha256(value: Any) -> str:
     return value
 
 
+def is_local_absolute(value: str, path: PurePath) -> bool:
+    """Absolute on a local drive without parent traversal: never a UNC share, pipe or device name.
+
+    Opening a UNC path sends the account's NTLM credentials to that host, and a
+    pipe name connects to whoever created the pipe first, so neither may name an artifact.
+    """
+    if not path.is_absolute() or value.startswith(("\\\\", "//")) or ".." in path.parts:
+        return False
+    return not isinstance(path, PureWindowsPath) or _DRIVE.fullmatch(path.drive) is not None
+
+
 def absolute_path(value: Any) -> Path:
-    """Refuse relative or invalid artifact paths before accessing the filesystem."""
+    """Refuse relative, remote, device or invalid artifact paths before accessing the filesystem."""
     if not isinstance(value, str) or not value or len(value) >= 32768 or "\0" in value:
         raise ValueError("invalid path")
     path = Path(value)
-    if not path.is_absolute():
-        raise ValueError("absolute path required")
+    if not is_local_absolute(value, path):
+        raise ValueError("local absolute path required")
     return path
 
 

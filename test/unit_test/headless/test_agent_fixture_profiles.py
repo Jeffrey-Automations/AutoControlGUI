@@ -1,5 +1,6 @@
 """Manage fixture profiles and both deployment bindings without native execution."""
 from dataclasses import replace
+from pathlib import PureWindowsPath
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -13,6 +14,7 @@ from je_auto_control.utils.agent_runtime.fixture_observations import FIXTURE_FIE
 from je_auto_control.utils.agent_runtime.fixture_deployment import load_fixture_image
 from je_auto_control.utils.agent_runtime.fixture_native_target import NativeFixtureTarget
 from je_auto_control.utils.agent_runtime.fixture_worker import FixtureWorker
+from je_auto_control.utils.agent_runtime.pinned_deployment import is_local_absolute
 from je_auto_control.utils.agent_runtime.target_config import AgentTargetProfile
 from je_auto_control.utils.rbac.authorization import AuthorizationContext, authorization_scope
 from headless.test_agent_fixture_readiness import spec
@@ -33,6 +35,9 @@ def config(tmp_path):
     {"allowed_tools": ["AC_write"]}, {"roots": ["C:/"]}, {"apps": ["anything"]},
     {"settings": {"config_path": "relative", "config_sha256": "0" * 64}},
     {"settings": {"config_path": "C:/fixed", "config_sha256": True}},
+    {"settings": {"config_path": '\\\\host\\share\\c.json', "config_sha256": "0" * 64}},
+    {"settings": {"config_path": "//host/share/c.json", "config_sha256": "0" * 64}},
+    {"settings": {"config_path": '\\\\.\\pipe\\fixture', "config_sha256": "0" * 64}},
     {"settings": {"argv": ["anything"]}},
 ])
 def test_profile_refuses_other_capabilities_and_launch_settings(tmp_path, change):
@@ -183,3 +188,15 @@ def test_registered_fixture_roundtrip_completion_and_live_disablement(tmp_path, 
             runtime.observe(next_task.task_id)
     finally:
         runtime.close()
+
+
+@pytest.mark.parametrize("value, local", [
+    ("C:/fixtures/fixture.exe", True), ('C:\\fixtures\\fixture.exe', True),
+    ('\\\\host\\share\\fixture.exe', False), ("//host/share/fixture.exe", False), ('\\\\.\\pipe\\fixture', False),
+    ('\\\\?\\C:\\fixture.exe', False), ('C:\\a\\..\\fixture.exe', False),
+    ("fixture.exe", False), ('\\fixture.exe', False),
+], ids=["slash", "backslash", "unc", "unc-slash", "pipe", "device", "parent", "relative", "rootless"])
+def test_artifact_paths_must_be_local_drive_paths(value, local):
+    # A UNC path would send the host account's credentials to that server, and
+    # a pipe name connects to whoever created the pipe first.
+    assert is_local_absolute(value, PureWindowsPath(value)) is local

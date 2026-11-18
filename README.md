@@ -131,3 +131,6 @@ criterion. The host-reviewed `service` profile pins `config_path`, `config_sha25
 and an ASCII `service_key`. Its fixed worker checks the deployment's service and
 operation ceiling before accepting task scope. Registration, reload and probe do
 not read the deployment or access SCM; native acceptance remains pending.
+Every pinned path (each profile's `config_path` and the image a deployment names) must be
+a local drive path: UNC shares, `\\.\pipe\` names, `\\?\` device paths and `..` segments are
+refused, so registering a profile cannot make the host send its credentials to another machine.

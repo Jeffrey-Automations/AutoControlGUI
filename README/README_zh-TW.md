@@ -124,3 +124,5 @@ adapter 範圍，不是全域 executor 指令。既有任務 API 與 GUI JSON �
 主機審閱的 `service` profile 固定 `config_path`、`config_sha256` 及 ASCII `service_key`。
 固定 worker 核對部署的服務與操作上限後才接受任務範圍。註冊、重載與 probe 不讀取部署檔
 或存取 SCM；原生驗收仍待完成。
+所有固定路徑（各 profile 的 `config_path` 及部署指定的映像檔）都必須是本機磁碟路徑：
+UNC 共用、`\\.\pipe\` 名稱、`\\?\` 裝置路徑與 `..` 片段一律拒絕，註冊 profile 不能讓主機把認證送到其他機器。

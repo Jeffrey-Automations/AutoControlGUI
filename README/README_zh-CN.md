@@ -124,3 +124,5 @@ adapter 范围，不是全局 executor 指令。现有任务 API 与 GUI JSON �
 主机审阅的 `service` profile 固定 `config_path`、`config_sha256` 及 ASCII `service_key`。
 固定 worker 核对部署的服务与操作上限后才接受任务范围。注册、重载与 probe 不读取部署文件
 或访问 SCM；原生验收仍待完成。
+所有固定路径（各 profile 的 `config_path` 及部署指定的映像文件）都必须是本机磁盘路径：
+UNC 共享、`\\.\pipe\` 名称、`\\?\` 设备路径与 `..` 片段一律拒绝，注册 profile 不能让主机把凭据发送到其他机器。

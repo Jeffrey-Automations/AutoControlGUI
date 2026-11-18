@@ -9,6 +9,7 @@ from typing import Callable
 
 from .capture_metadata import _identifier
 from .errors import AgentTaskError
+from .pinned_deployment import is_local_absolute
 from .uia_launch import BoundUiaWindow, OwnedUiaLauncher
 from .uia_target import UiaObservationTarget
 from ..exception.control_signals import is_run_interruption
@@ -34,8 +35,8 @@ class UiaFixtureImage:
                 or (self.pin.executable, self.pin.version) != ("uia-fixture", "1")):
             raise AgentTaskError("UI fixture requires its own executable identity")
         if (not isinstance(self.path, str) or not self.path or "\0" in self.path
-                or len(self.path) >= 32768 or not PureWindowsPath(self.path).is_absolute()):
-            raise AgentTaskError("UI fixture requires an absolute Windows image path")
+                or len(self.path) >= 32768 or not is_local_absolute(self.path, PureWindowsPath(self.path))):
+            raise AgentTaskError("UI fixture requires a local absolute Windows image path")
         self._check_bounds()
 
     def _check_bounds(self) -> None:

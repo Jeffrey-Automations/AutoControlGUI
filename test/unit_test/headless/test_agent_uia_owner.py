@@ -160,7 +160,10 @@ def test_cancellation_after_image_read_preserves_signal_and_retires(monkeypatch)
     {"max_image_bytes": True}, {"max_image_bytes": 0}, {"max_image_bytes": (64 << 20) + 1},
     {"attestation_timeout": True}, {"attestation_timeout": float("nan")}, {"attestation_timeout": float("inf")},
     {"attestation_timeout": 10**400},
-], ids=["relative", "nul", "target", "bool-bytes", "zero", "large", "bool-time", "nan", "inf", "huge"])
+    {"path": '\\\\host\\share\\fixture.exe'}, {"path": "//host/share/fixture.exe"}, {"path": '\\\\.\\pipe\\fixture'},
+    {"path": '\\\\?\\C:\\fixture.exe'}, {"path": 'C:\\a\\..\\fixture.exe'},
+], ids=["relative", "nul", "target", "bool-bytes", "zero", "large", "bool-time", "nan", "inf", "huge",
+        "unc", "unc-slash", "pipe", "device", "parent"])
 def test_invalid_image_contract_refuses_without_acquisition(monkeypatch, changes):
     _, kernel, _, _, calls, _, _, image, _ = setup(monkeypatch)
     with pytest.raises(AgentTaskError):
