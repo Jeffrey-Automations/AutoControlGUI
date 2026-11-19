@@ -1,6 +1,7 @@
 """Run a repository-owned semantic IPC target without any desktop or memory access."""
 from dataclasses import replace
 import hashlib
+import os
 from pathlib import Path
 import sys
 import threading
@@ -13,6 +14,13 @@ from je_auto_control.utils.agent_runtime.errors import AgentEffectUnknown, Agent
 from je_auto_control.utils.agent_runtime.native_worker import NativeWorker
 from je_auto_control.utils.agent_runtime.semantic_target import SemanticReceipt, SemanticSnapshot, SemanticTarget
 from je_auto_control.utils.process_memory.models import FailureReason, MemoryObservationError
+
+
+def mark_entered(marker: Path) -> None:
+    """Publish the marker whole: a reader polling for the file never sees it empty."""
+    staged = marker.with_name(marker.name + ".tmp")
+    staged.write_text("entered", encoding="utf-8")
+    os.replace(staged, marker)
 
 
 class FixtureTarget(SemanticTarget):
@@ -42,7 +50,7 @@ class FixtureTarget(SemanticTarget):
             self.worker._input({"kind": "key_press", "keycode": 65, "is_shift": False})
         if arguments.get("hang"):
             if self.started_marker is not None:
-                self.started_marker.write_text("entered", encoding="utf-8")
+                mark_entered(self.started_marker)
             threading.Event().wait(30)
         if not arguments.get("no_effect"):
             self.state = replace(self.state, fields=(("value", 1),), revision=self.state.revision + 2)

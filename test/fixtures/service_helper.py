@@ -16,6 +16,13 @@ from je_auto_control.utils.agent_runtime.windows_service import ServiceStatusPro
 from je_auto_control.wrapper._input_observer import input_event
 
 
+def mark_entered(marker: Path) -> None:
+    """Publish the marker whole: a reader polling for the file never sees it empty."""
+    staged = marker.with_name(marker.name + ".tmp")
+    staged.write_text("entered", encoding="utf-8")
+    os.replace(staged, marker)
+
+
 class Function:
     def __init__(self, callback):
         self.callback = callback
@@ -43,7 +50,7 @@ class Api:
 
     def change(self, state):
         if self.marker is not None:
-            self.marker.write_text("entered", encoding="utf-8")
+            mark_entered(self.marker)
         if self.fault == "hang":
             threading.Event().wait(30)
         if self.fault == "input":
