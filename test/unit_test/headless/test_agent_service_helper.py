@@ -357,9 +357,9 @@ def test_cancel_retires_blocked_control_process(tmp_path):
         thread = threading.Thread(target=blocked)
         thread.start()
         deadline = time.monotonic() + 5
-        while not marker.exists() and time.monotonic() < deadline:
+        while not (marker.exists() and marker.read_text(encoding="utf-8") == "entered"):
+            assert time.monotonic() < deadline, "the helper never entered the blocked command"
             threading.Event().wait(0.01)
-        assert marker.read_text() == "entered"
         runtime.cancel(task)
         thread.join(5)
         assert not thread.is_alive() and errors

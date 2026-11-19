@@ -133,9 +133,9 @@ def test_cancel_retires_a_helper_after_it_entered_a_blocked_command(tmp_path):
         worker = threading.Thread(target=blocked)
         worker.start()
         deadline = time.monotonic() + 5
-        while not marker.exists() and time.monotonic() < deadline:
+        while not (marker.exists() and marker.read_text(encoding="utf-8") == "entered"):
+            assert time.monotonic() < deadline, "the helper never entered the blocked command"
             threading.Event().wait(0.01)
-        assert marker.read_text(encoding="utf-8") == "entered"
         runtime.cancel(task.task_id)
         worker.join(timeout=5)
         assert not worker.is_alive() and len(failures) == 1
