@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261121-01 | 2026-11-21 | Start owned helpers suspended until their Job owns them | #done #security #agent | [2026-11-c](2026-11-c.md) |
 | U-20261119-04 | 2026-11-19 | Publish helper "entered" markers whole | #incident #ci #agent | [2026-11-c](2026-11-c.md) |
 | U-20261119-03 | 2026-11-19 | Throttle full checkpoints inside read-only UIA captures | #incident #ci #agent #uia | [2026-11-c](2026-11-c.md) |
 | U-20261119-02 | 2026-11-19 | Order captures with a fine clock; keep Docker helpers on the full package | #incident #ci #agent | [2026-11-c](2026-11-c.md) |
