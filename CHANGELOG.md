@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+- Windows arm64 now installs `opencv-python` and `je_open_cv`: opencv-python 5.1.0.95
+  ships a `win_arm64` wheel, so image matching works there. `cryptography` stays
+  marked off that platform. The image-stack accessors no longer mention arm64.
+
+- Service keys may now be non-ASCII on Windows. They are case-folded with the NT
+  upcase table, so every SCM spelling of a service shares one lock; ASCII keys
+  keep their existing lock digest.
+
+- Owned helpers on Windows start suspended and run only after their kill-on-close
+  Job owns them, so a child spawned at startup cannot escape containment.
+
 - Host-reviewed service profiles now bind a fixed worker to pinned configuration,
   an ASCII service key and bounded START/STOP permissions. Registration, reload
   and probe remain passive; native service acceptance is still pending.

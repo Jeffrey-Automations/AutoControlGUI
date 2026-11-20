@@ -830,16 +830,16 @@ fixture 的受管 profile／helper 及有時限的靜態診斷已接合；可信
 
 ### 還沒有答案的：Windows arm64 上這些功能不能用
 
-裝得起來不等於功能齊。該平台上以下四組會拋帶提示的錯誤，而不是默默失效：
+裝得起來不等於功能齊。該平台上以下三組會拋帶提示的錯誤，而不是默默失效
+（影像比對已隨 `opencv-python` 5.1.0.95 的 `win_arm64` wheel 恢復，U-20261121-03）：
 
 | 功能 | 缺的是 | 錯誤形式 |
 | --- | --- | --- |
-| 影像比對、截圖轉 BGR、螢幕錄影 | `opencv-python`／`je_open_cv` | `utils/cv2_utils/optional.py` 的 `require_cv2()`／`require_je_open_cv()` 拋 `RuntimeError` |
 | 動作檔加密與 Ed25519 簽章（`action_signing`） | `cryptography` | 拋 `CryptographyUnavailableError`（也是 `RuntimeError`；HMAC 簽章不受影響） |
 | 秘密金庫（`${secrets.NAME}`） | `cryptography` | 同上 |
 | ACME／TLS 發證、加密錄影 | `cryptography` | 模組層 `ImportError` 轉述（照 `webrtc_transport` 慣例） |
 
-`BLOCKED`（2026-11-12 以下方指令重驗，三者仍無 win_arm64 wheel；cryptography 仍只到 46.0.3）— 仍需相容的上游 wheel：`opencv-python>=4.8,<6`、
+`BLOCKED`（2026-11-21 以下方指令重驗：`opencv-python` 已有 5.1.0.95 的 win_arm64 wheel 並已解除標記；cryptography 仍只到 46.0.3，`google-crc32c` 仍無）— 仍需相容的上游 wheel：
 `cryptography>=50.0.0` 與 `aiortc` 的傳遞相依 `google-crc32c`。
 不能為相容性降低 cryptography 安全下限。上游提供相容版本後，需重驗安裝與功能，
 再移除 `pyproject.toml` 中相應平台標記並同步更新
@@ -848,7 +848,7 @@ fixture 的受管 profile／helper 及有時限的靜態診斷已接合；可信
 重驗指令（不需要 arm64 機器，也不需要 runner）：
 
 ```bash
-pip install --dry-run --only-binary=:all: --platform win_arm64 --python-version 3.12 --target /tmp/probe 'opencv-python>=4.8,<6' 'cryptography>=50.0.0'
+pip install --dry-run --only-binary=:all: --platform win_arm64 --python-version 3.12 --target /tmp/probe 'cryptography>=50.0.0' 'google-crc32c'
 ```
 
 重驗通過後，需調整相應環境標記與 `test_arm64_dependency_markers.py`，保留安全下限。
@@ -856,4 +856,4 @@ pip install --dry-run --only-binary=:all: --platform win_arm64 --python-version 
 注意一個驗證上的陷阱：**`pip --platform` 不會換掉 marker 的評估環境**，
 它只影響 wheel 相容性標籤，所以拿本機做 `--dry-run` **驗不到標記的效果**（兩個
 套件依舊會被要求）。能驗的是兩件事：直接評估 marker（上面那支測試在做的），
-以及 `windows-11-arm` 那一格自己綠。
+以及 `windows-11-arm` 那一格自己綠（含新加的 cv2 樣板比對步驟；解除 OpenCV 標記後尚待該格首次跑過）。

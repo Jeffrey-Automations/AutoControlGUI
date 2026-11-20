@@ -1,23 +1,22 @@
 """The Windows arm64 dependency markers must stay exactly as measured. No Qt.
 
-`opencv-python` and `cryptography` publish no `win_arm64` wheel, so
+`cryptography` publishes no `win_arm64` wheel at our security floor, so
 `pip install` used to fail on Windows arm64 before a single line of this
-package ran — pip built OpenCV from source and CMake could not configure for
-ARM64. Nothing in the package imports either one at import time, so the whole
+package ran. Nothing in the package imports it at import time, so the whole
 blocker lived in `pyproject.toml`'s dependency list, and a PEP 508 marker is
-the entire fix.
+the entire fix. `opencv-python` and `je_open_cv` carried the same marker until
+opencv-python 5.1.0.95 shipped a cp37-abi3 `win_arm64` wheel; they are
+unmarked again, and the windows-11-arm smoke square runs cv2 itself.
 
 Three things can silently undo it, and each has a test here:
 
-1. Dropping the marker from one of the three requirements. `je_open_cv` is the
-   easy one to miss — it is pure Python, but it depends on `opencv-python`, so
-   an unmarked `je_open_cv` drags OpenCV back in through the side door.
+1. Dropping the marker from `cryptography`.
 2. Writing a marker that does not mean what it looks like. PEP 508 has no
    boolean `not`, so the condition is spelled `A or B`; getting that wrong
    silently excludes far more than one platform.
-3. Marking a package that was never a blocker. Pillow was named as one for a
-   while and is not: it has always shipped `win_arm64` wheels. Marking it off
-   would cost Windows arm64 screenshots for no reason at all.
+3. Marking a package that is not a blocker. Pillow was named as one for a
+   while and never was; OpenCV stopped being one. Marking either off would
+   cost Windows arm64 screenshots or image matching for no reason at all.
 
 pip evaluates markers against the *running* interpreter — `--platform` only
 changes wheel-compatibility tags — so a local dry-run cannot prove any of
@@ -35,11 +34,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 ARM64_MARKER = "sys_platform != 'win32' or platform_machine != 'ARM64'"
 
 # Absent from Windows arm64 because upstream publishes no wheel there.
-MARKED = ("je_open_cv", "opencv-python", "cryptography")
+MARKED = ("cryptography",)
 
 # Present everywhere, including Windows arm64. Pillow is on this list on
-# purpose: it was once named a blocker and never was one.
-UNMARKED = ("pillow", "mss", "defusedxml")
+# purpose: it was once named a blocker and never was one. OpenCV and
+# je_open_cv were marked off until opencv-python 5.1.0.95 shipped win_arm64.
+UNMARKED = ("pillow", "mss", "defusedxml", "opencv-python", "je_open_cv")
 
 # A marker that names the platform. A Python-version marker is not one.
 _PLATFORM_MARKER = re.compile(r"\b(sys_platform|platform_machine|platform_system|os_name)\b")
@@ -105,7 +105,7 @@ def _requirement(name: str) -> str:
 
 @pytest.mark.parametrize("name", MARKED)
 def test_the_unavailable_wheels_are_marked_off_windows_arm64(name: str) -> None:
-    """Each of the three carries the arm64 marker, spelled the one way."""
+    """Each marked requirement carries the arm64 marker, spelled the one way."""
     requirement = _requirement(name)
     assert ";" in requirement, (
         f"{name} lost its environment marker. Without it, pip resolves "
@@ -115,13 +115,13 @@ def test_the_unavailable_wheels_are_marked_off_windows_arm64(name: str) -> None:
     marker = requirement.split(";", 1)[1].strip()
     assert marker == ARM64_MARKER, (
         f"{name} carries {marker!r}, not the shared arm64 marker "
-        f"{ARM64_MARKER!r}. Keep one spelling so all three move together."
+        f"{ARM64_MARKER!r}. Keep one spelling so the markers move together."
     )
 
 
 @pytest.mark.parametrize("name", UNMARKED)
 def test_the_available_wheels_are_not_marked_off_anything(name: str) -> None:
-    """Pillow, mss and defusedxml ship for arm64 and carry no platform marker.
+    """Pillow, mss, defusedxml and the image stack ship for arm64 and carry no platform marker.
 
     A requirement may be split by Python version, but no line may depend on
     the platform.
@@ -147,7 +147,7 @@ def test_a_platform_marker_on_an_unmarked_package_is_caught() -> None:
 @pytest.mark.parametrize("label,environment", sorted(ENVIRONMENTS.items()))
 def test_the_marker_excludes_exactly_one_platform(
         label: str, environment: Dict[str, str]) -> None:
-    """Windows arm64 loses the three; every other platform keeps them."""
+    """Windows arm64 loses the marked requirements; every other platform keeps them."""
     markers = pytest.importorskip(
         "packaging.markers",
         reason="packaging is not installed; the spelling test still guards this",

@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261121-03 | 2026-11-21 | Install the image stack on Windows arm64 again | #done #deps #arm64 | [2026-11-c](2026-11-c.md) |
 | U-20261121-02 | 2026-11-21 | Fold Unicode service keys with the OS casing table for one lock | #done #agent #service | [2026-11-c](2026-11-c.md) |
 | U-20261121-01 | 2026-11-21 | Start owned helpers suspended until their Job owns them | #done #security #agent | [2026-11-c](2026-11-c.md) |
 | U-20261119-04 | 2026-11-19 | Publish helper "entered" markers whole | #incident #ci #agent | [2026-11-c](2026-11-c.md) |

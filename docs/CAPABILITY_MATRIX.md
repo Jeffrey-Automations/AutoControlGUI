@@ -452,19 +452,21 @@ silently, on every BSD.
 
 **arm64.** `macos-15` is arm64, as `macos-14` was before it; `ubuntu-22.04-arm` joins the
 smoke matrix and passes. `windows-11-arm` was tried and removed, on
-measurement rather than assumption, and **two** dependencies are why:
-**opencv-python publishes no `win_arm64` wheel** in any version, so pip falls
-back to building from source and CMake cannot configure for ARM64; and
-**cryptography stopped publishing one after 46.0.3**, while this project's
-floor is `>=50.0.0` — a security floor (GHSA-537c-gmf6-5ccf, then
-GHSA-g6cj-pr64-35w5) that cannot be lowered to reach a wheel. The same floor
+measurement rather than assumption, because of two dependencies; it is back
+with one marked off. **opencv-python published no `win_arm64` wheel** until
+5.1.0.95 (a cp37-abi3 wheel), so pip built from source and CMake could not
+configure for ARM64; it is a plain dependency again and the smoke square runs
+cv2 template matching. **cryptography stopped publishing one after 46.0.3**,
+while this project's floor is `>=50.0.0` — a security floor
+(GHSA-537c-gmf6-5ccf, then GHSA-g6cj-pr64-35w5) that cannot be lowered to
+reach a wheel, so it stays marked off Windows arm64. The same floor
 costs Intel Macs their prebuilt wheel: cryptography 49.0.0 stopped publishing
 `macosx_10_9_universal2` and ships `macosx_11_0_arm64` only, so `pip install`
 on an x86_64 Mac compiles cryptography from source and needs a Rust toolchain
-first. Neither is a CI problem to work around: the package
-genuinely cannot be installed on Windows arm64 today. `Progress.md` records
-both, alongside a `pip --dry-run --platform win_arm64` command that re-checks
-them in seconds without an arm64 machine.
+first. Neither is a CI problem to work around: cryptography genuinely cannot
+be installed on Windows arm64 today. `Progress.md` records it, alongside a
+`pip --dry-run --platform win_arm64` command that re-checks it in seconds
+without an arm64 machine.
 
 The accessibility row said `backend tests` for Linux X11 and meant nothing by
 it: there was no Linux backend at all, and `_build_backend()` fell straight

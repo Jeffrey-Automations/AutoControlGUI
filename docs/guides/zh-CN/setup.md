@@ -24,9 +24,10 @@ pip install je_auto_control[gui]       # 加上 PySide6 桌面应用
 使用标签页关闭按钮关闭 factory 创建的功能面板时，下一次 Qt event loop 会释放 widget、订阅与计时器；重新打开会创建新面板。**View → Tabs** 与嵌入用的 `hide_tab` 只隐藏并保留状态。`tab_registry.open/close` 与 `close_tab` 提供明确的生命周期接口。核心分页与 Remote Desktop 也会在关闭时释放。共享 registry 的 TCP／WebSocket 连接仍可供脚本使用；页面拥有的 WebRTC 连接在后台停止。重新打开会创建新控件，不自动接回现有连接；待处理批准与延迟页面回调会被拒绝。嵌入者直接提供的 widget 保持原有所有权契约。
 
 **Windows arm64** 装得起来也跑得起来，少的是上游在那里发不出来的那些：
-`opencv-python` 与 `cryptography` 都没发 `win_arm64` wheel。所以 `find_image*`、
-`screenshot()`（OpenCV／BGR 那一支——Pillow 截图仍可用）、密钥金库、动作文件加密、
-ACME／TLS 与加密录影会抛出指名缺哪个 wheel 的错误，而不是难以追查的失败。
+`cryptography` 在本项目的安全下限之上没发 `win_arm64` wheel。所以密钥金库、动作文件加密、
+Ed25519 动作签名、ACME／TLS 与加密录影会抛出指名缺哪个 wheel 的错误，而不是难以追查的失败。
+图像比对在那里可用：`opencv-python` 5.1.0.95 有 `win_arm64` wheel，`find_image*` 与
+OpenCV／BGR 的 `screenshot()` 跟其他平台一样会安装。
 鼠标、键盘、屏幕尺寸、窗口管理、无障碍树、动作执行器、MCP／REST／TCP 服务器
 与 GUI 都正常——这是实测的，不是推论的。其他平台不受影响。
 

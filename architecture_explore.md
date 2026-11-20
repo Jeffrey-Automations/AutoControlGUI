@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,596 |
-| 程式碼總行數 | 244,589 |
+| 程式碼總行數 | 244,586 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -393,7 +393,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.5 影像辨識與畫面分析
 
-> 37 個套件、約 6,585 行。
+> 37 個套件、約 6,582 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -403,7 +403,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/color_region/` | 106 | 以顏色定位畫面區域（遮罩 + 連通元件） |
 | `utils/color_stats/` | 103 | 區域顏色統計：平均色與主色 |
 | `utils/coordinate_space/` | 93 | 模型網格座標與實體像素之間的座標空間對映 |
-| `utils/cv2_utils/` | 1,093 | OpenCV 基礎層：擷取後端選擇（`screen_grabber`，Pillow／mss 或平台後端）、截圖、`[left, top, right, bottom]` 區域擷取（`region_capture`，Windows 經 `grab_logical` 涵蓋所有螢幕）、樣板比對（走 `grab_logical`，涵蓋所有螢幕）、螢幕錄影、影片錄製（兩者都經 `frame_clock` 依 fps 配速）、連通元件、影像堆疊的取用口（`optional`，Windows arm64 沒有 wheel 時語意報錯）、非 ASCII 路徑也讀寫得到的影像檔存取（`image_file`） |
+| `utils/cv2_utils/` | 1,090 | OpenCV 基礎層：擷取後端選擇（`screen_grabber`，Pillow／mss 或平台後端）、截圖、`[left, top, right, bottom]` 區域擷取（`region_capture`，Windows 經 `grab_logical` 涵蓋所有螢幕）、樣板比對（走 `grab_logical`，涵蓋所有螢幕）、螢幕錄影、影片錄製（兩者都經 `frame_clock` 依 fps 配速）、連通元件、影像堆疊的取用口（`optional`，Windows arm64 沒有 wheel 時語意報錯）、非 ASCII 路徑也讀寫得到的影像檔存取（`image_file`） |
 | `utils/edge_lines/` | 131 | 以 Hough 轉換偵測線條／格線／分隔線 |
 | `utils/edge_match/` | 117 | 邊緣形狀（Chamfer／距離轉換）樣板比對 |
 | `utils/feature_match/` | 146 | ORB 特徵比對：在旋轉／縮放／主題變更下定位樣板 |
@@ -925,7 +925,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `rest_registry.py` | 91 | 保存執行中 REST 伺服器的行程級單例，狀態包含 RBAC 模式並隱去停用的共用 token。 |
 | `__main__.py` | 66 | `python -m je_auto_control.utils.rest_api` 進入點。 |
 
-#### `utils/cv2_utils/`（1,093 行）— 擷取、影像與共用定位 frame
+#### `utils/cv2_utils/`（1,090 行）— 擷取、影像與共用定位 frame
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -934,7 +934,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cv2_utils/frame_clock.py` | 50 | Pace a screen recorder to the frame rate its file header declares. |
 | `utils/cv2_utils/image_file.py` | 47 | Read and write image files with OpenCV at any path, including non-ASCII ones. |
 | `utils/cv2_utils/locator_frame.py` | 150 | Lazy run-local capture and provenance shared by image and VLM locators. |
-| `utils/cv2_utils/optional.py` | 39 | Name the missing image-stack wheel instead of raising ``ModuleNotFoundError``. |
+| `utils/cv2_utils/optional.py` | 36 | Name the missing image-stack wheel instead of raising ``ModuleNotFoundError``. |
 | `utils/cv2_utils/region_capture.py` | 64 | Capture a ``[left, top, right, bottom]`` screen region on whichever monitor holds it. |
 | `utils/cv2_utils/screen_grabber.py` | 229 | One place that decides how this platform's pixels are read. |
 | `utils/cv2_utils/screen_record.py` | 125 | Internal image/capture utilities. |
@@ -1620,8 +1620,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,058 | 110,012 |
-| **總計** | **1,584** | **243,844** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,058 | 110,009 |
+| **總計** | **1,584** | **243,841** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

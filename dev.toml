@@ -20,8 +20,8 @@ description = "GUI Automation Framework"
 requires-python = ">=3.11"
 license-files = ["LICENSE"]
 dependencies = [
-    "je_open_cv==0.0.22; sys_platform != 'win32' or platform_machine != 'ARM64'",
-    "opencv-python>=4.8,<6; sys_platform != 'win32' or platform_machine != 'ARM64'",
+    "je_open_cv==0.0.22",
+    "opencv-python>=4.8,<6",
     # Pillow 13.0.0 fixes the 12.x advisories (critical: GHSA-v9pv-5gc8-w2m6,
     # GHSA-5x8w-8jj5-q52h).
     "pillow==13.0.0",
