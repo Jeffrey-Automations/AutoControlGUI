@@ -121,7 +121,9 @@ MultiViewerHost 可返回含原始 session 清理对象的 offer，延后清理�
 判定须有对应操作的确认回执，以及同一资源所有者在接受后取得的新 SCM 查询。
 通过只表示 SCM 报告该状态，不证明原子完成、健康或桌面无干扰。这些工具名称仅属于
 adapter 范围，不是全局 executor 指令。现有任务 API 与 GUI JSON 编辑器可传递此条件。
-主机审阅的 `service` profile 固定 `config_path`、`config_sha256` 及 ASCII `service_key`。
+主机审阅的 `service` profile 固定 `config_path`、`config_sha256` 及 `service_key`。
+非 ASCII 的键以 Windows 本身的 NT upcase 表做大小写折叠，不用 Python 的大小写映射，
+因此 SCM 视为同一服务的各种写法共用同一把锁。
 固定 worker 核对部署的服务与操作上限后才接受任务范围。注册、重载与 probe 不读取部署文件
 或访问 SCM；原生验收仍待完成。
 所有固定路径（各 profile 的 `config_path` 及部署指定的映像文件）都必须是本机磁盘路径：

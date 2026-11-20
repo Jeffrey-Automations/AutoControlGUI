@@ -128,7 +128,9 @@ retained owner after acceptance. A passing result reports SCM state, not atomic
 completion, health or desktop noninterference. These tool names are adapter-scoped,
 not global executor commands. Existing task APIs and the GUI JSON editor carry the
 criterion. The host-reviewed `service` profile pins `config_path`, `config_sha256`
-and an ASCII `service_key`. Its fixed worker checks the deployment's service and
+and a `service_key`. Non-ASCII keys are case-folded with Windows' own NT upcase table,
+never Python's case mapping, so every spelling SCM treats as one service shares one lock.
+Its fixed worker checks the deployment's service and
 operation ceiling before accepting task scope. Registration, reload and probe do
 not read the deployment or access SCM; native acceptance remains pending.
 Every pinned path (each profile's `config_path` and the image a deployment names) must be

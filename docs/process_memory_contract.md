@@ -1027,23 +1027,31 @@ Service query errors cross IPC as fixed `ServiceFailure` codes. Unknown reasons,
 mixed error formats, extra fields and custom error text are rejected without
 echoing their contents. Error envelopes are checked before input events.
 
-For this helper version, service keys must be printable ASCII, at most 256
-characters, and contain no slash, backslash or NUL. Case aliases share one scope
-and resource path; whitespace is preserved. The resource key excludes target
+Service keys are at most 256 UTF-16 units and contain no slash, backslash or
+NUL. A printable ASCII key keeps its original ASCII-folded scope. Any other key
+must not contain control, format, surrogate, private-use or unassigned
+characters, or any separator other than the plain space, and is folded per
+UTF-16 unit with the NT upcase table (`RtlUpcaseUnicodeChar`), the table
+case-insensitive registry keys, and so service keys, are compared with. That
+table folds at least as much as SCM, so two spellings of one service cannot
+hold separate locks; it differs from Python's case mapping (`ß`, `ı`, the
+Kelvin sign and `µ` are left alone) and Python's is never used. A key that
+folds to printable ASCII shares that ASCII scope. Off Windows there is no such
+table and non-ASCII keys are unsupported. Case aliases share one scope and
+resource path; whitespace is preserved. The resource key excludes target
 name, configuration digest and database path. Two owners using the same lock
 root therefore contend for the same service, even with different task/profile
 names. The default root is the current user's `.je_auto_control/service_ownership`.
 Construction computes paths without launching a helper or acquiring a service.
 
-This is coordination between framework owners using that root. Unicode key
-canonicalization, coordination across Windows users and external SCM clients
-are not provided. The lower-level SCM reader's Unicode name support is unchanged.
+This is coordination between framework owners using that root. Coordination
+across Windows users and external SCM clients is not provided. The lower-level SCM reader's Unicode name support is unchanged.
 Hidden Python helper tests inject service calls and check actual child retirement;
 they do not establish native SCM compatibility or desktop noninterference.
 ### Pinned service profiles
 
 A host-reviewed `service` profile accepts exactly `config_path`, `config_sha256`
-and `service_key` settings. The ASCII key determines the same-service lock before
+and `service_key` settings. The key determines the same-service lock before
 helper launch. Registration, reload and probe do not open the deployment file,
 start a helper or access SCM. A missing deployment therefore does not prevent
 reopening the runtime to manage unrelated targets, including when the service

@@ -1647,12 +1647,12 @@ separate observed-service operation. NativeWorker shares input/authority/retirem
 guards across explicit semantic and service targets, preserving their separate
 bootstrap and evidence contracts. `service_native_target.py` pins helper evidence
 to the original bootstrap binding and uses the existing non-display owned channel.
-`service_scope.py` derives a same-user resource lock from printable ASCII service
-keys, independent of target/configuration/database names. Typed service errors
-cross IPC before event interpretation. The service profile carries its ASCII key
-so registration/reload can remain independent of deployment-file availability.
+`service_scope.py` derives a same-user resource lock from service keys, independent
+of target/configuration/database names: ASCII keys fold ASCII case, other keys fold
+with the NT upcase table so every SCM spelling of one service shares one lock. Typed
+service errors cross IPC before event interpretation. The service profile carries its
+key so registration/reload can remain independent of deployment-file availability.
 `service_deployment.py` validates bounded pinned config and the operation ceiling;
 `service_entrypoint.py` validates profile/task/deployment identity before the shared
 worker accepts scope. The config digest and task profile digest remain distinct.
-Native deployment, Unicode key canonicalization and cross-account coordination
-remain pending.
+Native deployment and cross-account coordination remain pending.
