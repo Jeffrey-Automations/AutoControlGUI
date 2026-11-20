@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,596 |
-| 程式碼總行數 | 244,586 |
+| 程式碼總行數 | 244,613 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -192,7 +192,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `wrapper/_platform_linux.py` | 155 | X11 後端組裝（python-Xlib + 選用 uinput）。鍵盤／滑鼠共用延後選擇的輸入後端；匯入不探測 uinput，鍵碼表只在明確存取時解析成共用 dict。 |
 | `wrapper/_platform_wayland.py` | 63 | Wayland 後端組裝（libei／ydotool／grim）。 |
 | `wrapper/_input_observer.py` | 30 | Optional context-local native input announcements; legacy callers remain unaffected. |
-| `wrapper/auto_control_mouse.py` | 604 | 滑鼠 API：位置讀寫、按下／放開／點擊、捲動、座標前處理、送訊息給指定視窗。 |
+| `wrapper/auto_control_mouse.py` | 606 | 滑鼠 API：位置讀寫、按下／放開／點擊、捲動、座標前處理、送訊息給指定視窗。 |
 | `wrapper/auto_control_keyboard.py` | 566 | 鍵盤 API：鍵表查詢、`keyboard_key_name` 反查標準鍵名（不回別名）、按下／放開／敲擊、`write` 字串、`hotkey` 組合鍵、按鍵狀態偵測。**`type_keyboard` 與 `hotkey` 的放開走 `finally`**（見下）。 |
 | `wrapper/auto_control_screen.py` | 111 | 螢幕 API：`screen_size`、`screenshot`（可指定區域）、`get_pixel`。 |
 | `wrapper/auto_control_image.py` | 89 | 影像 API：`locate_all_image`、`locate_image_center`、`locate_and_click`。 |
@@ -364,7 +364,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.4 輸入模擬與動作品質
 
-> 22 個套件、約 2,989 行。
+> 22 個套件、約 3,014 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -376,7 +376,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/ensure_state/` | 74 | 冪等地把控制項／設定帶到期望狀態 |
 | `utils/field_entry/` | 79 | 清空再輸入的欄位填寫慣用法（Playwright `fill`） |
 | `utils/gamepad/` | 335 | 虛擬遊戲手把後端（Windows ViGEmBus 驅動） |
-| `utils/humanize/` | 191 | 擬人輸入：貝茲曲線滑鼠路徑 + 抖動打字節奏 |
+| `utils/humanize/` | 210 | 擬人輸入：貝茲曲線滑鼠路徑 + 抖動打字節奏 |
 | `utils/ime_state/` | 150 | 讀取即時 IME 組字／轉換狀態，確保 CJK 輸入安全 |
 | `utils/key_hold/` | 117 | 按住按鍵一段時間，或以固定頻率自動重複 |
 | `utils/modifier_state/` | 81 | 跨一組動作按住修飾鍵，並保證安全釋放 |
@@ -388,7 +388,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/input_reach/` | 111 | 送出去的輸入到不到得了：桌面鎖定查詢（免費）＋ 實際送一個 F13 確認沒有被過濾（有副作用，只給診斷用） |
 | `utils/keyboard_layout/` | 182 | 向系統問「這個鍵盤配置下每個鍵印出什麼字」（`ToUnicodeEx`），問不到退回 US 對照表 |
 | `utils/text_unicode/` | 173 | 輸入任意 Unicode（emoji／CJK／重音字）：優先送字元按鍵事件，不支援時退回剪貼簿貼上 |
-| `utils/tween_drag/` | 182 | 沿曲線的緩動插值拖曳；`_drag_through` 是它與 `drag_path` 共用的按下／移動／放開（`step_delay_s`、`settle_s` 節奏，失敗時在 `finally` 裡於最後到達點放開） |
+| `utils/tween_drag/` | 188 | 沿曲線的緩動插值拖曳；`_drag_through` 是它與 `drag_path` 共用的按下／移動／放開（`step_delay_s`、`settle_s` 節奏，失敗時在 `finally` 裡於最後到達點放開） |
 | `utils/verify_field/` | 118 | 打字後讀回欄位，確認內容確實落地 |
 
 ### 5.4.5 影像辨識與畫面分析
@@ -1607,7 +1607,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `utils/usb/` | 20 | 5,069 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,168 |
 | `utils/accessibility/` | 16 | 3,384 |
-| `wrapper/` | 25 | 6,066 |
+| `wrapper/` | 25 | 6,068 |
 | `windows/` | 24 | 2,366 |
 | `utils/rest_api/` | 8 | 2,236 |
 | `utils/agent/` | 13 | 2,254 |
@@ -1620,8 +1620,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,058 | 110,009 |
-| **總計** | **1,584** | **243,841** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,058 | 110,034 |
+| **總計** | **1,584** | **243,868** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

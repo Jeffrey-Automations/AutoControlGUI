@@ -9,6 +9,8 @@ import random
 import time
 from typing import Callable, List, Optional
 
+from je_auto_control.utils.executor import run_control
+
 
 def humanized_key_delays(text: str, *, base_delay: float = 0.05,
                          jitter: float = 0.04, pause_chance: float = 0.0,
@@ -40,12 +42,15 @@ def type_text_humanized(text: str, *, base_delay: float = 0.05,
                         jitter: float = 0.04, pause_chance: float = 0.0,
                         seed: Optional[int] = None,
                         typer: Optional[Callable[[str], None]] = None,
-                        sleep: Callable[[float], None] = time.sleep
+                        sleep: Optional[Callable[[float], None]] = None
                         ) -> List[float]:
     """Type ``text`` character-by-character with humanized inter-key delays.
 
-    Returns the delays used. ``typer`` / ``sleep`` are injectable for tests.
+    Returns the delays used. ``typer`` / ``sleep`` are injectable for tests;
+    by default each delay wakes and raises on a stop of the surrounding run.
     """
+    if sleep is None:
+        sleep = _stoppable_sleep
     delays = humanized_key_delays(
         text, base_delay=base_delay, jitter=jitter,
         pause_chance=pause_chance, seed=seed,
@@ -56,3 +61,8 @@ def type_text_humanized(text: str, *, base_delay: float = 0.05,
         if delay:
             sleep(delay)
     return delays
+
+
+def _stoppable_sleep(seconds: float) -> None:
+    """``time.sleep`` that a stop of the surrounding stoppable run wakes."""
+    run_control.pause(seconds, time.sleep)

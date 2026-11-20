@@ -37,6 +37,7 @@ import warnings
 from je_auto_control.wrapper._input_observer import input_event, has_input_observer
 from typing import Any, Dict, Optional, Tuple
 
+from je_auto_control.utils.executor import run_control
 from je_auto_control.utils.exception.exception_tags import (
     mouse_click_mouse_error_message, mouse_get_position_error_message, mouse_press_mouse_error_message,
     mouse_release_mouse_error_message, mouse_scroll_error_message, mouse_set_position_error_message,
@@ -363,7 +364,8 @@ def click_mouse(mouse_keycode: int | str, x: int | None = None,
         keycode, x, y = mouse_preprocess(mouse_keycode, x, y)
         for index in range(count):
             if index and pause:
-                time.sleep(pause)
+                # Between whole clicks, so a stop never leaves a button held.
+                run_control.pause(pause, time.sleep)
             _mouse_input("mouse_press", keycode, x, y)
             # macOS orders its mouse backend as (x, y, button) — same convention as
             # press_mouse/release_mouse above. Without this branch the arguments
