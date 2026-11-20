@@ -686,7 +686,7 @@ best-effort 觀察沒有 revision，也不承諾後續操作具原子性。原�
 目前以注入原生呼叫、真實 reader 邏輯與隱藏 Python helper 驗證，仍非原生驗收；
 UIA 的實際部署信任與原生驗收仍待完成；限定 root／祖先、逐欄失敗、受保護欄位及唯一 selector
 目前只有注入測試，helper 阻塞退休只有隱藏 Python 程序證據，仍須核實原生 COM 行為。
-DOM 的來源身分與逐欄報告正規化仍待接合。UIA best-effort 不提供原子 revision。
+DOM 來源已綁定受管瀏覽器 context 並逐欄回報（U-20261121-05，只對假 session 驗過，實際瀏覽器驗收仍待完成）；DOM 與 UIA best-effort 都不提供原子 revision。
 
 M3 已加入內部受信任 `SemanticTarget` runtime 接點：封閉語意快照驗證、排除擷取時間的狀態比較、
 傳遞原始快照及 journal action ID 的提交介面、具 atomic／non_atomic 標記的回條，以及未知效果的

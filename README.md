@@ -136,6 +136,7 @@ not read the deployment or access SCM; native acceptance remains pending.
 Every pinned path (each profile's `config_path` and the image a deployment names) must be
 a local drive path: UNC shares, `\\.\pipe\` names, `\\?\` device paths and `..` segments are
 refused, so registering a profile cannot make the host send its credentials to another machine.
+A browser profile may also declare host-reviewed `semantic_fields`: up to 64 `{name, selector, frame?, property}` entries whose property is `text`, `value` or `visible`. Each browser observation then carries a `semantic_report` in the shared observation-report schema. The source is bound to the managed browser context, so a new session is a new target lifetime; an absent element is `not_found`, a value the SDK refuses to read back (password, hidden, file or `data-secret` controls) is `protected`, and a navigation during the read makes the source `inconsistent_snapshot`. Capture IDs and times are left out, so an unchanged page fingerprints the same before an action. Selectors must be unique, because the SDK retires the session on an ambiguous one. DOM reads have no revision and stay best-effort; real-browser acceptance remains pending.
 Before a fixture image runs, its lease also refuses a location another account could change:
 every directory from the drive root down must be a real directory (no junction or symlink) that
 only SYSTEM, Administrators, TrustedInstaller and the running user may rename, delete, re-ACL or

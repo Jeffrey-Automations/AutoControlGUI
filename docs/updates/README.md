@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261121-05 | 2026-11-21 | Report host-declared DOM fields with browser context identity | #done #agent #browser | [2026-11-c](2026-11-c.md) |
 | U-20261121-04 | 2026-11-21 | Wake gesture pacing sleeps on a stop | #done #executor #stop | [2026-11-c](2026-11-c.md) |
 | U-20261121-03 | 2026-11-21 | Install the image stack on Windows arm64 again | #done #deps #arm64 | [2026-11-c](2026-11-c.md) |
 | U-20261121-02 | 2026-11-21 | Fold Unicode service keys with the OS casing table for one lock | #done #agent #service | [2026-11-c](2026-11-c.md) |

@@ -577,8 +577,10 @@ revalidate the captured operation and owner before and after each source boundar
 
 Tests use injected native calls/buffers, the actual reader and real hidden Python
 helper IPC. The scoped UIA reader described below preserves explicit field failures
-and best-effort capture metadata. Native UI deployment trust, DOM source
-identity and revision normalization remain pending. Existing foreground desktop or
+and best-effort capture metadata. Browser profiles with `semantic_fields` report
+host-declared DOM fields through the same schema as a `dom` source bound to the
+managed browser context (`dom_observation.py`); the DOM has no revision, so those
+captures stay best-effort. Native UI deployment trust remains pending. Existing foreground desktop or
 legacy DOM dictionaries are not converted automatically. This work is not native
 observation or background-application acceptance.
 

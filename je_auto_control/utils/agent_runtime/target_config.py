@@ -125,19 +125,27 @@ def _settings(kind: str, value: Mapping[str, Any]) -> dict[str, Any]:
         return parsers[kind](data)
     allowed = {"allowed_origins"} | ({"platform"} if kind == "desktop" else set())
     if kind == "browser":
-        allowed.add("helper_python")
+        allowed |= {"helper_python", "semantic_fields"}
     if set(data) - allowed:
         raise AgentTaskError("unreviewed target profile settings")
     if kind == "desktop" and data.get("platform") not in {"windows", "macos", "x11", "wayland"}:
         raise AgentTaskError("desktop profiles require an explicit platform")
     _normalize_origins(data)
     if kind == "browser":
-        data["allowed_origins"] = browser_origins(value.get("allowed_origins", ()))
-        if "helper_python" in data:
-            # pylint: disable-next=import-outside-toplevel  # reason: optional helper selection stays lazy
-            from je_auto_control.utils.agent_runtime.helper_environment import normalize_helper_python
-            data["helper_python"] = normalize_helper_python(data["helper_python"])
+        _browser_settings(data, value)
     return data
+
+
+def _browser_settings(data: dict[str, Any], value: Mapping[str, Any]) -> None:
+    data["allowed_origins"] = browser_origins(value.get("allowed_origins", ()))
+    if "helper_python" in data:
+        # pylint: disable-next=import-outside-toplevel  # reason: optional helper selection stays lazy
+        from je_auto_control.utils.agent_runtime.helper_environment import normalize_helper_python
+        data["helper_python"] = normalize_helper_python(data["helper_python"])
+    if "semantic_fields" in data:
+        # pylint: disable-next=import-outside-toplevel  # reason: browser field parsing stays lazy
+        from je_auto_control.utils.agent_runtime.dom_observation import dom_fields
+        data["semantic_fields"] = [item.to_dict() for item in dom_fields(data["semantic_fields"])]
 
 
 def _normalize_origins(data: dict[str, Any]) -> None:

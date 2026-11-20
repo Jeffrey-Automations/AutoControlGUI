@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Browser host profiles accept `semantic_fields`; observations then include a
+  `semantic_report` with per-field `not_found` / `protected` reasons, bound to the
+  managed browser context. Profiles without the setting are unchanged.
+
 - Windows arm64 now installs `opencv-python` and `je_open_cv`: opencv-python 5.1.0.95
   ships a `win_arm64` wheel, so image matching works there. `cryptography` stays
   marked off that platform. The image-stack accessors no longer mention arm64.

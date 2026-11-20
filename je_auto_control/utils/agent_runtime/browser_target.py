@@ -53,7 +53,11 @@ def _task_origins(spec: AgentTaskSpec) -> tuple[str, ...]:
 class BrowserTarget:
     """A fresh headless browser with task origins intersected by its immutable host profile."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, target_id: str = "", semantic_fields: Any = None) -> None:
+        self._semantic = None
+        if semantic_fields is not None:
+            from je_auto_control.utils.agent_runtime.dom_observation import DomSource, dom_fields
+            self._semantic = DomSource(target_id, dom_fields(semantic_fields))
         self._session: Any = None
         self._identity = uuid.uuid4().hex
         self._spec: AgentTaskSpec | None = None
@@ -160,9 +164,20 @@ class BrowserTarget:
         self._elements(elements, raw.get("elements", []), "")
         for frame in raw.get("frames", []):
             self._elements(elements, frame.get("elements", []), frame["selector"])
-        return {"identity": {"browser_session": self._identity, "url": raw.get("url", "")},
-                "title": raw.get("title", ""), "text": raw.get("text", ""), "elements": elements,
-                "semantic_observation": True, "text_redacted": True}
+        result = {"identity": {"browser_session": self._identity, "url": raw.get("url", "")},
+                  "title": raw.get("title", ""), "text": raw.get("text", ""), "elements": elements,
+                  "semantic_observation": True, "text_redacted": True}
+        if self._semantic is not None:
+            result["semantic_report"] = self._semantic_report(self._semantic)
+        return result
+
+    def _semantic_report(self, source: Any) -> dict[str, Any]:
+        """Host-declared DOM fields in the shared report schema, with source identity and per-field reasons."""
+        from je_auto_control.utils.agent_runtime.context import current_operation
+        from je_auto_control.utils.agent_runtime.dom_observation import stable_state
+        operation = current_operation()
+        checkpoint = operation.checkpoint if operation is not None else (lambda: None)
+        return stable_state(source.report(self._session, checkpoint))
 
     @staticmethod
     def _elements(result: list[dict[str, Any]], values: list[dict[str, Any]], frame: str) -> None:

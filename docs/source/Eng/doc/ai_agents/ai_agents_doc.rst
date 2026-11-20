@@ -695,6 +695,7 @@ then retires it without acquiring input ownership or starting a browser. Its res
 ``python_dependencies_ready``; ``browser_launch=not_probed`` and ``native_evidence=not_recorded`` stay explicit.
 ``last_probe`` is an in-memory timestamped diagnostic snapshot; passive readiness and task permissions
 are unchanged by probing. Disabled targets stay disabled. Desktop/device native probes remain open.
+A browser profile may also declare host-reviewed ``semantic_fields``: up to 64 ``{name, selector, frame?, property}`` entries whose property is ``text``, ``value`` or ``visible``. Each browser observation then carries a ``semantic_report`` in the shared observation-report schema. The source is bound to the managed browser context, so a new session is a new target lifetime; an absent element is ``not_found``, a value the SDK refuses to read back (password, hidden, file or ``data-secret`` controls) is ``protected``, and a navigation during the read makes the source ``inconsistent_snapshot``. Capture IDs and times are left out, so an unchanged page fingerprints the same before an action. Selectors must be unique, because the SDK retires the session on an ambiguous one. DOM reads have no revision and stay best-effort; real-browser acceptance remains pending.
 The prepared isolated environment installs wheels from both feature worktrees. Shared environments
 and production checkouts remain untouched; production service configuration and real-browser acceptance
 remain separate work. Browser automation still belongs entirely to WebRunner (``je_web_runner``).

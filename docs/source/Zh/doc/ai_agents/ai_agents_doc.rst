@@ -586,6 +586,7 @@ MCP／REST、``agent-task target probe request.json`` 或 GUI 主機目標的診
 擁有權或啟動瀏覽器。結果可顯示 ``python_dependencies_ready``；瀏覽器啟動及原生證據仍明確保持
 ``not_probed``／``not_recorded``。``last_probe`` 僅為記憶體中的具時間診斷快照，不授予任務權限，
 也不啟用停用的目標。桌面／裝置的原生診斷仍待完成。
+browser profile 也可宣告主機審閱的 ``semantic_fields``：最多 64 筆 ``{name, selector, frame?, property}``，property 為 ``text``、``value`` 或 ``visible``。之後每次瀏覽器觀察都會附上共用 observation report 格式的 ``semantic_report``。來源綁定受管瀏覽器 context，新 session 即為新的目標生命週期；元素不存在回報 ``not_found``，SDK 拒絕讀回的值（密碼、隱藏、檔案或 ``data-secret`` 欄位）回報 ``protected``，讀取期間換頁則整個來源為 ``inconsistent_snapshot``。擷取編號與時間不列入，頁面未變時動作前的指紋維持相同。selector 必須唯一，因為 SDK 遇到不唯一的 selector 會讓 session 退休。DOM 讀取沒有 revision，維持 best-effort；實際瀏覽器驗收仍待完成。
 已準備的隔離環境安裝兩個功能工作樹建置的 wheel；共用環境與正式工作樹保持原狀。正式服務
 設定及實際瀏覽器驗收仍分開追蹤；所有瀏覽器自動化仍統一由 WebRunner（``je_web_runner``）提供。
 
