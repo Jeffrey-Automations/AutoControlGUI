@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,597 |
-| 程式碼總行數 | 244,834 |
+| 程式碼總行數 | 244,853 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -516,7 +516,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 58,203 行。
+> 14 個套件、約 58,222 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -530,7 +530,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cua_action/` | 204 | 標準化 computer-use 動作結構（Anthropic／OpenAI → `AC_*`） |
 | `utils/llm/` | 369 | 自然語言 → action list 規劃器 + Anthropic／null 後端；規劃執行隔離頂層變數並沿用巢狀範圍 |
 | `utils/mcp_registry/` | 97 | MCP registry `server.json` 資訊清單產生（可被發現） |
-| `utils/mcp_server/` | 22,322 | **無頭 MCP 伺服器**（預設註冊 820 個工具＝801 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
+| `utils/mcp_server/` | 22,341 | **無頭 MCP 伺服器**（預設註冊 820 個工具＝801 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
 | `utils/tool_use_schema/` | 194 | 把 `AC_*` 指令匯出成 Claude／OpenAI 的 tool-use schema |
 | `utils/trajectory_eval/` | 132 | agent 軌跡評估：依評分規準為一次執行打分 |
 | `utils/vision/` | 666 | VLM 元素定位器（依描述找元素）+ Anthropic／OpenAI／null 後端 |
@@ -763,7 +763,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `mouse_aliases.py` | 40 | 單鍵點擊別名（`AC_click_left` 等），executor 與 callback executor 共用。 |
 | `flags.py` | 19 | 旗標讀取 `as_bool`：依拼法（`"true"`／`"yes"`／`"on"`／`"1"`）而非 Python 真值判斷，所以 JSON、CLI、MCP 傳來的 `"false"` 是關；所有 adapter 與流程指令共用。 |
 
-#### `utils/mcp_server/`（22,322 行，820 個工具）— 最大子系統
+#### `utils/mcp_server/`（22,341 行，820 個工具）— 最大子系統
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -814,7 +814,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `prompts.py` | 220 | MCP prompt 目錄。 |
 | `fake_backend.py` | 187 | CI／無頭測試用的記憶體內假後端。 |
 | `plugin_watcher.py` | 169 | 檔案變更時熱重載外掛工具的背景 watcher。 |
-| `tools/_base.py` | 234 | 工具註冊表的共用型別與輔助；JSON 相容的 MCPToolResult 分離受控失敗旗標與資料。 |
+| `tools/_base.py` | 253 | 工具註冊表的共用型別與輔助；JSON 相容的 MCPToolResult 分離受控失敗旗標與資料。 |
 | `tools/_readonly.py` | 32 | Read-only registry variants with enforced argument restrictions. 預設／外部／動態目錄共用篩選及呼叫限制。 |
 | `tools/_validation.py` | 124 | MCP 工具用到的 JSON Schema 子集驗證器。 |
 | `tools/plugin_tools.py` | 150 | 把外掛載入的 `AC_*` callable 包成 `MCPTool`。 |
@@ -1602,7 +1602,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
 | `gui/` | 167 | 44,030 |
-| `utils/mcp_server/` | 63 | 22,322 |
+| `utils/mcp_server/` | 63 | 22,341 |
 | `utils/remote_desktop/` | 77 | 16,997 |
 | `utils/executor/` | 11 | 10,806 |
 | `utils/usb/` | 20 | 5,069 |
@@ -1622,7 +1622,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,059 | 110,255 |
-| **總計** | **1,585** | **244,089** |
+| **總計** | **1,585** | **244,108** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

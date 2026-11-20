@@ -572,8 +572,11 @@ plugin 工具**\ (見下方「Plugin Hot-Reload」);你自己的程式以
 * ``ac_launch_process`` 的 ``argv`` 與 ``ac_shell`` 的 ``command``，這是刻意的：命令列就是
   一個程式，參數的意義由該程式決定，只拒絕看起來像路徑的參數並不能限制任何東西。不要把這些
   工具提供給你想限制的 client。
-* 自由格式物件裡的路徑（``ac_run_suite`` 的 ``spec``、``ac_run_dag`` 的 ``definition``、
-  ``ac_assert_all`` 的 ``specs``）。
+* 自由格式物件裡宣告路徑鍵以外的鍵。宣告的路徑鍵與一般 ``path`` 參數一樣受根目錄限制
+  （工具收到的是檢查過的標準化路徑）：``ac_run_dag`` 每個節點的 ``action_file``（遠端節點也算，
+  它的動作在本機載入後才送出）、``ac_run_suite`` 案例的 ``data.path``，以及
+  ``ac_assert_all``／``ac_assert_any``／``ac_assert_eventually`` spec 的 ``template_path``／``path``。
+  suite 或 DAG 裡的動作清單仍屬上一點的動作清單。
 * 外掛註冊的工具，除非它的 schema 也帶這個標記。
 
 ``ac_resolve_ref`` / ``ac_resolve_refs`` 的 ``file://`` 參照套用同一組根目錄；``env://``

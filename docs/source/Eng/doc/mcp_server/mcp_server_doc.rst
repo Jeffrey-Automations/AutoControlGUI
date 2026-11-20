@@ -662,8 +662,13 @@ What the roots do **not** reach:
   purpose: a command line is a program, the program decides what its
   arguments mean, and refusing the ones that read as paths would confine
   nothing. Do not offer these tools to a client you want confined.
-* Paths inside free-form objects (``ac_run_suite`` ``spec``, ``ac_run_dag``
-  ``definition``, ``ac_assert_all`` ``specs``).
+* Keys of free-form objects other than the declared path keys. Those keys are
+  held to the roots like any ``path`` argument (and the tool gets the checked
+  canonical path): every ``ac_run_dag`` node's ``action_file`` (also for a
+  remote node, whose actions are loaded here), an ``ac_run_suite`` case's
+  ``data.path``, and the ``template_path`` / ``path`` of an ``ac_assert_all`` /
+  ``ac_assert_any`` / ``ac_assert_eventually`` spec. The action lists inside a
+  suite or DAG are action lists, as above.
 * Tools registered by plugins, unless their schema carries the annotation.
 
 ``ac_resolve_ref`` / ``ac_resolve_refs`` follow the same roots for

@@ -33,8 +33,8 @@ from je_auto_control.utils.mcp_server.tools import _handlers_journal as h_journa
 from je_auto_control.utils.mcp_server.tools import _handlers_scheduling as h_sched
 from je_auto_control.utils.mcp_server.tools import _handlers_remote as h_remote
 from je_auto_control.utils.mcp_server.tools._base import (
-    DESTRUCTIVE, MCPTool, MCPToolAnnotations, NON_DESTRUCTIVE, READ_ONLY,
-    SIDE_EFFECT_ONLY, schema,
+    ASSERTION_SPEC, DAG_DEFINITION, DESTRUCTIVE, MCPTool, MCPToolAnnotations, NON_DESTRUCTIVE, READ_ONLY,
+    SIDE_EFFECT_ONLY, SUITE_SPEC, schema,
 )
 
 #: A JSON document argument: an object or an array (a root array was refused).
@@ -1046,7 +1046,7 @@ def dag_tools() -> List[MCPTool]:
                          "console REST clients. Failures cascade — "
                          "downstream nodes are skipped, not retried."),
             input_schema=schema({
-                "definition": {"type": "object"},
+                "definition": DAG_DEFINITION,
                 "max_parallel": {"type": "integer"},
                 "batch_id": {"type": "string"},
                 "recovery": {"type": "object"},
@@ -8605,7 +8605,7 @@ def assertion_tools() -> List[MCPTool]:
                          "\"Saved\"}; kind is one of text/image/pixel/window/"
                          "clipboard."),
             input_schema=schema({
-                "specs": {"type": "array", "items": {"type": "object"}},
+                "specs": {"type": "array", "items": ASSERTION_SPEC},
                 "raise_on_fail": {"type": "boolean"},
             }, required=["specs"]),
             handler=hq.assert_all,
@@ -8618,7 +8618,7 @@ def assertion_tools() -> List[MCPTool]:
                          "complement of ac_assert_all. Each spec is an object "
                          "like {\"kind\": \"text\", \"text\": \"Welcome\"}."),
             input_schema=schema({
-                "specs": {"type": "array", "items": {"type": "object"}},
+                "specs": {"type": "array", "items": ASSERTION_SPEC},
                 "raise_on_fail": {"type": "boolean"},
             }, required=["specs"]),
             handler=hq.assert_any,
@@ -8631,7 +8631,7 @@ def assertion_tools() -> List[MCPTool]:
                          "seconds. The spec is an object like {\"kind\": "
                          "\"window\", \"title\": \"Done\"}."),
             input_schema=schema({
-                "spec": {"type": "object"},
+                "spec": ASSERTION_SPEC,
                 "timeout": {"type": "number"},
                 "interval": {"type": "number"},
                 "raise_on_fail": {"type": "boolean"},
@@ -9144,7 +9144,7 @@ def suite_tools() -> List[MCPTool]:
                          "also write CI-native reports. Quarantined case names "
                          "are skipped."),
             input_schema=schema({
-                "spec": {"type": "object"},
+                "spec": SUITE_SPEC,
                 "tags": {"type": "array", "items": {"type": "string"}},
                 "respect_quarantine": {"type": "boolean"},
                 "junit_path": {"type": "string", "format": "path"},

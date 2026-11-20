@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- With MCP path roots configured, `ac_run_dag` node `action_file`, `ac_run_suite`
+  case `data.path` and assertion spec `template_path` / `path` are now confined and
+  canonicalised like other path arguments.
+
 - Browser host profiles accept `semantic_fields`; observations then include a
   `semantic_report` with per-field `not_found` / `protected` reasons, bound to the
   managed browser context. Profiles without the setting are unchanged.

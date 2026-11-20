@@ -221,6 +221,25 @@ def schema(properties: Dict[str, Any],
     return node
 
 
+_PATH = {"type": "string", "format": "path"}
+
+#: One assertion spec: ``image`` reads ``template_path`` and ``file`` reads
+#: ``path`` on this machine, so path roots confine both. No other kind has a
+#: key of either name.
+ASSERTION_SPEC = {"type": "object", "properties": {"template_path": _PATH, "path": _PATH}}
+
+#: A DAG definition: every node's ``action_file`` is read here, also for a
+#: remote node, whose actions are loaded locally and then sent.
+DAG_DEFINITION = {"type": "object", "properties": {"nodes": {
+    "type": "array", "items": {"type": "object", "properties": {"action_file": _PATH}}}}}
+
+#: A QA suite spec: a case's ``data`` source names its rows file in ``path``
+#: (csv / json / sqlite / excel). Action lists inside it are not paths.
+SUITE_SPEC = {"type": "object", "properties": {"cases": {
+    "type": "array", "items": {"type": "object", "properties": {"data": {
+        "type": "object", "properties": {"path": _PATH}}}}}}}
+
+
 # Pre-built annotation singletons used by every tool factory.
 DESTRUCTIVE = MCPToolAnnotations(destructive=True)
 NON_DESTRUCTIVE = MCPToolAnnotations(destructive=False, idempotent=True)

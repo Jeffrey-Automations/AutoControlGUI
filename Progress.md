@@ -151,8 +151,8 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - **MCP 路徑根目錄**（`JE_AUTOCONTROL_MCP_PATH_ROOTS`，預設關閉）：`path-or-other` 已檢查
   `ac_open_path`／`ac_plan_open`／`ac_file_association`／`ac_act_in_view` 的 `target` 與 `ac_handle_file_dialog` 的 `path`，
   限於可辨識的絕對路徑、已存在的相對路徑及 `file:` URL；保留原字串，不代表能限制應用程式自行解讀的路徑或尚不存在的相對路徑。
-  仍管不到執行動作清單的工具、`ac_launch_process`／`ac_shell` 的 `argv`／`command`、
-  自由格式物件裡的路徑（`ac_run_suite` 的 `spec`、`ac_run_dag` 的 `definition`、`ac_assert_all` 的 `specs`）與沒標註的外掛工具。
+  自由格式物件的已知路徑鍵已納入（U-20261121-06：DAG 節點 `action_file`、suite 案例 `data.path`、斷言 spec 的 `template_path`／`path`）；
+  仍管不到執行動作清單的工具、`ac_launch_process`／`ac_shell` 的 `argv`／`command`（刻意不管）與沒標註的外掛工具。
   檔案 symlink 的跳脫在這台機器上建不出來（只跑了目錄 junction）；POSIX 的 `:` 分隔與 `~` 沒在 Linux／macOS 跑。
 - **USB passthrough 實機驗收**：仍須對真的舊版 host、WebRTC 通道與 USB 裝置驗證長時間 transfer、
   裝置逾時、通道 ERROR、晚到回覆與重新連線。現有 fake channel／backend 測試不能代替這項驗收。
