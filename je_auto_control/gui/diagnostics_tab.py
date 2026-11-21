@@ -26,7 +26,7 @@ from je_auto_control.utils.exception.control_signals import raise_caused_run_int
 from je_auto_control.utils.logging.secret_scope import scrub_secret_text
 from je_auto_control.utils.rbac.policy import authorize_command
 from je_auto_control.utils.run_history.run_outcome import _ordinary_error_text
-from je_auto_control.wrapper.capabilities import BackendContext, probe_capabilities
+from je_auto_control.wrapper.capabilities import BackendContext, probe_capabilities, reset_native_input
 
 
 _SEVERITY_COLOR = {
@@ -103,6 +103,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("diag_probe", self._probe_capabilities),
+            ("diag_reset_native_input", self._reset_native_input),
             ("diag_run", self._refresh),
             ("diag_stop", self._stop),
         ] + self._failed_stops.menu_actions() + self._mcp_discovery.menu_actions()
@@ -117,6 +118,11 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         self._render_summary()
         if self._view.report is not None:
             self._fill_table(self._view.report)
+
+    def _reset_native_input(self) -> None:
+        """Thin wrapper: the headless reset, then show the refreshed snapshot."""
+        reset_native_input(BackendContext.current())
+        self._probe_capabilities()
 
     def _probe_capabilities(self) -> None:
         snapshot = probe_capabilities(BackendContext.current())

@@ -103,6 +103,7 @@ COMMAND_CAPABILITIES: Dict[str, str] = {
     "AC_agent_runtime_stop": _HOSTS,
     "AC_agent_runtime_start": _HOSTS,
     "AC_probe_capabilities": _DATA,
+    "AC_reset_native_input": _DRIVE,
     "AC_diagnose": _DATA,
     "AC_remote_host_status": _DATA,
     "AC_remote_viewer_status": _DATA,

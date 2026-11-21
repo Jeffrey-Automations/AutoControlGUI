@@ -498,6 +498,11 @@ acceptance remains pending.
 部分授權維持未驗證，事件種類暫停或必要裝置移除則回報暫停／撤銷。XWayland 一律 ``desktop_wide=False``；其他範圍仍受授權區域限制，
 不代表已驗證每個螢幕。
 
+輸入狀態為 ``needs_permission``、``revoked`` 或 ``failed`` 時，``reset_native_input()``（亦即
+``AC_reset_native_input``、``ac_reset_native_input`` 與 **Diagnostics → Actions → 重設原生輸入工作階段**）
+會退休快取的 Wayland 輸入工作階段與記錄的拒絕，並回傳更新後的快照。它本身不要求任何授權；下一次真正的
+輸入操作才可能開新的 portal 工作階段與同意對話框。需要 ``drive_input``，Wayland 以外不做任何事。
+
 Context 複製前置資料，可由擁有者提供無原生物件的觀測，但不授權。AC／MCP 不接受外部觀測；
 預設本機結果不含環境值、命令參數、執行檔路徑或原生錯誤文字。拒絕／暫停／撤銷／失敗不代表改走 CLI；
 只有明確選擇 CLI 或觀測到選用原生依賴缺失才描述該替代路徑。輸入／擷取獨立診斷，重繪與切換語系

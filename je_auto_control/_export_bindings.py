@@ -2,7 +2,7 @@
 from je_auto_control._lazy_exports import AttributeBinding, ExportBinding, ModuleBinding
 
 
-PUBLIC_ORDER_SHA256 = 'c109d2a2016c994303368885f610e9332773cd0d5694404d4400efd976fd4266'
+PUBLIC_ORDER_SHA256 = '9e32126c2ea1fd3de01ecbc8ea414df15d4a45bdfcd72793de888c3dd1e77d51'
 
 _LINUX_WAYLAND_GLOBAL_SHORTCUTS = 'je_auto_control.linux_wayland.global_shortcuts'
 _LINUX_WAYLAND_INPUT_EVENTS = 'je_auto_control.linux_wayland.input_events'
@@ -1300,6 +1300,7 @@ EXPORTS: dict[str, ExportBinding] = {
     'CapabilitySnapshot': AttributeBinding(_WRAPPER_CAPABILITIES, 'CapabilitySnapshot'),
     'CapabilityStatus': AttributeBinding(_WRAPPER_CAPABILITIES, 'CapabilityStatus'),
     'probe_capabilities': AttributeBinding(_WRAPPER_CAPABILITIES, 'probe_capabilities'),
+    'reset_native_input': AttributeBinding(_WRAPPER_CAPABILITIES, 'reset_native_input'),
     'CancellationToken': AttributeBinding(_UTILS_EXCEPTION_CANCELLATION, 'CancellationToken'),
     'TaskProgress': AttributeBinding(_UTILS_EXCEPTION_CANCELLATION, 'TaskProgress'),
     'cancellation_scope': AttributeBinding(_UTILS_EXCEPTION_CANCELLATION, 'cancellation_scope'),

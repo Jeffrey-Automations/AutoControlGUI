@@ -64,6 +64,7 @@ japanese_word_dict = {
     # 診断タブ
     "diag_run": "診断を実行",
     "diag_probe": "入力・画面取得の機能を確認",
+    "diag_reset_native_input": "ネイティブ入力セッションをリセット",
     "diag_stop": "診断を停止",
     "diag_summary_running": "診断を実行中です。",
     "diag_summary_stopping": "診断を停止し、この要求を後片付けしています…",

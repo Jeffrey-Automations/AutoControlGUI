@@ -172,6 +172,7 @@ english_word_dict = {
     # Diagnostics tab
     "diag_run": "Run diagnostics",
     "diag_probe": "Inspect input and capture capabilities",
+    "diag_reset_native_input": "Reset the native input session",
     "diag_stop": "Stop diagnostics",
     "diag_summary_running": "Diagnostics are running.",
     "diag_summary_stopping": "Stopping diagnostics and cleaning up this request…",

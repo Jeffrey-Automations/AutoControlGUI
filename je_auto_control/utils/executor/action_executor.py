@@ -2,6 +2,7 @@ import threading
 import types
 from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 from je_auto_control.utils.diagnostics.capability_commands import probe_current_capabilities as _probe_capabilities
+from je_auto_control.utils.diagnostics.capability_commands import reset_current_native_input as _reset_native_input
 
 from je_auto_control.utils.exception.exception_tags import (
     action_is_null_error_message, add_command_exception_error_message,
@@ -8241,6 +8242,7 @@ class Executor:
 
             # System diagnostics
             "AC_probe_capabilities": _probe_capabilities,
+            "AC_reset_native_input": _reset_native_input,
             "AC_diagnose": _diagnose,
 
             # Config bundle export / import

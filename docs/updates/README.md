@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261121-18 | 2026-11-21 | Expose the explicit Wayland input-session reset | #done #wayland #capabilities | [2026-11-c](2026-11-c.md) |
 | U-20261121-17 | 2026-11-21 | Declare comtypes and run UI Automation on real COM in CI | #done #accessibility #ci #windows | [2026-11-c](2026-11-c.md) |
 | U-20261121-16 | 2026-11-21 | Add the android target profile kind | #done #agent #android | [2026-11-c](2026-11-c.md) |
 | U-20261121-15 | 2026-11-21 | Stop waiting for read-only accessibility walks | #done #executor #stop #accessibility | [2026-11-c](2026-11-c.md) |

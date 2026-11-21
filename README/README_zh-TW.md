@@ -130,6 +130,7 @@ adapter 範圍，不是全域 executor 指令。既有任務 API 與 GUI JSON �
 UNC 共用、`\\.\pipe\` 名稱、`\\?\` 裝置路徑與 `..` 片段一律拒絕，註冊 profile 不能讓主機把認證送到其他機器。
 browser profile 也可宣告主機審閱的 `semantic_fields`：最多 64 筆 `{name, selector, frame?, property}`，property 為 `text`、`value` 或 `visible`。之後每次瀏覽器觀察都會附上共用 observation report 格式的 `semantic_report`。來源綁定受管瀏覽器 context，新 session 即為新的目標生命週期；元素不存在回報 `not_found`，SDK 拒絕讀回的值（密碼、隱藏、檔案或 `data-secret` 欄位）回報 `protected`，讀取期間換頁則整個來源為 `inconsistent_snapshot`。擷取編號與時間不列入，頁面未變時動作前的指紋維持相同。selector 必須唯一，因為 SDK 遇到不唯一的 selector 會讓 session 退休。DOM 讀取沒有 revision，維持 best-effort；實際瀏覽器驗收仍待完成。
 `android` 目標 profile（設定 `serial`、`physical_id`、`package`，可選 `adb_port`、`user`、`idle_seconds`；單一 app；工具 `AC_android_tap`／`AC_android_swipe`／`AC_android_key`）經裝置端 helper 操作一台裝置，helper 須已安裝並執行。真機驗收仍待完成。
+Wayland portal 拒絕或撤銷後，`reset_native_input()`（`AC_reset_native_input`、`ac_reset_native_input`、Diagnostics → Actions）會退休快取的輸入工作階段，讓下一次輸入重新請求同意；它本身不要求任何授權。
 fixture 映像執行前，租約還會拒絕其他帳號能變更的位置：從磁碟根目錄往下的每一層都必須是實體目錄
 （不能是 junction 或 symlink），且只有 SYSTEM、Administrators、TrustedInstaller 與目前使用者能改名、刪除、
 改 ACL 或新增檔案；租約檔案的最終路徑也必須等於設定的路徑。請把 fixture 部署在 `%LOCALAPPDATA%` 這類受保護目錄；

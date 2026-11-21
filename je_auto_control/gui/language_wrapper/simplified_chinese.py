@@ -52,6 +52,7 @@ simplified_chinese_word_dict = {
     # 诊断分页
     "diag_run": "运行诊断",
     "diag_probe": "查看输入与截取能力",
+    "diag_reset_native_input": "重置原生输入会话",
     "diag_stop": "停止诊断",
     "diag_summary_running": "诊断运行中。",
     "diag_summary_stopping": "正在停止诊断并清理本次请求…",

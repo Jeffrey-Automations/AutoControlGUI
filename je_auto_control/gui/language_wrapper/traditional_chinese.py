@@ -53,6 +53,7 @@ traditional_chinese_word_dict = {
     # 診斷分頁
     "diag_run": "執行診斷",
     "diag_probe": "檢視輸入與擷取能力",
+    "diag_reset_native_input": "重設原生輸入工作階段",
     "diag_stop": "停止診斷",
     "diag_summary_running": "診斷執行中。",
     "diag_summary_stopping": "正在停止診斷並清理本次請求…",

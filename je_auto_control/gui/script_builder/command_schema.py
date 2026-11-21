@@ -2139,6 +2139,11 @@ def _add_misc_specs(specs: List[CommandSpec]) -> None:
                          "permission request."),
         ),
         CommandSpec(
+            "AC_reset_native_input", "System", "Reset Native Input Session",
+            description=("Retire the cached Wayland input session and recorded refusal so the next input "
+                         "asks for consent again; elsewhere nothing happens. Requests nothing itself."),
+        ),
+        CommandSpec(
             "AC_set_clipboard_html", "Data", "Set Clipboard HTML",
             fields=(
                 FieldSpec("html", FieldType.STRING,

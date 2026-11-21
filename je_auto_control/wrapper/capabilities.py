@@ -292,4 +292,26 @@ def _custom_capture(context: BackendContext, template: str) -> CapabilityStatus:
         'Check the explicit executable and deliberately verify its output; no alternate provider is selected.', True)
 
 
-__all__ = ['BackendContext', 'CapabilityStatus', 'CapabilitySnapshot', 'probe_capabilities']
+def reset_native_input(context: Optional[BackendContext] = None,
+                       reset: Optional[Callable[[], None]] = None) -> dict[str, object]:
+    """Retire the cached Wayland EI session and any recorded refusal, so the next input asks afresh.
+
+    This is the explicit reset/retry the ``needs_permission``, ``revoked`` and ``failed`` recovery
+    instructions refer to. It requests nothing itself: the next real input operation may open a new
+    portal session and its consent dialog. On other platforms there is no such session and nothing
+    happens. ``reset`` stands in for the backend reset in tests. Returns the refreshed passive snapshot.
+    """
+    context = context if context is not None else BackendContext.current()
+    if not isinstance(context, BackendContext):
+        raise AutoControlException('reset_native_input requires a BackendContext')
+    wayland = context.platform.startswith('linux') and _is_wayland(context.environ)
+    if wayland:
+        if reset is None:
+            # pylint: disable-next=import-outside-toplevel  # reason: the Wayland sender loads only on Wayland
+            from je_auto_control.linux_wayland.ei_default import reset_default_backend
+            reset = reset_default_backend
+        reset()
+    return {'reset': wayland, 'capabilities': probe_capabilities(context).to_dict()}
+
+
+__all__ = ['BackendContext', 'CapabilityStatus', 'CapabilitySnapshot', 'probe_capabilities', 'reset_native_input']

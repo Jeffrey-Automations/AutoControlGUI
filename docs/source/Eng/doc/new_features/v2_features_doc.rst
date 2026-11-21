@@ -574,6 +574,12 @@ unverified; paused families and removed required devices report paused/revoked.
 XWayland is always ``desktop_wide=False``; other scope flags
 remain limited by grants/regions and do not verify every monitor.
 
+After a ``needs_permission``, ``revoked`` or ``failed`` input state, ``reset_native_input()`` (also
+``AC_reset_native_input``, ``ac_reset_native_input`` and **Diagnostics → Actions → Reset the native
+input session**) retires the cached Wayland input session and the recorded refusal, then returns the
+refreshed snapshot. It requests nothing itself; the next real input operation may open a new portal
+session and its consent dialog. It needs ``drive_input`` and does nothing outside Wayland.
+
 Contexts detach facts and allow owner-supplied inert observations without granting
 authority. AC/MCP accept no supplied observations; default live results omit
 environment values, command arguments, executable paths and native error text.

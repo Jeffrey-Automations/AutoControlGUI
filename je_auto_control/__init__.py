@@ -1600,6 +1600,7 @@ if _TYPE_CHECKING:
         CapabilitySnapshot,
         CapabilityStatus,
         probe_capabilities,
+        reset_native_input,
     )
     from je_auto_control.utils.diagnostics import (
         Check,
@@ -2478,7 +2479,7 @@ __all__ = [
     "UsbAcl",
     "enable_usb_passthrough", "is_usb_passthrough_enabled",
     # System diagnostics
-    "BackendContext", "CapabilitySnapshot", "CapabilityStatus", "probe_capabilities",
+    "BackendContext", "CapabilitySnapshot", "CapabilityStatus", "probe_capabilities", "reset_native_input",
     "CancellationToken", "TaskProgress", "cancellation_scope",
     "Check", "DiagnosticsReport", "run_diagnostics",
     # Config bundle
