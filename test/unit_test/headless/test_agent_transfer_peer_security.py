@@ -28,9 +28,14 @@ def source_server(tmp_path, *, named=False, local_bridge=False):
             server.stop()
 
 
+# How long the test client waits for a reply. Every server operation is bounded by its own deadline;
+# this only has to outlast a loaded CI runner, where a bounded reply took longer than 3 s.
+CLIENT_TIMEOUT = 15
+
+
 def post(server, path, payload, *, token=None, headers=None, raw=None):
     address = urlsplit(server.base_url)
-    connection = http.client.HTTPConnection(address.hostname, address.port, timeout=3)
+    connection = http.client.HTTPConnection(address.hostname, address.port, timeout=CLIENT_TIMEOUT)
     body = json.dumps(payload).encode() if raw is None else raw
     fields = {'Authorization': 'Bearer ' + (server.token if token is None else token),
               'Content-Type': 'application/json', **(headers or {})}

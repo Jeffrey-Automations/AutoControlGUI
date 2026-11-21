@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261121-20 | 2026-11-21 | Remove two races from the transfer import tests | #incident #ci #agent | [2026-11-c](2026-11-c.md) |
 | U-20261121-19 | 2026-11-21 | Add the iOS Simulator extension through xcrun simctl | #done #ios #mobile | [2026-11-c](2026-11-c.md) |
 | U-20261121-18 | 2026-11-21 | Expose the explicit Wayland input-session reset | #done #wayland #capabilities | [2026-11-c](2026-11-c.md) |
 | U-20261121-17 | 2026-11-21 | Declare comtypes and run UI Automation on real COM in CI | #done #accessibility #ci #windows | [2026-11-c](2026-11-c.md) |
