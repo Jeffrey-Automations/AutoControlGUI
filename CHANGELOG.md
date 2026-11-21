@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- New `android` agent target profile kind, driven through the device helper; Wayland sessions now
+  read human activity from physical evdev devices; read-only accessibility walks and VLM requests
+  stop waiting on a stop; a refused local HTTP connection is now an `AgentTaskError`.
+
 - With MCP path roots configured, `ac_run_dag` node `action_file`, `ac_run_suite`
   case `data.path` and assertion spec `template_path` / `path` are now confined and
   canonicalised like other path arguments.

@@ -129,6 +129,7 @@ adapter 范围，不是全局 executor 指令。现有任务 API 与 GUI JSON �
 所有固定路径（各 profile 的 `config_path` 及部署指定的映像文件）都必须是本机磁盘路径：
 UNC 共享、`\\.\pipe\` 名称、`\\?\` 设备路径与 `..` 片段一律拒绝，注册 profile 不能让主机把凭据发送到其他机器。
 browser profile 也可声明主机审阅的 `semantic_fields`：最多 64 条 `{name, selector, frame?, property}`，property 为 `text`、`value` 或 `visible`。之后每次浏览器观察都会附上共用 observation report 格式的 `semantic_report`。来源绑定受管浏览器 context，新 session 即为新的目标生命周期；元素不存在报告 `not_found`，SDK 拒绝读回的值（密码、隐藏、文件或 `data-secret` 字段）报告 `protected`，读取期间换页则整个来源为 `inconsistent_snapshot`。捕获编号与时间不列入，页面未变时动作前的指纹保持相同。selector 必须唯一，因为 SDK 遇到不唯一的 selector 会让 session 退休。DOM 读取没有 revision，保持 best-effort；实际浏览器验收仍待完成。
+`android` 目标 profile（设置 `serial`、`physical_id`、`package`，可选 `adb_port`、`user`、`idle_seconds`；单一 app；工具 `AC_android_tap`／`AC_android_swipe`／`AC_android_key`）经设备端 helper 操作一台设备，helper 须已安装并运行。真机验收仍待完成。
 fixture 映像执行前，租约还会拒绝其他账户能更改的位置：从磁盘根目录往下的每一层都必须是实体目录
 （不能是 junction 或 symlink），且只有 SYSTEM、Administrators、TrustedInstaller 与当前用户能改名、删除、
 改 ACL 或新增文件；租约文件的最终路径也必须等于配置的路径。请把 fixture 部署在 `%LOCALAPPDATA%` 这类受保护目录；

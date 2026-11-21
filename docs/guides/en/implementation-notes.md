@@ -287,7 +287,7 @@ even returned input does not certify remote input retirement or task completion.
 The internal owned remote SDK worker now checks exact task/owner scope, refreshed authority and physical
 takeover; parent monitoring starts before the trusted host factory. Calls require a durable begin ACK,
 then matching device/epoch settlement before an end ACK. Missing proof keeps effects quarantined.
-The helper-backed `HelperControlProvider` (helper `begin`/`settle`, a fresh epoch per lease, `getevent` as the physical source) is the Android device-control provider. The WDA adapter (`IosRemoteAdapter`) is in place but needs an iOS provider that does not exist yet; managed profile wiring remains required.
+The helper-backed `HelperControlProvider` (helper `begin`/`settle`, a fresh epoch per lease, `getevent` as the physical source) is the Android device-control provider. The WDA adapter (`IosRemoteAdapter`) is in place but needs an iOS provider that does not exist yet. Android has a host profile kind (`android`) that runs the helper-backed worker.
 The command compiler reads the three native focus fields in one labeled extraction, accepting their
 six possible orders while refusing missing/duplicate/empty fields. Pre/post identity and input-security
 checks remain, and action deadlines are unchanged. Owned POSIX fixtures avoid extra Git Bash reader

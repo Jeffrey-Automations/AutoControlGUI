@@ -218,7 +218,7 @@ Android 检查后提案会绑定当前的原生输入窗口／队列及 keyguard
 缺少／错误阶段或退出码不符都维持未知；输入返回不代表远程输入已清空或任务完成，也不授权重试。
 内部自有远程 SDK worker 会核对精确任务／所有者范围、重新授权与真人接回；可信主机 factory
 创建前先启动 parent 监视。持久化 begin 并收到 ACK 后才调用 SDK，相符设备／世代的清理证据
-通过后才发送 end；缺证据维持隔离。Android 的可信设备控制来源为经 helper 的 `HelperControlProvider`（helper `begin`／`settle`、每次租约新 epoch、以 `getevent` 为实体来源）。WDA adapter（`IosRemoteAdapter`）已就位，但仍需目前尚不存在的 iOS provider；受管 profile 仍待接合。
+通过后才发送 end；缺证据维持隔离。Android 的可信设备控制来源为经 helper 的 `HelperControlProvider`（helper `begin`／`settle`、每次租约新 epoch、以 `getevent` 为实体来源）。WDA adapter（`IosRemoteAdapter`）已就位，但仍需目前尚不存在的 iOS provider。Android 已有 `android` 主机 profile，执行经 helper 的 worker。
 命令编译器以一次带标签的提取核对三个原生焦点字段，接受六种顺序，缺少／重复／空值仍拒绝。
 前后身份与输入安全检查、原本动作期限均保留。自有 POSIX 假设备减少 Git Bash 读取进程且维持
 原始文件 bytes；有限阶段／耗时诊断不含命令、参数或输出。

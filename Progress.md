@@ -401,9 +401,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      instrumentation app（只服務 shell／root 對端、注入器在柵欄後釋放輸入；CI 建出 debug APK）。
      第 3、4 階段已交付（U-20261121-08）：主機端 `HelperControlProvider`、經 ADB `localabstract:` 的
      `AndroidHelperClient`、`getevent` 實體輸入來源，租約帶 `dispatch` 時送出改走 helper 的 begin／settle
-     （不再用 `dispatch_checked` 的 adb input），CI 新增模擬器 job。`TODO`：尚未接入受管 profile（helper 啟動與
-     安裝亦未自動化）；六種順序／重複拒絕、ACK 前拒絕、撤權與真人接回只對 Python 版 ledger 與模擬器驗過；
-     `AC_android_text` 在 helper 路徑不支援；真機驗收仍暫緩。
+     （不再用 `dispatch_checked` 的 adb input），CI 新增模擬器 job。`android` 主機 profile 已接入（U-20261121-16，以 `android_worker` 執行）；helper APK 的安裝與啟動刻意不自動化，缺 helper 時就緒失敗；六種順序／重複拒絕、ACK 前拒絕、撤權與真人接回只對 Python 版 ledger 與模擬器驗過；`AC_android_text` 在 helper 路徑不支援；真機驗收仍暫緩。
    - 為 `utils/agent_runtime/android_adapter.py` 實作並審閱真實 `AndroidControlProvider`／
      `AndroidCommandLease` 來源；須有裝置端執行機制，在真人接回、取消／逾時後阻止舊寫入，
      並提供逐命令 ID／boot／epoch 相符的輸入釋放、遠端佇列清空與舊 writer 退出證據。

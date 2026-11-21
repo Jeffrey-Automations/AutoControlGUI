@@ -42,9 +42,10 @@ def test_missing_tools_and_packages_are_dependencies_and_present_ones_are_only_u
     assert _area(present, 'browser')['state'] == 'not_probed'
 
 
-def test_unimplemented_device_control_is_unsupported_even_when_its_tools_are_installed():
+def test_device_control_is_never_claimed_ready_without_a_probe():
     report = _report(tools=('adb',))
-    assert _area(report, 'android_managed_control')['state'] == 'unsupported'
+    # Android has a helper-backed provider but no device was contacted; iOS has no provider at all.
+    assert _area(report, 'android_managed_control')['state'] == 'not_probed'
     assert _area(report, 'ios_managed_control')['state'] == 'unsupported'
 
 

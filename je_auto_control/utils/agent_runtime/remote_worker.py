@@ -30,7 +30,9 @@ _LIMIT = 1_100_000
 class RemoteDeviceAdapter(Protocol):
     """Trusted host SDK contract; no built-in Android/WDA implementation is assumed to satisfy it."""
 
-    device: dict[str, str]
+    @property
+    def device(self) -> dict[str, str]:
+        """The physical device this adapter is bound to."""
 
     def ready(self, spec: AgentTaskSpec) -> tuple[bool, str]:
         """Validate fixed host app/tool scope and trusted presence/held-input providers without input."""

@@ -22,6 +22,14 @@ def build_target(profile: AgentTargetProfile) -> Any:
     if profile.kind == "service":
         from .service_native_target import NativeServiceTarget
         return NativeServiceTarget.from_profile(profile)
+    if profile.kind == "android":
+        # pylint: disable-next=import-outside-toplevel  # reason: construct only the selected inert adapter
+        from je_auto_control.utils.agent_runtime.android_profile import android_worker_argv
+        from je_auto_control.utils.agent_runtime.models import thaw
+        from je_auto_control.utils.agent_runtime.remote_target import NativeRemoteTarget
+        settings = thaw(profile.settings)
+        return NativeRemoteTarget(argv=android_worker_argv(settings), platform="android",
+                                  physical_id=settings["physical_id"])
     if profile.kind == "files":
         resource = hashlib.sha256("\n".join(sorted(profile.roots)).encode("utf-8")).hexdigest()
         path = Path.home() / ".je_auto_control" / "input_ownership" / ("files-" + resource + ".lock")

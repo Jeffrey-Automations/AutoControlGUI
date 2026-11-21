@@ -55,6 +55,10 @@ class AndroidDeviceSession:
             raise AgentTaskError("Android endpoint lacks an exact transport identity")
         return int(value)
 
+    def transport(self, timeout: float, check: Callable[[], None] = cancellation_checkpoint) -> int:
+        """Select the reviewed endpoint's current exact transport ID; nothing on the device is read."""
+        return self._select(_remaining(_deadline(timeout)), check)
+
     def inspect(self, *, timeout: float = 5,
                 check: Callable[[], None] = cancellation_checkpoint) -> tuple[int, AndroidSnapshot]:
         """Read current identity/focus; never adopt a new boot into an existing session."""

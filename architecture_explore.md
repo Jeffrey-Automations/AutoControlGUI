@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,608 |
-| 程式碼總行數 | 246,781 |
+| Python 模組總數（含周邊子專案） | 1,610 |
+| 程式碼總行數 | 246,919 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -516,13 +516,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 60,074 行。
+> 14 個套件、約 60,212 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,254 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 32,968 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 33,106 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 166 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1052,7 +1052,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（32,968 行／236 檔）
+#### `utils/agent_runtime/`（33,106 行／238 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1071,9 +1071,11 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `android_hierarchy.py` | 287 | Parse bounded Android app hierarchies with explicit host text grants and private freshness signatures. |
 | `android_input_evidence.py` | 223 | Bind current Android dispatcher geometry and keyguard evidence without granting input authority. |
 | `android_input_windows.py` | 127 | Decode pinned AOSP input-window records without retaining foreign names or raw window dumps. |
+| `android_profile.py` | 55 | Host-reviewed Android target profiles: closed settings and the fixed helper-backed worker argv. |
 | `android_scope.py` | 88 | Validate bounded Android device, boot and focused-app evidence without publishing raw dumps. |
-| `android_session.py` | 143 | Pin Android identity, propose finite commands and dispatch only exact checked proposals. |
+| `android_session.py` | 147 | Pin Android identity, propose finite commands and dispatch only exact checked proposals. |
 | `android_transport.py` | 264 | Bounded no-replay ADB smart-socket transport; never starts, kills or upgrades a server. |
+| `android_worker.py` | 53 | Owned Android remote worker for one host-reviewed profile, driven through the device helper. |
 | `api.py` | 231 | Public service-backed task functions; imports never start services or operate targets. |
 | `browser_commands.py` | 168 | Closed browser commands operate only inside an owned WebRunner helper session. |
 | `browser_environment.py` | 80 | Closed browser Python dependency reports; probing never starts Playwright or a browser. |
@@ -1141,7 +1143,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `ownership.py` | 96 | Fenced input ownership; running dispatch must retire before ownership transfers. |
 | `path_identity.py` | 32 | Resolve a path for identity checks without mistaking Windows' extended-length spelling for a redirect. |
 | `parent_watch.py` | 25 | POSIX helpers retire their own live process group when the owning parent disappears. |
-| `readiness.py` | 83 | Passive readiness of the desktop, presence source, devices, browser and models; never a grant or evidence. |
+| `readiness.py` | 85 | Passive readiness of the desktop, presence source, devices, browser and models; never a grant or evidence. |
 | `resume_gate.py` | 84 | A task's first action waits until a fresh observation passes every declared resume condition. |
 | `policy.py` | 132 | Explicit task scopes, rooted data paths and secret-safe durable payloads. |
 | `presence_channel_darwin.py` | 311 | Own authenticated macOS stream channels and protected listeners, with the Linux lease owner. |
@@ -1182,7 +1184,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `remote_effect.py` | 75 | Bracket trusted SDK calls with durable host ACKs and explicit remote settlement evidence. |
 | `remote_journal.py` | 170 | Fence remote effects durably; retiring a local writer never certifies a remote device idle. |
 | `remote_target.py` | 178 | Internal owned remote-helper lifecycle, without assuming ADB or WDA retirement guarantees. |
-| `remote_worker.py` | 213 | Owned remote SDK worker with closed RPC, refreshed authority and ACK-gated finite effects. |
+| `remote_worker.py` | 215 | Owned remote SDK worker with closed RPC, refreshed authority and ACK-gated finite effects. |
 | `retention.py` | 71 | Thirty-day cleanup of stopped tasks and exclusively owned runtime artifacts. |
 | `routes.py` | 165 | Authenticated REST adapters for the runtime explicitly owned by a server. |
 | `runner.py` | 118 | Autonomous skill/local-model driver over exactly the external task operations. |
@@ -1241,9 +1243,9 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `skill_recording.py` | 107 | Semantic skill drafts retain verified actions, original scope and independent completion evidence. |
 | `store.py` | 432 | Transactional task metadata, durable action receipts and input ownership. |
 | `submission.py` | 40 | Admission witnesses bind tagged DAG requests before live scope normalization, without granting authority. |
-| `target_config.py` | 221 | Immutable host-reviewed target configuration, distinct from untrusted task options. |
+| `target_config.py` | 235 | Immutable host-reviewed target configuration, distinct from untrusted task options. |
 | `target_continuity.py` | 16 | Require a live UI target context before trusting a finite skill's verified prefix. |
-| `target_factory.py` | 37 | Create inert managed adapters from host profiles; SDKs and native resources stay lazy. |
+| `target_factory.py` | 45 | Create inert managed adapters from host profiles; SDKs and native resources stay lazy. |
 | `target_profiles.py` | 231 | Durable target profiles, live controls and explicit dependency diagnostics separate from native evidence. |
 | `targets.py` | 193 | Explicit target adapters; native imports occur only during requested operations. |
 | `task_authority.py` | 322 | Trusted source-owner recovery admission and live owner/reviewer authority checks. |
@@ -1631,8 +1633,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,069 | 112,107 |
-| **總計** | **1,596** | **246,036** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,071 | 112,245 |
+| **總計** | **1,598** | **246,174** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
