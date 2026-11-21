@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261121-13 | 2026-11-21 | Read Wayland human activity from physical evdev devices | #done #agent #presence #wayland | [2026-11-c](2026-11-c.md) |
 | U-20261121-12 | 2026-11-21 | Keep AC_android_shell out of the MCP registry | #decision #mcp #android | [2026-11-c](2026-11-c.md) |
 | U-20261121-11 | 2026-11-21 | Pass the Android helper emulator stage | #incident #ci #android | [2026-11-c](2026-11-c.md) |
 | U-20261121-10 | 2026-11-21 | Stop waiting for VLM locator requests on a stop | #done #executor #stop #vlm | [2026-11-c](2026-11-c.md) |

@@ -13,8 +13,9 @@ from je_auto_control.utils.agent_runtime.presence_x11 import X11PresenceAPI
     ('darwin', {}, 'quartz'),
     ('linux', {'DISPLAY': ':0'}, 'x11'),
     ('linux', {'DISPLAY': ':0', 'XDG_SESSION_TYPE': 'x11'}, 'x11'),
-    ('linux', {'DISPLAY': ':0', 'WAYLAND_DISPLAY': 'wayland-0'}, 'unsupported'),
-    ('linux', {'DISPLAY': ':1', 'XDG_SESSION_TYPE': 'wayland'}, 'unsupported'),
+    ('linux', {'DISPLAY': ':0', 'WAYLAND_DISPLAY': 'wayland-0'}, 'evdev'),
+    ('linux', {'DISPLAY': ':1', 'XDG_SESSION_TYPE': 'wayland'}, 'evdev'),
+    ('linux', {'WAYLAND_DISPLAY': 'wayland-0'}, 'evdev'),
     ('linux', {}, 'unsupported'),
     ('freebsd14', {'DISPLAY': ':0'}, 'unsupported'),
     ('cygwin', {}, 'unsupported'),
@@ -34,4 +35,4 @@ def test_construction_is_inert_and_picks_the_platform_api(platform, environ, kin
 
 def test_a_platform_without_a_trusted_source_refuses():
     with pytest.raises(AgentTaskError, match='no trusted physical presence source'):
-        default_presence_api('linux', {'WAYLAND_DISPLAY': 'wayland-0'})
+        default_presence_api('linux', {})

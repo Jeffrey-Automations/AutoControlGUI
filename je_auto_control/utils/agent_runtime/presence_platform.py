@@ -10,16 +10,18 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 
 
 def presence_backend(platform: str = sys.platform, environ: Mapping[str, str] | None = None) -> str:
-    """Name the trusted source for a platform: ``win32``, ``quartz`` or ``x11``, else ``unsupported``."""
+    """Name the trusted source for a platform: ``win32``, ``quartz``, ``x11`` or ``evdev``, else ``unsupported``."""
     environ = os.environ if environ is None else environ
     if platform == 'win32':
         return 'win32'
     if platform == 'darwin':
         return 'quartz'
     if platform.startswith('linux'):
-        # Wayland clients see no global input and cannot tell a person from libei/uinput injection.
+        # A Wayland client sees no global input, so a Wayland session reads physical evdev devices instead.
         wayland = environ.get('XDG_SESSION_TYPE', '').lower() == 'wayland' or bool(environ.get('WAYLAND_DISPLAY'))
-        if environ.get('DISPLAY') and not wayland:
+        if wayland:
+            return 'evdev'
+        if environ.get('DISPLAY'):
             return 'x11'
     return 'unsupported'
 
@@ -44,6 +46,9 @@ def default_presence_api(platform: str = sys.platform, environ: Mapping[str, str
     if backend == 'x11':
         from je_auto_control.utils.agent_runtime.presence_x11 import X11PresenceAPI
         return X11PresenceAPI()
+    if backend == 'evdev':
+        from je_auto_control.utils.agent_runtime.presence_evdev import EvdevPresenceAPI
+        return EvdevPresenceAPI()
     raise AgentTaskError(f'no trusted physical presence source for {platform}')
 
 

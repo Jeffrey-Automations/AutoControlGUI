@@ -305,8 +305,8 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      `presence_pipe_linux.py`，U-20261101-13；reader 已接可信 Linux／macOS endpoint，原生執行未驗證）、觀察目標身分、
      視窗範圍輸入、自有 helper 隔離與非 Windows 對話框／未儲存 gate，以及以真實實體輸入
      驗證「實體／注入」判定的原生驗收（CI 只能證明注入事件不被誤計）。
-     Wayland：一般 client 看不到全域輸入，也無法區分 libei／uinput 注入與真人，目前沒有可信來源；
-     須另定可信來源（例如受權限保護的 evdev 讀取或 compositor 協定）後才能實作。
+     Wayland：維護者 2026-11-21 選定 evdev 讀取（`presence_evdev.py`，U-20261121-13）：只讀非 `/devices/virtual/`
+     的實體裝置（排除 uinput），沒有讀取權限時拒絕啟動；只對 pipe 假裝置驗過，真實 Wayland 桌面與實體輸入驗收仍待完成。
      目前不能解除不支援平台的共用桌面拒絕保護。
      Linux：presence_channel_linux 已接入自有 worker 啟動與可信 endpoint 傳遞（worker 經自有 bootstrap 回報
      endpoint，broker 只採用它，連線時核對 listener 程序），並沿用既有 presence challenge／lease；

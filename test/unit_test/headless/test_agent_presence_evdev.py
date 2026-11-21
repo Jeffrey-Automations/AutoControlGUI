@@ -1,0 +1,126 @@
+"""Wayland evdev presence: physical devices only, held keys, hotplug and fail-closed startup. No Qt."""
+import os
+import struct
+import sys
+
+import pytest
+
+from je_auto_control.utils.agent_runtime import presence_evdev
+from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+from je_auto_control.utils.agent_runtime.presence_evdev import EvdevPresenceAPI, _physical_nodes
+from je_auto_control.utils.agent_runtime.presence_platform import default_presence_api
+
+posix = pytest.mark.skipif(sys.platform == "win32", reason="select() takes only sockets on Windows")
+EVENT = struct.Struct("@llHHi")
+
+
+def event(kind, code, value):
+    return EVENT.pack(0, 0, kind, code, value)
+
+
+def test_wayland_sessions_get_the_evdev_source():
+    assert isinstance(default_presence_api("linux", {"WAYLAND_DISPLAY": "wayland-0"}), EvdevPresenceAPI)
+
+
+def test_no_readable_physical_device_refuses_to_start():
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: ["/dev/input/event0"],
+                              opener=lambda path: (_ for _ in ()).throw(PermissionError(path)))
+    with pytest.raises(AgentTaskError, match="needs read access"):
+        source.open(lambda: None)
+    with pytest.raises(AgentTaskError, match="cannot restart"):
+        source.open(lambda: None)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="sysfs symlinks need POSIX")
+def test_virtual_devices_such_as_uinput_are_left_out(tmp_path):
+    devices, sysfs, root = tmp_path / "devices", tmp_path / "class", tmp_path / "input"
+    for name, parent in (("event0", "platform/i8042/serio0/input/input0"), ("event1", "virtual/input/input7")):
+        target = devices / parent
+        target.mkdir(parents=True)
+        (sysfs / name).mkdir(parents=True)
+        os.symlink(target, sysfs / name / "device")
+    root.mkdir()
+    for name in ("event0", "event1", "mice"):
+        (root / name).touch()
+    assert _physical_nodes(str(root), str(sysfs)) == [str(root / "event0")]
+
+
+class Devices:
+    def __init__(self):
+        self.pipes, self.present = {}, []
+
+    def add(self, path):
+        read, write = os.pipe()
+        os.set_blocking(read, False)
+        self.pipes[path] = (read, write)
+        self.present.append(path)
+
+    def opener(self, path):
+        return os.dup(self.pipes[path][0])
+
+    def write(self, path, *events):
+        os.write(self.pipes[path][1], b"".join(events))
+
+    def close(self):
+        for read, write in self.pipes.values():
+            os.close(read)
+            os.close(write)
+
+
+@pytest.fixture
+def devices(monkeypatch):
+    owned = Devices()
+    monkeypatch.setattr(presence_evdev, "importlib",
+                        type("NoIoctl", (), {"import_module": staticmethod(lambda name: type(
+                            "F", (), {"ioctl": staticmethod(lambda *a: (_ for _ in ()).throw(OSError()))}))}))
+    yield owned
+    owned.close()
+
+
+@posix
+def test_physical_events_report_activity_and_held_keys(devices):
+    devices.add("/dev/input/event0")
+    calls, now = [], [0.0]
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: list(devices.present), opener=devices.opener,
+                              clock=lambda: now[0])
+    source.open(lambda: calls.append(True))
+    try:
+        assert source.poll(0.01) == (True, False) and calls == []
+        devices.write("/dev/input/event0", event(1, 30, 1), event(0, 0, 0))
+        assert source.poll(0.05) == (True, True) and calls == [True]
+        devices.write("/dev/input/event0", event(1, 30, 0), event(0, 0, 0))
+        assert source.poll(0.05) == (True, False)
+        devices.write("/dev/input/event0", event(0, 0, 0))
+        source.poll(0.05)
+        assert len(calls) == 2  # a lone SYN_REPORT is not input activity
+    finally:
+        source.close()
+
+
+@posix
+def test_hotplugged_devices_join_and_removed_ones_leave(devices):
+    devices.add("/dev/input/event0")
+    now = [0.0]
+    source = EvdevPresenceAPI(lambda: False, nodes=lambda: list(devices.present), opener=devices.opener,
+                              clock=lambda: now[0])
+    calls = []
+    source.open(lambda: calls.append(True))
+    try:
+        devices.add("/dev/input/event5")
+        now[0] = 2.0
+        devices.write("/dev/input/event5", event(2, 0, 3), event(0, 0, 0))
+        assert source.poll(0.05) == (False, False) and calls == [True]
+        devices.present.clear()
+        now[0] = 4.0
+        with pytest.raises(AgentTaskError, match="lost every physical input device"):
+            source.poll(0.01)
+    finally:
+        source.close()
+
+
+def test_poll_needs_a_bounded_timeout_and_an_open_source():
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: [])
+    with pytest.raises(AgentTaskError):
+        source.poll(0.01)
+    with pytest.raises(AgentTaskError):
+        source.poll(1.0)

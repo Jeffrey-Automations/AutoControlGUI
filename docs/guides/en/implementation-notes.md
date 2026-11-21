@@ -636,8 +636,11 @@ Physical-activity sources now exist for X11 and macOS. X11 counts XInput2 raw ev
 devices, never from XTEST slaves, and reads `Active`/`LockedHint` from logind: without logind or
 `XDG_SESSION_ID` the seat counts as locked. macOS uses a listen-only session event tap (it needs the
 Accessibility permission). An event counts as injected only when a process posted it from a non-HID
-source state, so a doubt keeps a task waiting rather than letting it take over. Wayland has no
-trusted source. On Linux the presence broker, worker and server now run over this transport: the owned
+source state, so a doubt keeps a task waiting rather than letting it take over. On Wayland, where a
+client sees no global input, the source reads the kernel's evdev devices directly (input-group read
+access) and ignores every device under `/devices/virtual/`, which is where `uinput` injectors such as
+`ydotool` create theirs; libei input never reaches evdev. Without read access to a physical device the
+source refuses to start. On Linux the presence broker, worker and server now run over this transport: the owned
 worker binds a fresh private endpoint and reports it in its bootstrap reply, the broker adopts only that
 endpoint, and connecting pins the listener to the process it names before the presence challenge. macOS
 uses the same flow over its own transport: a 0700 directory under the per-user temporary directory, a

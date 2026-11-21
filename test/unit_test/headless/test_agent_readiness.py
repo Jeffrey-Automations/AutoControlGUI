@@ -52,7 +52,8 @@ def test_unimplemented_device_control_is_unsupported_even_when_its_tools_are_ins
     ('win32', {}, 'not_probed', 'win32'),
     ('darwin', {}, 'not_probed', 'quartz'),
     ('linux', {'DISPLAY': ':0'}, 'not_probed', 'x11'),
-    ('linux', {'DISPLAY': ':0', 'WAYLAND_DISPLAY': 'wayland-0'}, 'unsupported', 'unsupported'),
+    ('linux', {'DISPLAY': ':0', 'WAYLAND_DISPLAY': 'wayland-0'}, 'not_probed', 'evdev'),
+    ('linux', {}, 'unsupported', 'unsupported'),
     ('freebsd14', {'DISPLAY': ':0'}, 'unsupported', 'unsupported'),
 ])
 def test_only_a_platform_with_a_presence_source_reports_one(platform, environ, state, backend):
