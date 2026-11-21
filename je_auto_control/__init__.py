@@ -1944,6 +1944,9 @@ if _TYPE_CHECKING:
         dismiss_alert, launch_app, mobile_extension,
         register_mobile_extension, stop_app, wait_for_app,
     )
+    from je_auto_control.ios.simctl import (
+        SimctlExtension, list_ios_simulators, use_ios_simulator,
+    )
     from je_auto_control.utils.codegen.robot_check import (
         RobotStructureError, check_robot_structure,
     )
@@ -2718,6 +2721,7 @@ __all__ = [
     "launch_app", "list_input_devices", "mobile_capability_matrix", "mobile_extension",
     "open_device", "rbac_add_user", "rbac_list_users", "rbac_remove_user",
     "rbac_rotate_user_token", "rbac_set_user_role", "register_mobile_extension", "run_mobile_command",
+    "SimctlExtension", "list_ios_simulators", "use_ios_simulator",
     "stop_app", "stop_execution", "stoppable_run", "use_device",
     "wait_for_app",
     "start_autocontrol_gui"

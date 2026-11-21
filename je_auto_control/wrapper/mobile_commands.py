@@ -461,6 +461,11 @@ _LEGACY: Tuple[MobileCommand, ...] = (
             _IOS_SELECTOR, "ui_tree", handwritten_mcp=True),
     _legacy("AC_ios_dump_source", "Dump Source", "The XCUITest page source as XML.",
             (_URL,), "ui_tree", read_only=True, handwritten_mcp=True),
+    _legacy("AC_ios_list_simulators", "List Simulators", "Booted iOS Simulators from xcrun simctl.",
+            (), PURPOSE_DEVICE_INFO, api="list_ios_simulators", read_only=True),
+    _legacy("AC_ios_use_simulator", "Use Simulator",
+            "Route install, files, pasteboard and recording through xcrun simctl for one Simulator "
+            "(an empty UDID removes it).", (Param("udid"),), PURPOSE_DEVICE_INFO, api="use_ios_simulator"),
 )
 
 

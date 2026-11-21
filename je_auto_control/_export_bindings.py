@@ -2,8 +2,9 @@
 from je_auto_control._lazy_exports import AttributeBinding, ExportBinding, ModuleBinding
 
 
-PUBLIC_ORDER_SHA256 = '9e32126c2ea1fd3de01ecbc8ea414df15d4a45bdfcd72793de888c3dd1e77d51'
+PUBLIC_ORDER_SHA256 = '2f1fa13b31794b9584f329c69fff3e351ce6ba9d0eab4e334e4003c51f0ace7b'
 
+_IOS_SIMCTL = 'je_auto_control.ios.simctl'
 _LINUX_WAYLAND_GLOBAL_SHORTCUTS = 'je_auto_control.linux_wayland.global_shortcuts'
 _LINUX_WAYLAND_INPUT_EVENTS = 'je_auto_control.linux_wayland.input_events'
 _UTILS_A11Y_AUDIT = 'je_auto_control.utils.a11y_audit'
@@ -1832,6 +1833,9 @@ EXPORTS: dict[str, ExportBinding] = {
     'rbac_set_user_role': AttributeBinding(_UTILS_RBAC_ADMIN, 'set_user_role'),
     'register_mobile_extension': AttributeBinding(_WRAPPER_MOBILE_EXTENSIONS, 'register_mobile_extension'),
     'run_mobile_command': AttributeBinding(_WRAPPER_MOBILE_COMMANDS, 'run_mobile_command'),
+    'SimctlExtension': AttributeBinding(_IOS_SIMCTL, 'SimctlExtension'),
+    'list_ios_simulators': AttributeBinding(_IOS_SIMCTL, 'list_ios_simulators'),
+    'use_ios_simulator': AttributeBinding(_IOS_SIMCTL, 'use_ios_simulator'),
     'stop_app': AttributeBinding(_WRAPPER_MOBILE_EXTENSIONS, 'stop_app'),
     'stop_execution': AttributeBinding(_UTILS_EXECUTOR_RUN_CONTROL, 'stop_execution'),
     'stoppable_run': AttributeBinding(_UTILS_EXECUTOR_RUN_CONTROL, 'stoppable_run'),

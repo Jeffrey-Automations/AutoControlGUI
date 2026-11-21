@@ -50,5 +50,5 @@ def test_the_matrix_keeps_device_capabilities_apart_from_the_rest():
     other = {row["purpose"]: row for row in matrix["other_commands"]}
     assert other["device_info"]["android"] == [
         "AC_android_list_devices", "AC_android_device_info"]
-    assert other["device_info"]["ios"] == ["AC_ios_device_info"]
+    assert other["device_info"]["ios"] == ["AC_ios_list_simulators", "AC_ios_use_simulator", "AC_ios_device_info"]
     assert other["shell"] == {"purpose": "shell", "android": ["AC_android_shell"], "ios": []}

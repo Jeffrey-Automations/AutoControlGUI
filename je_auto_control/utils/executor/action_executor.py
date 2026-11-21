@@ -1874,6 +1874,18 @@ def _mobile_command_handlers() -> Dict[str, Callable[..., Any]]:
 
 # === iOS executor adapters (WebDriverAgent / facebook-wda) ==================
 
+def _ios_use_simulator(udid: Optional[str] = None) -> Dict[str, Any]:
+    """Route iOS install / files / pasteboard / recording through ``xcrun simctl`` for one Simulator."""
+    from je_auto_control.ios.simctl import use_ios_simulator
+    return use_ios_simulator(udid)
+
+
+def _ios_list_simulators() -> List[Dict[str, str]]:
+    """Booted iOS Simulators; empty where ``xcrun simctl`` is unavailable."""
+    from je_auto_control.ios.simctl import list_ios_simulators
+    return list_ios_simulators()
+
+
 def _ios_device(url: Optional[str]) -> Any:
     """The WDA wrapper for ``url``: the bound session's, else a new one."""
     from je_auto_control.ios.session import bound_ios_session
@@ -8243,6 +8255,8 @@ class Executor:
             # System diagnostics
             "AC_probe_capabilities": _probe_capabilities,
             "AC_reset_native_input": _reset_native_input,
+            "AC_ios_use_simulator": _ios_use_simulator,
+            "AC_ios_list_simulators": _ios_list_simulators,
             "AC_diagnose": _diagnose,
 
             # Config bundle export / import

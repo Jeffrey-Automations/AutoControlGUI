@@ -349,7 +349,14 @@ WebDriverAgent covers what it does not provide::
 
     register_mobile_extension("ios", lambda session: MyTideviceAdapter(session))
 
-No such adapter ships with AutoControl.
+For an iOS **Simulator**, AutoControl ships one: ``use_ios_simulator(udid)`` (also
+``AC_ios_use_simulator`` / ``ac_ios_use_simulator`` and the iOS group of the Mobile tab and Script
+Builder) registers ``SimctlExtension``, which runs Xcode's ``xcrun simctl`` for install (a built
+``.app`` bundle), files (``"<bundle id>:<path>"`` inside that app's data container, resolved and
+bounded so ``..`` or a link cannot leave it), the pasteboard (read without the app switch WDA needs)
+and screen recording (``simctl io recordVideo``, finalised with ``SIGINT``). An empty UDID removes it,
+and ``list_ios_simulators()`` / ``AC_ios_list_simulators`` lists the booted ones. ``simctl`` addresses
+Simulators only, so a physical device still needs an adapter of your own.
 
 Commands, MCP tools, Script Builder, GUI
 ========================================

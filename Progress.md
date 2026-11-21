@@ -106,7 +106,7 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - 旋轉方向：螢幕截圖以面板自然方向回來時，`landscape_left` 轉 270°、`landscape_right` 轉 90°，是從文件推的，沒看過。
 - Android：`input draganddrop` 是否存在、`monkey` 啟動輸出、`pidof`／`pm path` 的結束碼、`dumpsys activity activities` 的格式、`pkill -INT screenrecord` 能否收尾 MP4。
   ADBKeyBoard 的送達無法由裝置確認，是從 IME 被選取推定的。
-- 已知限制：iOS 捏合忽略 `x`／`y`／`span`；iOS 滑動忽略 `duration_s`（WDA 的 drag duration 是按住時間，不能設移動時間）；iOS `app_state` 不會回 `not_installed`；iOS 的安裝／檔案／錄影沒有 adapter（只有 `MobileExtension` 協定與註冊點）；
+- 已知限制：iOS 捏合忽略 `x`／`y`／`span`；iOS 滑動忽略 `duration_s`（WDA 的 drag duration 是按住時間，不能設移動時間）；iOS `app_state` 不會回 `not_installed`；iOS 實體裝置的安裝／檔案／錄影沒有 adapter（模擬器已有 `SimctlExtension`）；
   Mobile 分頁的 probe／run 已由 TabTask 在背景執行；真實 SDK 的逾時、取消與裝置回應仍待實機驗收。`AC_android_shell` 不做成 MCP 工具（維護者 2026-11-21 確認，U-20261121-12）。
 - 沒有 `examples/` 的實機腳本以外的 smoke；Xcode／WDA 的建置與簽章只寫成前置條件。
 
@@ -552,7 +552,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
 `DECIDE`：「擷取結果與擁有者 context 的接合」沒有寫明要綁定什麼；目前 portal 擷取已在呼叫者的取消範圍內執行，取消時會關閉 portal request。請維護者定義要再綁定的擁有者資訊（例如受管任務 ID／授權）後再實作。
 D2 仍缺原生半開交握資源回收與合成器釋放證據；D3 的錄製／全域停止／Windows 原生崩潰證據仍缺，詳見計畫與下方生命週期待辦。
 計畫 E 已有裝置 context、輸入／畫面、應用生命週期與共用命令入口；
-仍缺真實 SDK 契約核對、iOS 擴充 adapter 與裝置驗收，不能以 fake backend 測試結案。
+iOS 擴充 adapter 已有模擬器版（`SimctlExtension`，經 `xcrun simctl`，U-20261121-19，只對假 simctl 驗過）；實體 iOS 裝置的擴充 adapter（需 pymobiledevice3 等工具）、真實 SDK 契約核對與裝置驗收仍缺，不能以 fake backend 測試結案。
 H 已有三平台型別 gate 與真實相依型別檢查；整個套件（1,525 個模組）都在嚴格型別層，`typing_strict_baseline.txt` 與 `typing_not_yet_strict.txt` 已清空（U-20261115-05～16）。仍缺：完整範例／文件與最終固定來源總驗收。
 F 還缺：
 
