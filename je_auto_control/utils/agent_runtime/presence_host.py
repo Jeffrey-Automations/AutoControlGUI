@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 from je_auto_control.utils.agent_runtime.errors import AgentControlBusy, AgentTaskError
 from je_auto_control.utils.agent_runtime.presence_pool import PresenceReference, shared_reference
-from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
+from je_auto_control.utils.agent_runtime.presence_endpoint_wire import endpoint_from_wire, endpoint_to_wire
 
 
 def require_windows() -> None:

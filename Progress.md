@@ -299,8 +299,9 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      不放寬既有提交／等待／清理期限，也不重播已完成效果。
    - macOS、X11：真人活動來源已實作（`presence_quartz.py`、`presence_x11.py`，U-20261101-06），
      由 `presence_platform.py` 依平台選用並由既有來源迴圈與 60 秒閒置狀態機執行；仍缺：
-     macOS 的 presence transport（Linux 的 worker／broker／server 已改經 `presence_pipe_linux.py`，
-     U-20261101-13；reader 已接可信 Linux endpoint，原生執行未驗證）、觀察目標身分、
+     macOS presence transport 的原生驗收（`presence_pipe_darwin.py` 已實作，U-20261121-07：audit token＋kqueue
+     結束監看＋`p_uniqueid`，只在 CI 的 macos-15 方格跑過真 socket；Linux 的 worker／broker／server 已改經
+     `presence_pipe_linux.py`，U-20261101-13；reader 已接可信 Linux／macOS endpoint，原生執行未驗證）、觀察目標身分、
      視窗範圍輸入、自有 helper 隔離與非 Windows 對話框／未儲存 gate，以及以真實實體輸入
      驗證「實體／注入」判定的原生驗收（CI 只能證明注入事件不被誤計）。
      Wayland：一般 client 看不到全域輸入，也無法區分 libei／uinput 注入與真人，目前沒有可信來源；

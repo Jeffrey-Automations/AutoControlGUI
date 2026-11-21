@@ -1570,6 +1570,13 @@ unfinished or failed cleanup stays unconfirmed. Unknown filesystem objects remai
 Pathname permissions do not isolate hostile processes sharing a UID. Bounded userspace waits
 do not promise hard realtime kernel syscall completion.
 
+macOS uses DarwinListener and DarwinChannel (presence_channel_darwin) with the same lease owner:
+a length-prefixed Unix stream under the per-user temporary directory, the connector named by its
+audit token, pinned by a kqueue NOTE_EXIT watch and identified by the boot-unique p_uniqueid.
+There are no per-message credentials, so the connector is authenticated per connection and checked
+alive before each delivery. presence_endpoint_wire picks the Linux or macOS endpoint schema from
+the metadata's shape, so either platform's channel refuses the other's endpoint.
+
 Trusted helper launch and endpoint transfer, expected-helper policy, presence challenge and lease
 integration, and login, seat, lock and physical-activity sources remain pending. Non-Windows shared
 desktop tasks remain unavailable. This transport is not full Linux application or native input acceptance.

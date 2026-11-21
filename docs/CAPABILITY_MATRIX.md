@@ -1201,9 +1201,12 @@ Accessibility permission). An event counts as injected only when a process poste
 source state, so a doubt keeps a task waiting rather than letting it take over. Wayland has no
 trusted source. On Linux the presence broker, worker and server now run over this transport: the owned
 worker binds a fresh private endpoint and reports it in its bootstrap reply, the broker adopts only that
-endpoint, and connecting pins the listener to the process it names before the presence challenge. macOS has
-no presence transport yet, and the runtime still refuses non-Windows shared desktop tasks until native
-acceptance. This transport is not full Linux application or native input acceptance.
+endpoint, and connecting pins the listener to the process it names before the presence challenge. macOS
+uses the same flow over its own transport: a 0700 directory under the per-user temporary directory, a
+length-prefixed Unix stream socket, the connector named by its audit token and retained by a kqueue exit
+watch with the boot-unique `p_uniqueid` as its birth. macOS has no per-message credentials, so the
+connector is authenticated once per connection and checked alive before each delivery. The runtime still
+refuses non-Windows shared desktop tasks until native acceptance. This transport is not full Linux application or native input acceptance.
 
 Installed wheel and source distributions include the REST Dashboard and Swagger HTML, CSS and
 JavaScript resources. The same localhost REST routes and authentication rules apply to an

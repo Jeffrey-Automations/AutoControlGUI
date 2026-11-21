@@ -129,4 +129,4 @@ RemoteDesktopHost(token="tok", ip_allowlist=["10.0.0.0/8", "192.168.1.100"])
 
 ---
 
-The internal presence transport can carry an owned Linux source endpoint through the private host/helper configuration. Lease and endpoint are pinned together; public task options cannot choose that endpoint. Standard desktop admission remains Windows-only. Linux socket execution and native desktop acceptance remain unverified.
+The internal presence transport can carry an owned Linux or macOS source endpoint through the private host/helper configuration. Lease and endpoint are pinned together; public task options cannot choose that endpoint. Standard desktop admission remains Windows-only. Linux socket execution, macOS beyond the CI square and native desktop acceptance remain unverified.

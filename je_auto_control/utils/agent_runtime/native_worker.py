@@ -25,7 +25,7 @@ from je_auto_control.utils.agent_runtime.context import (
 )
 from je_auto_control.utils.agent_runtime.presence_frames import presence_body
 from je_auto_control.utils.agent_runtime.presence_reader import PresenceReader
-from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
+from je_auto_control.utils.agent_runtime.presence_endpoint_wire import endpoint_from_wire, endpoint_to_wire
 from je_auto_control.utils.agent_runtime.observation_report import REPORT_VERSION
 from je_auto_control.utils.agent_runtime.semantic_target import SemanticTarget
 from je_auto_control.utils.agent_runtime.service_target import ServiceTarget

@@ -124,4 +124,4 @@ RemoteDesktopHost(token="tok", ip_allowlist=["10.0.0.0/8", "192.168.1.100"])
 
 ---
 
-内部 presence 传输可通过主机与 helper 的私有配置传递受管 Linux 来源端点。租约与端点一并固定，公开任务选项不能指定该端点。标准桌面准入仍限 Windows；Linux socket 实跑及原生桌面验收仍未完成。
+内部 presence 传输可通过主机与 helper 的私有配置传递受管 Linux 或 macOS 来源端点。租约与端点一并固定，公开任务选项不能指定该端点。标准桌面准入仍限 Windows；Linux socket 实跑、CI 方格以外的 macOS 及原生桌面验收仍未完成。

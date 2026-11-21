@@ -497,7 +497,7 @@ X11 与 macOS 已有真人活动来源。X11 只计入真实设备的 XInput2 ra
 event tap（需要辅助功能权限）；只有进程从非 HID 来源状态发出的事件才算注入，有疑义时让任务等待而不是接手。
 Wayland 没有可信来源。Linux 的 presence broker、worker 与 server 已改经此 transport：自有 worker 绑定
 全新的私有 endpoint 并在 bootstrap 回复中报告，broker 只采用该 endpoint，连接时先核对 listener 即其所列
-进程，再做 presence challenge。macOS 尚无 presence transport；原生验收前 runtime 仍拒绝非 Windows 共享
+进程，再做 presence challenge。macOS 以自己的 transport 走同一流程：每账户临时目录下的 0700 目录、长度前缀的 Unix stream socket，连接端以 audit token 指认、以 kqueue 退出监看保留，并以开机内唯一的 `p_uniqueid` 作为 birth。macOS 没有逐消息凭据，所以每条连接只认证一次，每次交付前再确认仍存活。原生验收前 runtime 仍拒绝非 Windows 共享
 桌面任务；此 transport 不是完整 Linux 应用或原生输入验收。
 
 [![PyPI](https://img.shields.io/pypi/v/je_auto_control)](https://pypi.org/project/je_auto_control/)

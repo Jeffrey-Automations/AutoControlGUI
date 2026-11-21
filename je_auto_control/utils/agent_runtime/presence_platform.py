@@ -53,6 +53,9 @@ def default_presence_pipe(namespace: str | None = None) -> Any:
     if sys.platform.startswith('linux'):
         from je_auto_control.utils.agent_runtime.presence_pipe_linux import LinuxPresencePipe
         return LinuxPresencePipe(namespace=namespace)
+    if sys.platform == 'darwin':
+        from je_auto_control.utils.agent_runtime.presence_pipe_darwin import DarwinPresencePipe
+        return DarwinPresencePipe(namespace=namespace)
     from je_auto_control.utils.agent_runtime.presence_pipe_windows import WindowsPresencePipe
     return WindowsPresencePipe(namespace=namespace)
 
@@ -63,5 +66,8 @@ def default_presence_security() -> Any:
     if sys.platform.startswith('linux'):
         from je_auto_control.utils.agent_runtime.presence_pipe_linux import LinuxPresenceSecurity
         return LinuxPresenceSecurity()
+    if sys.platform == 'darwin':
+        from je_auto_control.utils.agent_runtime.presence_pipe_darwin import DarwinPresenceSecurity
+        return DarwinPresenceSecurity()
     from je_auto_control.utils.agent_runtime.presence_security_windows import WindowsPresenceSecurity
     return WindowsPresenceSecurity()
