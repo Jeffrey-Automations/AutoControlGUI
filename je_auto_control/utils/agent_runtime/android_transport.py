@@ -135,6 +135,16 @@ def _shell_reply(stream: _Stream, limit: int) -> AdbShellResult:
     raise AgentTaskError("managed ADB shell packet count exceeds its bound")
 
 
+def _reply_line(stream: _Stream, limit: int) -> bytes:
+    """Read up to and including the first newline; more than ``limit`` bytes is refused."""
+    data = bytearray()
+    while not data.endswith(b"\n"):
+        if len(data) >= limit:
+            raise AgentTaskError("managed ADB local-socket reply exceeds its byte limit")
+        data.extend(stream.read(1))
+    return bytes(data)
+
+
 class ManagedAdbServer:
     """Internal host-only endpoint; selecting a transport ID alone does not prove physical-device identity.
 
@@ -177,6 +187,58 @@ class ManagedAdbServer:
             raise
         except OSError:
             raise AgentTaskError("managed ADB connection failed; server state was not changed") from None
+
+    def exchange_local(self, transport_id: int, socket_name: str, line: bytes, *, timeout: float,
+                       check: Callable[[], None] = cancellation_checkpoint, limit: int = 65536) -> bytes:
+        """Send one line to a device abstract socket and return its one reply line, on a fresh connection.
+
+        ADB opens ``localabstract:`` on the selected transport as the shell user, so a helper that
+        serves only shell or root peers accepts it, and no port forward is created or left behind.
+        """
+        if (not _integer(transport_id, 2**64 - 1) or re.fullmatch(r"[a-z0-9_]{1,64}", socket_name) is None
+                or not isinstance(line, bytes) or not 1 <= len(line) <= limit or b"\n" in line[:-1]
+                or not line.endswith(b"\n")):
+            raise AgentTaskError("managed ADB local-socket request is invalid")
+        deadline = _deadline(timeout)
+        try:
+            with self._connect(deadline, check) as connection:
+                stream = _Stream(connection, deadline, check)
+                stream.request(f"host:transport-id:{transport_id}".encode("ascii"))
+                stream.request(f"localabstract:{socket_name}".encode("ascii"))
+                stream.write(line)
+                return _reply_line(stream, limit)
+        except AuthorizationError:
+            raise
+        except OSError:
+            raise AgentTaskError("managed ADB local-socket exchange failed; remote outcome may be unknown") from None
+
+    def open_shell_stream(self, transport_id: int, command: str, *, timeout: float,
+                          check: Callable[[], None] = cancellation_checkpoint) -> socket.socket:
+        """Start one long-lived host-built shell-v2 command; the caller owns the returned socket.
+
+        Only connection setup is bounded by ``timeout``. The caller reads the shell-v2 packets and
+        closes the socket, which ends the remote command. Never expose this to a task catalog.
+        """
+        if not _integer(transport_id, 2**64 - 1):
+            raise AgentTaskError("managed ADB transport ID is invalid")
+        service = _shell_service(command)
+        deadline = _deadline(timeout)
+        connection = None
+        try:
+            connection = self._connect(deadline, check)
+            stream = _Stream(connection, deadline, check)
+            stream.request(f"host:transport-id:{transport_id}".encode("ascii"))
+            stream.request(service)
+            stream.write(struct.pack("<BI", 4, 0))
+            result, connection = connection, None
+            return result
+        except AuthorizationError:
+            raise
+        except OSError:
+            raise AgentTaskError("managed ADB stream could not start") from None
+        finally:
+            if connection is not None:
+                connection.close()
 
     def shell(self, transport_id: int, command: str, *, timeout: float = 30, limit: int = _LIMIT,
               check: Callable[[], None] = cancellation_checkpoint) -> AdbShellResult:

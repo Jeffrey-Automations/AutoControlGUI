@@ -398,10 +398,11 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
    - `WIP`：裝置端 helper 依使用者 2026-11-01 決定自建，於 CI 建置與測試（`native/android_helper/`，
      U-20261101-11、-12）。第 1、2 階段已完成：`FenceLedger`／`ProtocolHandler`（JVM 測試）與
      instrumentation app（只服務 shell／root 對端、注入器在柵欄後釋放輸入；CI 建出 debug APK）。
-     `TODO`（第 3 階段，使用者 2026-11-01 決定）：把受管 Android 的送出路徑從主機端 ADB session
-     （`dispatch_checked`）改為經 helper 的 begin／settle，舊的 adb input 路徑不再用於受管任務；
-     並重驗本項列出的六種順序／重複拒絕、ACK 前拒絕、撤權與真人接回。同時寫主機端 provider、
-     `getevent` 實體輸入來源與第 4 階段 CI 模擬器測試；真機驗收仍暫緩。排在非 Windows 在場服務鏈之後。
+     第 3、4 階段已交付（U-20261121-08）：主機端 `HelperControlProvider`、經 ADB `localabstract:` 的
+     `AndroidHelperClient`、`getevent` 實體輸入來源，租約帶 `dispatch` 時送出改走 helper 的 begin／settle
+     （不再用 `dispatch_checked` 的 adb input），CI 新增模擬器 job。`TODO`：尚未接入受管 profile（helper 啟動與
+     安裝亦未自動化）；六種順序／重複拒絕、ACK 前拒絕、撤權與真人接回只對 Python 版 ledger 與模擬器驗過；
+     `AC_android_text` 在 helper 路徑不支援；真機驗收仍暫緩。
    - 為 `utils/agent_runtime/android_adapter.py` 實作並審閱真實 `AndroidControlProvider`／
      `AndroidCommandLease` 來源；須有裝置端執行機制，在真人接回、取消／逾時後阻止舊寫入，
      並提供逐命令 ID／boot／epoch 相符的輸入釋放、遠端佇列清空與舊 writer 退出證據。

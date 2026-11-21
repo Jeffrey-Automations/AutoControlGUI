@@ -836,6 +836,7 @@ host-bound package and finite input tools, and withholds readiness before any AD
 held-input state, global-monitor review and real device-side suppression of old writes on physical
 takeover, cancellation or expiry. A host lock/context manager or local helper exit cannot implement that
 contract. No default provider, managed profile or native readiness claim is supplied.
+``HelperControlProvider`` is the first such provider. It talks to the device-side helper (``native/android_helper``) over the ADB ``localabstract:`` socket, fences the device into a fresh epoch for every lease, sends the command with the helper's ``begin`` instead of ``adb shell input`` (the lease's ``dispatch``), and settles it with the helper's own account of that request, boot and epoch. A ``getevent`` stream is its physical-input source: injected input never reaches evdev, so any event there fences the device again and reports takeover, and readiness needs that stream healthy and quiet for the idle window (60 s by default). ``AC_android_text`` has no helper command and stays unsupported on this path. CI drives the helper on an emulator; no managed profile wires it in yet and real-device acceptance remains deferred.
 
 An action requires a fresh metadata-only native observation. Preparation rereads identity/routing/
 security, refuses changed evidence and consumes that observation. A host-only ``AndroidCommandLease``

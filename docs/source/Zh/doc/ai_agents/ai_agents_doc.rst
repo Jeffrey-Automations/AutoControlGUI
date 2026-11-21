@@ -694,6 +694,7 @@ Android checked SDK 派送
 明確的 ``AndroidControlProvider`` 時，在連 ADB 前就拒絕就緒。Provider 須獨立證明真人活動／
 閒置、按住輸入及全域監看器審閱，並在裝置端阻止接回、取消或到期後的舊寫入。主機 lock、
 context manager 或本機 helper 結束不能提供這項保證；不提供預設來源、受管 profile 或真機就緒宣告。
+``HelperControlProvider`` 是第一個這樣的 provider：經 ADB ``localabstract:`` socket 與裝置端 helper（``native/android_helper``）通訊，每次租約都把裝置圍到新的 epoch，以 helper 的 ``begin`` 送出命令（租約的 ``dispatch``），不再用 ``adb shell input``，並以 helper 對該命令 ID、boot 與 epoch 的回報結算。實體輸入來源是 ``getevent``：注入的輸入不經 evdev，所以那裡出現任何事件都會再次圍起裝置並回報接回；就緒要求該串流正常且在閒置期間（預設 60 秒）內安靜。``AC_android_text`` 沒有 helper 命令，在此路徑維持不支援。CI 以模擬器驅動 helper；尚未接入受管 profile，真機驗收仍暫緩。
 
 動作須有新的原生 metadata 觀察；準備時重讀身分／路由／安全，拒絕變動證據並消耗這次觀察。
 主機端 ``AndroidCommandLease`` 綁定 checked proposal、新隨機命令 ID 與 epoch。Worker 持久化

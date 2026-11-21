@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,602 |
-| 程式碼總行數 | 245,674 |
+| Python 模組總數（含周邊子專案） | 1,605 |
+| 程式碼總行數 | 246,201 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 911 |
 | 套件門面 `__all__` 公開名稱數 | 1504 |
@@ -516,13 +516,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 59,043 行。
+> 14 個套件、約 59,570 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,254 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 31,939 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 32,466 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 166 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1052,7 +1052,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（31,939 行／231 檔）
+#### `utils/agent_runtime/`（32,466 行／234 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1061,16 +1061,19 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `activity.py` | 66 | Physical activity gates with explicit idle acquisition and manual takeover semantics. |
 | `activity_windows.py` | 102 | Owned Win32 presence-only hooks; no key values, coordinates or input contents are retained. |
 | `android_action_result.py` | 59 | Decode complete Android command phases without claiming input retirement or task completion. |
-| `android_adapter.py` | 201 | Bridge checked Android sessions into the owned worker only with explicit trusted device-control leases. |
+| `android_adapter.py` | 205 | Bridge checked Android sessions into the owned worker only with explicit trusted device-control leases. |
 | `android_commands.py` | 189 | Compile finite Android inputs behind same-connection identity checks; never dispatch raw model shell. |
-| `android_control.py` | 56 | Trusted Android control leases require real device fencing and independent per-command settlement. |
+| `android_control.py` | 64 | Trusted Android control leases require real device fencing and independent per-command settlement. |
+| `android_getevent.py` | 139 | Report physical Android input from the kernel's evdev stream; injected input never reaches it. |
 | `android_geometry.py` | 99 | Exact half-open Android touch-region coverage for whole pointer paths, including swipe interiors. |
+| `android_helper_client.py` | 142 | Speak protocol version 1 to the device-side helper; every reply has a closed schema or is refused. |
+| `android_helper_provider.py` | 172 | The trusted Android control provider: device-side fencing and settlement through the helper. |
 | `android_hierarchy.py` | 287 | Parse bounded Android app hierarchies with explicit host text grants and private freshness signatures. |
 | `android_input_evidence.py` | 223 | Bind current Android dispatcher geometry and keyguard evidence without granting input authority. |
 | `android_input_windows.py` | 127 | Decode pinned AOSP input-window records without retaining foreign names or raw window dumps. |
 | `android_scope.py` | 88 | Validate bounded Android device, boot and focused-app evidence without publishing raw dumps. |
 | `android_session.py` | 143 | Pin Android identity, propose finite commands and dispatch only exact checked proposals. |
-| `android_transport.py` | 202 | Bounded no-replay ADB smart-socket transport; never starts, kills or upgrades a server. |
+| `android_transport.py` | 264 | Bounded no-replay ADB smart-socket transport; never starts, kills or upgrades a server. |
 | `api.py` | 231 | Public service-backed task functions; imports never start services or operate targets. |
 | `browser_commands.py` | 168 | Closed browser commands operate only inside an owned WebRunner helper session. |
 | `browser_environment.py` | 80 | Closed browser Python dependency reports; probing never starts Playwright or a browser. |
@@ -1626,8 +1629,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,064 | 111,076 |
-| **總計** | **1,590** | **244,929** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,067 | 111,603 |
+| **總計** | **1,593** | **245,456** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

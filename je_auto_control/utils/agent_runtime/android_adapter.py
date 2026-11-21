@@ -177,8 +177,12 @@ def _prepared_call(session: AndroidDeviceSession, lease: AndroidCommandLease, na
             checkpoint()
             if verify is not None:
                 verify()
-            result = session.dispatch_checked(lease.proposal, name, arguments,
-                                              timeout=_remaining(deadline), check=checkpoint)
+            if lease.dispatch is not None:
+                # The device-side writer enforces this lease's epoch; no host input command is sent.
+                result = lease.dispatch(name, arguments, deadline, checkpoint)
+            else:
+                result = session.dispatch_checked(lease.proposal, name, arguments,
+                                                  timeout=_remaining(deadline), check=checkpoint)
         if result is None:
             raise AgentTaskError("Android device fence suppressed an unknown dispatch failure")
         results.append(result)
