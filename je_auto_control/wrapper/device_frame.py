@@ -192,7 +192,7 @@ class DeviceFrame:
             raise VLMNotAvailableError(
                 "no VLM backend configured; set ANTHROPIC_API_KEY or "
                 "OPENAI_API_KEY and install the matching SDK")
-        reply = bound.locate(self.png(), description, model=model)
+        reply = stoppable_call(bound.locate, self.png(), description, model=model)
         if reply is None:
             return None
         width, height = self.pixel_size

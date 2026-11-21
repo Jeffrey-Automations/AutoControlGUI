@@ -135,7 +135,7 @@ class VLMFrameLocator:
         started = perf_counter()
         view = _view(sample)
         model = self.backend.resolve_model(self.model)
-        point = self.backend.locate(view.png, self.description, model=model)
+        point = stoppable_call(self.backend.locate, view.png, self.description, model=model)
         coordinates = None if point is None else view.screen_point(point)
         elapsed = (perf_counter() - started) * 1000
         return LocatorCandidate(coordinates, "vlm" if point is not None else "miss", fallback_used=True,
