@@ -198,6 +198,7 @@ def test_peer_evidence_is_refused_off_macos(monkeypatch):
 # --- real sockets (macOS only) -----------------------------------------------------------------
 
 darwin = pytest.mark.skipif(sys.platform != "darwin", reason="real macOS Unix sockets and libproc")
+GENERATION = "0123456789abcdef" * 2  # the handshake accepts only 32 lowercase hex characters
 
 
 @pytest.fixture
@@ -252,14 +253,14 @@ def test_the_presence_handshake_runs_over_the_macos_pipe(runtime):
 
         def serve():
             connection = listener.accept()
-            result["server"] = server_handshake(connection, security, "gen-1")
+            result["server"] = server_handshake(connection, security, GENERATION)
             result["server_pipe"] = connection
         worker = threading.Thread(target=serve)
         worker.start()
         connection = client_pipe.connect()
         generation, peer = client_handshake(connection, security)
         worker.join(3)
-        assert generation == "gen-1" and peer.alive() and result["server"].alive()
+        assert generation == GENERATION and peer.alive() and result["server"].alive()
         for item in (peer, result["server"]):
             item.close()
         connection.close()

@@ -169,6 +169,7 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - **free-threaded**：呼叫者身分、綁定的裝置、自愈的執行標記與 stop token 都改成只在設定它的執行緒上有效（`utils/thread_bound.py`）。
   這台機器沒有 free-threaded 直譯器：驗證用的是模擬繼承與真的 `-X thread_inherit_context=1`（3.14.7，GIL 開著）；`free-threaded-scope` job（3.14t）是第一次真的跑。
 - **Windows 的版面鍵名**（`slash` 等 8 個）只在美式配置上實際呼叫過。
+- **`test_agent_transfer_import_lifecycle.py` 在 Windows 3.14 CI 間歇逾時**：run 44853694982（a8cfe043）的三個案例（`test_cancel_fences_the_producer_before_receiving_chunks`、`test_actual_recipient_revocation_before_receiving_never_publishes`、`test_committed_import_reply_does_not_wait_for_the_new_background_writer[run_import]`）以 `TimeoutError`／`runtime still has an active transfer operation` 失敗，該次整套跑了 1:01:13；同一方格的前後兩次 run 與本機（16 項）都通過。原因未查明，須在負載下重現後再定，不放寬期限。
 
 ---
 
