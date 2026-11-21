@@ -547,8 +547,9 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
 `TODO` — 真機與付費 API 驗收暫緩，待明確恢復後執行；其餘目前缺環境的實驗先略過，相關項目保留未驗證。
 
 `WIP` — 改版仍缺以下內容；原生平台與正式環境驗收缺口另列於後。
-計畫 D1 仍缺 portal session 關閉／恢復、compositor 重啟的狀態與原生驗收，以及擷取結果與擁有者 context 的接合；
-原生輸入 session 的明確重設／重試已有 `reset_native_input`／`AC_reset_native_input`／`ac_reset_native_input`／Diagnostics 動作（U-20261121-18）。
+計畫 D1：狀態機已有——portal session 關閉（`OEFFIS_EVENT_CLOSED`）回報 `needs_permission`、compositor 斷線／重啟（`EI_EVENT_DISCONNECT`）回報 `revoked`、裝置移除回報 `paused`／`revoked`；明確重設／重試為 `reset_native_input`／`AC_reset_native_input`／`ac_reset_native_input`／Diagnostics 動作（U-20261121-18）。仍缺這些狀態在真實合成器上的原生驗收。
+`BLOCKED`（上游）：portal restore token——liboeffis 不提供 restore token，無法在此路徑保存／恢復同意。
+`DECIDE`：「擷取結果與擁有者 context 的接合」沒有寫明要綁定什麼；目前 portal 擷取已在呼叫者的取消範圍內執行，取消時會關閉 portal request。請維護者定義要再綁定的擁有者資訊（例如受管任務 ID／授權）後再實作。
 D2 仍缺原生半開交握資源回收與合成器釋放證據；D3 的錄製／全域停止／Windows 原生崩潰證據仍缺，詳見計畫與下方生命週期待辦。
 計畫 E 已有裝置 context、輸入／畫面、應用生命週期與共用命令入口；
 仍缺真實 SDK 契約核對、iOS 擴充 adapter 與裝置驗收，不能以 fake backend 測試結案。
