@@ -5,7 +5,8 @@ package's own ``ManagedAdbServer``, ``AndroidHelperClient`` and ``GeteventSource
 emulator, and checks, on the device: the helper's boot identity, a tap begun under a fresh epoch
 that settles ``completed`` with input released, a stale epoch refused at ``begin``, a long swipe
 stopped by a fence, and that injected input (through the helper or ``adb shell input``) never
-reaches the physical-input stream while an emulator-forwarded key does. This is emulator
+reaches the physical-input stream while a key written to evdev (emulator console, else
+``sendevent``) does. This is emulator
 evidence only; it is not real-device acceptance.
 """
 from __future__ import annotations
@@ -58,6 +59,29 @@ def _quiet(activity: threading.Event, seconds: float) -> bool:
     return not activity.wait(seconds)
 
 
+def _evdev_key(server: ManagedAdbServer, transport: int, activity: threading.Event) -> bool:
+    """A key that does go through evdev must be seen: first via the emulator console, then via sendevent."""
+    activity.clear()
+    for value in ("1", "0"):
+        subprocess.run(["adb", "emu", "event", "send", f"EV_KEY:KEY_VOLUMEDOWN:{value}"],
+                       check=False, timeout=10)  # nosec B603 B607  # reason: fixed CI command
+    if activity.wait(5):
+        print("evdev key: emulator console event seen")
+        return True
+    listing = server.shell(transport, "/system/bin/getevent -lp", timeout=10).stdout.decode(errors="replace")
+    print("--- getevent -lp")
+    print(listing[:4000])
+    nodes = server.shell(transport, "/system/bin/ls /dev/input", timeout=10).stdout.decode().split()
+    for node in (name for name in nodes if name.startswith("event") and name[5:].isdigit()):
+        # EV_KEY KEY_VOLUMEDOWN down/up with SYN_REPORT; a device without the key drops the code.
+        script = "; ".join(f"/system/bin/sendevent /dev/input/{node} {event}"
+                           for event in ("1 114 1", "0 0 0", "1 114 0", "0 0 0"))
+        server.shell(transport, script, timeout=10)
+    seen = activity.wait(5)
+    print(f"evdev key: sendevent seen={seen}")
+    return seen
+
+
 def main() -> int:
     server = ManagedAdbServer("127.0.0.1", 5037)
     transport = _transport(server)
@@ -98,11 +122,7 @@ def main() -> int:
         server.shell(transport, "/system/bin/input tap 50 50", timeout=10)
         report["adb_input_not_physical"] = _quiet(activity, 3)
 
-        activity.clear()
-        for value in ("1", "0"):
-            subprocess.run(["adb", "emu", "event", "send", f"EV_KEY:KEY_VOLUMEDOWN:{value}", "EV_SYN:0:0"],
-                           check=True, timeout=10)  # nosec B603 B607  # reason: fixed CI command
-        report["emulator_key_is_physical"] = activity.wait(10)
+        report["evdev_key_is_physical"] = _evdev_key(server, transport, activity)
         report["source_healthy"] = source.healthy
     finally:
         source.close()
