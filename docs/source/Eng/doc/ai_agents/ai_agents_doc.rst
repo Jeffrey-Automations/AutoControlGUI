@@ -824,8 +824,11 @@ takeover. An exact device/epoch proof must certify released input and an empty r
 end is emitted and acknowledged. A shell return or parsed Android phase cannot supply that proof.
 Malformed/missing ACK, lost replies, revocation, timeout or failed settlement never trigger replay,
 replacement or desktop release input. Cleanup retires the owned helper; unknown remote effects remain
-quarantined. Real device-control providers, the WDA adapter, target profiles and shared
-user surfaces remain open; simulated SDK contracts do not establish native device readiness.
+quarantined. The internal WDA adapter (``IosRemoteAdapter``) reads only foreground-app metadata and
+withholds readiness without an ``IosControlProvider``; because WebDriverAgent has no device-side fence,
+a lease must bring its own ``dispatch`` and there is no host fallback writer. No iOS provider exists
+yet. Real iOS device-control providers, target profiles and shared user surfaces remain open;
+simulated SDK contracts do not establish native device readiness.
 
 Checked Android SDK dispatch
 ----------------------------------------------------------------------

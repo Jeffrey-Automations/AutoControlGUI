@@ -410,7 +410,8 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      補可信真人活動、已按下輸入、閒置條件與全域監看器的即時審閱；沒有來源時保持拒絕就緒。
      提案／證據的 `input_authorized=false` 不得當作批准，只有完整前置拒絕證明此命令未呼叫輸入；
      返回／後置拒絕仍不授權重試或清除未知 journal。
-     WDA 還須實作 `RemoteDeviceAdapter` 與同等來源；真實 provider／SDK 契約確認後才接
+     WDA 的 `RemoteDeviceAdapter` 已實作（`ios_adapter.py` 的 `IosRemoteAdapter`，U-20261121-09；沒有 provider
+     時拒絕就緒、租約須自帶 `dispatch`），仍須同等的裝置端來源（iOS provider）；真實 provider／SDK 契約確認後才接
      `target_config.py`／`target_factory.py`。內部橋接與模擬裝置都不代表已可正式受管執行。
      在實際 SDK 重驗合併焦點擷取的六種順序／重複拒絕、原期限、ACK 前拒絕、begin 後取消／逾時、
      錯誤裝置／世代、撤權、真人接回，並確認原生診斷仍不含敏感參數；

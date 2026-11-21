@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261121-09 | 2026-11-21 | Add the WebDriverAgent remote adapter behind a required provider | #done #agent #ios | [2026-11-c](2026-11-c.md) |
 | U-20261121-08 | 2026-11-21 | Drive managed Android input through the device helper | #done #agent #android | [2026-11-c](2026-11-c.md) |
 | U-20261121-07 | 2026-11-21 | Add the macOS presence transport | #done #agent #presence #macos | [2026-11-c](2026-11-c.md) |
 | U-20261121-06 | 2026-11-21 | Hold nested DAG, suite and assertion paths to MCP roots | #done #mcp #security | [2026-11-c](2026-11-c.md) |

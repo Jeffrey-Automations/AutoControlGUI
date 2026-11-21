@@ -684,8 +684,10 @@ Android 原生輸入與安全證據
 重新核對帳號權限、期限與真人接回。只有相符裝置／世代、輸入已釋放且遠端待送佇列清空的
 可信證據，才可送出並確認 end；shell 返回或 Android 階段不能提供這項證明。缺少／錯誤 ACK、
 撤權、逾時、晚到回覆及清理失敗都不重播、更換 helper 或代送桌面釋放。結束自有 helper 後，
-未知遠端副作用仍保留隔離。可信裝置控制來源、WDA adapter、profile 與共用使用者介面
-仍待接合；模擬 SDK 測試不代表真機就緒。
+未知遠端副作用仍保留隔離。內部 WDA adapter（``IosRemoteAdapter``）只讀前景 app 的 metadata，
+沒有 ``IosControlProvider`` 時拒絕就緒；WebDriverAgent 沒有裝置端防護，所以租約必須自帶
+``dispatch``，沒有主機端備援寫入路徑。目前尚無 iOS provider。iOS 可信裝置控制來源、profile 與
+共用使用者介面仍待接合；模擬 SDK 測試不代表真機就緒。
 
 Android checked SDK 派送
 ----------------------------------------------------------------------
