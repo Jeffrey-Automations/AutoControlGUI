@@ -60,7 +60,7 @@ def _quiet(activity: threading.Event, seconds: float) -> bool:
 
 
 def _evdev_key(server: ManagedAdbServer, transport: int, activity: threading.Event) -> bool:
-    """A key that does go through evdev must be seen: first via the emulator console, then via sendevent."""
+    """Input that does go through evdev must be seen: first a console key, then a sendevent touch contact."""
     activity.clear()
     for value in ("1", "0"):
         subprocess.run(["adb", "emu", "event", "send", f"EV_KEY:KEY_VOLUMEDOWN:{value}"],
@@ -68,17 +68,17 @@ def _evdev_key(server: ManagedAdbServer, transport: int, activity: threading.Eve
     if activity.wait(5):
         print("evdev key: emulator console event seen")
         return True
-    listing = server.shell(transport, "/system/bin/getevent -lp", timeout=10).stdout.decode(errors="replace")
-    print("--- getevent -lp")
-    print(listing[:4000])
     nodes = server.shell(transport, "/system/bin/ls /dev/input", timeout=10).stdout.decode().split()
+    # The emulator's evdev devices are virtio multi-touch screens, which drop key codes, so the
+    # control is one contact: ABS_MT_TRACKING_ID, POSITION_X/Y, SYN_REPORT, then lift (id -1).
+    events = ("3 57 7", "3 53 100", "3 54 100", "0 0 0", "3 57 4294967295", "0 0 0")
     for node in (name for name in nodes if name.startswith("event") and name[5:].isdigit()):
-        # EV_KEY KEY_VOLUMEDOWN down/up with SYN_REPORT; a device without the key drops the code.
-        script = "; ".join(f"/system/bin/sendevent /dev/input/{node} {event}"
-                           for event in ("1 114 1", "0 0 0", "1 114 0", "0 0 0"))
-        server.shell(transport, script, timeout=10)
+        script = "; ".join(f"/system/bin/sendevent /dev/input/{node} {event}" for event in events)
+        result = server.shell(transport, script, timeout=10)
+        if result.returncode or result.stderr:
+            print(f"sendevent {node}: exit={result.returncode} {result.stderr[:200]!r}")
     seen = activity.wait(5)
-    print(f"evdev key: sendevent seen={seen}")
+    print(f"evdev contact: sendevent seen={seen}")
     return seen
 
 
