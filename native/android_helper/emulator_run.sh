@@ -4,6 +4,10 @@
 set -eu
 apk="$1"
 adb wait-for-device
+# Root only so the check can write one evdev contact as its positive control; the AOSP
+# emulator image allows it. The helper serves root peers as it does shell ones.
+adb root
+adb wait-for-device
 adb install -r "$apk"
 nohup adb shell am instrument -w je.autocontrol.helper/.HelperInstrumentation > instrument.log 2>&1 &
 status=0
