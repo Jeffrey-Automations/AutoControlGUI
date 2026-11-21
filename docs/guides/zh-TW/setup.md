@@ -20,6 +20,7 @@ pip install je_auto_control[gui]       # 加上 PySide6 桌面應用程式
 | `pdf` / `office` | PDF 與 Excel／Word／PowerPoint 讀取 |
 | `fuzzy` / `locale` | `rapidfuzz` 模糊比對、`babel` 地區解析 |
 | `s3` / `audio` | S3 產出物儲存、系統音量控制 |
+| `accessibility` | 真實的 Windows UI Automation（`comtypes`；僅 Windows） |
 
 以分頁關閉鈕關閉 factory 建立的功能面板時，下一次 Qt event loop 會釋放 widget、訂閱與計時器；重新開啟會建立新面板。**View → Tabs** 與嵌入用的 `hide_tab` 只隱藏並保留狀態。`tab_registry.open/close` 與 `close_tab` 提供明確的生命週期介面。核心分頁與 Remote Desktop 也會在關閉時釋放。共用 registry 的 TCP／WebSocket 連線仍可供腳本使用；頁面擁有的 WebRTC 連線在背景停止。重開會建立新控制項，不自動接回既有連線；待處理核准與晚到頁面回呼會被拒絕。嵌入者直接提供的 widget 維持其既有所有權契約。
 

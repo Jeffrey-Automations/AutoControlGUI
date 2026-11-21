@@ -431,6 +431,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+accessibility = [
+    { name = "comtypes", marker = "sys_platform == 'win32'" },
+]
 audio = [
     { name = "pycaw" },
 ]
@@ -474,6 +477,7 @@ requires-dist = [
     { name = "av", marker = "extra == 'webrtc'", specifier = ">=14.0.0" },
     { name = "babel", marker = "extra == 'locale'", specifier = ">=2.12" },
     { name = "boto3", marker = "extra == 's3'", specifier = ">=1.34" },
+    { name = "comtypes", marker = "sys_platform == 'win32' and extra == 'accessibility'", specifier = ">=1.4.11" },
     { name = "cryptography", marker = "platform_machine != 'ARM64' or sys_platform != 'win32'", specifier = ">=50.0.0" },
     { name = "defusedxml", specifier = "==0.7.1" },
     { name = "fastapi", marker = "extra == 'signaling'", specifier = ">=0.115" },
@@ -496,7 +500,7 @@ requires-dist = [
     { name = "uvicorn", marker = "extra == 'signaling'", specifier = ">=0.32" },
     { name = "zeroconf", marker = "extra == 'discovery'", specifier = ">=0.149.16" },
 ]
-provides-extras = ["gui", "webrtc", "signaling", "discovery", "pdf", "office", "fuzzy", "s3", "locale", "audio"]
+provides-extras = ["gui", "webrtc", "signaling", "discovery", "pdf", "office", "fuzzy", "s3", "locale", "audio", "accessibility"]
 
 [[package]]
 name = "je-open-cv"

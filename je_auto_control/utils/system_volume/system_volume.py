@@ -153,6 +153,13 @@ class _PycawDriver:
     def __init__(self) -> None:
         """Activate the default-output ``IAudioEndpointVolume`` interface."""
         from ctypes import POINTER, cast  # local: optional Windows path
+        from je_auto_control.utils.accessibility.backends.windows_automation import (
+            enter_apartment, import_comtypes_client,
+        )
+        # The same COM initialisation the UIA backend uses: comtypes' first import fixes the
+        # apartment of the importing thread, and Core Audio needs this thread's COM entered.
+        import_comtypes_client()
+        enter_apartment()
         from comtypes import CLSCTX_ALL
         from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
         speakers = AudioUtilities.GetSpeakers()
