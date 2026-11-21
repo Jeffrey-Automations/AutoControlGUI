@@ -123,7 +123,7 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
   `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
-- **stop 還叫不醒的**：已經進到後端的單一指令只剩其他未接合的原生呼叫（擷取輸出的 shell 指令已可停止，U-20261115-23；共用 HTTP client 的請求連 TCP 交握都可中斷，正在進行的 DNS 查詢也不必等（查詢在背景跑完、之後不會送出請求），U-20261116-08／-10／-15；套件內每個 `cv2.matchTemplate` 與 OCR 引擎的單次原生運算都改由 `stoppable_call` 不再等待，但運算本身在背景跑完，U-20261116-11／-14）；單一手勢內的節奏 sleep 已可停止（U-20261121-04）；VLM 定位請求同樣改由 `stoppable_call` 不再等待（U-20261121-10）；Windows UIA 樹走訪仍未接合（每次換執行緒會各建一個 COM apartment 與 automation 物件，須原生驗證後才改）；
+- **stop 還叫不醒的**：已經進到後端的單一指令只剩其他未接合的原生呼叫（擷取輸出的 shell 指令已可停止，U-20261115-23；共用 HTTP client 的請求連 TCP 交握都可中斷，正在進行的 DNS 查詢也不必等（查詢在背景跑完、之後不會送出請求），U-20261116-08／-10／-15；套件內每個 `cv2.matchTemplate` 與 OCR 引擎的單次原生運算都改由 `stoppable_call` 不再等待，但運算本身在背景跑完，U-20261116-11／-14）；單一手勢內的節奏 sleep 已可停止（U-20261121-04）；VLM 定位請求同樣改由 `stoppable_call` 不再等待（U-20261121-10）；唯讀無障礙讀取（列出／焦點／值／狀態／表格）改在單一常駐執行緒上跑，stop 不再等待（U-20261121-15，本機以真 UIA 驗過）；寫入（設值／invoke／toggle）仍在呼叫者執行緒，不可中斷；
   非腳本分頁已傳遞協作取消；尚未檢查 token 的後端呼叫仍只能丟棄晚到結果，須逐一接合。
   ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在指令 handler 裡呼叫 `stop()`／`wait_idle()` 會立刻回 `False`、不再等到逾時（U-20261116-15）。沒對真的 Slack workspace 跑過。
   新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。
