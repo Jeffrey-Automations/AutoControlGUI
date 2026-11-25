@@ -207,7 +207,7 @@ class DagTab(TranslatableMixin, QWidget):
         try:
             with open(path, "r", encoding="utf-8") as fp:
                 self._editor.setPlainText(fp.read())
-        except OSError as error:
+        except (OSError, ValueError) as error:      # ValueError: the file is not UTF-8
             self._status_label.setText(f"{_t('dag_error')}: {error}")
 
     def _on_validate(self) -> None:

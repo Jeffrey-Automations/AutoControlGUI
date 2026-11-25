@@ -54,6 +54,19 @@ def _call(work: Callable[[], Any], _token: CancellationToken) -> Any:
     return work()
 
 
+def _call_stop(stop: Callable[[], Any], authority: DeferredAuthorization, _token: CancellationToken) -> Any:
+    """Worker thread: run a stop; one that fails goes to the custody here, whoever is left to hear of it.
+
+    Left to the task's ``error`` signal, a stop that failed after its tab was
+    closed -- the closing tab is what started it -- was neither kept nor logged.
+    """
+    try:
+        return stop()
+    except Exception as error:  # reason: re-raised for the panel; the custody must hear of it first
+        hold_failed_stop(stop, error, authority)
+        raise
+
+
 def _log_failure(error: object) -> None:
     """A failed stop with nobody to tell is still recorded."""
     autocontrol_logger.warning(f"GUI background operation failed: {error!r}")
@@ -166,16 +179,14 @@ class SlowOp(QObject):
             return False
         _refuse_widgets(work)
         controller = self._controller if self._controller is not None else task_controller()
-        handle = controller.submit(functools.partial(_call, work), owner=self, timeout_s=timeout_s,
-                                   discard=discard)
+        call = (functools.partial(_call_stop, work, DeferredAuthorization.capture()) if retain_failure
+                else functools.partial(_call, work))
+        handle = controller.submit(call, owner=self, timeout_s=timeout_s, discard=discard)
         self._busy = True
         self._on_done = _WeakCall(on_done, args)
         self._on_error = _WeakCall(on_error, args)
         handle.result.connect(self._deliver_result)
         handle.error.connect(self._deliver_error)
-        if retain_failure:
-            handle.error.connect(functools.partial(hold_failed_stop, work,
-                                                   authority=DeferredAuthorization.capture()))
         handle.finished.connect(self._settle)
         self.busy_changed.emit(True)
         return True
@@ -237,9 +248,9 @@ class StopQueue(QObject):
         _refuse_widgets(stop)
         close_admission_of(stop)            # at once: nothing new is admitted while the stop is queued
         controller = self._controller if self._controller is not None else task_controller()
-        handle = controller.submit(functools.partial(_call, stop), owner=self)
+        handle = controller.submit(
+            functools.partial(_call_stop, stop, DeferredAuthorization.capture()), owner=self)
         self._pending += 1
-        handle.error.connect(functools.partial(hold_failed_stop, stop, authority=DeferredAuthorization.capture()))
         if on_done is not None:
             handle.result.connect(weak_slot(on_done, *args))     # a weak call, never the panel
         if on_error is not None:

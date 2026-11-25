@@ -46,7 +46,7 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
         self._tr_init()
         self._tr(self, "rest_users_group", "setTitle")
         self._path_input = QLineEdit(os.environ.get(USERS_ENV, "").strip())
-        self._path_input.setPlaceholderText(_t("rest_users_path_ph"))
+        self._tr(self._path_input, "rest_users_path_ph")
         self._enable_check = QCheckBox()
         self._enable_check.setChecked(bool(self._path_input.text()))
         self._table = QTableWidget(0, len(_COLUMNS))

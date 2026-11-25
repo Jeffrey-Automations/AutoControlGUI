@@ -67,6 +67,11 @@ class InspectorTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
+    def retranslate(self) -> None:
+        TranslatableMixin.retranslate(self)
+        self._apply_table_headers()
+        self._refresh()
+
     def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [

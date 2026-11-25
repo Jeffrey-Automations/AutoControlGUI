@@ -49,7 +49,7 @@ class RestApiTab(TranslatableMixin, QWidget):
         self._port_input.setRange(0, 65535)
         self._port_input.setValue(9939)
         self._token_input = QLineEdit()
-        self._token_input.setPlaceholderText(_t("rest_token_ph"))
+        self._tr(self._token_input, "rest_token_ph")
         self._audit_check = QCheckBox()
         self._audit_check.setChecked(True)
         self._url_value = QLabel("-")

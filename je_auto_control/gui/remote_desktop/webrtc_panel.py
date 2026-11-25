@@ -171,7 +171,11 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         offer or file push still out and the tray icon.
         """
         self._view.retire()
-        release_resources(self, self._stop_host_if_any, self._hide_tray)
+        release_resources(self, self._stop_host_if_any, self._hide_blanking, self._hide_tray)
+
+    def _hide_blanking(self) -> None:
+        # Its windows have no parent: left up, nothing on screen could take them down.
+        self._on_toggle_blanking(False)
 
     def _hide_tray(self) -> None:
         if self._tray is not None:
@@ -236,6 +240,13 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
+        self._apply_session_headers()
+        host = self._multi_host
+        self._sessions_label.setText(
+            _t("rd_webrtc_sessions_count").format(n=host.session_count() if host is not None else 0))
+        self._hw_codec_combo.setItemText(0, _t("rd_webrtc_hw_codec_off"))
+        if self._monitor_combo.itemText(0) != "#0":     # "#0": the monitors could not be listed
+            self._monitor_combo.setItemText(0, _t("rd_webrtc_monitor_all"))
 
 
 class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMixin, _ViewerMediaMixin,
@@ -418,6 +429,15 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
+        self._remote_files_table.retranslate()
+        self._tag_filter_combo.setItemText(0, _t("rd_webrtc_tag_all"))
+        # The registered texts are the buttons' idle ones.
+        if self._recorder is not None or not self._record_btn.isEnabled():
+            self._record_btn.setText(_t("rd_webrtc_stop_recording" if self._recorder is not None
+                                        else "gui_op_stopping"))
+        if self._sync_engine is not None or not self._sync_btn.isEnabled():
+            self._sync_btn.setText(_t("rd_webrtc_sync_stop" if self._sync_engine is not None else "gui_op_stopping"))
+        self._pen_btn.setText(_t("rd_webrtc_pen_on" if self._pen_btn.isChecked() else "rd_webrtc_pen_off"))
 
 
 __all__ = ["_PanelSignals", "_WebRTCHostPanel", "_WebRTCViewerPanel"]

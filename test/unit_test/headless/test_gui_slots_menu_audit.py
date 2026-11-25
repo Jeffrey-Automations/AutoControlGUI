@@ -77,27 +77,26 @@ def test_an_assertion_backend_error_is_shown_once_the_run_is_delivered(monkeypat
      lambda m, mp: (mp.setattr(m, "load_rows", _raiser(AutoControlActionException("bad query"))),
                     {"_limit": types.SimpleNamespace(value=lambda: 0), "_build_source": lambda: {},
                      "_status": _Text()})[1]),
-    ("self_healing_tab", "SelfHealingTab",
-     lambda m, mp: (mp.setattr(m, "self_heal_click", _raiser(AutoControlMouseException("click failed"))),
-                    {"_collect_inputs": lambda: ("t.png", "", 0.8, None), "_status": _Text(),
-                     "refresh_log": lambda: None,
-                     "_verification_input": _Text(),
-                     "_click_check": types.SimpleNamespace(isChecked=lambda: True)})[1]),
 ])
 def test_framework_errors_are_shown_by_the_slot(module_name, cls_name, setup, monkeypatch):
-    from je_auto_control.gui import data_source_tab, self_healing_tab
-    module = {"data_source_tab": data_source_tab, "self_healing_tab": self_healing_tab}[module_name]
+    from je_auto_control.gui import data_source_tab
+    module = {"data_source_tab": data_source_tab}[module_name]
     stub = types.SimpleNamespace(**setup(module, monkeypatch))
-    cls = getattr(module, cls_name)
-    slot = cls._run if cls_name == "SelfHealingTab" else cls._on_load
-    if cls_name == "SelfHealingTab":
-        slot(stub, do_click=True)
-    else:
-        slot(stub)
-    status = stub._status
-    assert status.value, "the slot did not report the error"
-    if cls_name == "SelfHealingTab":
-        assert "click failed" in status.value
+    getattr(module, cls_name)._on_load(stub)
+    assert stub._status.value, "the slot did not report the error"
+
+
+def test_a_failed_self_heal_click_is_shown_once_the_run_is_delivered(monkeypatch):
+    # The locate or click runs off the GUI thread, so this needs the real tab.
+    from je_auto_control.gui import self_healing_tab as module
+    _app()
+    monkeypatch.setattr(module, "self_heal_click", _raiser(AutoControlMouseException("click failed")))
+    tab = module.SelfHealingTab()
+    tab._template_input.setText("t.png")
+    tab._on_click()
+    assert settle(tab._task, "task")
+    assert "click failed" in tab._status.text()
+    tab.deleteLater()
 
 
 def test_the_planner_run_slot_shows_an_assertion_failure(monkeypatch):
@@ -229,3 +228,81 @@ def test_rebuilding_the_tabs_menu_does_not_leak():
         counts.append(len(view.findChildren(QMenu)))
     assert counts[0] == counts[-1]
     owner.deleteLater()
+
+
+def test_a_dag_file_that_is_not_utf8_is_reported(monkeypatch, tmp_path):
+    from je_auto_control.gui import dag_tab as module
+    _app()
+    path = tmp_path / "dag.json"
+    path.write_bytes(b"\xff\xfe{\x00}\x00")
+    monkeypatch.setattr(module.QFileDialog, "getOpenFileName", lambda *_args: (str(path), ""))
+    tab = module.DagTab()
+    tab._on_load()
+    assert "utf-8" in tab._status_label.text()
+    tab.deleteLater()
+
+
+@pytest.mark.parametrize("error", [OSError("read-only file system"), "cryptography"])
+@pytest.mark.parametrize("command, method", [("_on_init", "initialize"), ("_on_unlock", "unlock")])
+def test_a_vault_that_cannot_be_opened_or_written_is_reported(monkeypatch, command, method, error):
+    from je_auto_control.gui import secrets_tab as module
+    from je_auto_control.utils.exception.exceptions import CryptographyUnavailableError
+    _app()
+    warned = []
+    failure = CryptographyUnavailableError("needs cryptography") if error == "cryptography" else error
+    monkeypatch.setattr(module.QMessageBox, "warning", lambda *args: warned.append(args[-1]))
+    monkeypatch.setattr(module, "default_secret_manager", types.SimpleNamespace(
+        is_initialized=False, is_unlocked=False, **{method: _raiser(failure)}))
+    tab = module.SecretsTab()
+    tab._passphrase.setText("correct horse")
+    getattr(tab, command)()
+    assert warned == [str(failure)]
+    tab.deleteLater()
+
+
+@pytest.mark.parametrize("command, writer, dialog, chosen", [
+    ("_on_junit", "write_junit_xml", "getSaveFileName", ("/full/junit.xml", "")),
+    ("_on_allure", "write_allure_results", "getExistingDirectory", "/full"),
+])
+def test_a_suite_report_that_cannot_be_written_is_reported(monkeypatch, command, writer, dialog, chosen):
+    from je_auto_control.gui import test_suite_tab as module
+    _app()
+    monkeypatch.setattr(module.ac, writer, _raiser(OSError("disk full")))
+    monkeypatch.setattr(module.QFileDialog, dialog, lambda *_args: chosen)
+    tab = module.TestSuiteTab()
+    tab._last_result = object()
+    getattr(tab, command)()
+    assert "disk full" in tab._summary.text()
+    tab.deleteLater()
+
+
+def test_a_page_source_is_shown_in_the_output_not_rendered():
+    from je_auto_control.gui.chatops_tab import ChatOpsTab
+    from je_auto_control.gui.webrunner_tab import WebRunnerTab
+    _app()
+    source = '<html><body><img src="file://host/share/x.png"><b>bold</b></body></html>'
+    web = WebRunnerTab()
+    web._runs.tag = "web_run_btn"
+    web._show_result(source)
+    web._show_error(ValueError(source))
+    chat = ChatOpsTab()
+    chat._show_result(types.SimpleNamespace(succeeded=True, text=source, artifact_path=""))
+    chat._show_error(source)
+    assert web._output.toPlainText().count(source) == 2
+    assert chat._output.toPlainText().count(source) == 2
+    for tab in (web, chat):
+        assert "<img" not in tab._output.toHtml()
+        tab.dispose()
+        tab.deleteLater()
+
+
+def test_a_chat_command_is_echoed_as_typed(monkeypatch):
+    from je_auto_control.gui.chatops_tab import ChatOpsTab
+    _app()
+    chat = ChatOpsTab()
+    monkeypatch.setattr(chat._runs, "start_script", lambda _work: True)
+    chat._command_input.setText("/run <b>x</b>")
+    chat._on_send()
+    assert chat._output.toPlainText() == "> /run <b>x</b>"
+    chat.dispose()
+    chat.deleteLater()

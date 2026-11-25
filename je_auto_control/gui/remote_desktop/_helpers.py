@@ -55,13 +55,19 @@ for _i in range(1, 13):
 
 
 def _key_event_to_ac(event: QKeyEvent) -> Optional[str]:
-    """Return the AC keycode for ``event``, or ``None`` if unmappable."""
+    """Return the AC keycode for ``event``, or ``None`` if unmappable.
+
+    With Ctrl held the text of a letter is a control character (Ctrl+C is
+    ``\\x03``), so the key itself is sent: as typed text it did nothing on the host.
+    """
     mapped = _QT_KEY_TO_AC.get(Qt.Key(event.key()))
     if mapped is not None:
         return mapped
     text = event.text()
     if len(text) == 1 and text.isprintable():
         return text
+    if 0x21 <= event.key() <= 0x7e:         # Qt's codes for the printable ASCII keys
+        return chr(event.key()).lower()
     return None
 
 

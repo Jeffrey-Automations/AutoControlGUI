@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._weak_call import weak_slot
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
@@ -74,6 +75,7 @@ class PresenceTab(TranslatableMixin, QWidget):
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
         self._apply_translations()
+        self.refresh()
 
     # --- layout ----------------------------------------------------
 
@@ -108,9 +110,12 @@ class PresenceTab(TranslatableMixin, QWidget):
 
     def refresh(self) -> None:
         rows = self._registry.list()
-        self._table.setRowCount(len(rows))
-        for index, row in enumerate(rows):
-            self._populate_row(index, row)
+        # A viewer who leaves moves the rows below up: Kick and the role
+        # commands then went to whoever had taken the selected row.
+        with kept_selection(self._table):
+            self._table.setRowCount(len(rows))
+            for index, row in enumerate(rows):
+                self._populate_row(index, row)
         self._status.setText(
             _t("presence_count").replace("{count}", str(len(rows))),
         )

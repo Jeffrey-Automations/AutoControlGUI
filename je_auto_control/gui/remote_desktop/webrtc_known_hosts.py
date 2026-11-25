@@ -220,7 +220,7 @@ class KnownHostsDialog(QDialog):
         try:
             with open(path, "r", encoding="utf-8") as fh:
                 data = json.load(fh)
-        except (OSError, json.JSONDecodeError) as error:
+        except (OSError, ValueError, RecursionError) as error:      # also not UTF-8, or nested too deeply
             QMessageBox.warning(self, "WebRTC", str(error))
             return None
         if not isinstance(data, dict):
@@ -264,17 +264,10 @@ class KnownHostsDialog(QDialog):
 
     def _on_forget_stale(self) -> None:
         from datetime import datetime, timedelta, timezone
-        cutoff = datetime.now(timezone.utc) - timedelta(days=90)
-        stale_ids = []
-        for host_id, fps in self._known.list_entries().items():
-            last_seen = fps.get("last_seen")
-            if not last_seen:
-                continue
-            try:
-                if datetime.fromisoformat(last_seen) < cutoff:
-                    stale_ids.append(host_id)
-            except (TypeError, ValueError):
-                continue
+        now = datetime.now(timezone.utc)
+        # The rule the table greys a row by: a naive time was shown stale and never forgotten.
+        stale_ids = [host_id for host_id, fps in self._known.list_entries().items()
+                     if self._is_stale(fps.get("last_seen"), now=now, stale_after=timedelta(days=90))]
         if not stale_ids:
             QMessageBox.information(
                 self, "WebRTC", _t("rd_webrtc_kh_no_stale"),

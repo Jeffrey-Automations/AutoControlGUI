@@ -114,6 +114,12 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 `TODO` — U-20261009-27、-28、-34、-36、-38、-40 之後還開著的
 
 - **Windows UIA 後端的執行緒模型**已對真的 COM 驗過（U-20261113-01；U-20261121-17 再驗：讀取在呼叫者執行緒與 walker 上都可用、stop 能叫醒等待中的 `AC_wait_for_focus_change`、`system_volume` 的 Core Audio 改經同一條 apartment 路徑，主執行緒與 worker 執行緒皆可讀）。`comtypes` 已宣告為 `accessibility` extra，`windows-uia.yml` 已在 Windows runner 以真 COM 跑過（3 項通過）。
+- **GUI 審查留下的（U-20261126-12）**：
+  - `DECIDE`：桌面使用者視為未驗證，secrets／webhooks／plugins／REST／admin／audit／USB ACL 等較舊分頁呼叫核心函式前沒有 `authorize_command`；
+    Host／Viewer／WebRTC 面板與 REST 的 token 欄沒有遮蔽；Quick Connect 核准對話框預設「允許（完整）」，按 Enter 就放人進來。
+  - `TODO`：`utils/device_matrix/matrix.py` 的執行緒池沒有帶呼叫者的權限 context；WebRTC 一次斷線的「disconnected」「failed」會用掉兩次重連；
+    `test_suite_tab` 以兩個空白加「(」拆標籤解除隔離，案例名含該字串會拆錯；資料來源載入、稽核鏈驗證與 vault 金鑰推導仍在 GUI 執行緒；
+    切換語言後部分暫態文字與品質提示仍是舊語言。
 - **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）。
   結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。

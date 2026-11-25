@@ -76,6 +76,7 @@ class AgentTasksTab(TranslatableMixin, QWidget):
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
         self._table = QTableWidget(0, 4)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.cellClicked.connect(self._select)
         self._status = QLabel()
         self._task_id.textChanged.connect(self._clear_observation)

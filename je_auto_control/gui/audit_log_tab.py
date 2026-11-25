@@ -84,6 +84,10 @@ class AuditLogTab(TranslatableMixin, QWidget):
         set_role(self._verify_status, "hint")
         root.addWidget(self._verify_status)
 
+    def retranslate(self) -> None:
+        TranslatableMixin.retranslate(self)
+        self._apply_table_headers()
+
     def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [

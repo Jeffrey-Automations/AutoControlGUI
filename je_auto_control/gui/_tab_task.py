@@ -22,6 +22,8 @@ tab shares on top of :mod:`je_auto_control.gui.tab_task_controller`:
   drives the machine.
   Other work binds a headless cancellation scope. Cooperative backends stop
   at their next checkpoint; late results from noncooperative work are dropped.
+* **Authority.** The work runs as whoever started it (``DeferredAuthorization``),
+  not under the worker thread's own empty context, which refuses nothing.
 * **Execution details.** Each run is published to the workspace's details
   pane for the page the task runs on (:mod:`je_auto_control.gui._task_details`):
   running, stopping, then succeeded, cancelled or error, with reported
@@ -45,6 +47,7 @@ from je_auto_control.utils.exception.cancellation import (
 from je_auto_control.utils.executor.run_control import (
     ExecutionStopped, StopToken, stop_execution, stoppable_run,
 )
+from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
 
 class TabTask(QObject):
@@ -136,6 +139,7 @@ class TabTask(QObject):
         self.tag = tag
         # The tab owns the work; a TabTask built without a parent owns its own.
         owner = self.parent() or self
+        work = functools.partial(_call_as, DeferredAuthorization.capture(), work)
         handle = task_controller().submit(work, owner=owner, timeout_s=timeout_s, discard=discard)
         self.task = handle
         handle.result.connect(self.result)
@@ -167,6 +171,13 @@ class TabTask(QObject):
         if self._details is not None:
             self._details.finished()
         self.finished.emit()
+
+
+def _call_as(authority: DeferredAuthorization, work: Callable[[CancellationToken], Any],
+             token: CancellationToken) -> Any:
+    """Worker thread: run ``work`` as its registrant, refreshed now; a revoked one is refused."""
+    with authority.context_scope():
+        return work(token)
 
 
 def _call_plain(work: Callable[[], Any], token: CancellationToken) -> Any:

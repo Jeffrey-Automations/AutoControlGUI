@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -236,6 +237,10 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         else:
             running = default_email_trigger_watcher.is_running
             self._status_label.setText(_t("eml_running") if running else _t("eml_stopped"))
+        with kept_selection(self._table):
+            self._fill_table()
+
+    def _fill_table(self) -> None:
         rows = default_email_trigger_watcher.list_triggers()
         self._table.setRowCount(len(rows))
         for row, trigger in enumerate(rows):

@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.tab_task_controller import TaskTimeout
@@ -295,6 +296,11 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         self._viewer_status.setText(str(error))
 
     def _show_local_devices(self, result: UsbEnumerationResult) -> None:
+        # Hotplug refreshes the list by itself: Allow / Block must stay on the device that was selected.
+        with kept_selection(self._local_table, 0, 1, 3):
+            self._fill_local_table(result)
+
+    def _fill_local_table(self, result: UsbEnumerationResult) -> None:
         devices = result.devices
         self._local_table.setRowCount(len(devices))
         for row, device in enumerate(devices):

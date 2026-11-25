@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._qt_typed import decoded_image
+from je_auto_control.gui._qt_typed import as_plain, decoded_image
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui._dispose import release_resources
@@ -607,7 +607,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         # The session is over: the popup stayed open on its last frame and
         # the badge kept saying connected.
         self._disconnect()
-        QMessageBox.warning(self, _t("rd_quick_connect_btn"), message)
+        QMessageBox.warning(self, _t("rd_quick_connect_btn"), as_plain(message))     # the host worded it
 
     def _open_screen_window(self, title: str) -> None:
         if self._screen_window is None:

@@ -85,6 +85,10 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
         """
         release_resources(self, self._hold.release)
 
+    def retranslate(self) -> None:
+        TranslatableMixin.retranslate(self)
+        self._apply_table_headers()
+
     def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [

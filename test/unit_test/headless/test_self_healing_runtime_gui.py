@@ -7,6 +7,7 @@ import pytest
 pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 from PySide6.QtWidgets import QApplication, QPushButton
 
+from headless._qt_settle import pump_until, settle
 from je_auto_control.gui.self_healing_tab import SelfHealingTab
 from je_auto_control.utils.self_healing import HealEvent, HealEventLog, HealOutcome
 
@@ -45,10 +46,34 @@ def test_runtime_region_reaches_headless_api_and_comparison_stays_separate(widge
     view._description_input.setText("submit")
     view._region_input.setText("[-20,-30,10,20]")
     view._on_locate()
+    assert settle(view._task, "task")
     assert calls[0]["screen_region"] == [-20, -30, 10, 20]
     assert view.findChildren(QPushButton) == []
     assert view._group_box.parentWidget() is view._views.widget(0)
     assert view._evaluation is view._views.widget(1)
+
+
+def test_a_locate_leaves_the_gui_thread_and_runs_one_at_a_time(widget, monkeypatch):
+    """A screen search and a model request: on the GUI thread the window froze for both."""
+    import threading
+    view, _log = widget
+    release, threads = threading.Event(), []
+
+    def locate(**_arguments):
+        threads.append(threading.current_thread())
+        release.wait(10.0)
+        return HealOutcome(True, (5, 6), "vlm")
+
+    monkeypatch.setattr("je_auto_control.gui.self_healing_tab.self_heal_locate", locate)
+    view._description_input.setText("submit")
+    view._on_locate()                                # returns while the locate waits
+    assert pump_until(lambda: len(threads) == 1)
+    assert threads[0] is not threading.main_thread()
+    view._on_locate()                                # refused, not run beside it
+    release.set()
+    assert settle(view._task, "task")
+    assert len(threads) == 1
+    assert "5" in view._status.text() and "6" in view._status.text()
 
 
 @pytest.mark.parametrize("raw", ["not-json", '"not-a-region"'])
@@ -112,8 +137,10 @@ def test_verification_input_is_explicit_and_reports_its_result(widget, monkeypat
     view._description_input.setText("submit")
     view._verification_input.setText("confirmation is visible")
     view._on_locate()
+    assert settle(view._task, "task")
     assert calls == []
     view._on_click()
+    assert settle(view._task, "task")
     assert len(calls) == 1
     assert calls[0].operation == "click"
     assert calls[0].verification.description == "confirmation is visible"

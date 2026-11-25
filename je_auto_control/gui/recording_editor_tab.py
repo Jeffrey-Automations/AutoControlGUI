@@ -1,5 +1,6 @@
 """Recording Editor tab: trim, filter and rescale recorded action lists."""
 import json
+import math
 from typing import Any, Callable, Optional
 
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
@@ -148,7 +149,10 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         if not path:
             return
         try:
-            self._actions = read_action_json(path)
+            actions = read_action_json(path)
+            if not isinstance(actions, list) or not all(isinstance(entry, list) and entry for entry in actions):
+                raise ValueError(f"{path}: not a list of actions")
+            self._actions = actions
         except (AutoControlException, OSError, ValueError) as error:
             QMessageBox.warning(self, "Error", str(error))
             return
@@ -230,6 +234,8 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         try:
             factor = float(self._delay_factor.text() or "1.0")
             clamp = int(self._delay_clamp.text() or "0")
+            if not math.isfinite(factor):
+                raise ValueError("the delay factor must be finite")
         except ValueError:
             QMessageBox.warning(self, "Error", "Factor/clamp must be numeric")
             return
@@ -239,6 +245,8 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         try:
             fx = float(self._scale_x.text() or "1.0")
             fy = float(self._scale_y.text() or "1.0")
+            if not (math.isfinite(fx) and math.isfinite(fy)):     # float() reads "inf" and "nan"
+                raise ValueError("the scale factors must be finite")
         except ValueError:
             QMessageBox.warning(self, "Error", "Scale factors must be numeric")
             return

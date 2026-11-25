@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import as_plain
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -190,14 +191,15 @@ class WebRunnerTab(TranslatableMixin, QWidget):
             self._output.append(_t("task_busy"))
 
     def _show_error(self, error: object) -> None:
-        self._output.append(f"{_t(self._runs.tag)} {_t('web_error')}: {error}")
+        self._output.append(as_plain(f"{_t(self._runs.tag)} {_t('web_error')}: {error}"))
 
     def _show_result(self, result: object) -> None:
         rendered = (
             result if isinstance(result, str)
             else json.dumps(result, default=str, ensure_ascii=False)
         )
-        self._output.append(f"{_t(self._runs.tag)}: {rendered}")
+        # A command may return a page's source: shown as text, not rendered (and its images not fetched).
+        self._output.append(as_plain(f"{_t(self._runs.tag)}: {rendered}"))
 
 
 __all__ = ["WebRunnerTab"]

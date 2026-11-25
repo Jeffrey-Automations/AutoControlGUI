@@ -331,3 +331,68 @@ def test_destroying_the_window_removes_its_listeners():
     # [language listeners, presence listeners]: each window adds one of each.
     assert all(d > b for d, b in zip(counts["during"], counts["before"])), counts
     assert counts["after"] == counts["before"], counts
+
+
+def _language_texts(root):
+    """Headers, placeholders and combo entries: what a language switch has to re-read by hand."""
+    from PySide6.QtWidgets import QLineEdit
+    found = []
+    for widget in (root, *root.findChildren(QWidget)):
+        if isinstance(widget, QTableWidget):
+            found.append([widget.horizontalHeaderItem(column).text() for column in range(widget.columnCount())])
+        elif isinstance(widget, QLineEdit):
+            found.append(widget.placeholderText())
+        elif isinstance(widget, QComboBox):
+            found.append([widget.itemText(index) for index in range(widget.count())])
+    return found
+
+
+@pytest.mark.parametrize("module, name", [
+    ("secrets_tab", "SecretsTab"), ("rest_api_tab", "RestApiTab"), ("admin_console_tab", "AdminConsoleTab"),
+    ("audit_log_tab", "AuditLogTab"), ("inspector_tab", "InspectorTab"), ("usb_devices_tab", "UsbDevicesTab"),
+    ("usb_browser_tab", "UsbBrowserTab"), ("remote_desktop.webrtc_panel", "_WebRTCHostPanel"),
+    ("remote_desktop.webrtc_panel", "_WebRTCViewerPanel"),
+])
+def test_a_language_switch_reaches_headers_and_placeholders(qapp, module, name):
+    import importlib
+    from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
+    if module.startswith("remote_desktop"):
+        pytest.importorskip("av")
+        pytest.importorskip("aiortc")
+    build = getattr(importlib.import_module(f"je_auto_control.gui.{module}"), name)
+    previous, tabs = language_wrapper.language, []
+    try:
+        language_wrapper.reset_language("English")
+        tabs.append(build())
+        language_wrapper.reset_language("Japanese")
+        tabs[0].retranslate()
+        tabs.append(build())
+        assert _language_texts(tabs[0]) == _language_texts(tabs[1])
+    finally:
+        language_wrapper.reset_language(previous)
+        for tab in tabs:
+            getattr(tab, "dispose", tab.close)()
+            tab.deleteLater()
+
+
+@pytest.mark.parametrize("module, name, label", [
+    ("variables_tab", "VariablesTab", "_status"), ("presence_tab", "PresenceTab", "_status"),
+    ("inspector_tab", "InspectorTab", "_summary_label"),
+])
+def test_a_language_switch_reaches_the_count_line(qapp, module, name, label):
+    import importlib
+    from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
+    build = getattr(importlib.import_module(f"je_auto_control.gui.{module}"), name)
+    previous, tabs = language_wrapper.language, []
+    try:
+        language_wrapper.reset_language("English")
+        tabs.append(build())
+        language_wrapper.reset_language("Japanese")
+        tabs[0].retranslate()
+        tabs.append(build())
+        assert getattr(tabs[0], label).text() == getattr(tabs[1], label).text()
+    finally:
+        language_wrapper.reset_language(previous)
+        for tab in tabs:
+            getattr(tab, "dispose", tab.close)()
+            tab.deleteLater()

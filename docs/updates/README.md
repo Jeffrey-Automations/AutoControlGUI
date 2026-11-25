@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-12 | 2026-11-26 | Review and fix the GUI | #review #fix #gui #security | [2026-11-c](2026-11-c.md) |
 | U-20261126-11 | 2026-11-26 | Fix the first whole-package review batch | #review #fix #security | [2026-11-c](2026-11-c.md) |
 | U-20261126-10 | 2026-11-26 | Refuse hosts that may grab input devices | #decision #presence #security | [2026-11-c](2026-11-c.md) |
 | U-20261126-09 | 2026-11-26 | Extend the native memory fixture cases | #memory #acceptance | [2026-11-c](2026-11-c.md) |

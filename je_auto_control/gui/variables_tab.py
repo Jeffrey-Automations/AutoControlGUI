@@ -33,6 +33,7 @@ class VariablesTab(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         self._table = QTableWidget(0, 2)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch,
         )
@@ -49,6 +50,7 @@ class VariablesTab(TranslatableMixin, QWidget):
         TranslatableMixin.retranslate(self)
         self._apply_placeholders()
         self._update_table_headers()
+        self._refresh()
 
     def _apply_placeholders(self) -> None:
         self._set_name.setPlaceholderText(_t("vars_name_placeholder"))

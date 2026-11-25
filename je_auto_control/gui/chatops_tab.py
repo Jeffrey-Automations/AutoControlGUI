@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import as_plain
 from je_auto_control.gui._tab_task import TabTask, was_stopped
 from je_auto_control.gui.adaptive.surfaces import Card
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
@@ -113,7 +114,7 @@ class ChatOpsTab(TranslatableMixin, QWidget):
             self._output.append(_t("task_busy"))
             return
         self._pending_message = message
-        self._output.append(f"> {message}")
+        self._output.append(as_plain(f"> {message}"))
 
     def _on_stop(self) -> None:
         if self._runs.stop():
@@ -123,7 +124,7 @@ class ChatOpsTab(TranslatableMixin, QWidget):
         if was_stopped(error):
             self._output.append(_t("task_stopped"))
             return
-        self._output.append(f"router error: {error}")
+        self._output.append(as_plain(f"router error: {error}"))
 
     def _show_result(self, result: Any) -> None:
         if result is None:
@@ -132,7 +133,7 @@ class ChatOpsTab(TranslatableMixin, QWidget):
             )
             return
         prefix = "✓" if result.succeeded else "✗"
-        self._output.append(f"{prefix} {result.text}")
+        self._output.append(as_plain(f"{prefix} {result.text}"))
         if result.artifact_path:
             self._output.append(f"  artifact: {result.artifact_path}")
 

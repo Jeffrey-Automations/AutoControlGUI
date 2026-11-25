@@ -2,9 +2,12 @@
 
 Fire a template-first / VLM-fallback locate from the GUI and browse the
 audit log, or compare explicit versions on provided PNG samples without device effects.
+A locate or click -- a screen search, then a model request -- runs off the GUI
+thread (:class:`~je_auto_control.gui._tab_task.TabTask`), one at a time.
 """
+import functools
 import json
-from typing import Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent
@@ -14,7 +17,9 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.responsive import fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.healing_evaluation_panel import HealingEvaluationPanel
@@ -27,7 +32,6 @@ from je_auto_control.utils.self_healing import (
     HealEvent, HealOutcome, default_heal_log, self_heal_click, self_heal_locate,
     SelfHealRequest, SelfHealRequestError, VerificationRequest, self_heal_run,
 )
-from je_auto_control.utils.exception.exceptions import AutoControlException
 
 
 _COLUMNS = ("timestamp", "method", "coordinates",
@@ -76,6 +80,9 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         self._details.setReadOnly(True)
         self._group_box = QGroupBox()
         self._events: list[HealEvent] = []
+        self._task = TabTask(self)          # one locate or click at a time, off the GUI thread
+        self._task.result.connect(self._on_run_done)
+        self._task.error.connect(self._on_run_failed)
         # pylint: disable-next=no-member  # reason: PySide binds this Qt signal at runtime
         self._table.itemSelectionChanged.connect(self._show_event)
         self._build_layout()
@@ -125,6 +132,13 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         form.addRow(QLabel(), self._verification_input)
         form.addRow(QLabel(), self._click_check)
         return group
+
+    def dispose(self) -> None:
+        """Release what the tab holds beyond its widgets: a locate or click still out, and its panels' readers.
+
+        Called by ``close_tab(key)`` before the widget is deleted; safe to call twice.
+        """
+        release_resources(self, self._source.cancel, self._candidates.cancel, self._evaluation.cancel)
 
     def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
@@ -203,16 +217,19 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         inputs = self._collect_inputs()
         if inputs is None:
             return
-        try:
-            outcome, verified = _dispatch(inputs, do_click or self._click_check.isChecked(),
-                                           self._verification_input.text().strip())
-        except (AutoControlException, OSError, ValueError, RuntimeError) as error:
-            self._status.setText(f"{_t('self_heal_error')}: {error}")
-            self.refresh_log()
-            return
+        work = functools.partial(_dispatch, inputs, do_click or self._click_check.isChecked(),
+                                 self._verification_input.text().strip())
+        self._status.setText(_t("task_running" if self._task.start(work) else "task_busy"))
+
+    def _on_run_done(self, result: Any) -> None:
+        outcome, verified = result
         self._report_outcome(outcome)
         if verified is not None:
             self._status.setText(_t("self_heal_verification_passed" if verified else "self_heal_verification_failed"))
+        self.refresh_log()
+
+    def _on_run_failed(self, error: object) -> None:
+        self._status.setText(f"{_t('self_heal_error')}: {error}")
         self.refresh_log()
 
     def _report_outcome(self, outcome: HealOutcome) -> None:
@@ -278,7 +295,8 @@ class SelfHealingTab(TranslatableMixin, QWidget):
 
     # pylint: disable-next=invalid-name  # reason: Qt override
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802  # reason: Qt override
-        """Cancel source inspection immediately when the owning tab closes."""
+        """Cancel a locate still out and source inspection immediately when the owning tab closes."""
+        self._task.stop()
         self._source.cancel()
         self._candidates.cancel()
         super().closeEvent(event)

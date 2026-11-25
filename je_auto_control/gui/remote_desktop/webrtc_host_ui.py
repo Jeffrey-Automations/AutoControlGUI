@@ -49,6 +49,15 @@ class _HostUiMixin(_HostPanelPart):
         layout.addWidget(build_trusted_group(self))
         layout.addWidget(self._build_sessions_card(), stretch=1)
 
+    def _apply_session_headers(self) -> None:
+        self._sessions_table.setHorizontalHeaderLabels([
+            "",  # quality dot column
+            _t("rd_webrtc_sess_col_id"),
+            _t("rd_webrtc_sess_col_viewer"),
+            _t("rd_webrtc_sess_col_state"),
+            _t("rd_webrtc_sess_col_connected"),
+        ])
+
     def _build_sessions_card(self) -> Card:
         """Status line, the live sessions table and what can be done to a session."""
         card = Card()
@@ -68,13 +77,7 @@ class _HostUiMixin(_HostPanelPart):
         sessions_row.addWidget(self._sessions_label, stretch=1)
         card.add(sessions_row)
         self._sessions_table = QTableWidget(0, 5)
-        self._sessions_table.setHorizontalHeaderLabels([
-            "",  # quality dot column
-            _t("rd_webrtc_sess_col_id"),
-            _t("rd_webrtc_sess_col_viewer"),
-            _t("rd_webrtc_sess_col_state"),
-            _t("rd_webrtc_sess_col_connected"),
-        ])
+        self._apply_session_headers()
         self._sessions_table.setColumnWidth(0, 18)
         self._sessions_table.horizontalHeader().setSectionResizeMode(
             2, QHeaderView.ResizeMode.Stretch,

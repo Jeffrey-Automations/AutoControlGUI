@@ -271,3 +271,24 @@ def test_attach_prompt_requires_qapplication(monkeypatch):
         attach_prompt_to_session(session)
     assert "QApplication" in str(exc_info.value)
     _ = QDialog  # silence unused import warning if Qt eagerly trims
+
+
+def test_what_the_viewer_sent_is_never_rendered_in_the_question(qapp):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QLabel
+    markup = '<img src="file://host/share/x.png"><b>Trusted printer</b>'
+    dialog = UsbPassthroughPromptDialog(vendor_id="1050", product_id="0407", serial=markup, viewer_id=markup)
+    shown = [label for label in dialog.findChildren(QLabel) if label.text() == markup]
+    assert len(shown) == 2
+    assert all(label.textFormat() == Qt.TextFormat.PlainText for label in shown)
+    dialog.deleteLater()
+
+
+def test_the_viewer_id_of_a_pending_viewer_is_never_rendered(qapp):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QLabel
+    from je_auto_control.gui.remote_desktop.webrtc_dialogs import PendingViewerDialog
+    dialog = PendingViewerDialog("<b>admin</b>0123456789abcdef")
+    [shown] = [label for label in dialog.findChildren(QLabel) if label.text().startswith("viewer_id")]
+    assert shown.textFormat() == Qt.TextFormat.PlainText
+    dialog.deleteLater()

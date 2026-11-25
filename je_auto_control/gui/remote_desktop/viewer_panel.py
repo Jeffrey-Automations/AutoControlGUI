@@ -16,7 +16,7 @@ from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._qt_typed import decoded_image
+from je_auto_control.gui._qt_typed import as_plain, decoded_image
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui.remote_desktop._connect_task import connect_viewer
 from je_auto_control.gui.remote_desktop._helpers import (
@@ -479,7 +479,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         # The session is over: the window stayed open on its last frame and
         # the audio player kept running until the operator clicked Disconnect.
         self._disconnect()
-        QMessageBox.warning(self, _t("rd_viewer_error"), message)
+        QMessageBox.warning(self, _t("rd_viewer_error"), as_plain(message))     # the host worded it
 
     def _on_audio_main(self, payload: bytes) -> None:
         player = self._audio_player

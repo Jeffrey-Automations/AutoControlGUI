@@ -23,6 +23,7 @@ from je_auto_control.gui.remote_desktop._helpers import (
 from je_auto_control.gui.remote_desktop.webrtc_workers import (
     HostPublishLoopWorker, generate_host_id, retire_worker,
 )
+from je_auto_control.gui._qt_typed import as_plain
 from je_auto_control.gui._slow_op import app_stop_queue, hold_failed_stop, stop_each
 from je_auto_control.gui._weak_call import weak_slot
 from je_auto_control.gui.tab_task_controller import CancellationToken, task_controller
@@ -184,7 +185,7 @@ class _HostConnectionMixin(_HostPanelPart):
             self._signals.session_count.emit(self._multi_host.session_count())
 
     def _on_signaling_failed(self, message: str) -> None:
-        QMessageBox.warning(self, "WebRTC", message)
+        QMessageBox.warning(self, "WebRTC", as_plain(message))      # may quote the signaling server
         self._status_label.setText(_t("rd_webrtc_status_idle"))
 
     def _on_generate_offer(self) -> None:

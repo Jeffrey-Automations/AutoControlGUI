@@ -12,9 +12,11 @@ from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
-from je_auto_control.utils.secrets import (
-    SecretStoreError, SecretStoreLocked, default_secret_manager,
-)
+from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.secrets import SecretStoreError, default_secret_manager
+
+# The store's own errors, a missing cryptography package, and a vault file that cannot be written.
+_VAULT_ERRORS = (AutoControlException, OSError, ValueError)
 
 
 def _t(key: str) -> str:
@@ -47,7 +49,7 @@ class SecretsTab(TranslatableMixin, QWidget):
         root.setSpacing(12)
         unlock_box = self._tr(QGroupBox(), "secret_unlock_group")
         unlock_layout = QFormLayout(unlock_box)
-        self._passphrase.setPlaceholderText(_t("secret_passphrase_placeholder"))
+        self._tr(self._passphrase, "secret_passphrase_placeholder")
         unlock_layout.addRow(self._tr(QLabel(), "secret_passphrase_label"), self._passphrase)
         root.addWidget(unlock_box)
 
@@ -105,7 +107,7 @@ class SecretsTab(TranslatableMixin, QWidget):
             return
         try:
             default_secret_manager.initialize(passphrase)
-        except SecretStoreError as error:
+        except _VAULT_ERRORS as error:
             QMessageBox.warning(self, _t("secret_init"), str(error))
             return
         QMessageBox.information(self, _t("secret_init"),
@@ -118,7 +120,7 @@ class SecretsTab(TranslatableMixin, QWidget):
             return
         try:
             ok = default_secret_manager.unlock(passphrase)
-        except SecretStoreError as error:
+        except _VAULT_ERRORS as error:
             QMessageBox.warning(self, _t("secret_unlock"), str(error))
             return
         if not ok:
@@ -148,7 +150,7 @@ class SecretsTab(TranslatableMixin, QWidget):
             return
         try:
             default_secret_manager.set(name.strip(), value)
-        except (SecretStoreError, SecretStoreLocked, ValueError) as error:
+        except _VAULT_ERRORS as error:
             QMessageBox.warning(self, _t("secret_add"), str(error))
             return
         self._refresh_list()
@@ -159,7 +161,7 @@ class SecretsTab(TranslatableMixin, QWidget):
             return
         try:
             default_secret_manager.remove(item.text())
-        except (SecretStoreError, SecretStoreLocked) as error:
+        except _VAULT_ERRORS as error:
             QMessageBox.warning(self, _t("secret_remove"), str(error))
             return
         self._refresh_list()
@@ -179,7 +181,7 @@ class SecretsTab(TranslatableMixin, QWidget):
             return
         try:
             default_secret_manager.change_passphrase(old, new)
-        except (SecretStoreError, ValueError) as error:
+        except _VAULT_ERRORS as error:
             QMessageBox.warning(self, _t("secret_change_passphrase"),
                                 str(error))
             return

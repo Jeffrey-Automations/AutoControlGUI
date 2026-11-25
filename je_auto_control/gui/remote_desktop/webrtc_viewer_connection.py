@@ -26,6 +26,7 @@ from je_auto_control.gui.remote_desktop.webrtc_workers import (
     ViewerAnswerPushWorker, ViewerSignalingWorker,
     retire_worker,
 )
+from je_auto_control.gui._qt_typed import as_plain
 from je_auto_control.gui._slow_op import stop_each
 from je_auto_control.gui._weak_call import WeakCall, weak_slot
 from je_auto_control.gui.tab_task_controller import CancellationToken, task_controller
@@ -141,7 +142,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         self._status_label.setText(_t("rd_webrtc_waiting_auth"))
 
     def _on_signaling_failed(self, message: str) -> None:
-        QMessageBox.warning(self, "WebRTC", message)
+        QMessageBox.warning(self, "WebRTC", as_plain(message))      # may quote the signaling server
         self._status_label.setText(_t("rd_webrtc_status_idle"))
 
     def _on_create_answer(self) -> None:
@@ -235,6 +236,8 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
                 self._sync_btn.setChecked(False)
                 self._sync_btn.setText(_t("rd_webrtc_sync_start"))
         self._stop_stats_polling()
+        if hasattr(self, "_mic_btn"):
+            self._mic_btn.setChecked(False)         # the next session starts with the microphone off
         if self._recorder is not None:
             stops.append(self._recorder.stop)
             self._recorder = None

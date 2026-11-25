@@ -63,6 +63,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._token_input = QLineEdit()
         self._token_input.setEchoMode(QLineEdit.EchoMode.Password)
         self._table = QTableWidget(0, 5)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents,
         )
@@ -301,15 +302,22 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
                 out.append(item.text())
         return out
 
-    def _refresh_table(self, statuses: Optional[List[HostStatus]] = None) -> None:
-        hosts = self._client.list_hosts()
-        status_by_label = {s.label: s for s in (statuses or [])}
-        self._table.setRowCount(len(hosts))
+    def retranslate(self) -> None:
+        TranslatableMixin.retranslate(self)
+        self._apply_table_headers()
+
+    def _apply_table_headers(self) -> None:
         self._table.setHorizontalHeaderLabels([
             _t("admin_col_label"), _t("admin_col_url"),
             _t("admin_col_health"), _t("admin_col_latency"),
             _t("admin_col_jobs"),
         ])
+
+    def _refresh_table(self, statuses: Optional[List[HostStatus]] = None) -> None:
+        hosts = self._client.list_hosts()
+        status_by_label = {s.label: s for s in (statuses or [])}
+        self._table.setRowCount(len(hosts))
+        self._apply_table_headers()
         for row, host in enumerate(hosts):
             self._table.setItem(row, 0, QTableWidgetItem(host.label))
             self._table.setItem(row, 1, QTableWidgetItem(host.base_url))

@@ -41,6 +41,13 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
+def _plain(text: str) -> QLabel:
+    """What the viewer sent, shown as typed: as markup it could rewrite the question or load an image."""
+    label = QLabel(text)
+    label.setTextFormat(Qt.TextFormat.PlainText)
+    return label
+
+
 class UsbPassthroughPromptDialog(TranslatableMixin, QDialog):
     """Modal dialog asking the host operator to allow / deny one OPEN."""
 
@@ -77,13 +84,13 @@ class UsbPassthroughPromptDialog(TranslatableMixin, QDialog):
         root.addWidget(intro)
         form = QFormLayout()
         form.addRow(self._tr(QLabel(), "usb_prompt_vendor"),
-                    QLabel(self._vendor_id))
+                    _plain(self._vendor_id))
         form.addRow(self._tr(QLabel(), "usb_prompt_product"),
-                    QLabel(self._product_id))
+                    _plain(self._product_id))
         form.addRow(self._tr(QLabel(), "usb_prompt_serial"),
-                    QLabel(self._serial or "—"))
+                    _plain(self._serial or "—"))
         form.addRow(self._tr(QLabel(), "usb_prompt_viewer"),
-                    QLabel(self._viewer_id or "—"))
+                    _plain(self._viewer_id or "—"))
         root.addLayout(form)
         root.addWidget(self._remember_check)
         root.addWidget(self._buttons)

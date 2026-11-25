@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QFileDialog, QMessageBox,
 )
 
+from je_auto_control.gui._qt_typed import as_plain
 from je_auto_control.gui._slow_op import stop_each
 from je_auto_control.gui.remote_desktop.folder_sync_controls import start_folder_sync
 from je_auto_control.gui.remote_desktop.folder_sync_io import make_folder_engine
@@ -179,9 +180,9 @@ class _ViewerFilesMixin(_ViewerPanelPart):
         else:
             QMessageBox.warning(
                 self, "WebRTC",
-                _t("rd_webrtc_browse_op_failed").format(
+                as_plain(_t("rd_webrtc_browse_op_failed").format(
                     name=name, error=str(error or ""),
-                ),
+                )),
             )
 
     def _on_send_file(self) -> None:

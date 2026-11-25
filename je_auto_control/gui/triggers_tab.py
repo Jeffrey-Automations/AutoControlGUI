@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -79,6 +80,7 @@ class TriggersTab(TranslatableMixin, QWidget):
         self._engine_op = SlowOp(self)
         self._apply_status()
         self._table = QTableWidget(0, 5)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(
@@ -377,7 +379,10 @@ class TriggersTab(TranslatableMixin, QWidget):
         self._refresh()
 
     def _refresh(self) -> None:
-        triggers = default_trigger_engine.list_triggers()
+        with kept_selection(self._table):       # a trigger can go away between two refreshes
+            self._fill_table(default_trigger_engine.list_triggers())
+
+    def _fill_table(self, triggers: Sequence[_TriggerBase]) -> None:
         self._table.setRowCount(len(triggers))
         yes = _t("tr_yes")
         no = _t("tr_no")

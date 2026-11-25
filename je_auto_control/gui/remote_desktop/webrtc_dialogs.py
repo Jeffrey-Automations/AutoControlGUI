@@ -57,6 +57,7 @@ class PendingViewerDialog(QDialog):
         layout.addWidget(prompt)
         if viewer_id:
             id_label = QLabel(f"viewer_id: {viewer_id[:12]}...{viewer_id[-4:]}")
+            id_label.setTextFormat(Qt.TextFormat.PlainText)     # the viewer chose it
             id_label.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse,
             )
@@ -238,11 +239,7 @@ class RemoteFilesTable(QTableWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(0, 3, parent)
-        self.setHorizontalHeaderLabels([
-            _t("rd_webrtc_browse_col_name"),
-            _t("rd_webrtc_browse_col_size"),
-            _t("rd_webrtc_browse_col_mtime"),
-        ])
+        self.retranslate()
         self.horizontalHeader().setSectionResizeMode(
             0, QHeaderView.ResizeMode.Stretch,
         )
@@ -252,11 +249,20 @@ class RemoteFilesTable(QTableWidget):
         self.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection,
         )
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)  # Pull and Delete read the names
         self.setMaximumHeight(180)
         self.setAcceptDrops(True)
         self.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
+
+    def retranslate(self) -> None:
+        """Re-read the column titles in the active language."""
+        self.setHorizontalHeaderLabels([
+            _t("rd_webrtc_browse_col_name"),
+            _t("rd_webrtc_browse_col_size"),
+            _t("rd_webrtc_browse_col_mtime"),
+        ])
 
     def selected_names(self) -> list[str]:
         names: list[str] = []

@@ -130,3 +130,20 @@ def test_a_refused_native_input_reset_is_shown_and_resets_nothing(panel, monkeyp
     dict(widget.menu_actions())['diag_reset_native_input']()
     _finished(widget)
     assert calls == [] and 'role may not drive input' in widget._progress_label.text()
+
+
+def test_a_successful_reset_takes_the_earlier_refusal_off_the_page(panel, monkeypatch):
+    widget, _snapshot, calls = panel
+
+    def refused(_name):
+        raise RuntimeError('role may not drive input')
+    monkeypatch.setattr(diagnostics_tab, 'authorize_command', refused)
+    monkeypatch.setattr(diagnostics_tab, 'reset_native_input', lambda _context: None)
+    reset = dict(widget.menu_actions())['diag_reset_native_input']
+    reset()
+    _finished(widget)
+    assert 'role may not drive input' in widget._progress_label.text()
+    monkeypatch.setattr(diagnostics_tab, 'authorize_command', lambda _name: None)
+    reset()
+    _finished(widget)
+    assert calls == ['passive'] and widget._progress_label.text() == ''

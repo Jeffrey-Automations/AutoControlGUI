@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveSplitter
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -211,9 +212,10 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         except ValueError:
             runs = []
         self._records = runs
-        self._table.setRowCount(len(runs))
-        for row, record in enumerate(runs):
-            self._set_row(row, record)
+        with kept_selection(self._table):       # newest first: each new run moves every row down
+            self._table.setRowCount(len(runs))
+            for row, record in enumerate(runs):
+                self._set_row(row, record)
         self._count_label.setText(
             _t("rh_count_label").replace("{n}", str(len(runs))),
         )

@@ -29,6 +29,8 @@ class WindowManagerTab(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         self._table = QTableWidget(0, 2)
+        # Focus and Close read the window id out of the table.
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._apply_table_headers()
         self._filter = QLineEdit()
         self._apply_filter_placeholder()

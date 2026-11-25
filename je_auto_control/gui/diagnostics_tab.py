@@ -137,6 +137,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
             self._show_note(_t("task_busy"))
 
     def _on_reset(self, _result: object) -> None:
+        self._render_summary()              # an earlier refusal is no longer news
         self._probe_capabilities()
 
     def _on_reset_error(self, error: object) -> None:

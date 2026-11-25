@@ -113,7 +113,7 @@ def fetch_remote_devices(*, base_url: str,
         raise urllib.error.HTTPError(url, response["status"], response["text"][:200], Message(), None)
     body = response["json"]
     devices = body.get("devices", []) if isinstance(body, dict) else None
-    if not isinstance(devices, list):
+    if not isinstance(devices, list) or not all(isinstance(device, dict) for device in devices):
         raise ValueError(f"unexpected response shape: {response['text'][:200]!r}")
     return devices
 
@@ -163,6 +163,10 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
         ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
         """
         release_resources(self)
+
+    def retranslate(self) -> None:
+        TranslatableMixin.retranslate(self)
+        self._apply_table_headers()
 
     def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
@@ -224,7 +228,8 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
                 device.get("serial") or "",
             ]
             for col_index, text in enumerate(cells):
-                self._table.setItem(row_index, col_index, QTableWidgetItem(text))
+                # str(): the host chose the types, and QTableWidgetItem(5) is an empty item of type 5.
+                self._table.setItem(row_index, col_index, QTableWidgetItem(str(text)))
 
     def _apply_failure(self, error: object) -> None:
         if isinstance(error, TaskTimeout):

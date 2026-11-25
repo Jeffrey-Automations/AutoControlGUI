@@ -242,3 +242,69 @@ def test_a_lan_broadcast_whose_retirement_fails_keeps_its_advertiser():
         assert calls == ["stop", "stop"]
     finally:
         _empty_custody()
+
+
+# --- state that must follow the record, the tab or the sender --------------------------------------------
+
+def test_disconnect_stays_on_the_session_that_was_selected(qapp):
+    """A session above it ended between two refreshes, and Disconnect closed the next viewer's."""
+    panel = webrtc_panel._WebRTCHostPanel()
+    sessions = [{"session_id": name * 8, "state": "connected"} for name in "abc"]
+    asked = []
+    panel._multi_host = types.SimpleNamespace(
+        list_sessions=lambda: list(sessions), session_count=lambda: len(sessions),
+        session_retirement=lambda sid: asked.append(sid), stop_all=lambda: None)
+    panel._refresh_sessions_table()
+    panel._sessions_table.setCurrentCell(1, 1)
+    del sessions[0]
+    panel._refresh_sessions_table()
+    panel._on_disconnect_selected()
+    assert asked == ["b" * 8]
+    panel._multi_host = None
+
+
+def test_closing_the_host_panel_takes_the_privacy_screen_down(qapp, monkeypatch):
+    """Its windows have no parent: the black screen stayed up with nothing left to switch it off."""
+    panel = webrtc_panel._WebRTCHostPanel()
+    hidden = []
+    panel._blanking = types.SimpleNamespace(show=lambda: None, hide=lambda: hidden.append(True))
+    panel.dispose()
+    assert hidden == [True]
+
+
+def test_text_the_peer_or_the_signaling_server_worded_is_shown_not_rendered(qapp):
+    markup = '<img src="file://host/share/x.png">'
+    host, viewer = webrtc_panel._WebRTCHostPanel(), webrtc_panel._WebRTCViewerPanel()
+    host._on_signaling_failed(markup)
+    viewer._on_signaling_failed(markup)
+    viewer._on_inbox_op_result(markup, False, markup)
+    assert len(qapp.messages) == 3
+    assert not any("<img" in message for message in qapp.messages)
+
+
+def test_a_language_switch_keeps_what_the_session_buttons_say(qapp):
+    """"Stop recording" went back to "Start recording" while the recording ran on."""
+    panel = webrtc_panel._WebRTCViewerPanel()
+    panel._recorder, panel._sync_engine = types.SimpleNamespace(stop=lambda: None), types.SimpleNamespace(
+        stop=lambda: None)
+    panel._pen_btn.setChecked(True)
+    panel.retranslate()
+    assert panel._record_btn.text() == _t("rd_webrtc_stop_recording")
+    assert panel._sync_btn.text() == _t("rd_webrtc_sync_stop")
+    assert panel._pen_btn.text() == _t("rd_webrtc_pen_on")
+    panel._recorder = panel._sync_engine = None
+    for button in (panel._record_btn, panel._sync_btn):
+        button.setEnabled(False)                    # its stop is still out
+    panel._pen_btn.setChecked(False)
+    panel.retranslate()
+    assert panel._record_btn.text() == panel._sync_btn.text() == _t("gui_op_stopping")
+    assert panel._pen_btn.text() == _t("rd_webrtc_pen_off")
+
+
+def test_the_microphone_button_is_off_once_its_session_ended(qapp):
+    panel = webrtc_panel._WebRTCViewerPanel()
+    panel._mic_btn.setChecked(True)
+    panel._viewer = types.SimpleNamespace(stop=lambda: None, authenticated=True)
+    panel._on_stop()
+    assert settle_op(panel._stops)
+    assert not panel._mic_btn.isChecked()

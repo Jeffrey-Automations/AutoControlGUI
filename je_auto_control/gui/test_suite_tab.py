@@ -24,6 +24,7 @@ from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
 import je_auto_control as ac
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.quarantine import (
     auto_quarantine_from_flakiness, default_quarantine_store,
 )
@@ -169,14 +170,21 @@ class TestSuiteTab(TranslatableMixin, QWidget):
         path, _ = QFileDialog.getSaveFileName(self, _t("suite_junit"),
                                               "junit.xml")
         if path:
-            ac.write_junit_xml(self._last_result, path)
+            self._export(functools.partial(ac.write_junit_xml, self._last_result, path))
 
     def _on_allure(self) -> None:
         if self._last_result is None:
             return
         directory = QFileDialog.getExistingDirectory(self, _t("suite_allure"))
         if directory:
-            ac.write_allure_results(self._last_result, directory)
+            self._export(functools.partial(ac.write_allure_results, self._last_result, directory))
+
+    def _export(self, write: Callable[[], Any]) -> None:
+        """Write one report; a target that cannot be written is shown, not raised out of the slot."""
+        try:
+            write()
+        except (AutoControlException, OSError, ValueError) as error:
+            self._summary.setText(_t("suite_error").replace("{error}", str(error)))
 
     def _refresh_quarantine(self) -> None:
         self._quarantine.clear()

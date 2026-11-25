@@ -8,13 +8,14 @@ from __future__ import annotations
 from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
 
 import functools
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional, Sequence
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._slow_op import hold_failed_stop
 from je_auto_control.gui.remote_desktop._webrtc_types import MultiViewerHostT
 from je_auto_control.gui.remote_desktop._helpers import (
@@ -139,12 +140,16 @@ class _HostSessionsMixin(_HostPanelPart):
         return "#cc4444"
 
     def _refresh_sessions_table(self) -> None:
-        from datetime import datetime
-        from PySide6.QtGui import QColor
         if self._multi_host is None:
             self._sessions_table.setRowCount(0)
             return
-        sessions = self._multi_host.list_sessions()
+        # A session that ends moves the rows below up: Disconnect then closed another viewer's.
+        with kept_selection(self._sessions_table, 1):
+            self._fill_sessions(self._multi_host.list_sessions())
+
+    def _fill_sessions(self, sessions: Sequence[Mapping[str, Any]]) -> None:
+        from datetime import datetime
+        from PySide6.QtGui import QColor
         self._sessions_table.setRowCount(len(sessions))
         for row, info in enumerate(sessions):
             sid = info.get("session_id", "")

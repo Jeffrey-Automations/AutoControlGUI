@@ -15,6 +15,7 @@ from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QAbstractItemView, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from je_auto_control.gui._stop_custody import StopCustody, stop_custody
+from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
@@ -75,6 +76,10 @@ class FailedStopsView(QWidget):
 
     def refresh(self) -> None:
         """Show what the custody holds now."""
+        with kept_selection(self._table):       # a retry that succeeds takes its row away
+            self._fill_table()
+
+    def _fill_table(self) -> None:
         rows = self._custody.snapshot()
         self._table.setRowCount(len(rows))
         for row, held in enumerate(rows):
