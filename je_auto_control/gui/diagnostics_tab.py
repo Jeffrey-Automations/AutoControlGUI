@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.diagnostics_capabilities import CapabilityView
 from je_auto_control.gui.failed_stops_view import FailedStopsView
@@ -57,6 +58,12 @@ def _diagnostic_work(runner: Callable[[], DiagnosticsReport], token: Cancellatio
     return runner()
 
 
+def _reset_work() -> object:
+    """Retire the native input session under the role its command needs."""
+    authorize_command('AC_reset_native_input')
+    return reset_native_input(BackendContext.current())
+
+
 class DiagnosticsTab(TranslatableMixin, QWidget):
     """Run :func:`run_diagnostics` and render the results."""
 
@@ -70,6 +77,10 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         self.execution_details = ExecutionDetailsSource(self)
         self._task_controller = TaskController(self)
         self._active_task: Optional[TaskHandle] = None
+        # Off the GUI thread: retiring the session waits for any consent dialog still open.
+        self._reset_task = TabTask(self, details=False)
+        self._reset_task.result.connect(self._on_reset)
+        self._reset_task.error.connect(self._on_reset_error)
         self._summary_label = QLabel(_t("diag_summary_idle"))
         self._summary_label.setTextFormat(Qt.TextFormat.PlainText)
         self._summary_label.setWordWrap(True)
@@ -120,9 +131,20 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
             self._fill_table(self._view.report)
 
     def _reset_native_input(self) -> None:
-        """Thin wrapper: the headless reset, then show the refreshed snapshot."""
-        reset_native_input(BackendContext.current())
+        """Thin wrapper: the headless reset on a worker, then show the refreshed snapshot."""
+        if not self._reset_task.start(_reset_work):
+            self._show_note(_t("task_busy"))
+
+    def _on_reset(self, _result: object) -> None:
         self._probe_capabilities()
+
+    def _on_reset_error(self, error: object) -> None:
+        detail = _ordinary_error_text(error) if isinstance(error, Exception) else str(error)
+        self._show_note(scrub_secret_text(detail))
+
+    def _show_note(self, text: str) -> None:
+        self._progress_label.setText(text)
+        self._progress_label.setVisible(True)
 
     def _probe_capabilities(self) -> None:
         snapshot = probe_capabilities(BackendContext.current())

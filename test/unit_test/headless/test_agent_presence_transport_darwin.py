@@ -13,7 +13,7 @@ import pytest
 from je_auto_control.utils.agent_runtime import presence_endpoint_wire, presence_peer_darwin as peer_module
 from je_auto_control.utils.agent_runtime import presence_platform
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
-from je_auto_control.utils.agent_runtime.presence_channel_darwin import _take_frame, frame_bytes
+from je_auto_control.utils.agent_runtime.presence_channel_darwin import _missing, _take_frame, frame_bytes
 from je_auto_control.utils.agent_runtime.presence_endpoint_darwin import DarwinEndpoint, socket_path
 from je_auto_control.utils.agent_runtime.presence_endpoint_linux import FileIdentity
 from je_auto_control.utils.agent_runtime.presence_peer_darwin import DarwinPeerIdentity
@@ -98,6 +98,16 @@ def test_frames_are_length_prefixed_and_taken_only_when_whole():
     first = _take_frame(pending)
     assert first == raw[4:] and bytes(pending) == raw
     assert _take_frame(pending) == raw[4:] and not pending
+
+
+def test_a_receive_never_reads_into_the_following_frame():
+    raw = frame_bytes({"protocol": 1, "challenge": "ab"})
+    stream, pending, reads = raw + raw, bytearray(), []
+    while _take_frame(bytearray(pending)) is None:
+        size = _missing(pending)
+        reads.append(size)
+        pending.extend(stream[len(pending):len(pending) + size])
+    assert bytes(pending) == raw and reads == [4, len(raw) - 4]
 
 
 @pytest.mark.parametrize("header", [b"\0\0\0\0", (4097).to_bytes(4, "big")])

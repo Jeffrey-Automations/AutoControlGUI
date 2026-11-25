@@ -19,11 +19,12 @@ import subprocess  # nosec B404  # reason: fixed xcrun simctl argv, never a shel
 import sys
 import tempfile
 import threading
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 from je_auto_control.wrapper.device_context import (
     STATE_AVAILABLE, STATE_NEEDS_DEPENDENCY, STATE_UNSUPPORTED, DeviceCapability, DeviceError,
-    DeviceUnsupportedError,
+    DeviceTimeoutError, DeviceUnsupportedError,
 )
 
 _UDID = re.compile(r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}")
@@ -32,6 +33,21 @@ _TIMEOUT_S = 120.0
 _FEATURES = ("install", "files", "clipboard", "recording")
 _NO_XCRUN = "xcrun simctl needs macOS with Xcode's command line tools"
 Runner = Callable[..., Any]
+
+
+@dataclass
+class _Recording:
+    """One ``recordVideo`` process, the host file it writes and the timer that ends it."""
+
+    process: Any
+    path: str
+    timer: Optional[threading.Timer] = None
+
+
+# Keyed by UDID, not held by an extension: every command builds its own extension, so the one
+# that stops a recording is never the one that started it.
+_RECORDINGS: Dict[str, _Recording] = {}
+_RECORDINGS_LOCK = threading.Lock()
 
 
 def _udid(value: Any) -> str:
@@ -44,6 +60,34 @@ def _simctl_available() -> bool:
     return sys.platform == "darwin" and shutil.which("xcrun") is not None
 
 
+def _run_simctl(runner: Runner, *arguments: str, data: Optional[str] = None) -> str:
+    """Run one bounded ``simctl`` command and return its output; every failure is a device error."""
+    try:
+        # Bytes, not text mode: pasteboard text must keep its carriage returns.
+        result = runner(["xcrun", "simctl", *arguments], capture_output=True, timeout=_TIMEOUT_S, check=False,
+                        shell=False,  # nosec B603  # reason: fixed simctl argv, no shell
+                        input=None if data is None else data.encode("utf-8"))
+    except subprocess.TimeoutExpired:
+        raise DeviceTimeoutError(f"xcrun simctl {arguments[0]} timed out after {_TIMEOUT_S:g}s") from None
+    except OSError as error:
+        raise DeviceError(f"xcrun simctl {arguments[0]} could not start") from error
+    if result.returncode != 0:
+        raise DeviceError(f"xcrun simctl {arguments[0]} failed with exit code {result.returncode}")
+    output = result.stdout or b""
+    return output.decode("utf-8", "replace") if isinstance(output, bytes) else str(output)
+
+
+def _time_limit(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise DeviceError(f"time_limit_s must be a whole number of seconds, or 0 for no limit, got {value!r}")
+    return value
+
+
+def _interrupt(process: Any) -> None:
+    if process.poll() is None:
+        process.send_signal(signal.SIGINT)  # recordVideo finalizes the file on SIGINT
+
+
 class SimctlExtension:
     """The extension surface for one booted iOS Simulator."""
 
@@ -54,9 +98,6 @@ class SimctlExtension:
                  available: Callable[[], bool] = _simctl_available) -> None:
         self._udid = _udid(udid)
         self._run, self._popen, self._available = runner, popen, available
-        self._recording: Optional[Any] = None
-        self._recording_path: Optional[str] = None
-        self._lock = threading.Lock()
 
     def capability(self, feature: str) -> DeviceCapability:
         """Whether ``feature`` can be used; this never runs ``simctl``."""
@@ -72,12 +113,7 @@ class SimctlExtension:
             raise DeviceUnsupportedError(f"{feature} is not available: {status.reason}", reason=status.reason)
 
     def _simctl(self, *arguments: str, data: Optional[str] = None) -> str:
-        argv = ["xcrun", "simctl", *arguments]
-        result = self._run(argv, capture_output=True, text=True, timeout=_TIMEOUT_S, check=False,
-                           shell=False, input=data)  # nosec B603  # reason: fixed simctl argv, no shell
-        if result.returncode != 0:
-            raise DeviceError(f"xcrun simctl {arguments[0]} failed with exit code {result.returncode}")
-        return str(result.stdout or "")
+        return _run_simctl(self._run, *arguments, data=data)
 
     def install_app(self, source: str) -> str:
         """Install the ``.app`` bundle at host path ``source`` on the Simulator."""
@@ -92,7 +128,10 @@ class SimctlExtension:
         bundle, separator, relative = str(remote_path).partition(":")
         if not separator or _BUNDLE.fullmatch(bundle) is None or not relative:
             raise DeviceError("iOS Simulator paths are '<bundle id>:<path inside its data container>'")
-        root = os.path.realpath(self._simctl("get_app_container", self._udid, bundle, "data").strip())
+        container = self._simctl("get_app_container", self._udid, bundle, "data").strip()
+        if not os.path.isabs(container):  # realpath("") would be this process's working directory
+            raise DeviceError("xcrun simctl reported no data container for the app")
+        root = os.path.realpath(container)
         target = os.path.realpath(os.path.join(root, relative.lstrip("/")))
         if os.path.commonpath([root, target]) != root or target == root:
             raise DeviceError("the path leaves the app's data container")
@@ -116,6 +155,7 @@ class SimctlExtension:
         if not os.path.isfile(source):
             raise DeviceError(f"no file at {remote_path!r} on the Simulator")
         target = os.path.realpath(local_path)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
         shutil.copyfile(source, target)
         return target
 
@@ -136,46 +176,49 @@ class SimctlExtension:
         """Start ``simctl io recordVideo`` into a host temporary file; ``time_limit_s`` stops it."""
         del remote_path  # simctl records on the host; there is no device-side file
         self._require("recording")
-        with self._lock:
-            if self._recording is not None:
+        limit = _time_limit(time_limit_s)
+        with _RECORDINGS_LOCK:
+            if self._udid in _RECORDINGS:
                 raise DeviceError("a Simulator recording is already running")
             handle, path = tempfile.mkstemp(suffix=".mp4", prefix="je-simctl-")
             os.close(handle)
             os.unlink(path)  # recordVideo refuses an existing file
-            self._recording = self._popen(  # nosec B603  # reason: fixed simctl argv, no shell
-                ["xcrun", "simctl", "io", self._udid, "recordVideo", "--force", path],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=False)
-            self._recording_path = path
-        if time_limit_s:
-            timer = threading.Timer(float(time_limit_s), self._interrupt)
-            timer.daemon = True
-            timer.start()
+            try:
+                process = self._popen(  # nosec B603  # reason: fixed simctl argv, no shell
+                    ["xcrun", "simctl", "io", self._udid, "recordVideo", "--force", path],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=False)
+            except OSError as error:
+                raise DeviceError("xcrun simctl io could not start") from error
+            recording = _RECORDINGS[self._udid] = _Recording(process, path)
+            if limit:
+                # Bound to this process: a later recording must not inherit an earlier limit.
+                recording.timer = threading.Timer(limit, _interrupt, (process,))
+                recording.timer.daemon = True
+                recording.timer.start()
         return path
-
-    def _interrupt(self) -> None:
-        with self._lock:
-            process = self._recording
-        if process is not None and process.poll() is None:
-            process.send_signal(signal.SIGINT)  # recordVideo finalizes the file on SIGINT
 
     def stop_recording(self, local_path: str, remote_path: str = "") -> str:
         """Stop the recording, let ``simctl`` finish the file, and move it to ``local_path``."""
         del remote_path
-        with self._lock:
-            process, path = self._recording, self._recording_path
-            self._recording, self._recording_path = None, None
-        if process is None or path is None:
+        with _RECORDINGS_LOCK:
+            recording = _RECORDINGS.pop(self._udid, None)
+        if recording is None:
             raise DeviceError("no Simulator recording is running")
-        if process.poll() is None:
-            process.send_signal(signal.SIGINT)
+        if recording.timer is not None:
+            recording.timer.cancel()
+        process = recording.process
+        _interrupt(process)
         try:
             process.wait(timeout=30)
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=5)
             raise DeviceError("the Simulator recording did not finish its file") from None
+        if not os.path.isfile(recording.path):
+            raise DeviceError("the Simulator recording produced no file")
         target = os.path.realpath(local_path)
-        shutil.move(path, target)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.move(recording.path, target)
         return target
 
 
@@ -183,11 +226,11 @@ def list_ios_simulators(*, runner: Runner = subprocess.run) -> List[Dict[str, st
     """Booted iOS Simulators as ``{udid, name, runtime}``; empty where ``simctl`` is unavailable."""
     if not _simctl_available() and runner is subprocess.run:
         return []
-    result = runner(["xcrun", "simctl", "list", "devices", "booted", "-j"], capture_output=True, text=True,
-                    timeout=_TIMEOUT_S, check=False, shell=False)  # nosec B603  # reason: fixed argv
-    if result.returncode != 0:
-        raise DeviceError("xcrun simctl list failed")
-    devices = json.loads(result.stdout or "{}").get("devices", {})
+    output = _run_simctl(runner, "list", "devices", "booted", "-j")
+    try:
+        devices = json.loads(output or "{}").get("devices", {})
+    except (ValueError, AttributeError):
+        raise DeviceError("xcrun simctl list returned no device list") from None
     found = []
     for runtime, entries in devices.items():
         for entry in entries:

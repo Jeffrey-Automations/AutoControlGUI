@@ -170,6 +170,12 @@ def test_physical_events_mark_activity_and_notify_the_handler():
         assert source.idle_for() == 0.0
 
 
+def test_closing_the_source_is_not_reported_as_physical_input():
+    with getevent(time.monotonic) as (source, _far, notified):
+        source.close()
+        assert not source._thread.is_alive() and not notified.is_set()
+
+
 def test_an_ended_or_malformed_stream_makes_the_source_unhealthy():
     with getevent(time.monotonic) as (source, far, notified):
         far.sendall(packet(3, b"\0"))
@@ -337,6 +343,11 @@ def test_a_refused_begin_is_a_proven_no_effect(provider):
     helper.epoch = "f" * 32  # someone else fenced the device after the lease
     result = lease.dispatch("AC_android_key", {"key": "BACK"}, time.monotonic() + 5, lambda: None)
     assert result.phase == "pre_input_refused" and not result.may_have_effect
+    # The ledger never recorded it, so it is settled, not left as an unknown effect on the device.
+    proof = lease.settle(result)
+    assert proof["epoch"] == lease.epoch and proof["inputs_released"] and proof["queue_empty"]
+    with pytest.raises(AgentTaskError, match="does not match"):
+        lease.settle(AndroidActionResult("input_returned", 0))
 
 
 def test_a_command_that_does_not_settle_in_time_is_unknown(provider):

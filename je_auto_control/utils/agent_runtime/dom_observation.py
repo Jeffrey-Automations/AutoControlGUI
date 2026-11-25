@@ -82,8 +82,8 @@ class DomSource:
     (a new session, or a retired one) never pass as the same target lifetime.
     The page URL is read before and after the fields: a navigation in between
     makes the whole capture an ``inconsistent_snapshot`` failure. A field whose
-    element is absent is ``not_found`` and one the SDK refuses to read back is
-    ``protected``; any other SDK failure is sticky in the session and raises.
+    element is absent or not shown is ``not_found`` (the SDK does not tell the two
+    apart) and a shown one the SDK refuses to read back is ``protected``; any other SDK failure is sticky in the session and raises.
     The DOM has no revision counter, so captures are ``best_effort``.
     """
 

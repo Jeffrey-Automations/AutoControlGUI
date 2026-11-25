@@ -10,12 +10,12 @@ from je_auto_control.utils.agent_runtime.browser_commands import (
     BROWSER_ADAPTER_TOOLS, BROWSER_TRANSFER_TOOLS, browser_session_scope,
 )
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError, AgentHumanReview
-from je_auto_control.utils.agent_runtime.models import AgentTaskSpec, detached
+from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.agent_runtime.target_continuity import require_context_continuity
 from je_auto_control.utils.agent_runtime.browser_retirement import retirement_proof
 from je_auto_control.utils.agent_runtime.browser_readonly_scope import readonly_verification_scope
-from je_auto_control.utils.agent_runtime.browser_secrets import marked_documents, redact_marked
+from je_auto_control.utils.agent_runtime.browser_secrets import observe_unmarked
 
 _RETIREMENT_UNCONFIRMED = "browser retirement is unconfirmed"
 
@@ -156,10 +156,7 @@ class BrowserTarget:
         if self._session is None:
             raise AgentTaskError("browser session is unavailable")
         try:
-            before = marked_documents(self._session, {})
-            raw = detached(self._session.observe())
-            marked = before | marked_documents(self._session, raw)
-            redact_marked(self._session, raw, marked)
+            raw = observe_unmarked(self._session)
         except Exception as error:  # noqa: BLE001 - SDK errors must stay inside the AutoControl error family
             if getattr(error, "reason", "") == "human_review_required":
                 raise AgentHumanReview("browser dialog requires human review") from None

@@ -169,7 +169,7 @@ def test_a_wda_read_past_its_deadline_is_unavailable(adapter):
 @pytest.mark.parametrize("name, arguments", [
     ("AC_ios_tap", {"x": -1, "y": 0}), ("AC_ios_tap", {"x": True, "y": 0}), ("AC_ios_tap", {"x": 1, "y": 1, "z": 1}),
     ("AC_ios_swipe", {"x1": 1, "y1": 1, "x2": 2, "y2": 2, "duration_s": 5}),
-    ("AC_ios_press_key", {"key": "lock"}), ("AC_ios_type", {"text": "hi"}),
+    ("AC_ios_press_key", {"key": "lock"}), ("AC_ios_press_key", {"key": []}), ("AC_ios_type", {"text": "hi"}),
 ])
 def test_only_closed_argument_shapes_are_accepted(name, arguments):
     with pytest.raises(AgentTaskError):

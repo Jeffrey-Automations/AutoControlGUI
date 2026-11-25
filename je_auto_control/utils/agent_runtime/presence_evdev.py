@@ -74,6 +74,7 @@ class EvdevPresenceAPI:
         # A second descriptor per device: asking one for its key state discards its queued key events.
         self._state_fds: dict[str, int] = {}
         self._unannounced, self._seen = UnannouncedKeys(), set[tuple[str, int]]()
+        self._resynced: set[str] = set()  # devices whose events this round were partly discarded
         self._held: set[tuple[str, int]] = set()
         self._physical: Callable[[], None] | None = None
         self._thread: int | None = None
@@ -177,6 +178,7 @@ class EvdevPresenceAPI:
                 active |= self._event(path, kind, code, value)
             if dropped:
                 self._unannounced.forget(path)
+                self._resynced.add(path)
                 if not self._seed_held(path, self._fds[path]):
                     self._drop(path)
                     return True
@@ -215,9 +217,12 @@ class EvdevPresenceAPI:
         """Drain events against the key state read before them; an unexplained key is activity, then a refusal."""
         down = self._kernel_down()
         self._seen.clear()
+        self._resynced.clear()
         active = self._drain_ready(timeout)
+        # A key whose events the kernel discarded was announced to no one; that is not a grab.
+        known = set(self._fds) - self._resynced
         grabbed, suspected = self._unannounced.check(
-            {item for item in down if item[0] in self._fds}, self._held | self._seen, self._clock())
+            {item for item in down if item[0] in known}, self._held | self._seen, self._clock())
         if grabbed:
             raise AgentTaskError("Wayland physical presence device is held by another program")
         return active or suspected

@@ -133,8 +133,7 @@ class HelperControlProvider:
             return self._dispatch(request_id, epoch, name, arguments, deadline, check)
 
         def settle(result: AndroidActionResult) -> dict[str, Any]:
-            del result
-            return self._settle(request_id, epoch, proposal.snapshot.boot_id, device)
+            return self._settle(request_id, epoch, proposal.snapshot.boot_id, device, result)
 
         return AndroidCommandLease(proposal, request_id, epoch, device_fence, lambda: self.checkpoint(("", "", 0)),
                                    settle, dispatch=dispatch)
@@ -158,9 +157,15 @@ class HelperControlProvider:
                 raise AgentTaskError("Android helper command did not settle before its deadline")
             time.sleep(_POLL)
 
-    def _settle(self, request_id: str, epoch: str, boot_id: str, device: dict[str, str]) -> dict[str, Any]:
+    def _settle(self, request_id: str, epoch: str, boot_id: str, device: dict[str, str],
+                result: AndroidActionResult) -> dict[str, Any]:
         value = self._client.settle(request_id, timeout=self._timeout, check=lambda: None)
-        if value.boot_id != boot_id or value.epoch != epoch or value.status not in _TERMINAL:
+        if result.phase == "pre_input_refused":
+            # Never queued, so the ledger has no record: it answers "rejected" under its current epoch.
+            settled = value.status == "rejected"
+        else:
+            settled = value.epoch == epoch and value.status in _TERMINAL
+        if value.boot_id != boot_id or not settled:
             raise AgentTaskError("Android helper settlement does not match this command")
         return {"device": device, "epoch": epoch, "inputs_released": value.input_released,
                 "queue_empty": value.queue_empty, "request_id": request_id, "boot_id": boot_id}

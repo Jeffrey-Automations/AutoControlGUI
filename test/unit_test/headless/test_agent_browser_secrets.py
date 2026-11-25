@@ -47,7 +47,7 @@ def test_a_page_that_marks_nothing_is_published_unchanged_with_one_probe_per_doc
     observation = observed(session)
     assert observation["text"] == "public secret-note"
     assert names(observation) == ["secret-button", "Save", "secret-link", "Help"]
-    assert [frame for _selector, frame in session.probes] == ["", "", "#f"]
+    assert [frame for _selector, frame in session.probes] == ["", "", "#f", "", "#f"]
 
 
 def test_marked_text_withholds_the_page_text_and_only_the_touched_names():
@@ -63,9 +63,26 @@ def test_a_marked_frame_does_not_withhold_the_main_page():
     assert names(observation) == ["secret-button", "Save", "", "Help"]
 
 
-@pytest.mark.parametrize("rounds", [[{""}, set()], [set(), {""}]])
-def test_marked_text_that_appears_or_disappears_around_the_observation_is_withheld(rounds):
-    assert observed(Session(rounds))["text"] == ""
+@pytest.mark.parametrize("rounds", [[{""}, set(), set()], [set(), {""}, set()], [set(), set(), {""}]])
+def test_marked_text_that_comes_or_goes_around_the_observation_takes_every_name_with_it(rounds):
+    observation = observed(Session(rounds, touched=()))
+    assert observation["text"] == "" and names(observation) == ["", "", "secret-link", "Help"]
+
+
+@pytest.mark.parametrize("rounds", [[set(), {"#f"}, set()], [set(), set(), {"#f"}]])
+def test_marked_text_that_comes_or_goes_in_a_frame_takes_that_frames_names(rounds):
+    assert names(observed(Session(rounds, touched=()))) == ["secret-button", "Save", "", ""]
+
+
+def test_a_frame_that_appears_between_the_two_observations_is_withheld():
+    session, pages = Session([set()]), []
+
+    def observe():
+        pages.append(True)
+        extra = {"selector": "#late", "elements": [{"selector": "#z", "text": "late-name", "tag": "a"}]}
+        return {**PAGE, "frames": PAGE["frames"] + ([extra] if len(pages) == 2 else [])}
+    session.observe = observe
+    assert names(observed(session)) == ["secret-button", "Save", "secret-link", "Help", ""]
 
 
 def test_an_unreadable_probe_never_publishes_the_page():

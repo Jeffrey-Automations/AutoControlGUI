@@ -77,17 +77,18 @@ class GeteventSource:
             pass  # recorded below: any end of the stream makes the source unhealthy
         finally:
             with self._lock:
-                if not self._stop.is_set():
-                    self._failed = True
-            self._notify()
+                failed = self._failed = not self._stop.is_set()
+            if failed:  # an owner's close is not physical activity
+                self._notify()
 
     def _receive(self, size: int) -> bytes:
         data = bytearray()
         while len(data) < size:
-            if self._stop.is_set() or self._socket is None:
+            connection = self._socket  # close() clears it from another thread
+            if self._stop.is_set() or connection is None:
                 raise AgentTaskError("Android physical input stream was closed")
             try:
-                part = self._socket.recv(size - len(data))
+                part = connection.recv(size - len(data))
             except socket.timeout:
                 continue
             if not part:

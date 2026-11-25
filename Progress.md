@@ -508,6 +508,8 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      C／D 儲存尾延遲對照不構成所有磁碟的根治；保留原始失敗與收據、逐案確認實際耗時／未知狀態，
      不放寬2／3／15秒期限、不改 WAL／耐久性、不重播已完成效果、不以局部通過抵銷舊失敗。
      test_dag_managed_loopback 的完整執行曾遇提交 HTTP409／限流，尚缺最初拒絕原因；
+     run 45668849127（Windows 3.11，只改文件的提交）：`test_agent_dag_background.py::test_service_runs_without_any_default_client_connection_file`
+     的背景批次 10 秒內沒到預期狀態（收尾時節點為 requires review），同一程式的其他 run 通過；根因未知。
      stage71 matching_grant_digest 的首次 observe 曾耗盡15秒 bootstrap，仍缺啟動堆疊／耗時原因。
      共用 pytest-current 的 WinError5 權限／生命週期問題仍未修復；不得刪除共用連結、改共用環境
      或將自有新 basetemp 成功視為清理問題已消失。原始計數與檔案位置已保留於本次月誌。

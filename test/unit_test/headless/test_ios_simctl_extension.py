@@ -2,15 +2,23 @@
 import json
 import os
 import signal
+import subprocess  # nosec B404  # reason: only its TimeoutExpired is raised; nothing is started
 from types import SimpleNamespace
 
 import pytest
 
 from je_auto_control.ios import simctl
 from je_auto_control.ios.simctl import SimctlExtension, list_ios_simulators, use_ios_simulator
-from je_auto_control.wrapper.device_context import DeviceError, DeviceUnsupportedError
+from je_auto_control.wrapper.device_context import DeviceError, DeviceTimeoutError, DeviceUnsupportedError
 
 UDID = "0123ABCD-0123-4567-89AB-0123456789AB"
+
+
+@pytest.fixture(autouse=True)
+def recordings(monkeypatch):
+    owned = {}
+    monkeypatch.setattr(simctl, "_RECORDINGS", owned)
+    return owned
 
 
 class Simctl:
@@ -150,3 +158,78 @@ def test_the_commands_reach_the_executor_and_rbac():
     assert {"AC_ios_use_simulator", "AC_ios_list_simulators"} <= set(executor.known_commands())
     assert COMMAND_CAPABILITIES["AC_ios_use_simulator"] == Capability.DRIVE_INPUT
     assert simctl.__all__ == ["SimctlExtension", "list_ios_simulators", "use_ios_simulator"]
+
+
+def test_a_recording_is_stopped_through_a_different_extension_than_started_it(tmp_path, monkeypatch):
+    from je_auto_control.wrapper import mobile_extensions
+    monkeypatch.setattr(mobile_extensions, "_FACTORIES", {})
+    monkeypatch.setattr(simctl, "_simctl_available", lambda: True)
+    monkeypatch.setattr(SimctlExtension.__init__, "__kwdefaults__", {
+        "runner": None, "popen": Recorder, "available": lambda: True})
+    use_ios_simulator(UDID)
+    factory = mobile_extensions._FACTORIES["ios"]
+    started, stopped = factory(object()), factory(object())
+    assert started is not stopped  # what two AC_ios_* commands get
+    started.start_recording()
+    assert open(stopped.stop_recording(str(tmp_path / "new" / "video.mp4")), "rb").read() == b"mp4"
+
+
+def test_a_time_limit_never_ends_a_later_recording(extension, tmp_path, recordings):
+    ext, _runner, _container, recorders = extension
+    ext.start_recording(time_limit_s=3600)
+    first = recordings[UDID].timer
+    ext.stop_recording(str(tmp_path / "one.mp4"))
+    assert first.finished.is_set()  # cancelled
+    ext.start_recording()
+    first.function(*first.args)  # even one that had already fired holds only its own process
+    assert recorders[1].signals == []
+    with pytest.raises(DeviceError, match="time_limit_s"):
+        SimctlExtension(UDID.replace("0123ABCD", "FFFFFFFF"), available=lambda: True).start_recording(time_limit_s=-1)
+    ext.stop_recording(str(tmp_path / "two.mp4"))
+
+
+def test_a_recording_that_wrote_nothing_is_a_device_error(extension, tmp_path):
+    ext, _runner, _container, _recorders = extension
+    os.unlink(ext.start_recording())
+    with pytest.raises(DeviceError, match="produced no file"):
+        ext.stop_recording(str(tmp_path / "video.mp4"))
+
+
+@pytest.mark.parametrize("failure, expected", [
+    (subprocess.TimeoutExpired(["xcrun", "SECRET"], 120), DeviceTimeoutError), (FileNotFoundError("xcrun"), DeviceError)])
+def test_simctl_failures_stay_in_the_framework_family(failure, expected):
+    def runner(_argv, **_options):
+        raise failure
+    ext = SimctlExtension(UDID, runner=runner, available=lambda: True)
+    for call in (ext.get_clipboard, lambda: list_ios_simulators(runner=runner)):
+        with pytest.raises(expected) as caught:
+            call()
+        assert "SECRET" not in str(caught.value)
+
+
+@pytest.mark.parametrize("stdout", ["not json", "[]"])
+def test_an_unreadable_simulator_list_is_a_device_error(stdout):
+    with pytest.raises(DeviceError, match="no device list"):
+        list_ios_simulators(runner=lambda _argv, **_options: SimpleNamespace(returncode=0, stdout=stdout))
+
+
+def test_a_blank_container_never_becomes_the_working_directory(tmp_path):
+    source = tmp_path / "in.txt"
+    source.write_text("x", encoding="utf-8")
+    ext = SimctlExtension(UDID, available=lambda: True,
+                          runner=lambda _argv, **_options: SimpleNamespace(returncode=0, stdout="\n"))
+    with pytest.raises(DeviceError, match="no data container"):
+        ext.push_file(str(source), "org.example.app:Documents/in.txt")
+
+
+def test_clipboard_text_keeps_its_carriage_returns():
+    board = {}
+
+    def runner(argv, **options):
+        assert "text" not in options  # text mode would turn CRLF into LF
+        if argv[2] == "pbcopy":
+            board["value"] = options["input"]
+        return SimpleNamespace(returncode=0, stdout=board.get("value", b"") if argv[2] == "pbpaste" else b"")
+    simulator = SimctlExtension(UDID, runner=runner, available=lambda: True)
+    simulator.set_clipboard("a\r\nb李")
+    assert simulator.get_clipboard() == "a\r\nb李"

@@ -64,11 +64,13 @@ def _raise_worker_error(error: BaseException) -> NoReturn:
 
     A refused connection or socket error reaches here as a ``URLError``/``OSError`` from the
     worker thread. It is raised as ``AgentTaskError`` (the original kept as its cause), so every task boundary
-    that catches the framework family handles it.
+    that catches the framework family handles it. Only those say the endpoint was the problem.
     """
     if isinstance(error, (AutoControlException, CancelledError)) or not isinstance(error, Exception):
         raise error
-    raise AgentTaskError("local HTTP request failed; the endpoint was unreachable or closed") from error
+    if isinstance(error, OSError):
+        raise AgentTaskError("local HTTP request failed; the endpoint was unreachable or closed") from error
+    raise AgentTaskError(f"local HTTP request failed: {type(error).__name__}") from error
 
 
 def _await_reply(replies: queue.Queue[Any], timeout: float, check: Callable[[], None]) -> dict[str, Any]:

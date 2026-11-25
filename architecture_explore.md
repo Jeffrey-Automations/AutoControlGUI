@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,615 |
-| 程式碼總行數 | 247,688 |
+| 程式碼總行數 | 247,793 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -517,13 +517,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 60,508 行。
+> 14 個套件、約 60,548 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,254 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 33,391 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 33,431 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 166 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1053,7 +1053,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（33,391 行／241 檔）
+#### `utils/agent_runtime/`（33,431 行／241 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1065,10 +1065,10 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `android_adapter.py` | 205 | Bridge checked Android sessions into the owned worker only with explicit trusted device-control leases. |
 | `android_commands.py` | 189 | Compile finite Android inputs behind same-connection identity checks; never dispatch raw model shell. |
 | `android_control.py` | 64 | Trusted Android control leases require real device fencing and independent per-command settlement. |
-| `android_getevent.py` | 139 | Report physical Android input from the kernel's evdev stream; injected input never reaches it. |
+| `android_getevent.py` | 140 | Report physical Android input from the kernel's evdev stream; injected input never reaches it. |
 | `android_geometry.py` | 99 | Exact half-open Android touch-region coverage for whole pointer paths, including swipe interiors. |
 | `android_helper_client.py` | 142 | Speak protocol version 1 to the device-side helper; every reply has a closed schema or is refused. |
-| `android_helper_provider.py` | 173 | The trusted Android control provider: device-side fencing and settlement through the helper. |
+| `android_helper_provider.py` | 178 | The trusted Android control provider: device-side fencing and settlement through the helper. |
 | `android_hierarchy.py` | 287 | Parse bounded Android app hierarchies with explicit host text grants and private freshness signatures. |
 | `android_input_evidence.py` | 223 | Bind current Android dispatcher geometry and keyguard evidence without granting input authority. |
 | `android_input_windows.py` | 127 | Decode pinned AOSP input-window records without retaining foreign names or raw window dumps. |
@@ -1082,8 +1082,8 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `browser_environment.py` | 80 | Closed browser Python dependency reports; probing never starts Playwright or a browser. |
 | `browser_readonly_scope.py` | 35 | Narrow a frozen browser to a host-admitted verification scope without replacing input authority. |
 | `browser_retirement.py` | 51 | Exact live SDK retirement descriptions; serialized context IDs never grant authority. |
-| `browser_secrets.py` | 47 | Keep text a page marks `data-secret` out of a browser observation. |
-| `browser_target.py` | 227 | Own a WebRunner SDK session inside a managed helper, without importing browser engines. |
+| `browser_secrets.py` | 66 | Keep text a page marks `data-secret` out of a browser observation. |
+| `browser_target.py` | 224 | Own a WebRunner SDK session inside a managed helper, without importing browser engines. |
 | `browser_transfers.py` | 101 | Rooted file snapshots and atomic publication around WebRunner-owned browser transfers. |
 | `browser_validation.py` | 35 | Pure browser text and URL bounds shared without loading SDK or command dispatch. |
 | `browser_verification.py` | 91 | Pinned browser completion clauses use fresh bounded SDK reads, never agent claims or previews. |
@@ -1120,7 +1120,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `helper_environment.py` | 56 | Host-reviewed browser Python environments and bounded owned dependency-probe helpers. |
 | `helper_owner_linux.py` | 452 | Linux owner-service channel: one lease per helper, relayed JSON lines, fenced close. |
 | `images.py` | 42 | Bounded redacted JPEG validation is shared by point grounding, previews and persistence. |
-| `ios_adapter.py` | 297 | Bridge a WebDriverAgent session into the owned remote worker only with an explicit trusted control provider. |
+| `ios_adapter.py` | 298 | Bridge a WebDriverAgent session into the owned remote worker only with an explicit trusted control provider. |
 | `input_journal.py` | 96 | Durable resource witnesses prevent input transfer after an unreviewed host crash. |
 | `input_ledger.py` | 88 | Host-owned press announcements and acknowledged releases survive helper termination. |
 | `jobs.py` | 109 | Durable background dispatch over the existing fenced WorkQueue implementation. |
@@ -1148,12 +1148,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `readiness.py` | 85 | Passive readiness of the desktop, presence source, devices, browser and models; never a grant or evidence. |
 | `resume_gate.py` | 84 | A task's first action waits until a fresh observation passes every declared resume condition. |
 | `policy.py` | 132 | Explicit task scopes, rooted data paths and secret-safe durable payloads. |
-| `presence_channel_darwin.py` | 311 | Own authenticated macOS stream channels and protected listeners, with the Linux lease owner. |
+| `presence_channel_darwin.py` | 321 | Own authenticated macOS stream channels and protected listeners, with the Linux lease owner. |
 | `presence_channel_linux.py` | 434 | Own authenticated Linux packet channels, bounded leases and protected listeners. |
 | `presence_endpoint_darwin.py` | 113 | Own protected macOS socket paths, reusing the Linux identity checks where POSIX allows. |
 | `presence_endpoint_wire.py` | 29 | Carry a presence endpoint through owned launches, choosing the Linux or macOS shape by the metadata itself. |
 | `presence_endpoint_linux.py` | 226 | Own protected Linux socket paths without stale-path reuse or recursive cleanup. |
-| `presence_evdev.py` | 254 | Wayland physical presence: kernel evdev devices that are not virtual, plus logind lock state. |
+| `presence_evdev.py` | 259 | Wayland physical presence: kernel evdev devices that are not virtual, plus logind lock state. |
 | `presence_evdev_grab.py` | 89 | Recognise hosts where another program may hold a physical input device for itself. |
 | `presence_frames.py` | 137 | Closed finite JSON byte frames and exact presence request/result validation. |
 | `presence_broker.py` | 182 | Private broker with internally selected source ownership and normal busy/lease-lost results. |
@@ -1278,7 +1278,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `transfer_records.py` | 292 | Private transfer reservations bind consent and retain capacity until owned cleanup is confirmed. |
 | `transfer_selection.py` | 136 | Resolve only source-owned passed file criteria and their explicitly selected manifest names. |
 | `transfer_source.py` | 274 | Explicitly reviewed source artifacts publish immutable blobs under live host-derived authority. |
-| `transport.py` | 142 | Bounded HTTP requests; cancellation discards late inference replies before any input. |
+| `transport.py` | 144 | Bounded HTTP requests; cancellation discards late inference replies before any input. |
 | `trigger_config.py` | 69 | Validate durable trigger schedules and rooted file-version notifications without side effects. |
 | `trigger_history.py` | 89 | Renewed trigger lineages share accepted event tombstones and outstanding-task limits. |
 | `trigger_reauthorization.py` | 150 | Explicitly replace a trigger's unavailable origins while retaining its event history and template. |
@@ -1468,7 +1468,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | usb_devices | `usb_devices_tab.py` | 176 | 唯讀列舉 + 熱插拔監看控制。 |
 | usb_browser | `usb_browser_tab.py` | 277 | 檢視端 USB 裝置瀏覽器。 |
 | usb_share | `usb_passthrough_panel.py` + `usb_passthrough_prompt.py` | 779 | AnyDesk 風格 USB 直通面板與主機端 ACL 授權對話框。 |
-| diagnostics | `diagnostics_tab.py` | 248 | Actions 提供被動快照、背景主動診斷與停止；四語進度／重試、關閉後結果隔離；不自動取得授權。 |
+| diagnostics | `diagnostics_tab.py` | 270 | Actions 提供被動快照、背景主動診斷與停止；四語進度／重試、關閉後結果隔離；不自動取得授權。 |
 | report | `_report_tab.py` | 106 | 產生 HTML／JSON／XML 報表。 |
 
 #### 診斷顯示輔助
@@ -1617,7 +1617,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 167 | 44,045 |
+| `gui/` | 167 | 44,067 |
 | `utils/mcp_server/` | 63 | 22,352 |
 | `utils/remote_desktop/` | 77 | 16,997 |
 | `utils/executor/` | 11 | 10,822 |
@@ -1637,8 +1637,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 112,829 |
-| **總計** | **1,603** | **246,943** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 112,912 |
+| **總計** | **1,603** | **247,048** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

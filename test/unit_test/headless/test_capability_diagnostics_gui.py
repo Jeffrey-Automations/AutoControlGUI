@@ -98,3 +98,35 @@ def test_passive_probe_cancellation_retains_the_original_control(panel, monkeypa
     assert caught.value is original
     assert calls == []
     assert widget._table.rowCount() == 0
+
+
+def _finished(widget):
+    import time
+    deadline = time.monotonic() + 5
+    while widget._reset_task.running and time.monotonic() < deadline:
+        _APP.processEvents()
+    assert not widget._reset_task.running
+
+
+def test_the_native_input_reset_runs_off_the_gui_thread_under_its_own_role(panel, monkeypatch):
+    import threading
+    widget, _snapshot, calls = panel
+    seen = []
+    monkeypatch.setattr(diagnostics_tab, 'authorize_command', lambda name: seen.append(name))
+    monkeypatch.setattr(diagnostics_tab, 'reset_native_input', lambda _context: seen.append(threading.current_thread()))
+    dict(widget.menu_actions())['diag_reset_native_input']()
+    _finished(widget)
+    assert seen[0] == 'AC_reset_native_input' and seen[1] is not threading.main_thread()
+    assert calls == ['passive']
+
+
+def test_a_refused_native_input_reset_is_shown_and_resets_nothing(panel, monkeypatch):
+    widget, _snapshot, calls = panel
+
+    def refused(_name):
+        raise RuntimeError('role may not drive input')
+    monkeypatch.setattr(diagnostics_tab, 'authorize_command', refused)
+    monkeypatch.setattr(diagnostics_tab, 'reset_native_input', lambda _context: pytest.fail('reset was reached'))
+    dict(widget.menu_actions())['diag_reset_native_input']()
+    _finished(widget)
+    assert calls == [] and 'role may not drive input' in widget._progress_label.text()

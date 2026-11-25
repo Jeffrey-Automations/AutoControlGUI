@@ -120,7 +120,8 @@ def check_ios_arguments(name: str, arguments: dict[str, Any]) -> None:
     if name not in fields or not isinstance(arguments, dict) or set(arguments) - fields[name]:
         raise AgentTaskError("iOS action has an unreviewed tool or argument")
     if name == "AC_ios_press_key":
-        if arguments.get("key") not in _KEYS:
+        key = arguments.get("key")
+        if not isinstance(key, str) or key not in _KEYS:
             raise AgentTaskError("iOS key is outside the finite hardware-button set")
         return
     _check_points(arguments, ("x", "y") if name == "AC_ios_tap" else ("x1", "y1", "x2", "y2"))

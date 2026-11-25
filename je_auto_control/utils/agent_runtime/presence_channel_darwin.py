@@ -126,6 +126,18 @@ def _take_frame(pending: bytearray) -> bytes | None:
     return raw
 
 
+def _missing(pending: bytearray) -> int:
+    """How many bytes the frame at the front of an incomplete buffer still needs.
+
+    Never more than that is read: a following frame stays in the socket, where the caller's
+    wait for readability can see it.
+    """
+    if len(pending) < _HEADER.size:
+        return _HEADER.size - len(pending)
+    length, = _HEADER.unpack_from(pending)
+    return int(_HEADER.size + length - len(pending))
+
+
 def frame_bytes(frame: dict[str, Any]) -> bytes:
     """One length-prefixed encoded frame."""
     raw = encode_frame(frame)
@@ -199,14 +211,12 @@ class DarwinChannel:
                     return decode_frame(raw)
                 self._owner.ready(resources.connection, deadline, cancel)
                 try:
-                    chunk = resources.connection.recv(_HEADER.size + _FRAME_LIMIT)
+                    chunk = resources.connection.recv(_missing(resources.pending))
                 except (BlockingIOError, InterruptedError):
                     continue
                 if not chunk:
                     raise AgentTaskError('macOS channel peer closed the connection')
                 resources.pending.extend(chunk)
-                if len(resources.pending) > 2 * (_HEADER.size + _FRAME_LIMIT):
-                    raise AgentTaskError('macOS channel received more than one pending frame')
 
     def send(self, frame: dict[str, Any], *, timeout: float, cancel: threading.Event | None = None) -> None:
         """Send exactly one frame while retaining the original live peer."""

@@ -355,3 +355,33 @@ def test_unannounced_keys_settle_before_they_refuse_and_are_forgotten_with_their
     keys.forget("a")
     assert keys.check(set(), set(), 9.0) == (False, False)
     assert keys.check({("a", 1)}, {("a", 1)}, 9.0) == (False, False)
+
+
+def test_a_key_released_among_discarded_events_is_not_taken_for_a_grab(monkeypatch):
+    path, now, queued = "/dev/input/event0", [0.0], []
+    answers = [()]  # the key state each query in turn reports; the last one repeats
+
+    def ioctl(_descriptor, _request, state, _mutate):
+        for code in answers[0] if len(answers) == 1 else answers.pop(0):
+            state[code // 8] |= 1 << code % 8
+
+    def read(_descriptor, _size):
+        if not queued:
+            raise BlockingIOError
+        return queued.pop(0)
+    monkeypatch.setattr(presence_evdev.importlib, "import_module", lambda _name: type(
+        "F", (), {"ioctl": staticmethod(ioctl)}))
+    monkeypatch.setattr(presence_evdev.select, "select", lambda fds, *_rest: (fds if queued else [], [], []))
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: [path], remapper=lambda: False, clock=lambda: now[0],
+                              opener=lambda _path: os.open(os.devnull, os.O_RDONLY))
+    source.open(lambda: None)
+    try:
+        with monkeypatch.context() as patched:
+            patched.setattr(presence_evdev.os, "read", read)
+            answers[:] = [(30,), ()]  # down before the round, up again by the query after SYN_DROPPED
+            queued.append(event(0, 3, 0))
+            assert source.poll(0.01) == (True, False)
+            now[0] = 0.5
+            assert source.poll(0.01) == (True, False)
+    finally:
+        source.close()
