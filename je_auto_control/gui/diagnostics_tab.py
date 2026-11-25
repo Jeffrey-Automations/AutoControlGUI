@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -235,6 +236,13 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         self.execution_details.publish(ExecutionDetails(
             phase, text, self._view.completed, self._view.total if self._active_task is not None else 0,
         ))
+
+    def dispose(self) -> None:
+        """Drop a reset still running in the background; the registry calls it before deleting the tab.
+
+        Retiring the native session cannot be interrupted, so it runs to its end and its result is dropped.
+        """
+        release_resources(self)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Abandon this run's display and request cleanup without blocking or closing another owner."""
