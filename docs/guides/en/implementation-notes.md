@@ -641,8 +641,10 @@ client sees no global input, the source reads the kernel's evdev devices directl
 access) and ignores only devices under `/devices/virtual/input/`, which is where `uinput` injectors such as
 `ydotool` create theirs; Bluetooth keyboards and mice (`uhid`) stay in, and libei input never reaches evdev.
 One physical device that cannot be read refuses the source, and a device plugged in or removed, or a
-dropped-event marker, counts as activity: missing activity is never read as idleness. Do not use it beside a key remapper that
-grabs devices (keyd, input-remapper): a grabbed device's events never reach the source. On Linux the presence broker, worker and server now run over this transport: the owned
+dropped-event marker, counts as activity: missing activity is never read as idleness. A virtual (`uinput`) keyboard or
+pointer other than `ydotoold`'s refuses it, because a key remapper that grabs devices (keyd, input-remapper) needs one;
+so does a key the kernel reports down without an event. Motion on a device grabbed without such output, as a virtual
+machine's evdev passthrough can do, is not detected. On Linux the presence broker, worker and server now run over this transport: the owned
 worker binds a fresh private endpoint and reports it in its bootstrap reply, the broker adopts only that
 endpoint, and connecting pins the listener to the process it names before the presence challenge. macOS
 uses the same flow over its own transport: a 0700 directory under the per-user temporary directory, a

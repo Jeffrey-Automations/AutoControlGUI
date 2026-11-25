@@ -274,7 +274,6 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      2026-11-26 以真實 headless Chromium 對本機 loopback 頁面驗過（U-20261126-06）：登入狀態、頁面身分、表單讀回、
      獨立 DOM 完成條件、舊觀察拒絕、來源限制、下載摘要、上傳不自動送出、根目錄拒絕、對話框轉人工、逾時與 session 清理。
      頁面標 `[data-secret]` 的文字已由 AutoControl 端遮蔽（`browser_secrets.py`，U-20261126-08）；在標記範圍外的 label 不在此列。
-     `DECIDE`（另一個 repo）：是否也在 WebRunner 的 `BrowserSession.observe()` 排除，讓其他呼叫者一起受惠。
      經獨立 helper 程序驗過讀取、取消、helper 崩潰與程序回收；該 helper 用暫存的 venv 加 `.pth`，不是已審閱的固定安裝。
      驗收腳本未收進 repo。
      真實外部頁面（非 loopback）、固定 helper 環境與長時間 session 的證據仍缺。
@@ -305,7 +304,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      驗證「實體／注入」判定的原生驗收（CI 只能證明注入事件不被誤計）。
      Wayland：維護者 2026-11-21 選定 evdev 讀取（`presence_evdev.py`，U-20261121-13）：只排除 `/devices/virtual/input/`
      （uinput；藍牙 uhid 仍計入），任一實體裝置或其鍵態讀不到就拒絕（U-20261126-01、-03 修正）；
-     鍵位重映射程式（keyd、input-remapper）以 `EVIOCGRAB` 獨占裝置時看不到真人輸入，未能偵測，只有文件警告（`DECIDE`）；只對 pipe 假裝置驗過，真實 Wayland 桌面與實體輸入驗收仍待完成。
+     可能獨占裝置的主機直接拒絕（維護者 2026-11-26 決定，U-20261126-10；沒有 uinput 輸出的獨占下只移動滑鼠仍偵測不到）；只對 pipe 假裝置驗過，真實 Wayland 桌面與實體輸入驗收仍待完成。
      目前不能解除不支援平台的共用桌面拒絕保護。
      Linux：presence_channel_linux 已接入自有 worker 啟動與可信 endpoint 傳遞（worker 經自有 bootstrap 回報
      endpoint，broker 只採用它，連線時核對 listener 程序），並沿用既有 presence challenge／lease；

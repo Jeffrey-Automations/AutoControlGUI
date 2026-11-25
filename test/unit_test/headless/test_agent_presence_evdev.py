@@ -8,6 +8,7 @@ import pytest
 from je_auto_control.utils.agent_runtime import presence_evdev
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.presence_evdev import EvdevPresenceAPI, _physical_nodes
+from je_auto_control.utils.agent_runtime.presence_evdev_grab import _WORD_BITS, UnannouncedKeys, virtual_remapper
 from je_auto_control.utils.agent_runtime.presence_platform import default_presence_api
 
 posix = pytest.mark.skipif(sys.platform == "win32", reason="select() takes only sockets on Windows")
@@ -24,7 +25,7 @@ def test_wayland_sessions_get_the_evdev_source():
 
 def test_no_readable_physical_device_refuses_to_start():
     source = EvdevPresenceAPI(lambda: True, nodes=lambda: ["/dev/input/event0"],
-                              opener=lambda path: (_ for _ in ()).throw(PermissionError(path)))
+                              opener=lambda path: (_ for _ in ()).throw(PermissionError(13, "denied", path)))
     with pytest.raises(AgentTaskError, match="cannot read every"):
         source.open(lambda: None)
     with pytest.raises(AgentTaskError, match="cannot restart"):
@@ -215,3 +216,142 @@ def test_an_unreadable_key_state_refuses_the_source_at_start(devices):
     with pytest.raises(AgentTaskError, match="key state"):
         source.open(lambda: None)
     assert source._fds == {}
+
+
+class Sysfs:
+    """Event nodes with a device directory each, as sysfs lays them out."""
+
+    def __init__(self, base):
+        self.devices, self.sysfs, self.root = base / "devices", base / "class", base / "input"
+        self.root.mkdir()
+
+    def add(self, node, parent, name, ev, key="0"):
+        target = self.devices / parent
+        (target / "capabilities").mkdir(parents=True)
+        (target / "name").write_text(name + "\n", encoding="utf-8")
+        (target / "capabilities" / "ev").write_text(ev + "\n", encoding="utf-8")
+        (target / "capabilities" / "key").write_text(key + "\n", encoding="utf-8")
+        (self.sysfs / node).mkdir(parents=True)
+        os.symlink(target, self.sysfs / node / "device")
+        (self.root / node).touch()
+        return target
+
+    def remapper(self):
+        return virtual_remapper(str(self.root), str(self.sysfs))
+
+
+def mask(*bits):
+    words = {}
+    for bit in bits:
+        words[bit // _WORD_BITS] = words.get(bit // _WORD_BITS, 0) | 1 << bit % _WORD_BITS
+    return " ".join(format(words.get(index, 0), "x") for index in range(max(words), -1, -1))
+
+
+sysfs_links = pytest.mark.skipif(sys.platform == "win32", reason="sysfs symlinks need POSIX")
+
+
+@sysfs_links
+@pytest.mark.parametrize("ev,key", [(mask(0, 1), mask(30)), (mask(0, 1), mask(0x110)), (mask(0, 1, 2), mask(0x110))])
+def test_a_virtual_keyboard_or_pointer_refuses_the_source(tmp_path, ev, key):
+    sysfs = Sysfs(tmp_path)
+    sysfs.add("event0", "platform/i8042/serio0/input/input0", "AT keyboard", mask(0, 1), mask(30))
+    assert sysfs.remapper() is False
+    sysfs.add("event3", "virtual/input/input30", "keyd virtual keyboard", ev, key)
+    assert sysfs.remapper() is True
+
+
+@sysfs_links
+@pytest.mark.parametrize("parent,name,ev,key", [
+    ("virtual/input/input30", "Headset (AVRCP)", mask(0, 1), mask(200, 201)),       # media keys only
+    ("virtual/input/input30", "Virtual gamepad", mask(0, 1, 3), mask(0x130)),       # no keys, no pointer
+    ("virtual/input/input30", "ydotoold virtual device", mask(0, 1, 2), mask(30)),  # this project's injector
+    ("virtual/misc/uhid/0005/input/input9", "Bluetooth keyboard", mask(0, 1), mask(30)),
+])
+def test_devices_a_remapper_cannot_be_do_not_refuse_the_source(tmp_path, parent, name, ev, key):
+    sysfs = Sysfs(tmp_path)
+    sysfs.add("event3", parent, name, ev, key)
+    assert sysfs.remapper() is False
+
+
+@sysfs_links
+def test_a_virtual_device_that_cannot_be_read_refuses_the_source(tmp_path):
+    sysfs = Sysfs(tmp_path)
+    target = sysfs.add("event3", "virtual/input/input30", "x", mask(0, 1), "not hexadecimal")
+    assert sysfs.remapper() is True
+    (target / "name").unlink()
+    assert sysfs.remapper() is True
+    (sysfs.root / "event3").unlink()
+    assert sysfs.remapper() is False
+
+
+def test_a_remapper_refuses_to_start_and_stops_a_running_source():
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: [], remapper=lambda: True)
+    with pytest.raises(AgentTaskError, match="virtual keyboard or pointer"):
+        source.open(lambda: None)
+
+
+@posix
+def test_a_remapper_started_later_stops_the_source(devices):
+    devices.add("/dev/input/event0")
+    present, now = [], [0.0]
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: list(devices.present), opener=devices.opener,
+                              clock=lambda: now[0], remapper=lambda: bool(present))
+    source.open(lambda: None)
+    try:
+        source.poll(0.01)
+        present.append(True)
+        now[0] = 2.0
+        with pytest.raises(AgentTaskError, match="virtual keyboard or pointer"):
+            source.poll(0.01)
+    finally:
+        source.close()
+
+
+@posix
+def test_a_key_the_kernel_reports_without_an_event_is_activity_and_then_a_refusal(devices):
+    devices.add("/dev/input/event0")
+    calls, now = [], [0.0]
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: list(devices.present), opener=devices.opener,
+                              clock=lambda: now[0])
+    source.open(lambda: calls.append(True))
+    try:
+        devices.down = (30,)
+        source.poll(0.01)
+        assert calls == [True]
+        devices.down = ()  # already released: the person still was there
+        now[0] = 0.05
+        with pytest.raises(AgentTaskError, match="held by another program"):
+            source.poll(0.01)
+    finally:
+        source.close()
+
+
+@posix
+def test_an_event_that_arrives_just_after_the_key_state_explains_it(devices):
+    devices.add("/dev/input/event0")
+    now = [0.0]
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: list(devices.present), opener=devices.opener,
+                              clock=lambda: now[0])
+    source.open(lambda: None)
+    try:
+        devices.down = (30,)
+        source.poll(0.01)
+        devices.write("/dev/input/event0", event(1, 30, 1), event(0, 0, 0))
+        now[0] = 0.05
+        assert source.poll(0.01) == (True, True)
+        devices.down = ()
+        devices.write("/dev/input/event0", event(1, 30, 0), event(0, 0, 0))
+        now[0] = 0.10
+        assert source.poll(0.01) == (True, False)
+    finally:
+        source.close()
+
+
+def test_unannounced_keys_settle_before_they_refuse_and_are_forgotten_with_their_device():
+    keys = UnannouncedKeys()
+    assert keys.check({("a", 1)}, set(), 0.0) == (False, True)
+    assert keys.check(set(), set(), 0.01) == (False, True)
+    assert keys.check(set(), set(), 0.03) == (True, True)
+    keys.forget("a")
+    assert keys.check(set(), set(), 9.0) == (False, False)
+    assert keys.check({("a", 1)}, {("a", 1)}, 9.0) == (False, False)

@@ -16,10 +16,8 @@ as activity and re-reads which keys are held; a key state that cannot be read re
 the source. Seat usability comes from the same logind query the X11 source uses.
 
 This is a host trust decision, not a sandbox: an account that may write evdev
-nodes or create kernel input drivers can still forge physical input. A key remapper
-that grabs a device (``EVIOCGRAB``: keyd, input-remapper) hides it: the kernel then
-delivers its events to the grabber alone, whose own output is a ``uinput`` device.
-Do not use this source on such a host.
+nodes or create kernel input drivers can still forge physical input. A host where
+another program may hold a device for itself is refused; see :mod:`presence_evdev_grab`.
 """
 from __future__ import annotations
 
@@ -33,6 +31,9 @@ import time
 from typing import Any, Callable
 
 from je_auto_control.utils.agent_runtime.errors import AgentControlBusy, AgentTaskError
+from je_auto_control.utils.agent_runtime.presence_evdev_grab import (
+    VIRTUAL_INPUT, UnannouncedKeys, virtual_remapper,
+)
 from je_auto_control.utils.agent_runtime.presence_platform import require_poll_timeout
 
 _EVENT = struct.Struct("@llHHi")  # struct input_event: timeval, type, code, value
@@ -43,7 +44,6 @@ _KEY_BYTES = 96  # KEY_MAX (0x2ff) + 1 bits
 _EVIOCGKEY = (2 << 30) | (_KEY_BYTES << 16) | (ord("E") << 8) | 0x18
 _RESCAN_SECONDS = 1.0
 _DRAIN_LIMIT = 4096
-_UINPUT = "/devices/virtual/input/"
 
 
 def _physical_nodes(root: str = "/dev/input", sysfs: str = "/sys/class/input") -> list[str]:
@@ -53,7 +53,7 @@ def _physical_nodes(root: str = "/dev/input", sysfs: str = "/sys/class/input") -
     except OSError:
         return []
     return [os.path.join(root, name) for name in names
-            if _UINPUT not in os.path.realpath(os.path.join(sysfs, name, "device")) + "/"]
+            if VIRTUAL_INPUT not in os.path.realpath(os.path.join(sysfs, name, "device")) + "/"]
 
 
 class EvdevPresenceAPI:
@@ -61,16 +61,19 @@ class EvdevPresenceAPI:
 
     def __init__(self, interactive: Callable[[], bool] | None = None, *,
                  nodes: Callable[[], list[str]] = _physical_nodes,
-                 opener: Callable[[str], int] | None = None,
+                 opener: Callable[[str], int] | None = None, remapper: Callable[[], bool] = virtual_remapper,
                  clock: Callable[[], float] = time.monotonic) -> None:
         if interactive is None:
             # pylint: disable-next=import-outside-toplevel  # reason: shares the X11 source's logind query
             from je_auto_control.utils.agent_runtime.presence_x11 import LogindSession
             interactive = LogindSession().interactive
-        self._interactive, self._nodes, self._clock = interactive, nodes, clock
+        self._interactive, self._nodes, self._clock, self._remapper = interactive, nodes, clock, remapper
         self._opener = opener if opener is not None else (
             lambda path: os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK") | getattr(os, "O_CLOEXEC")))
         self._fds: dict[str, int] = {}
+        # A second descriptor per device: asking one for its key state discards its queued key events.
+        self._state_fds: dict[str, int] = {}
+        self._unannounced, self._seen = UnannouncedKeys(), set[tuple[str, int]]()
         self._held: set[tuple[str, int]] = set()
         self._physical: Callable[[], None] | None = None
         self._thread: int | None = None
@@ -97,20 +100,23 @@ class EvdevPresenceAPI:
         self._changed = False  # the devices found at start are the baseline, not a change
 
     def _rescan(self) -> None:
+        if self._remapper():
+            raise AgentTaskError("Wayland physical presence is refused beside a virtual keyboard or pointer")
         current = set(self._nodes())
         for path in [path for path in self._fds if path not in current]:
             self._drop(path)
         for path in sorted(current - set(self._fds)):
             try:
-                descriptor = self._opener(path)
+                self._fds[path] = self._opener(path)
+                self._state_fds[path] = self._opener(path)
             except OSError as error:
                 if error.errno in (errno.ENOENT, errno.ENODEV, errno.ENXIO):
+                    self._drop(path)
                     continue  # unplugged between the listing and the open
                 # A person could be using a device this source cannot see.
                 raise AgentTaskError("Wayland physical presence cannot read every physical input device") from None
-            self._fds[path] = descriptor
             self._changed = True
-            if not self._seed_held(path, descriptor):
+            if not self._seed_held(path, self._fds[path]):
                 self._drop(path)
         self._scanned = self._clock()
 
@@ -120,28 +126,34 @@ class EvdevPresenceAPI:
         No event announces a key already down, and the query also removes key events still queued
         for this descriptor, so it must follow everything read so far, never precede it.
         """
+        down = self._down(path, descriptor)
+        if down is None:
+            return False
+        self._held = {item for item in self._held if item[0] != path} | down
+        return True
+
+    def _down(self, path: str, descriptor: int) -> set[tuple[str, int]] | None:
+        """The keys the kernel reports down on one device; None when it is gone."""
+        state = bytearray(_KEY_BYTES)
         try:
-            state = bytearray(_KEY_BYTES)
             importlib.import_module("fcntl").ioctl(descriptor, _EVIOCGKEY, state, True)
         except OSError as error:
             if error.errno == errno.ENODEV:
-                return False
+                return None
             raise AgentTaskError("Wayland physical presence cannot read a device's key state") from None
-        self._held = {item for item in self._held if item[0] != path}
-        for index, byte in enumerate(state):
-            for bit in range(8):
-                if byte >> bit & 1:
-                    self._held.add((path, index * 8 + bit))
-        return True
+        return {(path, index * 8 + bit) for index, byte in enumerate(state) for bit in range(8) if byte >> bit & 1}
 
     def _drop(self, path: str) -> None:
-        descriptor = self._fds.pop(path)
         self._changed = True
         self._held = {item for item in self._held if item[0] != path}
-        try:
-            os.close(descriptor)
-        except OSError:
-            pass  # the node is gone; its descriptor no longer names an open device
+        self._unannounced.forget(path)
+        for owned in (self._fds, self._state_fds):
+            descriptor = owned.pop(path, None)
+            try:
+                if descriptor is not None:
+                    os.close(descriptor)
+            except OSError:
+                pass  # the node is gone; its descriptor no longer names an open device
 
     def _read(self, path: str) -> bool:
         """Consume pending events of one device; True when any of them was input activity."""
@@ -163,15 +175,18 @@ class EvdevPresenceAPI:
                 _seconds, _micro, kind, code, value = _EVENT.unpack_from(raw, offset)
                 dropped |= kind == _EV_SYN and code == _SYN_DROPPED
                 active |= self._event(path, kind, code, value)
-            if dropped and not self._seed_held(path, self._fds[path]):
-                self._drop(path)
-                return True
+            if dropped:
+                self._unannounced.forget(path)
+                if not self._seed_held(path, self._fds[path]):
+                    self._drop(path)
+                    return True
         raise AgentControlBusy("physical presence input queue is still active")
 
     def _event(self, path: str, kind: int, code: int, value: int) -> bool:
         if kind == _EV_SYN:
             return code == _SYN_DROPPED  # the kernel discarded events this source never saw
         if kind == _EV_KEY:
+            self._seen.add((path, code))
             if value:
                 self._held.add((path, code))
             else:
@@ -188,13 +203,34 @@ class EvdevPresenceAPI:
             self._rescan()
         if not self._fds:
             raise AgentTaskError("Wayland physical presence lost every physical input device")
-        active = self._drain_ready(timeout)
+        active = self._observe(timeout)
         changed, self._changed = self._changed, False
         if active or changed:
             if self._physical is None:
                 raise AgentTaskError("physical presence callback is unavailable")
             self._physical()
         return self._interactive(), bool(self._held)
+
+    def _observe(self, timeout: float) -> bool:
+        """Drain events against the key state read before them; an unexplained key is activity, then a refusal."""
+        down = self._kernel_down()
+        self._seen.clear()
+        active = self._drain_ready(timeout)
+        grabbed, suspected = self._unannounced.check(
+            {item for item in down if item[0] in self._fds}, self._held | self._seen, self._clock())
+        if grabbed:
+            raise AgentTaskError("Wayland physical presence device is held by another program")
+        return active or suspected
+
+    def _kernel_down(self) -> set[tuple[str, int]]:
+        found: set[tuple[str, int]] = set()
+        for path, descriptor in list(self._state_fds.items()):
+            down = self._down(path, descriptor)
+            if down is None:
+                self._drop(path)
+            else:
+                found |= down
+        return found
 
     def _drain_ready(self, timeout: float) -> bool:
         readable, _write, _error = select.select(list(self._fds.values()), [], [], timeout)

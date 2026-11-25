@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-10 | 2026-11-26 | Refuse hosts that may grab input devices | #decision #presence #security | [2026-11-c](2026-11-c.md) |
 | U-20261126-09 | 2026-11-26 | Extend the native memory fixture cases | #memory #acceptance | [2026-11-c](2026-11-c.md) |
 | U-20261126-08 | 2026-11-26 | Withhold marked page text and verify the browser helper | #security #browser #acceptance #rbac | [2026-11-c](2026-11-c.md) |
 | U-20261126-07 | 2026-11-26 | Stop charging durable checkpoints to the read deadline | #incident #ci #memory #agent | [2026-11-c](2026-11-c.md) |
