@@ -515,3 +515,46 @@ def test_status_reports_rbac_instead_of_a_token_that_is_refused(users):
         stopped = rest_api_registry.stop()
     assert stopped["rbac"] is False
     assert stopped["token"] is None
+
+
+def test_a_store_opened_before_another_change_keeps_that_change(users):
+    """Each surface opens its own store; saving a stale copy brought a removed user back."""
+    from je_auto_control.utils.rbac.users import UserStore
+    stale = UserStore(users.path)
+    UserStore(users.path).remove_user("viewer-user")
+    UserStore(users.path).add_user(user_id="dana", display_name="", role=Role.VIEWER)
+    stale.rotate_token("operator-user")
+    kept = {record.user_id for record in UserStore(users.path).list_users()}
+    assert "viewer-user" not in kept
+    assert "dana" in kept
+
+
+def test_two_admins_demoted_at_once_still_leave_one(users, monkeypatch):
+    import threading
+    path = str(users.path)
+    admin.set_user_role("operator-user", Role.ADMIN, users_path=path)
+    both_checked = threading.Barrier(2)
+    original = admin._keep_an_admin
+
+    def slow(store, user_id, action):
+        original(store, user_id, action)
+        try:
+            both_checked.wait(0.5)
+        except threading.BrokenBarrierError:
+            pass
+    monkeypatch.setattr(admin, "_keep_an_admin", slow)
+    refused = []
+
+    def demote(user_id):
+        try:
+            admin.set_user_role(user_id, Role.VIEWER, users_path=path)
+        except UserAuthError:
+            refused.append(user_id)
+    threads = [threading.Thread(target=demote, args=(name,)) for name in ("admin-user", "operator-user")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10)
+    roles = {row["user_id"]: row["role"] for row in admin.list_users(users_path=path)}
+    assert len(refused) == 1
+    assert [name for name, role in roles.items() if role == Role.ADMIN] == refused

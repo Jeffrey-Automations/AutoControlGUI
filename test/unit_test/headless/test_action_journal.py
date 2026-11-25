@@ -340,3 +340,10 @@ def test_foreign_destination_reports_the_format_refusal(tmp_path):
     event = _event()
     with pytest.raises(ActionJournalError, match="destination has no committed journal"):
         journal.append(event)
+
+
+def test_a_record_nested_too_deep_to_parse_is_a_journal_error(tmp_path):
+    path = tmp_path / "deep.jsonl"
+    path.write_bytes(b"[" * 200_000 + bytes([10]))
+    with pytest.raises(ActionJournalError):
+        read_events(path)

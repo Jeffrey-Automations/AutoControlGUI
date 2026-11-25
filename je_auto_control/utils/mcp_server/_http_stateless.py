@@ -144,7 +144,7 @@ def stateless_refusal(headers: Headers,
     if message is None or message.get("id") is None or not isinstance(message.get("method"), str):
         return None
     msg_id, method = message["id"], message["method"]
-    params = message.get("params")
+    params = {} if message.get("params") is None else message["params"]
     if not isinstance(params, dict):
         return None
     refused = (_version_refusal(headers, msg_id, message, params)

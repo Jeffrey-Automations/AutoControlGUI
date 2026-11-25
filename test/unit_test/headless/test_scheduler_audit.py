@@ -11,6 +11,7 @@ import types
 
 import pytest
 
+from je_auto_control.utils.run_history.history_store import HistoryStoreError
 from je_auto_control.utils.scheduler import scheduler as sm
 
 _EDT, _EST = dt.timedelta(hours=-4), dt.timedelta(hours=-5)
@@ -110,3 +111,20 @@ def test_a_run_of_a_removed_job_leaves_its_successor_alone(quiet_scheduler):
     worker.join(5)
     assert new.runs == 0
     assert [job.job_id for job in scheduler.list_jobs()] == ["J"]
+
+
+@pytest.mark.parametrize("repeat", [True, False])
+def test_a_failing_history_store_does_not_rerun_the_job_every_tick(monkeypatch, quiet_scheduler, repeat):
+    """The run was settled after the history row, so a store failing there left the job due for ever."""
+    def broken(*_args, **_kwargs):
+        raise sm.default_history_store.error
+    sm.default_history_store.error = HistoryStoreError("database is locked")
+    sm.default_history_store.finish_run = broken
+    runs = []
+    scheduler = sm.Scheduler(executor=runs.append)
+    job = scheduler.add_job("x.json", 60.0, repeat=repeat, job_id="J")
+    job.next_run_ts = sm.time.monotonic()
+    for _ in range(3):
+        scheduler._tick_once()
+    assert len(runs) == 1
+    assert [live.runs for live in scheduler.list_jobs()] == ([1] if repeat else [])

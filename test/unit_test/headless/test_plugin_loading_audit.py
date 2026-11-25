@@ -105,3 +105,30 @@ def test_the_watcher_keeps_a_tool_another_file_still_defines(tmp_path):
     one.unlink()
     watcher.poll_once()
     assert list(server.tools) == ["plugin_ac_shared"]
+
+
+def test_a_plugin_that_exits_does_not_take_the_loader_with_it(tmp_path):
+    from je_auto_control.utils.plugin_loader import load_plugin_directory
+    (tmp_path / "a_exits.py").write_text("raise SystemExit(3)", encoding="utf-8")
+    (tmp_path / "b_good.py").write_text("def AC_good(): return 1", encoding="utf-8")
+    assert list(load_plugin_directory(str(tmp_path))) == ["AC_good"]
+    from je_auto_control.utils.mcp_server.plugin_watcher import PluginWatcher
+    from je_auto_control.utils.mcp_server.server import MCPServer
+    server = MCPServer(tools=[])
+    PluginWatcher(server, str(tmp_path)).poll_once()
+    assert list(server._tools) == ["plugin_ac_good"]
+
+
+def test_a_plugin_entry_point_that_exits_is_skipped():
+    from je_auto_control.utils.plugin_sdk import discover_plugins
+
+    class _Point:
+        def __init__(self, factory):
+            self.name, self._factory = "p", factory
+
+        def load(self):
+            return self._factory
+
+    def exits():
+        raise SystemExit(2)
+    assert list(discover_plugins(entry_points=[_Point(exits), _Point(lambda: {"AC_ok": len})])) == ["AC_ok"]

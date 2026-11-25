@@ -182,7 +182,10 @@ class ClientRequestMixin:
                 self._pending_outbound.pop(request_id, None)
         if "error" in slot:
             raise RuntimeError(f"{method} failed: {slot['error']}")
-        return slot.get("result") or {}
+        result = slot.get("result") or {}
+        if not isinstance(result, dict):
+            raise RuntimeError(f"{method} was answered with {type(result).__name__}, not an object")
+        return result
 
     def request_elicitation(self, message: str,
                             requested_schema: Optional[Dict[str, Any]] = None,

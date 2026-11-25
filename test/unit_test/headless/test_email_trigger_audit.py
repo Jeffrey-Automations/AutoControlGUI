@@ -91,3 +91,22 @@ def test_a_body_in_an_unknown_charset_is_kept():
         b"Content-Type: text/plain; charset=unknown-8bit\r\n\r\nhello world\r\n",
         policy=et.email.policy.default)
     assert et._extract_text_body(message) == "hello world"
+
+
+def test_one_mailbox_that_cannot_be_searched_does_not_stop_the_pass(tmp_path, history, monkeypatch):
+    """Search criteria imaplib cannot encode raised out of the pass and left the other mailboxes unread."""
+    script = tmp_path / "a.json"
+    script.write_text(json.dumps([["AC_noop"]]), encoding="utf-8")
+
+    class _Ascii(_Imap):
+        def uid(self, command, *args):
+            if command == "SEARCH":
+                args[0].encode("ascii")
+            return super().uid(command, *args)
+    monkeypatch.setattr(_Imap, "error", RuntimeError, raising=False)
+    monkeypatch.setattr(et.imaplib, "IMAP4_SSL", _Ascii)
+    watcher = et.EmailTriggerWatcher(executor=lambda actions, variables: None)
+    broken = watcher.add("imap.one.example", "u", "pw", str(script), search_criteria="SUBJECT " + chr(0x5DF2))
+    watcher.add("imap.two.example", "u", "pw", str(script))
+    assert watcher.poll_once() == 1
+    assert "UnicodeEncodeError" in str(broken.last_error)

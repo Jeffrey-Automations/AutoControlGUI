@@ -120,3 +120,19 @@ def test_without_roots_nothing_is_checked_or_rewritten(registry, tmp_path):
     arguments = _dag(str(tmp_path / "anywhere.json"))
     assert not _call(server, "ac_run_dag", arguments)[0]
     assert calls[0][1] == arguments
+
+
+def test_chatops_context_paths_are_held_to_the_roots(tmp_path):
+    from je_auto_control.utils.mcp_server._argument_policy import ArgumentPolicy
+    from je_auto_control.utils.mcp_server.tools import build_default_tool_registry
+    from je_auto_control.utils.path_guard import PathNotAllowedError
+    from je_auto_control.utils.path_guard.policy import PathPolicy
+    tool = next(item for item in build_default_tool_registry(read_only=False)
+                if item.name == "ac_chatops_dispatch")
+    root = tmp_path / "root"
+    root.mkdir()
+    policy = ArgumentPolicy(PathPolicy(roots=[str(root)]))
+    for key in ("script_root", "screenshot_dir"):
+        with pytest.raises(PathNotAllowedError):
+            policy.apply(tool.name, tool.input_schema, {"message": "/run a.json", "context": {key: str(tmp_path)}})
+    policy.apply(tool.name, tool.input_schema, {"message": "hi", "context": {"script_root": str(root), "user": "x"}})

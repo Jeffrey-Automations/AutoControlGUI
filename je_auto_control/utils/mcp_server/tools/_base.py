@@ -240,6 +240,11 @@ SUITE_SPEC = {"type": "object", "properties": {"cases": {
         "type": "object", "properties": {"path": _PATH}}}}}}}
 
 
+#: A chat message's context: ``/run`` reads ``script_root`` and ``/screenshot``
+#: writes into ``screenshot_dir``. Everything else in it is free-form.
+CHATOPS_CONTEXT = {"type": "object", "properties": {"script_root": _PATH, "screenshot_dir": _PATH}}
+
+
 # Pre-built annotation singletons used by every tool factory.
 DESTRUCTIVE = MCPToolAnnotations(destructive=True)
 NON_DESTRUCTIVE = MCPToolAnnotations(destructive=False, idempotent=True)

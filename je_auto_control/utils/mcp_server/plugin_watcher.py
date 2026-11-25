@@ -7,6 +7,7 @@ plugin loader and registers / unregisters MCP tools so the model
 sees the updated catalogue without a server restart.
 """
 import os
+import pathlib
 import threading
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -63,7 +64,7 @@ class PluginWatcher:
             if not entry.endswith(".py") or entry.startswith("_"):
                 continue
             full = os.path.join(self._directory, entry)
-            if not os.path.isfile(full):
+            if not os.path.isfile(full) or self._is_foreign(full):
                 continue
             seen.add(full)
             try:
@@ -77,6 +78,11 @@ class PluginWatcher:
             self._unregister_file(stale)
 
     # --- internals ----------------------------------------------------------
+
+    def _is_foreign(self, path: str) -> bool:
+        """Whether ``path`` is a link out of the directory, as ``load_plugin_directory`` refuses."""
+        from je_auto_control.utils.plugin_loader import plugin_loader
+        return not plugin_loader._inside(pathlib.Path(self._directory), pathlib.Path(path))
 
     def _run(self, stop: threading.Event) -> None:
         autocontrol_logger.info(
@@ -131,7 +137,8 @@ class PluginWatcher:
             commands = load_plugin_file(path)
             return [make_plugin_tool(raw_name, handler)
                     for raw_name, handler in commands.items()]
-        except Exception as error:  # pylint: disable=broad-exception-caught  # reason: plugin code is untrusted and may raise anything
+        # SystemExit: a script that calls sys.exit() ended the watcher thread.
+        except (Exception, SystemExit) as error:  # pylint: disable=broad-exception-caught  # reason: plugin code is untrusted and may raise anything
             autocontrol_logger.warning(
                 "plugin %s reload failed, keeping previous tools: %r",
                 path, error,

@@ -7,6 +7,7 @@ run-history failure dropped the connection without a response.
 import http.client
 import io
 import json
+import socket
 import types
 
 import pytest
@@ -90,3 +91,31 @@ def test_bad_or_oversized_chunked_bodies_are_refused(stream, too_large):
     with pytest.raises(ChunkedBodyError) as caught:
         read_chunked_body(body, 100)
     assert caught.value.too_large is too_large
+
+
+def test_a_history_failure_after_the_run_is_not_reported_as_unfired(server, monkeypatch):
+    """The sender was told fired=false for a script that had run, and retried it."""
+    def broken(*_args, **_kwargs):
+        raise HistoryStoreError("database is locked")
+    monkeypatch.setattr(ws.default_history_store, "finish_run", broken)
+    status, body = _request(server, b"{}", {"Authorization": "Bearer abc123"})
+    assert (status, json.loads(body)["fired"]) == (200, True)
+    assert len(server.captured) == 1
+    assert server.list_webhooks()[0].fired == 1
+
+
+@pytest.mark.parametrize("revoke", [
+    lambda server, trigger: server.remove(trigger.webhook_id),
+    lambda server, trigger: server.set_enabled(trigger.webhook_id, False),
+])
+def test_a_webhook_revoked_while_its_request_waited_does_not_run(server, revoke):
+    trigger = server.list_webhooks()[0]
+    revoke(server, trigger)
+    assert server.fire(trigger, {}) is None
+    assert server.captured == []
+
+
+def test_an_unparseable_request_target_is_answered(server):
+    with socket.create_connection(server.address, timeout=5) as client:
+        client.sendall(b"GET http://[ HTTP/1.0" + bytes([13, 10, 13, 10]))
+        assert b" 400 " in client.recv(4096)

@@ -55,7 +55,7 @@ def load_plugin_directory(directory: str) -> Dict[str, Callable[..., Any]]:
             continue
         try:
             commands = load_plugin_file(str(file_path))
-        except Exception as error:  # noqa: BLE001  # reason: plugin code is untrusted and may raise anything; one broken file must not stop the rest of the directory loading
+        except (Exception, SystemExit) as error:  # noqa: BLE001  # reason: plugin code is untrusted and may raise anything; one broken file must not stop the rest of the directory loading
             autocontrol_logger.error("plugin %s failed to load: %r",
                                      file_path, error)
             continue

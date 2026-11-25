@@ -108,7 +108,8 @@ class FileSystemProvider(ResourceProvider):
                 or any(char in rel for char in "/\\:")):
             return None
         path = os.path.realpath(os.path.join(self.root, rel))
-        if not path.startswith(self.root + os.sep) and path != self.root:
+        # join: "/" and a drive root already end in the separator.
+        if not path.startswith(os.path.join(self.root, "")):
             return None
         if not os.path.isfile(path):
             return None

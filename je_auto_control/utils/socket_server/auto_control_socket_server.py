@@ -3,7 +3,6 @@ import socket
 import socketserver
 import threading
 
-from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.executor.action_executor import execute_action
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.script_vars.execution import execution_scope
@@ -84,6 +83,11 @@ def _close_server_async(server: socketserver.BaseServer) -> None:
                      daemon=True).start()
 
 
+def _wire_text(value: object) -> bytes:
+    """``str(value)`` as UTF-8, a lone surrogate (an undecodable file name) escaped."""
+    return str(value).encode("utf-8", errors="backslashreplace")
+
+
 _HANDLER_TIMEOUT_S = 30.0
 
 
@@ -112,7 +116,7 @@ class TCPServerHandler(socketserver.BaseRequestHandler):
                 with execution_scope():  # one command, one variable scope
                     execute_record = execute_action(execute_str)
                 for execute_return in execute_record.values():
-                    socket.sendall(str(execute_return).encode("utf-8"))
+                    socket.sendall(_wire_text(execute_return))
                     socket.sendall("\n".encode("utf-8"))
                 socket.sendall("Return_Data_Over_JE".encode("utf-8"))
                 socket.sendall("\n".encode("utf-8"))
@@ -120,12 +124,13 @@ class TCPServerHandler(socketserver.BaseRequestHandler):
             # empty payload raises AutoControlActionNullException and an unknown
             # command AutoControlActionException. Missing it here killed the
             # handler thread, so the client saw a bare EOF with no error line or
-            # terminator. Catch the family and always answer with the error +
-            # the Return_Data_Over_JE sentinel below.
-            except (ValueError, RuntimeError, AutoControlException) as error:
+            # terminator. sqlite3 and cv2 errors derive from Exception alone and
+            # did the same. Always answer with the error + the
+            # Return_Data_Over_JE sentinel below.
+            except Exception as error:  # noqa: BLE001  # reason: whatever a command raised, the client must get its reply
                 autocontrol_logger.error("socket command failed: %r", error)
                 try:
-                    socket.sendall(str(error).encode("utf-8"))
+                    socket.sendall(_wire_text(error))
                     socket.sendall("\n".encode("utf-8"))
                     socket.sendall("Return_Data_Over_JE".encode("utf-8"))
                     socket.sendall("\n".encode("utf-8"))

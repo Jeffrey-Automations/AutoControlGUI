@@ -267,3 +267,8 @@ def test_hmac_signing_still_works_without_cryptography(tmp_path, monkeypatch):
     path = _script(tmp_path)
     sign_action_file(path, _HMAC_KEY)
     assert verify_action_file(path, _HMAC_KEY).verified is True
+
+
+def test_a_sidecar_nested_too_deep_to_parse_fails_verification():
+    from je_auto_control.utils.action_signing import asymmetric
+    assert asymmetric._parse_envelope('{"a":' * 200_000) is None

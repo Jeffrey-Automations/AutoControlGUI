@@ -1,3 +1,4 @@
+import inspect
 import threading
 import types
 from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
@@ -2270,7 +2271,9 @@ _EXECUTOR_METRIC_CACHE: Dict[str, Any] = {}
 
 def _executor_metrics() -> Dict[str, Any]:
     """Lazily register the action-executor Counter + Histogram (Phase 10.1)."""
-    if "calls" in _EXECUTOR_METRIC_CACHE:
+    # The last one added: with "calls", an action on another thread found the
+    # cache half filled and was recorded as failed (KeyError 'duration').
+    if "duration" in _EXECUTOR_METRIC_CACHE:
         return _EXECUTOR_METRIC_CACHE
     from je_auto_control.utils.observability import (
         Counter, Histogram, default_registry,
@@ -8353,8 +8356,22 @@ class Executor:
                     resolved[key] = interpolate_value(value, self.variables)
             return resolved
         if isinstance(args, list):
-            return [interpolate_value(item, self.variables) for item in args]
+            positions = self._deferred_positions(command)
+            return [item if index in positions else interpolate_value(item, self.variables)
+                    for index, item in enumerate(args)]
         return args
+
+    def _deferred_positions(self, command: str) -> FrozenSet[int]:
+        """The positional arguments of ``command`` that hold a deferred action list.
+
+        The keys were honoured for named arguments only, so
+        ``["AC_execute_action", [[...]]]`` was still expanded twice.
+        """
+        keys = self._DEFERRED_COMMAND_KEYS.get(command)
+        if keys is None:
+            return frozenset()
+        names = inspect.signature(self.event_dict[command]).parameters
+        return frozenset(index for index, name in enumerate(names) if name in keys)
 
     def _execute_event(self, action: List[Any]) -> Any:
         """
@@ -8549,9 +8566,10 @@ class Executor:
         # is contained (recorded) here rather than aborting the whole script.
         # ArithmeticError: an OverflowError (a date past year 9999, int() of
         # an infinite float) or a ZeroDivisionError is a failed action too;
-        # it used to abort every remaining action.
+        # it used to abort every remaining action. ImportError: so is a command
+        # whose optional package is not installed.
         except (AutoControlException, OSError, RuntimeError, ArithmeticError,
-                AttributeError, TypeError, ValueError, LookupError) as error:
+                AttributeError, TypeError, ValueError, LookupError, ImportError) as error:
             _observe_executor_metrics(action_name, started, error=error)
             # A failed ``AC_assert_*`` (raise_on_fail=True) is a deliberate
             # fail signal, not an incidental error, so it still propagates even

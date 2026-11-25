@@ -134,6 +134,21 @@ class _RestRequestHandler(BaseHTTPRequestHandler):
         autocontrol_logger.info("rest-api %s - %s",
                                 self.address_string(), log_safe(format % args))
 
+    def parse_request(self) -> bool:
+        """As the stdlib does, refusing a target no handler here could route.
+
+        An absolute-form target such as ``http://[`` made ``urlparse`` raise
+        in the handler, before authentication, and dropped the connection.
+        """
+        if not super().parse_request():
+            return False
+        try:
+            urlparse(self.path)
+        except ValueError:
+            self._send_json({"error": "invalid request target"}, status=400)
+            return False
+        return True
+
     def do_GET(self) -> None:  # noqa: N802  # reason: stdlib API
         parsed = urlparse(self.path)
         if parsed.path == _PATH_METRICS:

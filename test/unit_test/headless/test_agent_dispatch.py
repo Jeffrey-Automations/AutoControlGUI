@@ -72,3 +72,11 @@ def test_task_guard_survives_parallel_worker_boundary():
     with command_guard(guard), pytest.raises(AutoControlException, match="refused"):
         executor.execute_one("AC_parallel", {"branches": [[["AC_forbidden_test"]]]})
     assert calls == []
+
+
+@pytest.mark.parametrize("name", ["AC_break", "AC_continue"])
+def test_single_dispatch_of_a_loop_signal_is_a_framework_error(name):
+    from je_auto_control.utils.exception.exceptions import AutoControlActionException
+    from je_auto_control.utils.executor.action_executor import Executor
+    with pytest.raises(AutoControlActionException, match="outside a loop"):
+        Executor().execute_one(name)

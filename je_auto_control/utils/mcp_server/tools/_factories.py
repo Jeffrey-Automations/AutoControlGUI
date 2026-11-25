@@ -33,8 +33,8 @@ from je_auto_control.utils.mcp_server.tools import _handlers_journal as h_journa
 from je_auto_control.utils.mcp_server.tools import _handlers_scheduling as h_sched
 from je_auto_control.utils.mcp_server.tools import _handlers_remote as h_remote
 from je_auto_control.utils.mcp_server.tools._base import (
-    ASSERTION_SPEC, DAG_DEFINITION, DESTRUCTIVE, MCPTool, MCPToolAnnotations, NON_DESTRUCTIVE, READ_ONLY,
-    SIDE_EFFECT_ONLY, SUITE_SPEC, schema,
+    ASSERTION_SPEC, CHATOPS_CONTEXT, DAG_DEFINITION, DESTRUCTIVE, MCPTool, MCPToolAnnotations, NON_DESTRUCTIVE,
+    READ_ONLY, SIDE_EFFECT_ONLY, SUITE_SPEC, schema,
 )
 
 #: A JSON document argument: an object or an array (a root array was refused).
@@ -1022,7 +1022,7 @@ def chatops_tools() -> List[MCPTool]:
                          "reply back to Slack / Discord / webhook."),
             input_schema=schema({
                 "message": {"type": "string"},
-                "context": {"type": "object"},
+                "context": CHATOPS_CONTEXT,
                 "script_root": {"type": "string", "format": "path"},
             }, required=["message"]),
             handler=h_ops.chatops_dispatch,

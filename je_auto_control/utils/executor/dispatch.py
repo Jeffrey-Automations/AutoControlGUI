@@ -50,6 +50,7 @@ def execute_one(executor: Executor, name: str, arguments: Optional[Mapping[str, 
     """Execute one validated public command, returning its raw value and propagating failures."""
     from je_auto_control.utils.action_journal.capture import action_step
     from je_auto_control.utils.executor.action_executor import _RUNNING, _STRICT_BODIES
+    from je_auto_control.utils.executor.flow_control import LoopBreak, LoopContinue
     from je_auto_control.utils.logging.secret_scope import secret_log_scope
 
     action = _prepare(executor, name, arguments)
@@ -60,7 +61,10 @@ def execute_one(executor: Executor, name: str, arguments: Optional[Mapping[str, 
     try:
         with secret_log_scope(), action_step(action) as captured:
             record: dict[str, Any] = {}
-            executor._run_one_action(action, record, True, name)
+            try:
+                executor._run_one_action(action, record, True, name)
+            except (LoopBreak, LoopContinue) as signal:  # no loop encloses a single command
+                executor._record_unwound_signal(signal, record, True, name)
             result = record[name]
             if captured is not None:
                 captured.outcome = result

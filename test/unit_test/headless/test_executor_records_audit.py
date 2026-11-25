@@ -19,6 +19,21 @@ def ex():
     return local
 
 
+@pytest.mark.parametrize("params", [
+    {"action_list": [["AC_note_value", {"text": "${ocr}"}]]},
+    [[["AC_note_value", {"text": "${ocr}"}]]],
+])
+def test_nested_actions_are_expanded_once_however_they_are_passed(params):
+    """A positional action list was expanded at dispatch and again when it ran."""
+    engine = Executor()
+    seen = []
+    engine.event_dict["AC_note_value"] = lambda text: seen.append(text)
+    engine.variables.set("ocr", "${secret_text}")
+    engine.variables.set("secret_text", "LEAKED")
+    engine.execute_action([["AC_execute_action", params]])
+    assert seen == ["${secret_text}"]
+
+
 def test_dag_node_actions_are_expanded_once():
     seen = []
     global_executor.event_dict["AC_fake_echo"] = lambda v: seen.append(v)

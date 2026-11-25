@@ -27,7 +27,7 @@ from je_auto_control.utils.rbac.authorization import (
     AuthorizationError, current_authorization, user_store_from_env,
 )
 from je_auto_control.utils.rbac.users import (
-    Capability, Role, UserAuthError, UserRecord, UserStore,
+    STORE_CHANGES, Capability, Role, UserAuthError, UserRecord, UserStore,
 )
 
 _MASK = "<shown once>"
@@ -128,9 +128,10 @@ def add_user(user_id: str, role: str = Role.VIEWER, display_name: str = "",
 
 def remove_user(user_id: str, users_path: Optional[str] = None) -> Dict[str, Any]:
     """Remove a user; ``{"removed": False}`` when there was no such user."""
-    store = management_store(users_path)
-    _keep_an_admin(store, str(user_id), "remove")
-    removed = store.remove_user(str(user_id))
+    with STORE_CHANGES:  # the check and the change: two admins could remove each other
+        store = management_store(users_path)
+        _keep_an_admin(store, str(user_id), "remove")
+        removed = store.remove_user(str(user_id))
     if removed:
         _audit("user_removed", str(user_id), "")
     return {"user_id": str(user_id), "removed": removed}
@@ -139,10 +140,11 @@ def remove_user(user_id: str, users_path: Optional[str] = None) -> Dict[str, Any
 def set_user_role(user_id: str, role: str,
                   users_path: Optional[str] = None) -> Dict[str, Any]:
     """Change a user's role; it applies to their next request and their deferred work."""
-    store = management_store(users_path)
-    if role != Role.ADMIN:
-        _keep_an_admin(store, str(user_id), "demote")
-    store.set_role(str(user_id), str(role))
+    with STORE_CHANGES:
+        store = management_store(users_path)
+        if role != Role.ADMIN:
+            _keep_an_admin(store, str(user_id), "demote")
+        store.set_role(str(user_id), str(role))
     _audit("user_role_set", str(user_id), f"role={role}")
     return {"user_id": str(user_id), "role": str(role)}
 

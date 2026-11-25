@@ -165,3 +165,37 @@ def test_dispatch_contains_sqlite_error():
 
     assert sent["status"] == 500
     assert any(status == 500 for _, _, status in server.metrics.requests)
+
+
+def _answer(monkeypatch, error):
+    def boom(_payload):
+        raise error
+    monkeypatch.setattr(ss, "execute_action", boom)
+    handler = ss.TCPServerHandler.__new__(ss.TCPServerHandler)
+    handler.request = request = _FakeRequest([b'[["AC_x"]]' + bytes([10])])
+    handler.server = object()
+    handler.handle()
+    return b"".join(request.sent)
+
+
+def test_an_error_outside_the_framework_family_is_answered(monkeypatch):
+    """sqlite3 and cv2 errors derive from Exception alone; the client got a bare EOF."""
+    joined = _answer(monkeypatch, sqlite3.OperationalError("database is locked"))
+    assert b"database is locked" in joined
+    assert joined.endswith(b"Return_Data_Over_JE" + bytes([10]))
+
+
+def test_an_error_text_that_is_not_utf8_is_answered(monkeypatch):
+    joined = _answer(monkeypatch, AutoControlActionException("unknown command " + chr(0xD800)))
+    assert b"unknown command" in joined
+    assert joined.endswith(b"Return_Data_Over_JE" + bytes([10]))
+
+
+def test_a_result_that_is_not_utf8_is_sent_escaped(monkeypatch):
+    monkeypatch.setattr(ss, "execute_action", lambda _payload: {"a": "file" + chr(0xDC80), "b": "ok"})
+    handler = ss.TCPServerHandler.__new__(ss.TCPServerHandler)
+    handler.request = request = _FakeRequest([b'[["AC_x"]]' + bytes([10])])
+    handler.server = object()
+    handler.handle()
+    lines = b"".join(request.sent).split(bytes([10]))
+    assert lines[1:3] == [b"ok", b"Return_Data_Over_JE"]

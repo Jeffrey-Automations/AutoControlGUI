@@ -46,7 +46,7 @@ def discover_plugins(group: str = COMMANDS_GROUP,
         try:
             factory = point.load()
             produced = factory()
-        except Exception as error:  # noqa: BLE001  # reason: plugin isolation — a single broken third-party plugin (SyntaxError/KeyError/OSError/... at import or factory time) must be skipped and logged, never abort discovery of the rest
+        except (Exception, SystemExit) as error:  # noqa: BLE001  # reason: plugin isolation — a single broken third-party plugin (SyntaxError/KeyError/OSError/... at import or factory time) must be skipped and logged, never abort discovery of the rest
             from je_auto_control.utils.logging.logging_instance import (
                 autocontrol_logger)
             autocontrol_logger.warning(

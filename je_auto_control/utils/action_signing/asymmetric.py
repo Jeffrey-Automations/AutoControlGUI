@@ -193,7 +193,7 @@ def _parse_envelope(sidecar_text: str) -> Optional[Dict[str, Any]]:
     """Return the envelope when it is a well-formed version-2 one, else ``None``."""
     try:
         envelope = json.loads(sidecar_text)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
     if not isinstance(envelope, dict) or not isinstance(envelope.get("signature"), str):
         return None

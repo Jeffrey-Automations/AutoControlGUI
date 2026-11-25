@@ -7,9 +7,10 @@ import json
 import os
 import secrets
 import threading
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, Iterator, List, Optional, Set, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.json_store.json_store import atomic_write_text
@@ -111,6 +112,14 @@ _SAVES: Dict[str, int] = {}
 _SAVES_LOCK = threading.Lock()
 
 
+# Held for one change to a user store, from reading the file to replacing it.
+# Every management call opens its own UserStore, so a lock per instance let
+# two of them load the same users and the second save undo the first --
+# which brought a removed user back. Reentrant: ``admin`` holds it around
+# the last-admin check as well.
+STORE_CHANGES = threading.RLock()
+
+
 def _saves_key(path: Path) -> str:
     return os.path.normcase(os.path.abspath(path))
 
@@ -165,7 +174,7 @@ class UserStore:
             role=role, token_hash=_hash_token(plain_token),
             tags=_tags(tags),
         )
-        with self._lock:
+        with self._changing():
             if user_id in self._users:
                 raise UserAuthError(
                     f"user_id {user_id!r} already exists",
@@ -179,7 +188,7 @@ class UserStore:
         return plain_token
 
     def remove_user(self, user_id: str) -> bool:
-        with self._lock:
+        with self._changing():
             if user_id not in self._users:
                 return False
             self._commit_locked({key: record for key, record in self._users.items() if key != user_id})
@@ -188,7 +197,7 @@ class UserStore:
     def rotate_token(self, user_id: str) -> str:
         """Generate a fresh token for an existing user; returns the plain token."""
         plain_token = secrets.token_urlsafe(24)
-        with self._lock:
+        with self._changing():
             existing = self._users.get(user_id)
             if existing is None:
                 raise UserAuthError(f"unknown user_id: {user_id!r}")
@@ -199,7 +208,7 @@ class UserStore:
     def set_role(self, user_id: str, role: str) -> None:
         if role not in Role.all():
             raise UserAuthError(f"unknown role: {role!r}")
-        with self._lock:
+        with self._changing():
             existing = self._users.get(user_id)
             if existing is None:
                 raise UserAuthError(f"unknown user_id: {user_id!r}")
@@ -236,6 +245,14 @@ class UserStore:
                 return False
         self._load()
         return True
+
+    @contextmanager
+    def _changing(self) -> Iterator[None]:
+        """Hold the store for one change, made to what the file holds now."""
+        with STORE_CHANGES:
+            self.refresh()
+            with self._lock:
+                yield
 
     def _stamp(self) -> Optional[Tuple[int, int]]:
         """``(mtime_ns, size)`` of the file, or ``None`` when there is none."""

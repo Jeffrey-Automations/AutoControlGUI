@@ -93,6 +93,16 @@ def _is_initialize(line: str) -> bool:
     return isinstance(message, dict) and message.get("method") == "initialize"
 
 
+def _expects_reply(message: Optional[Dict[str, Any]]) -> bool:
+    """Whether a POSTed body gets a JSON-RPC answer, so one it can be streamed.
+
+    A notification and a reply to the server's own request do not: they were
+    answered 200 with an empty event stream whenever the client accepted one,
+    and clients that open their GET stream on the 202 never opened it.
+    """
+    return message is None or ("method" in message and "id" in message)
+
+
 def _forget_if_dropped(bridge: "MCPServer", session: Optional[HttpSession]) -> None:
     """Release a session's dispatcher state if it was dropped mid-request.
 
@@ -150,9 +160,10 @@ class _MCPHttpHandler(HttpResponseMixin, BaseHTTPRequestHandler):
             if is_stateless(self.headers, message):
                 self._serve_stateless(bridge, line, message)
                 return
-            self._serve_in_session(bridge, line)
+            self._serve_in_session(bridge, line, message)
 
-    def _serve_in_session(self, bridge: MCPServer, line: str) -> None:
+    def _serve_in_session(self, bridge: MCPServer, line: str,
+                          message: Optional[Dict[str, Any]]) -> None:
         """Serve a handshake-era request under its session, or its connection."""
         session, resolved = self._resolve_session(line)
         if not resolved:
@@ -162,7 +173,7 @@ class _MCPHttpHandler(HttpResponseMixin, BaseHTTPRequestHandler):
         # capabilities it advertised at initialize — across connections.
         conn_id = session.id if session is not None else id(self)
         extra = {SESSION_HEADER: session.id} if session is not None else None
-        if self._client_accepts_sse():
+        if self._client_accepts_sse() and _expects_reply(message):
             self._dispatch_sse(bridge, line, conn_id, extra)
             _forget_if_dropped(bridge, session)
             return
@@ -192,10 +203,11 @@ class _MCPHttpHandler(HttpResponseMixin, BaseHTTPRequestHandler):
         if refused is not None:
             self._send_raw_json(refused.body, status=refused.status)
             return
-        if message is not None and message.get("method") == LISTEN_METHOD:
+        replies = _expects_reply(message)
+        if message is not None and replies and message.get("method") == LISTEN_METHOD:
             self._stream_listen(bridge, line, message)
             return
-        if self._client_accepts_sse():
+        if self._client_accepts_sse() and replies:
             self._dispatch_sse(bridge, line, id(self))
             return
         with bridge.connection_scope(connection_id=id(self), concurrent_tools=False):
@@ -561,27 +573,34 @@ class HttpMCPServer:
         """Bind the socket and begin serving on a background thread."""
         if self._server is not None:
             return
-        self._server = _MCPHttpServer(
+        server = _MCPHttpServer(
             self._address, self._mcp, auth_token=self._auth_token,
             user_store=self._users,
         )
         if self._ssl_context is not None:
             # Defer the handshake so it runs in get_request() under a timeout
             # rather than implicitly inside accept() with no bound.
-            self._server.socket = self._ssl_context.wrap_socket(
-                self._server.socket, server_side=True,
-                do_handshake_on_connect=False,
-            )
+            try:
+                server.socket = self._ssl_context.wrap_socket(
+                    server.socket, server_side=True,
+                    do_handshake_on_connect=False,
+                )
+            except (OSError, ValueError):  # ssl.SSLError is an OSError
+                # Kept as the running server, it made start() a no-op and
+                # stop() wait for a loop that never began.
+                server.server_close()
+                raise
+        self._server = server
         # `server_address` is typed for every address family a socketserver
         # can bind; an AF_INET HTTP server always answers with (host, port).
-        bound_host, bound_port = self._server.server_address[:2]
+        bound_host, bound_port = server.server_address[:2]
         self._address = (
             bound_host.decode() if isinstance(bound_host, (bytes, bytearray))
             else bound_host,
             int(bound_port),
         )
         self._thread = threading.Thread(
-            target=self._server.serve_forever, daemon=True,
+            target=server.serve_forever, daemon=True,
             name="AutoControlMCPHttp",
         )
         self._thread.start()

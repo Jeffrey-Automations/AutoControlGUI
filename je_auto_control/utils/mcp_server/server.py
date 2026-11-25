@@ -420,9 +420,13 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
         # connection or be dropped as "no writer" — a reply belongs to the
         # transport that accepted the request.
         writer = self._writer
+        call_key = (self._connection_id, msg_id)
 
         def worker() -> None:
-            payload = self._build_response(msg_id, _TOOLS_CALL_METHOD, params)
+            try:
+                payload = self._build_response(msg_id, _TOOLS_CALL_METHOD, params)
+            finally:
+                self._release_call(call_key)
             if payload is None:
                 return
             if writer is None:
@@ -437,6 +441,9 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
             if writer is not None:
                 writer(_error_response(msg_id, -32602, str(error)))
             return
+        # On the reader's thread: a cancel on the very next line must find the call.
+        with self._calls_lock:
+            self._active_calls[call_key] = ToolCallContext(request_id=msg_id)
         thread = threading.Thread(target=target, daemon=True, name=f"MCPCall-{msg_id}")
         with self._workers_lock:
             self._workers = [live for live in self._workers if live.is_alive()]

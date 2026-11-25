@@ -184,6 +184,8 @@ class SubscriptionMixin:
         if not _is_hashable(msg_id):
             raise _MCPError(-32600, "Invalid Request: id must be a string or a number")
         tools_list_changed, uris = _listen_filter(params)
+        for uri in uris:  # as resources/subscribe: the same right as reading it
+            authorize_resource(uri, self._audit, LISTEN_METHOD)
         key = (self._connection_id, msg_id)
         listener = Listener(msg_id, writer, tools_list_changed)
         with self._listeners_lock:

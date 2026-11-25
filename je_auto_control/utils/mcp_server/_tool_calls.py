@@ -97,19 +97,43 @@ class ToolCallMixin:
     @secret_log_scope()
     def _handle_tools_call(self, msg_id: Any,
                            params: Dict[str, Any]) -> Dict[str, Any]:
+        view = self._accepted_tool_view()
+        ctx = self._build_call_context(msg_id, params, view)
+        call_key = (self._connection_id, msg_id)
+        self._register_call(call_key, ctx)
         try:
-            view = self._accepted_tool_view()
             name, tool, arguments = self._prepare_tool_call(params, view)
+            return self._run_tool(name, tool, arguments, ctx)
         except _InvalidToolArguments as error:
             return {"content": [{"type": "text", "text": str(error)}], "isError": True}
         except AnsweredByGate as answered:
             return answered.result
-        ctx = self._build_call_context(msg_id, params, view)
-        call_key = (self._connection_id, msg_id)
+        finally:
+            self._release_call(call_key)
+
+    def _register_call(self, call_key: Any, ctx: ToolCallContext) -> None:
+        """Make the call cancellable before it is admitted.
+
+        Registered only after admission, a cancel sent while the call waited
+        for its confirmation -- or right behind the request -- was dropped,
+        and the tool ran. A cancel the reader already noted is carried over.
+        """
         with self._calls_lock:
+            early = self._active_calls.get(call_key)
+            if early is not None:
+                ctx.cancelled_event = early.cancelled_event
             self._active_calls[call_key] = ctx
+
+    def _release_call(self, call_key: Any) -> None:
+        with self._calls_lock:
+            self._active_calls.pop(call_key, None)
+
+    def _run_tool(self, name: str, tool: Any, arguments: Dict[str, Any],
+                  ctx: ToolCallContext) -> Dict[str, Any]:
+        """Invoke an admitted tool; audit the outcome and shape the result."""
         started_at = time.monotonic()
         try:
+            ctx.check_cancelled()
             result = tool.invoke(arguments, ctx=ctx)
         except OperationCancelledError:
             self._audit.record(
@@ -124,9 +148,6 @@ class ToolCallMixin:
         # left the call unanswered (stdio) or dropped the connection (HTTP).
         except Exception as error:  # noqa: BLE001  # reason: a tool's failure of any type must answer the call with isError
             return self._tool_failure(name, tool, arguments, error, started_at)
-        finally:
-            with self._calls_lock:
-                self._active_calls.pop(call_key, None)
         failure = _tool_result_error(result)
         self._audit.record(
             tool=name, arguments=arguments, status="error" if failure is not None else "ok",
