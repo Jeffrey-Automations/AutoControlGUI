@@ -36,15 +36,18 @@ split／guard／noaccess／decommitted 四種頁面配置通過，清理都確�
 
 ### 桌面行為驗收
 
-`TODO` — 原生桌面與正式批次升級前的行為驗收暫緩。
+`WIP` — 原生桌面驗收已於 2026-11-26 在這台 Windows 恢復；會送輸入或搶前景的案例須等桌面沒有其他程式（Discord bot、別的專案的 GUI 測試）在用。
 
 - **正式批次升級前的桌面行為驗收**：需核對 `_gui_control.py` 對下列行為的實際依賴：
   `write()` 大寫與 `is_shift` 在 Windows／X11 生效、`"\r\n"` 只按一次 Enter、`mouse_scroll` 預設方向改為 `scroll_up`
   （X11／Wayland 上 `mouse_scroll(3)` 由往下變往上）、小數座標四捨五入、`focus_window` 在 Windows 沒拿到前景會丟例外、
   `list_windows` 不再列出 DWM cloak 與零面積視窗、`post_key` 對可列印字元只送 `WM_CHAR`。
+  原始碼已唯讀核對（2026-11-26，`NovelAI_RPA/JeffreyRPA/_gui_control.py`，工作樹版本）：滾輪正值往上（與 Windows 相同），座標都先取整，
+  `focus_window`／`list_windows`／`post_key_to_window`／`write` 的例外都轉成 `GuiError`，沒有使用 `is_shift`；實際桌面行為仍未驗。
 - **混合 DPI 座標與樣板**：需實測各螢幕上的舊版座標、`screen_region`、視窗版面與樣板，
   包含縮放不同的副螢幕、負原點與多螢幕排列；必要時重新錄製，不能以推導代替驗收。
 - **舊版存的視窗版面檔要重存**：`save_window_layout` 改存 `GetWindowRect`，舊檔還原會偏右 7 px、縮小 14×7 px。
+  這台機器的 `NovelAI_RPA` 沒有 `window_layouts` 目錄（2026-11-26），沒有舊檔要重存；其他主機未查。
 - **Win32 行為的實測（U-20261113-01，Windows 11、單一 1920×1080 螢幕）只涵蓋自有的原生 `EDIT` 視窗**：
   `post_key` 每個字只到一次、DWM cloak 過濾與最大化視窗的還原都已驗；還沒驗的：另一個 DPI 的螢幕上的還原（只有一個螢幕）、
   工作列在左或上時最大化視窗存下的還原矩形（工作區座標換算只有單元測試，U-20261113-05）、
