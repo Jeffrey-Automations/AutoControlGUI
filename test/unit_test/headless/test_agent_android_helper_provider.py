@@ -382,3 +382,19 @@ def test_the_adapter_sends_a_helper_lease_through_its_device_writer_not_adb_inpu
                                             time.monotonic() + 5, lambda: None, None)
     assert action.invoke() == {"android_phase": "input_returned", "may_have_effect": True}
     assert sent == ["AC_android_tap"]
+
+
+def test_an_unconfirmed_fence_refuses_every_later_lease(provider):
+    control, helper, _source = provider
+    ready(control)
+    lease = control.lease(proposal(), ID)
+
+    def lost(epoch, **_kwargs):
+        raise AgentTaskError("helper unreachable")
+    original, helper.fence = helper.fence, lost
+    with pytest.raises(RuntimeError):
+        with lease.device_fence():
+            raise RuntimeError("dispatch failed")
+    helper.fence = original
+    with pytest.raises(AgentControlBusy):
+        control.lease(proposal(), "b" * 32)

@@ -62,11 +62,12 @@ class HelperControlProvider:
                 handler()
 
     def _fence_quietly(self) -> None:
-        """Fence from the source thread; a failure leaves the takeover flag set, so every later lease fails."""
+        """Fence without raising over the caller's own error; an unconfirmed fence refuses every later lease."""
         try:
             self._fence(lambda: None)
         except AgentTaskError:
-            return  # reason: the takeover flag already refuses readiness, leases and checkpoints
+            with self._lock:
+                self._active = True  # an old writer may still run: only a new readiness check can clear this
 
     def _fence(self, check: Callable[[], None]) -> Any:
         epoch = secrets.token_hex(16)

@@ -638,9 +638,10 @@ devices, never from XTEST slaves, and reads `Active`/`LockedHint` from logind: w
 Accessibility permission). An event counts as injected only when a process posted it from a non-HID
 source state, so a doubt keeps a task waiting rather than letting it take over. On Wayland, where a
 client sees no global input, the source reads the kernel's evdev devices directly (input-group read
-access) and ignores every device under `/devices/virtual/`, which is where `uinput` injectors such as
-`ydotool` create theirs; libei input never reaches evdev. Without read access to a physical device the
-source refuses to start. On Linux the presence broker, worker and server now run over this transport: the owned
+access) and ignores only devices under `/devices/virtual/input/`, which is where `uinput` injectors such as
+`ydotool` create theirs; Bluetooth keyboards and mice (`uhid`) stay in, and libei input never reaches evdev.
+One physical device that cannot be read refuses the source, and a device plugged in or removed, or a
+dropped-event marker, counts as activity: missing activity is never read as idleness. On Linux the presence broker, worker and server now run over this transport: the owned
 worker binds a fresh private endpoint and reports it in its bootstrap reply, the broker adopts only that
 endpoint, and connecting pins the listener to the process it names before the presence challenge. macOS
 uses the same flow over its own transport: a 0700 directory under the per-user temporary directory, a

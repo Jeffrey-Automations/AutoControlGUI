@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,611 |
-| 程式碼總行數 | 247,226 |
+| 程式碼總行數 | 247,302 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -463,12 +463,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.7 無障礙樹與原生控制項
 
-> 16 個套件、約 5,011 行。
+> 16 個套件、約 5,069 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a11y_audit/` | 362 | 以無障礙樹 + OCR 進行無障礙與 i18n 稽核 |
-| `utils/accessibility/` | 3,460 | 跨平台無障礙樹定位與錄製；Windows UIA／macOS AX／null 三後端。支援限定視窗（換搜尋起點，不是過濾）、逐節點可中斷走訪、`IUIAutomation2` 連線逾時、名稱子字串比對與排序、`control_get_state` 一次讀完值／勾選／選取／數值（密碼欄位不回內容） |
+| `utils/accessibility/` | 3,518 | 跨平台無障礙樹定位與錄製；Windows UIA／macOS AX／null 三後端。支援限定視窗（換搜尋起點，不是過濾）、逐節點可中斷走訪、`IUIAutomation2` 連線逾時、名稱子字串比對與排序、`control_get_state` 一次讀完值／勾選／選取／數值（密碼欄位不回內容） |
 | `utils/ax_events/` | 35 | 反應式 UIA 事件等待（focus-changed） |
 | `utils/ax_props/` | 44 | 讀取豐富 UIA 屬性（enabled／offscreen／help／status／快捷鍵） |
 | `utils/ax_text/` | 105 | 透過 UIA TextPattern 取得原生文字（讀取／尋找／選取／屬性） |
@@ -516,13 +516,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 60,223 行。
+> 14 個套件、約 60,241 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,254 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 33,106 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 33,124 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 166 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1052,7 +1052,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（33,106 行／238 檔）
+#### `utils/agent_runtime/`（33,124 行／238 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1067,7 +1067,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `android_getevent.py` | 139 | Report physical Android input from the kernel's evdev stream; injected input never reaches it. |
 | `android_geometry.py` | 99 | Exact half-open Android touch-region coverage for whole pointer paths, including swipe interiors. |
 | `android_helper_client.py` | 142 | Speak protocol version 1 to the device-side helper; every reply has a closed schema or is refused. |
-| `android_helper_provider.py` | 172 | The trusted Android control provider: device-side fencing and settlement through the helper. |
+| `android_helper_provider.py` | 173 | The trusted Android control provider: device-side fencing and settlement through the helper. |
 | `android_hierarchy.py` | 287 | Parse bounded Android app hierarchies with explicit host text grants and private freshness signatures. |
 | `android_input_evidence.py` | 223 | Bind current Android dispatcher geometry and keyguard evidence without granting input authority. |
 | `android_input_windows.py` | 127 | Decode pinned AOSP input-window records without retaining foreign names or raw window dumps. |
@@ -1151,7 +1151,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `presence_endpoint_darwin.py` | 113 | Own protected macOS socket paths, reusing the Linux identity checks where POSIX allows. |
 | `presence_endpoint_wire.py` | 29 | Carry a presence endpoint through owned launches, choosing the Linux or macOS shape by the metadata itself. |
 | `presence_endpoint_linux.py` | 226 | Own protected Linux socket paths without stale-path reuse or recursive cleanup. |
-| `presence_evdev.py` | 186 | Wayland physical presence: kernel evdev devices that are not virtual, plus logind lock state. |
+| `presence_evdev.py` | 203 | Wayland physical presence: kernel evdev devices that are not virtual, plus logind lock state. |
 | `presence_frames.py` | 137 | Closed finite JSON byte frames and exact presence request/result validation. |
 | `presence_broker.py` | 182 | Private broker with internally selected source ownership and normal busy/lease-lost results. |
 | `presence_handshake.py` | 77 | Fresh byte challenges bound to native peer identity, birth and process-object liveness. |
@@ -1619,7 +1619,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `utils/executor/` | 11 | 10,822 |
 | `utils/usb/` | 20 | 5,069 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,178 |
-| `utils/accessibility/` | 17 | 3,460 |
+| `utils/accessibility/` | 17 | 3,518 |
 | `wrapper/` | 25 | 6,095 |
 | `windows/` | 24 | 2,366 |
 | `utils/rest_api/` | 8 | 2,236 |
@@ -1633,8 +1633,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,072 | 112,473 |
-| **總計** | **1,599** | **246,481** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,072 | 112,491 |
+| **總計** | **1,599** | **246,557** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

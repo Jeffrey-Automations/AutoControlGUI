@@ -25,7 +25,7 @@ def test_wayland_sessions_get_the_evdev_source():
 def test_no_readable_physical_device_refuses_to_start():
     source = EvdevPresenceAPI(lambda: True, nodes=lambda: ["/dev/input/event0"],
                               opener=lambda path: (_ for _ in ()).throw(PermissionError(path)))
-    with pytest.raises(AgentTaskError, match="needs read access"):
+    with pytest.raises(AgentTaskError, match="cannot read every"):
         source.open(lambda: None)
     with pytest.raises(AgentTaskError, match="cannot restart"):
         source.open(lambda: None)
@@ -34,20 +34,22 @@ def test_no_readable_physical_device_refuses_to_start():
 @pytest.mark.skipif(sys.platform == "win32", reason="sysfs symlinks need POSIX")
 def test_virtual_devices_such_as_uinput_are_left_out(tmp_path):
     devices, sysfs, root = tmp_path / "devices", tmp_path / "class", tmp_path / "input"
-    for name, parent in (("event0", "platform/i8042/serio0/input/input0"), ("event1", "virtual/input/input7")):
+    for name, parent in (("event0", "platform/i8042/serio0/input/input0"), ("event1", "virtual/input/input7"),
+                         ("event2", "virtual/misc/uhid/0005:046D:B342.0003/input/input9")):
         target = devices / parent
         target.mkdir(parents=True)
         (sysfs / name).mkdir(parents=True)
         os.symlink(target, sysfs / name / "device")
     root.mkdir()
-    for name in ("event0", "event1", "mice"):
+    for name in ("event0", "event1", "event2", "mice"):
         (root / name).touch()
-    assert _physical_nodes(str(root), str(sysfs)) == [str(root / "event0")]
+    # event2 is a Bluetooth keyboard (uhid): leaving it out would read its user as absent.
+    assert _physical_nodes(str(root), str(sysfs)) == [str(root / "event0"), str(root / "event2")]
 
 
 class Devices:
     def __init__(self):
-        self.pipes, self.present = {}, []
+        self.pipes, self.present, self.ioctl_error = {}, [], None
 
     def add(self, path):
         read, write = os.pipe()
@@ -61,6 +63,11 @@ class Devices:
     def write(self, path, *events):
         os.write(self.pipes[path][1], b"".join(events))
 
+    def ioctl(self, *_arguments):
+        if self.ioctl_error is not None:
+            raise self.ioctl_error
+        return 0  # no key down: the buffer stays zero
+
     def close(self):
         for read, write in self.pipes.values():
             os.close(read)
@@ -72,7 +79,7 @@ def devices(monkeypatch):
     owned = Devices()
     monkeypatch.setattr(presence_evdev, "importlib",
                         type("NoIoctl", (), {"import_module": staticmethod(lambda name: type(
-                            "F", (), {"ioctl": staticmethod(lambda *a: (_ for _ in ()).throw(OSError()))}))}))
+                            "F", (), {"ioctl": staticmethod(lambda *a: owned.ioctl(*a))}))}))
     yield owned
     owned.close()
 
@@ -124,3 +131,60 @@ def test_poll_needs_a_bounded_timeout_and_an_open_source():
         source.poll(0.01)
     with pytest.raises(AgentTaskError):
         source.poll(1.0)
+
+
+def test_having_no_device_at_all_refuses_to_start():
+    with pytest.raises(AgentTaskError, match="needs read access"):
+        EvdevPresenceAPI(lambda: True, nodes=lambda: []).open(lambda: None)
+
+
+@posix
+def test_one_unreadable_device_refuses_the_source_even_beside_a_readable_one(devices):
+    devices.add("/dev/input/event0")
+
+    def opener(path):
+        if path.endswith("event1"):
+            raise PermissionError(13, "denied", path)
+        return devices.opener(path)
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: ["/dev/input/event0", "/dev/input/event1"], opener=opener)
+    with pytest.raises(AgentTaskError, match="cannot read every"):
+        source.open(lambda: None)
+    assert source._fds == {}
+
+
+@posix
+def test_a_device_unplugged_before_it_opens_is_skipped(devices):
+    devices.add("/dev/input/event0")
+
+    def opener(path):
+        if path.endswith("event1"):
+            raise FileNotFoundError(2, "gone", path)
+        return devices.opener(path)
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: ["/dev/input/event0", "/dev/input/event1"], opener=opener)
+    source.open(lambda: None)
+    source.close()
+
+
+@posix
+def test_plugging_a_device_in_and_dropped_events_both_count_as_activity(devices):
+    devices.add("/dev/input/event0")
+    calls, now = [], [0.0]
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: list(devices.present), opener=devices.opener,
+                              clock=lambda: now[0])
+    source.open(lambda: calls.append(True))
+    try:
+        devices.add("/dev/input/event5")
+        now[0] = 2.0
+        source.poll(0.01)
+        assert calls == [True]
+        devices.write("/dev/input/event0", event(1, 30, 1), event(0, 0, 0))
+        assert source.poll(0.05)[1] is True
+        devices.write("/dev/input/event0", event(0, 3, 0))  # SYN_DROPPED: the key-up may have been discarded
+        assert source.poll(0.05) == (True, False) and len(calls) == 3
+        devices.write("/dev/input/event0", event(1, 30, 1), event(0, 0, 0))
+        source.poll(0.05)
+        devices.ioctl_error = OSError()
+        devices.write("/dev/input/event0", event(0, 3, 0))
+        assert source.poll(0.05)[1] is True  # the key state is unknown, so it still counts as held
+    finally:
+        source.close()

@@ -104,3 +104,85 @@ def test_the_callers_context_is_carried_to_the_walker():
     marker.set("caller")
     with stoppable_run():
         assert stoppable_read(marker.get) == "caller"
+
+
+def _stop_when(event, call):
+    with pytest.raises(ExecutionStopped):
+        with stoppable_run() as token:
+            threading.Thread(target=lambda: event.wait(5) and token.stop(), daemon=True).start()
+            call()
+
+
+def test_a_hung_read_does_not_block_the_reads_after_it():
+    entered, release, stuck = threading.Event(), threading.Event(), []
+
+    def hung():
+        stuck.append(threading.current_thread())
+        entered.set()
+        release.wait(30)
+    try:
+        _stop_when(entered, lambda: stoppable_read(hung))
+        started = time.monotonic()
+        with stoppable_run():
+            assert stoppable_read(lambda: "next") == "next"
+        assert time.monotonic() - started < 5
+        assert _WALKER.thread is not stuck[0]  # the stuck thread was retired, not reused
+    finally:
+        release.set()
+
+
+def test_a_read_queued_behind_a_hung_one_still_runs():
+    entered, release, results = threading.Event(), threading.Event(), []
+
+    def hung():
+        entered.set()
+        release.wait(30)
+
+    def queued():
+        entered.wait(5)
+        with stoppable_run():
+            results.append(stoppable_read(lambda: "queued"))
+    waiter = threading.Thread(target=queued, daemon=True)
+    waiter.start()
+    try:
+        def call():
+            stoppable_read(hung)
+        with pytest.raises(ExecutionStopped):
+            with stoppable_run() as token:
+                threading.Timer(1.0, token.stop).start()  # long enough for the other read to queue behind it
+                call()
+        waiter.join(5)
+        assert results == ["queued"]
+    finally:
+        release.set()
+
+
+def test_a_read_abandoned_before_it_started_never_runs():
+    entered, release, ran = threading.Event(), threading.Event(), []
+
+    def slow():
+        entered.set()
+        release.wait(30)
+    holder = threading.Thread(target=lambda: _hold(slow), daemon=True)
+    holder.start()
+    assert entered.wait(5)
+    with pytest.raises(ExecutionStopped):
+        with stoppable_run() as token:
+            threading.Timer(0.3, token.stop).start()
+            stoppable_read(lambda: ran.append(True))
+    release.set()
+    holder.join(5)
+    with stoppable_run():
+        stoppable_read(lambda: None)  # anything still queued would have run by now
+    assert ran == []
+
+
+def _hold(function):
+    with stoppable_run():
+        stoppable_read(function)
+
+
+def test_a_read_inside_a_read_runs_directly():
+    from je_auto_control.utils.exception.cancellation import CancellationToken, cancellation_scope
+    with cancellation_scope(CancellationToken(1)):  # carried into the walker by the context
+        assert stoppable_read(lambda: stoppable_read(lambda: "inner")) == "inner"

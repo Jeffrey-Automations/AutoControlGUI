@@ -495,7 +495,7 @@ Linux 內部 presence_peer_linux 以不可繼承的 pidfd 保留原始 Unix stre
 X11 與 macOS 已有真人活動來源。X11 只計入真實裝置的 XInput2 raw 事件（XTEST 從屬裝置一律排除），
 並從 logind 讀 `Active`／`LockedHint`；沒有 logind 或 `XDG_SESSION_ID` 時視為鎖定。macOS 用唯讀的 session
 event tap（需要輔助使用權限）；只有程序從非 HID 來源狀態送出的事件才算注入，有疑義時讓任務等待而不是接手。
-Wayland 上一般 client 看不到全域輸入，所以來源直接讀核心的 evdev 裝置（需 input 群組讀取權限），並忽略所有位於 `/devices/virtual/` 的裝置——`ydotool` 等 uinput 注入工具建立的裝置都在那裡，libei 的輸入則根本不經 evdev。讀不到任何實體裝置時來源拒絕啟動。Linux 的 presence broker、worker 與 server 已改經此 transport：自有 worker 綁定
+Wayland 上一般 client 看不到全域輸入，所以來源直接讀核心的 evdev 裝置（需 input 群組讀取權限），並只忽略位於 `/devices/virtual/input/` 的裝置——`ydotool` 等 uinput 注入工具建立的裝置都在那裡；藍牙鍵盤與滑鼠（`uhid`）仍計入，libei 的輸入則根本不經 evdev。只要有一個實體裝置讀不到，來源就拒絕；裝置插拔與事件遺失標記都算活動，缺少的活動不會被當成閒置。Linux 的 presence broker、worker 與 server 已改經此 transport：自有 worker 綁定
 全新的私有 endpoint 並在 bootstrap 回覆中回報，broker 只採用該 endpoint，連線時先核對 listener 即其所列
 程序，再做 presence challenge。macOS 以自己的 transport 走同一流程：每帳號暫存目錄下的 0700 目錄、長度前綴的 Unix stream socket，連線端以 audit token 指認、以 kqueue 結束監看保留，並以開機內唯一的 `p_uniqueid` 作為 birth。macOS 沒有逐訊息憑證，所以每條連線只認證一次，每次交付前再確認仍存活。原生驗收前 runtime 仍拒絕非 Windows 共用
 桌面任務；此 transport 不是完整 Linux 應用或原生輸入驗收。
