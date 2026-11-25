@@ -374,11 +374,13 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
                 _t("rd_quick_approval_view_only"),
                 QMessageBox.ButtonRole.ActionRole,
             )
-            box.addButton(
+            deny_btn = box.addButton(
                 _t("rd_quick_approval_deny"),
                 QMessageBox.ButtonRole.RejectRole,
             )
-            box.setDefaultButton(allow_btn)
+            # Enter and Escape both deny: granting control takes an explicit click.
+            box.setDefaultButton(deny_btn)
+            box.setEscapeButton(deny_btn)
             # The host stops waiting after the timeout and denies; the box
             # stayed up, and an Allow clicked after that admitted nobody.
             QTimer.singleShot(int(_APPROVAL_TIMEOUT_S * 1000), box, box.reject)
