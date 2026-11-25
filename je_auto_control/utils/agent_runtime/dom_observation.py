@@ -83,7 +83,8 @@ class DomSource:
     The page URL is read before and after the fields: a navigation in between
     makes the whole capture an ``inconsistent_snapshot`` failure. A field whose
     element is absent or not shown is ``not_found`` (the SDK does not tell the two
-    apart) and a shown one the SDK refuses to read back is ``protected``; any other SDK failure is sticky in the session and raises.
+    apart) and a shown one the SDK refuses to read back is ``protected``; any
+    other SDK failure is sticky in the session and raises.
     The DOM has no revision counter, so captures are ``best_effort``.
     """
 
