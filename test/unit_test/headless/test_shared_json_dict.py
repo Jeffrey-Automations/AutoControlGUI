@@ -10,6 +10,7 @@ copy exactly as a process does.
 import os
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -87,3 +88,33 @@ def test_without_a_path_the_state_stays_in_memory():
     token = gate.request("deploy", requester="maker")
     assert gate.approve(token, "checker")
     assert gate.is_approved(token)
+
+
+# --- a damaged file is kept, not erased (quarantine_label) -----------------
+
+def test_a_quarantining_store_moves_a_damaged_file_aside_and_raises(tmp_path):
+    path = tmp_path / "store.json"
+    path.write_text("{oops", encoding="utf-8")
+    state = json_store.SharedJsonDict(path, quarantine_label="test store")
+    with pytest.raises(json_store.JsonStoreDamagedError, match="moved to"):
+        state.update(lambda data: data.__setitem__("k", 1))
+    [kept] = tmp_path.glob("store.json.corrupt-*")
+    assert kept.read_text(encoding="utf-8") == "{oops"
+    assert not path.exists()
+
+
+def test_a_quarantining_store_leaves_a_file_it_cannot_read_in_place(tmp_path, monkeypatch):
+    # An OSError says nothing about the content: the file is not moved.
+    path = tmp_path / "store.json"
+    path.write_text('{"k": 1}', encoding="utf-8")
+
+    def locked(self, *args, **kwargs):
+        raise PermissionError("locked by antivirus")
+
+    state = json_store.SharedJsonDict(path, quarantine_label="test store")
+    monkeypatch.setattr(Path, "read_text", locked)
+    with pytest.raises(PermissionError):
+        state.read()
+    monkeypatch.undo()
+    assert state.read() == {"k": 1}
+    assert not list(tmp_path.glob("store.json.corrupt-*"))

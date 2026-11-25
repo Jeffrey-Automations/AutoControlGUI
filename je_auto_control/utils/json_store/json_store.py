@@ -14,9 +14,17 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, Optional, TypeVar
 
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 _Result = TypeVar("_Result")
+
+
+class JsonStoreDamagedError(AutoControlException, ValueError):
+    """A store file is not a UTF-8 JSON object; it was moved aside, not overwritten.
+
+    ``ValueError`` stays a base: a strict store raised that for the same file.
+    """
 
 
 def atomic_write_text(path: str | Path, text: str,
@@ -220,20 +228,35 @@ class SharedJsonDict:
 
     By default an unreadable file reads as empty. With ``strict`` it raises
     ``ValueError`` instead -- for stores of user-authored content (skills,
-    locators) where writing back an empty dict would erase the file.
-    An :meth:`update` that cannot read the file at all (``OSError``: locked, no
-    permission) raises either way: that says nothing about what it holds.
+    locators) where writing back an empty dict would erase the file. With
+    ``quarantine_label`` a file that is not a UTF-8 JSON object is also moved
+    aside as ``<name>.corrupt-<time>`` (logged under that label) and every
+    read or update that finds it raises :class:`JsonStoreDamagedError`; the
+    next one starts from an empty file. An :meth:`update` that cannot read the
+    file at all (``OSError``: locked, no permission) raises either way, and
+    never moves it: that says nothing about what it holds.
     """
 
     def __init__(self, path: Optional[str | Path], *,
-                 strict: bool = False) -> None:
+                 strict: bool = False,
+                 quarantine_label: Optional[str] = None) -> None:
         self._path = Path(path) if path is not None else None
         self._memory: Dict[str, Any] = {}
         self._memory_lock = threading.Lock()
         self._strict = strict
+        self._quarantine_label = quarantine_label
 
     def _load(self, path: Path) -> Dict[str, Any]:
-        return _read_json_object(path) if self._strict else read_json_dict(path)
+        if self._quarantine_label is None:
+            return _read_json_object(path) if self._strict else read_json_dict(path)
+        try:
+            return _read_json_object(path)
+        except ValueError as error:  # JSON syntax, not UTF-8, not an object
+            moved = quarantine_file(path, self._quarantine_label, repr(error))
+            where = f"moved to {moved}" if moved is not None else "left in place (could not be moved)"
+            raise JsonStoreDamagedError(
+                f"{self._quarantine_label} {path} is unreadable ({error}); {where} "
+                "and nothing was written") from error
 
     def read(self) -> Dict[str, Any]:
         """Return the current contents, always a copy the caller may keep.
@@ -247,6 +270,12 @@ class SharedJsonDict:
                 return copy.deepcopy(self._memory)
         return self._load(self._path)
 
+    def _load_for_update(self, path: Path) -> Dict[str, Any]:
+        """What an update starts from; a file that cannot be read raises instead of reading as empty."""
+        if self._quarantine_label is not None:
+            return self._load(path)     # moves a damaged file aside and raises
+        return _read_json_object(path) if self._strict else _read_dict(path)
+
     def update(self, mutate: Callable[[Dict[str, Any]], _Result]) -> _Result:
         """Apply ``mutate`` to the current contents and persist them."""
         if self._path is None:
@@ -255,7 +284,7 @@ class SharedJsonDict:
             with self._memory_lock:
                 return mutate(self._memory)
         with _file_lock(self._path):
-            data = _read_json_object(self._path) if self._strict else _read_dict(self._path)
+            data = self._load_for_update(self._path)
             result = mutate(data)
             write_json_dict(self._path, data)
         return result
