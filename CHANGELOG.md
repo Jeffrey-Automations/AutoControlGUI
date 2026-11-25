@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Browser task observations no longer contain text a page marks `data-secret`: such a
+  document's page text is empty, and elements touching marked content have no name.
+
 - New `android` agent target profile kind, driven through the device helper; Wayland sessions now
   read human activity from physical evdev devices; read-only accessibility walks and VLM requests
   stop waiting on a stop; a refused local HTTP connection is now an `AgentTaskError`.

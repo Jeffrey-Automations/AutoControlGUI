@@ -325,6 +325,9 @@ def canonical_tool_name(name: str) -> str:
     return TOOL_ALIASES.get(name, name)
 
 
+# Reviewed and kept out of the read-only catalogue for good: listing plugins calls every installed
+# plugin's factory, and the WebRunner reads import whatever version is deployed. No review of this
+# source can show that either leaves the host unchanged.
 UNREVIEWED_EXTERNAL_TOOLS = frozenset({"ac_list_plugins", "ac_web_list_commands", "ac_web_current_url"})
 
 ANCHOR_TOOLS = frozenset({"ac_anchor_locate", "ac_anchor_locate_all"})

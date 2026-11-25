@@ -35,6 +35,8 @@ class Session:
         return self.urls.pop(0) if len(self.urls) > 1 else self.urls[0]
 
     def visible(self, selector, frame=""):
+        if "[data-secret]" in selector:
+            return False  # this page marks nothing
         self.calls.append(("visible", selector, frame))
         if self.fault:
             raise SdkError(self.fault)

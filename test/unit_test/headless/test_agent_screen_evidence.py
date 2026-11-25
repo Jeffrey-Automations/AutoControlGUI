@@ -102,7 +102,8 @@ def test_bounded_desktop_labels_keep_safe_matches_and_exclude_mask_placeholders(
 @pytest.mark.parametrize("frames", [[], [{"selector": "#frame", "error": "Unavailable"}]])
 def test_bounded_browser_previews_never_prove_global_absence(frames):
     target = BrowserTarget()
-    target._session = SimpleNamespace(observe=lambda: {"text": "Other body text", "frames": frames,
+    target._session = SimpleNamespace(visible=lambda _selector, _frame="": False, observe=lambda: {
+        "text": "Other body text", "frames": frames,
         "elements": [{"selector": "#save", "text": "Saved", "is_visible": True, "is_enabled": True},
                      {"selector": "#hidden", "text": "Hidden", "is_visible": False}]})
     observation = target.observe()

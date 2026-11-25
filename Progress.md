@@ -30,8 +30,8 @@ comtypes 來自專案環境以外的隔離目錄）；部署 pin 只核對自己
 
 `WIP` — 2026-11-26 在這台 Windows（x64）執行 `test/fixtures/native_memory/acceptance.py --execute`：一般往返與
 split／guard／noaccess／decommitted 四種頁面配置通過，清理都確認（U-20261126-04，修正了首跑發現的兩個缺陷）。
-映像雜湊取自自己的建置，沒有獨立審查者。仍缺：可信應用身分核對、32 位配置、程序退出、PID 重用、權限拒絕、
-取消、長時間資源與 handle 回收；前景不干擾未能判定（同時有另一個專案的 GUI 測試在切換前景；滑鼠位置與最後輸入
+產品預設的 1 秒讀取期限、程序退出、取消、兩次啟動身分不同、150 次讀取與 13 次啟動的 handle／記憶體也通過（U-20261126-07、-09）。
+映像雜湊取自自己的建置，沒有獨立審查者。仍缺：可信應用身分核對、32 位配置、PID 重用、權限拒絕、數小時以上的資源觀測；前景不干擾未能判定（同時有另一個專案的 GUI 測試在切換前景；滑鼠位置與最後輸入
 時間在各次執行中都沒有變）。設計見 [記憶體觀察契約](docs/process_memory_contract.md)。
 
 ### 桌面行為驗收
@@ -141,7 +141,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；
   私鑰支援選用通行碼加密，未設定時仍是明文 PEM（0600，Windows 上沒驗權限位元）；遷移模式開著時 HMAC 簽章會被接受。
 - **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：
-  - `ac_list_plugins` 的外掛 factory，以及 `ac_web_list_commands`／`ac_web_current_url` 的實際相依版本初始化契約尚待審查；目前不列入唯讀目錄，完整目錄仍要求 `read_data`。本機 sibling 原始碼不代表部署版本驗收。
   - 沒對真的 client（Claude Desktop、VS Code、內建 dashboard）試過；回送測試的 SSE、無狀態、`subscriptions/listen` 與 TLS 結果不代表真實客戶端通過。
 - **MCP 路徑根目錄**（`JE_AUTOCONTROL_MCP_PATH_ROOTS`，預設關閉）：`path-or-other` 已檢查
   `ac_open_path`／`ac_plan_open`／`ac_file_association`／`ac_act_in_view` 的 `target` 與 `ac_handle_file_dialog` 的 `path`，
@@ -274,11 +273,11 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
    - 瀏覽器統一使用 WebRunner（`je_web_runner`），來源 `D:\Codes\WebRunner`。
      2026-11-26 以真實 headless Chromium 對本機 loopback 頁面驗過（U-20261126-06）：登入狀態、頁面身分、表單讀回、
      獨立 DOM 完成條件、舊觀察拒絕、來源限制、下載摘要、上傳不自動送出、根目錄拒絕、對話框轉人工、逾時與 session 清理。
-     `TODO`（WebRunner，另一個 repo，待維護者同意修改）：`BrowserSession.observe()` 的頁面文字取 `body.innerText`，沒有排除
-     `[data-secret]`，標記為祕密的可見文字會進入觀察並可能交給 planner；密碼欄的值沒有外洩。讀回與截圖路徑已排除。
-     `TODO`：上述在程序內執行，未經固定 helper；取消後狀態正確，但程序內的同步呼叫約 10 秒後才返回，helper 終止未驗。
-     驗收腳本未收進 repo（只在該次工作階段的暫存目錄）。
-     真實外部頁面（非 loopback）、helper 取消／終止與長時間 session 的證據仍缺。
+     頁面標 `[data-secret]` 的文字已由 AutoControl 端遮蔽（`browser_secrets.py`，U-20261126-08）；在標記範圍外的 label 不在此列。
+     `DECIDE`（另一個 repo）：是否也在 WebRunner 的 `BrowserSession.observe()` 排除，讓其他呼叫者一起受惠。
+     經獨立 helper 程序驗過讀取、取消、helper 崩潰與程序回收；該 helper 用暫存的 venv 加 `.pth`，不是已審閱的固定安裝。
+     驗收腳本未收進 repo。
+     真實外部頁面（非 loopback）、固定 helper 環境與長時間 session 的證據仍缺。
 
 2. **P4／P2：四條流程的實際應用驗收**
    - 查詢／下載／歸檔：真實來源、完整下載、命名衝突、取消、摘要與獨立檔案清單驗證。
@@ -710,11 +709,11 @@ OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLa
 接到同一受管 channel 的啟動 handle，並拒絕 bootstrap PID／位元寬度不符（只有注入測試）。
 可信來源交付、載入映像綁定的原生相容性與 attestation 驗收尚未完成。
 另有 `test/fixtures/native_memory/` 的 x64 靜態 CRT fixture 原始碼與僅建置工具；
-已編譯、靜態盤點直接 OS DLL 匯入並記錄來源／產物雜湊，未執行該原生產物。
-原生程式行為、DLL 解析信任、載入位元組核對與故障驗收仍未驗證。
+已編譯、靜態盤點直接 OS DLL 匯入並記錄來源／產物雜湊；原生執行結果見本檔上方。
+DLL 解析信任與完整故障矩陣仍未驗證。
 已有從固定雜湊 PE32+ x64 產物推導完整可執行區段的 planner 與 reader guard；
 拒絕可寫入／重定位程式碼，核對原啟動 pin，且不擴大 probe 預算。測試僅使用合成映像及靜態產物；
-區段 padding 的原生相容性、實際頁面保護與 DLL 信任仍未驗證，不能當成完整 runtime attestation。
+區段 padding 已對一個 x64 映像原生相符；實際頁面保護與 DLL 信任仍未驗證，不能當成完整 runtime attestation。
 內部 OwnedFixtureTarget 已組裝啟動、映像核對、fixture 命令與受管語意讀取；
 擁有者在啟動前保留，失敗回收可重試，終止後不得發布晚到的 target。
 `ready()` 已能在受管 scope 內先綁定固定 task／owner 再延遲取得資源，
@@ -733,7 +732,7 @@ OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLa
 Python／helper 來源及 DLL 的可信交付、服務獨立身分／空環境下的套件與帳號檔存取，
 以及子 fixture 的 nested grant 仍待接合；Windows fixture 入口不支援 Linux 原生讀取。
 原生 smoke 工具已有初始讀值、操作回條、新讀回、runtime 完成及回收的分項報告；
-目前只跑過靜態產物預檢與注入測試，不代表原生驗收或完整故障矩陣通過。
+已在一台 Windows 原生通過（見本檔上方），不代表完整故障矩陣通過。
 Windows venv 啟動器可能另開解譯器，不能直接把 channel PID 當成 fixture 出生身分。
 內部 MemorySemanticTarget 已組合固定 reader binding、受管 scope 與背景命令 owner，
 並以 injected provider 驗證 runtime 讀取、操作與獨立完成判定；cleanup 終止使用並保留失敗 handle 重試。

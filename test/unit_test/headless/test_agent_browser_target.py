@@ -62,8 +62,8 @@ class FakeSession:
     def text(self, _selector, _frame=""):
         return "visible text"
 
-    def visible(self, _selector, _frame=""):
-        return True
+    def visible(self, selector, _frame=""):
+        return "data-secret" not in selector  # this page marks nothing
 
     def close(self):
         self.closed = True
