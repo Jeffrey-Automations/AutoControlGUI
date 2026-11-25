@@ -12,11 +12,14 @@ a person only delays a task, while missing a person would let it take over.
 Missing activity is never read as idleness. A physical device this account cannot
 read refuses the source (at start, or when it is plugged in), a device appearing or
 disappearing counts as activity, and a dropped-event marker (``SYN_DROPPED``) counts
-as activity and re-reads which keys are held. Seat usability comes from the same
-logind query the X11 source uses.
+as activity and re-reads which keys are held; a key state that cannot be read refuses
+the source. Seat usability comes from the same logind query the X11 source uses.
 
 This is a host trust decision, not a sandbox: an account that may write evdev
-nodes or create kernel input drivers can still forge physical input.
+nodes or create kernel input drivers can still forge physical input. A key remapper
+that grabs a device (``EVIOCGRAB``: keyd, input-remapper) hides it: the kernel then
+delivers its events to the grabber alone, whose own output is a ``uinput`` device.
+Do not use this source on such a host.
 """
 from __future__ import annotations
 
@@ -107,21 +110,29 @@ class EvdevPresenceAPI:
                 raise AgentTaskError("Wayland physical presence cannot read every physical input device") from None
             self._fds[path] = descriptor
             self._changed = True
-            self._seed_held(path, descriptor)
+            if not self._seed_held(path, descriptor):
+                self._drop(path)
         self._scanned = self._clock()
 
-    def _seed_held(self, path: str, descriptor: int) -> None:
-        """Replace this device's held keys with the kernel's own answer; no event announced those already down."""
+    def _seed_held(self, path: str, descriptor: int) -> bool:
+        """Replace this device's held keys with the kernel's own answer; False when the device is gone.
+
+        No event announces a key already down, and the query also removes key events still queued
+        for this descriptor, so it must follow everything read so far, never precede it.
+        """
         try:
             state = bytearray(_KEY_BYTES)
             importlib.import_module("fcntl").ioctl(descriptor, _EVIOCGKEY, state, True)
-        except OSError:
-            return  # unknown: whatever was held stays held
+        except OSError as error:
+            if error.errno == errno.ENODEV:
+                return False
+            raise AgentTaskError("Wayland physical presence cannot read a device's key state") from None
         self._held = {item for item in self._held if item[0] != path}
         for index, byte in enumerate(state):
             for bit in range(8):
                 if byte >> bit & 1:
                     self._held.add((path, index * 8 + bit))
+        return True
 
     def _drop(self, path: str) -> None:
         descriptor = self._fds.pop(path)
@@ -136,6 +147,7 @@ class EvdevPresenceAPI:
         """Consume pending events of one device; True when any of them was input activity."""
         active = False
         for _index in range(_DRAIN_LIMIT):
+            dropped = False
             try:
                 raw = os.read(self._fds[path], _EVENT.size * 64)
             except BlockingIOError:
@@ -149,13 +161,16 @@ class EvdevPresenceAPI:
                 return active
             for offset in range(0, len(raw) - len(raw) % _EVENT.size, _EVENT.size):
                 _seconds, _micro, kind, code, value = _EVENT.unpack_from(raw, offset)
+                dropped |= kind == _EV_SYN and code == _SYN_DROPPED
                 active |= self._event(path, kind, code, value)
+            if dropped and not self._seed_held(path, self._fds[path]):
+                self._drop(path)
+                return True
         raise AgentControlBusy("physical presence input queue is still active")
 
     def _event(self, path: str, kind: int, code: int, value: int) -> bool:
-        if kind == _EV_SYN and code == _SYN_DROPPED:
-            self._seed_held(path, self._fds[path])  # the kernel discarded events this source never saw
-            return True
+        if kind == _EV_SYN:
+            return code == _SYN_DROPPED  # the kernel discarded events this source never saw
         if kind == _EV_KEY:
             if value:
                 self._held.add((path, code))

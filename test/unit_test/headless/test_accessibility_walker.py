@@ -186,3 +186,29 @@ def test_a_read_inside_a_read_runs_directly():
     from je_auto_control.utils.exception.cancellation import CancellationToken, cancellation_scope
     with cancellation_scope(CancellationToken(1)):  # carried into the walker by the context
         assert stoppable_read(lambda: stoppable_read(lambda: "inner")) == "inner"
+
+
+def test_a_read_that_hangs_after_being_moved_to_a_fresh_worker_is_retired_too():
+    entered, second, release = threading.Event(), threading.Event(), threading.Event()
+
+    def hung(event):
+        event.set()
+        release.wait(30)
+
+    def queued():
+        entered.wait(5)
+        _stop_when(second, lambda: stoppable_read(hung, second))
+    waiter = threading.Thread(target=queued, daemon=True)
+    waiter.start()
+    try:
+        with pytest.raises(ExecutionStopped):
+            with stoppable_run() as token:
+                threading.Timer(1.0, token.stop).start()  # the second read queues behind this one first
+                stoppable_read(hung, entered)
+        waiter.join(5)
+        assert second.is_set() and not waiter.is_alive()
+        finished = threading.Event()
+        threading.Thread(target=lambda: (_hold(lambda: None), finished.set()), daemon=True).start()
+        assert finished.wait(5)
+    finally:
+        release.set()

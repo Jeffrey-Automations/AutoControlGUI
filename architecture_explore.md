@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,611 |
-| 程式碼總行數 | 247,302 |
+| Python 模組總數（含周邊子專案） | 1,612 |
+| 程式碼總行數 | 247,365 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -248,7 +248,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `uinput/keyboard.py` | 44 | uinput 鍵盤後端，介面與 X11 版一致。 |
 | `uinput/mouse.py` | 130 | uinput 滑鼠後端。 |
 
-#### Linux Wayland（`linux_wayland/`，24 檔／4,455 行）
+#### Linux Wayland（`linux_wayland/`，25 檔／4,503 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -257,6 +257,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `_ctypes_bind.py` | 75 | libei／liboeffis 共用的 ctypes 載入與 prototype 綁定。 |
 | `_dbus_client.py` | 24 | 只用標準函式庫的 D-Bus session bus 客戶端（連線／認證／`Hello`／`AddMatch`／一次方法呼叫／等訊號）。portal 的回應是**指名送給發出呼叫的那條連線**,所以訂閱與呼叫必須同一條連線——這是 `gdbus monitor` + `gdbus call` 兩個行程做不到的事。 |
 | `_input_state.py` | 47 | 不含 Qt／原生載入的失敗中繼資料與有界 cause 分類；先保留取消，再阻止權限拒絕改走 CLI。 |
+| `_capture_owner.py` | 40 | 受管操作內的擷取：前後各核對同一操作仍有效且未撤權，否則丟棄影像。 |
 | `_select_input.py` | 106 | 決定使用原生 libei 或 CLI shim；`active_backend()` 是 keyboard／mouse 的唯一入口，`emitted()` 僅容許未分類的選用後端缺席退回 CLI；明確原生選擇、權限／裝置／協定拒絕保持失敗。 |
 | `_layout.py` | 83 | 版面原點的共用查詢。擷取與輸入不是同一個座標空間,差的就是這個原點:libei 的 region offset 是 `uint32`（描述不了負原點）,`ydotool mousemove --absolute` 的原點是合成器夾取的那個角落——兩條路都要減掉它,所以放在這裡而不是各自複製。讀數快取一秒——擷取那一側刻意不快取,但 ydotool 每次絕對移動都會問,不快取等於每次移動多開一個 `wlr-randr` 行程。 |
 | `oeffis.py` | 230 | liboeffis 綁定：跑完 RemoteDesktop portal 交握，交出 EIS fd；請求後的拒絕／逾時／失敗保留明確狀態。 |
@@ -268,7 +269,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `mouse.py` | 390 | 滑鼠後端：移動、按鈕與捲動都 libei 優先，僅選用缺席時退回 ydotool；權限／裝置拒絕不重送；送往 libei 時垂直捲動軸取負（kernel `REL_WHEEL` 與 `wl_pointer` 正負號相反）。退到 ydotool 的絕對移動會先減掉版面原點（`--absolute` 是相對於版面左上角,不是版面座標的 `(0, 0)`),並依 `pointer_accel_mode()` 處理指標加速度——倍率讀不回來,只有操作者知道,所以由 `JE_AUTOCONTROL_WAYLAND_POINTER_ACCEL` 宣告:未設定＝每個行程警告一次後照送、`flat`＝已關掉加速度故靜靜送出、`strict`＝拒絕這次移動。 |
 | `keyboard.py` | 209 | 鍵盤後端：按鍵／組合鍵 libei 優先，權限拒絕不改走 CLI；中斷時逐一釋放原後端已按下的鍵。文字仍用 wtype。 |
 | `keymap.py` | 155 | 友善鍵名 → evdev key code。 |
-| `capture.py` | 250 | 擷取分層：操作者自訂指令 → grim → gnome-screenshot → spectacle → portal。 |
+| `capture.py` | 258 | 擷取分層：操作者自訂指令 → grim → gnome-screenshot → spectacle → portal。 |
 | `portal.py` | 234 | `org.freedesktop.portal.Screenshot` 最後備援，直接講 D-Bus；未完成請求在原始 bus 上限時 Request.Close，保留原始控制，已完成 Response 不重複關閉。只需 session bus，不需 gdbus。 |
 | `screen.py` | 296 | 螢幕後端；發布 `grab_image` 與 `layout_origin`（擷取畫面左上角的版面座標，有螢幕在主螢幕左側／上方時為負），全框架的擷取都經由它。 |
 | `listener.py` / `record.py` | 60 / 45 | 監聽與錄製 stub（Wayland 限制）。 |
@@ -516,13 +517,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 60,241 行。
+> 14 個套件、約 60,256 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,254 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 33,124 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 33,139 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 166 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1052,7 +1053,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（33,124 行／238 檔）
+#### `utils/agent_runtime/`（33,139 行／238 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1151,7 +1152,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `presence_endpoint_darwin.py` | 113 | Own protected macOS socket paths, reusing the Linux identity checks where POSIX allows. |
 | `presence_endpoint_wire.py` | 29 | Carry a presence endpoint through owned launches, choosing the Linux or macOS shape by the metadata itself. |
 | `presence_endpoint_linux.py` | 226 | Own protected Linux socket paths without stale-path reuse or recursive cleanup. |
-| `presence_evdev.py` | 203 | Wayland physical presence: kernel evdev devices that are not virtual, plus logind lock state. |
+| `presence_evdev.py` | 218 | Wayland physical presence: kernel evdev devices that are not virtual, plus logind lock state. |
 | `presence_frames.py` | 137 | Closed finite JSON byte frames and exact presence request/result validation. |
 | `presence_broker.py` | 182 | Private broker with internally selected source ownership and normal busy/lease-lost results. |
 | `presence_handshake.py` | 77 | Fresh byte challenges bound to native peer identity, birth and process-object liveness. |
@@ -1625,7 +1626,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `utils/rest_api/` | 8 | 2,236 |
 | `utils/agent/` | 13 | 2,254 |
 | `linux_with_x11/` | 19 | 1,382 |
-| `linux_wayland/` | 24 | 4,455 |
+| `linux_wayland/` | 25 | 4,503 |
 | `utils/triggers/` | 4 | 1,409 |
 | `utils/ocr/` | 10 | 1,393 |
 | `utils/usbip/` | 5 | 1,008 |
@@ -1633,8 +1634,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,072 | 112,491 |
-| **總計** | **1,599** | **246,557** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,072 | 112,506 |
+| **總計** | **1,600** | **246,620** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

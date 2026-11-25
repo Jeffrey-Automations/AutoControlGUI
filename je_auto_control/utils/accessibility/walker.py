@@ -27,11 +27,11 @@ _POLL_SECONDS = 0.1
 
 @dataclass(eq=False)
 class _Job:
-    """One read and its outcome; ``abandoned`` and ``started`` are guarded by the walker's lock."""
+    """One read and its outcome; ``owner`` (the worker running it) and ``abandoned`` are under the walker's lock."""
 
     read: Callable[[], Any]
     done: threading.Event = field(default_factory=threading.Event)
-    started: bool = False
+    owner: Optional["_Worker"] = None
     abandoned: bool = False
     value: Any = None
     error: Optional[BaseException] = None
@@ -54,7 +54,7 @@ class _Worker:
             with self._lock:
                 if job.abandoned:
                     continue
-                job.started = True
+                job.owner = self
             try:
                 job.value = job.read()
             except BaseException as error:  # NOSONAR python:S5754  # reason: the waiting caller raises it
@@ -76,17 +76,17 @@ class _Walker:
         worker = self._worker
         return None if worker is None else worker.thread
 
-    def _submit(self, job: _Job) -> _Worker:
+    def _submit(self, job: _Job) -> None:
         with self._lock:
             if self._worker is None or not self._worker.thread.is_alive():
                 self._worker = _Worker(self._lock)
             self._worker.jobs.put(job)
-            return self._worker
 
-    def _abandon(self, worker: _Worker, job: _Job) -> None:
+    def _abandon(self, job: _Job) -> None:
         with self._lock:
             job.abandoned = True
-            if not job.started or job.done.is_set() or self._worker is not worker:
+            worker = job.owner  # the worker it runs on, which a transfer may have changed
+            if worker is None or job.done.is_set() or self._worker is not worker:
                 return
             # Still reading, so possibly hung: later reads must not queue behind it. Reads already
             # queued move to a fresh worker; the old thread ends if its read ever returns.
@@ -106,13 +106,13 @@ class _Walker:
         run_control.checkpoint()
         context = contextvars.copy_context()
         job = _Job(lambda: context.run(function, *args, **kwargs))
-        worker = self._submit(job)
+        self._submit(job)
         try:
             while not job.done.wait(_POLL_SECONDS):
                 cancellation_checkpoint()
                 run_control.checkpoint()
         except BaseException:
-            self._abandon(worker, job)
+            self._abandon(job)
             raise
         if job.error is not None:
             raise job.error

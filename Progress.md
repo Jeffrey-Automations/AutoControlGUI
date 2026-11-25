@@ -13,8 +13,9 @@
 
 以下集中列出未完成的實機驗收，以及與驗收不可分的缺口與前置實作。
 各段原有的 `TODO`／`WIP`／`BLOCKED`／`DECIDE` 狀態與暫緩條件維持有效。
-原生桌面、實際瀏覽器、Android／iOS 真機、WebRunner 原生雙向 bridge 與完整 24 小時驗收仍暫緩；
-真機與付費 API 驗收須待使用者明確恢復後執行。文件置頂不代表取得執行或付費授權。
+使用者 2026-11-26 恢復：這台 Windows 的原生桌面驗收，以及實際瀏覽器（WebRunner）驗收。
+執行時 Discord bot（`NovelAI_RPA`）可能操作同一桌面，會送輸入的案例只對自建視窗做並核對前景。
+Android／iOS 真機、WebRunner 原生雙向 bridge、付費 API 與完整 24 小時驗收仍暫緩；須待使用者明確恢復後執行。文件置頂不代表取得執行或付費授權。
 
 ## 輸入、視窗與擷取修正：還沒在真的桌面與 Jeffrey_RPA 上驗過
 
@@ -307,7 +308,8 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      視窗範圍輸入、自有 helper 隔離與非 Windows 對話框／未儲存 gate，以及以真實實體輸入
      驗證「實體／注入」判定的原生驗收（CI 只能證明注入事件不被誤計）。
      Wayland：維護者 2026-11-21 選定 evdev 讀取（`presence_evdev.py`，U-20261121-13）：只排除 `/devices/virtual/input/`
-     （uinput；藍牙 uhid 仍計入），任一實體裝置讀不到就拒絕（U-20261126-01 修正）；只對 pipe 假裝置驗過，真實 Wayland 桌面與實體輸入驗收仍待完成。
+     （uinput；藍牙 uhid 仍計入），任一實體裝置或其鍵態讀不到就拒絕（U-20261126-01、-03 修正）；
+     鍵位重映射程式（keyd、input-remapper）以 `EVIOCGRAB` 獨占裝置時看不到真人輸入，未能偵測，只有文件警告（`DECIDE`）；只對 pipe 假裝置驗過，真實 Wayland 桌面與實體輸入驗收仍待完成。
      目前不能解除不支援平台的共用桌面拒絕保護。
      Linux：presence_channel_linux 已接入自有 worker 啟動與可信 endpoint 傳遞（worker 經自有 bootstrap 回報
      endpoint，broker 只採用它，連線時核對 listener 程序），並沿用既有 presence challenge／lease；
@@ -552,7 +554,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
 `WIP` — 改版仍缺以下內容；原生平台與正式環境驗收缺口另列於後。
 計畫 D1：狀態機已有——portal session 關閉（`OEFFIS_EVENT_CLOSED`）回報 `needs_permission`、compositor 斷線／重啟（`EI_EVENT_DISCONNECT`）回報 `revoked`、裝置移除回報 `paused`／`revoked`；明確重設／重試為 `reset_native_input`／`AC_reset_native_input`／`ac_reset_native_input`／Diagnostics 動作（U-20261121-18）。仍缺這些狀態在真實合成器上的原生驗收。
 `BLOCKED`（上游）：portal restore token——liboeffis 不提供 restore token，無法在此路徑保存／恢復同意。
-`DECIDE`：「擷取結果與擁有者 context 的接合」沒有寫明要綁定什麼；目前 portal 擷取已在呼叫者的取消範圍內執行，取消時會關閉 portal request。請維護者定義要再綁定的擁有者資訊（例如受管任務 ID／授權）後再實作。
+擷取結果已綁定受管操作與授權（維護者 2026-11-26 決定，U-20261126-02），真實合成器上仍待原生驗收。
 D2 仍缺原生半開交握資源回收與合成器釋放證據；D3 的錄製／全域停止／Windows 原生崩潰證據仍缺，詳見計畫與下方生命週期待辦。
 計畫 E 已有裝置 context、輸入／畫面、應用生命週期與共用命令入口；
 iOS 擴充 adapter 已有模擬器版（`SimctlExtension`，經 `xcrun simctl`，U-20261121-19，只對假 simctl 驗過）；實體 iOS 裝置的擴充 adapter（需 pymobiledevice3 等工具）、真實 SDK 契約核對與裝置驗收仍缺，不能以 fake backend 測試結案。

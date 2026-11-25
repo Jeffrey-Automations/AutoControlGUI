@@ -49,7 +49,7 @@ def test_virtual_devices_such_as_uinput_are_left_out(tmp_path):
 
 class Devices:
     def __init__(self):
-        self.pipes, self.present, self.ioctl_error = {}, [], None
+        self.pipes, self.present, self.ioctl_error, self.down = {}, [], None, ()
 
     def add(self, path):
         read, write = os.pipe()
@@ -63,10 +63,12 @@ class Devices:
     def write(self, path, *events):
         os.write(self.pipes[path][1], b"".join(events))
 
-    def ioctl(self, *_arguments):
+    def ioctl(self, _descriptor, _request, state, _mutate):
         if self.ioctl_error is not None:
             raise self.ioctl_error
-        return 0  # no key down: the buffer stays zero
+        for code in self.down:
+            state[code // 8] |= 1 << code % 8
+        return 0
 
     def close(self):
         for read, write in self.pipes.values():
@@ -183,8 +185,33 @@ def test_plugging_a_device_in_and_dropped_events_both_count_as_activity(devices)
         assert source.poll(0.05) == (True, False) and len(calls) == 3
         devices.write("/dev/input/event0", event(1, 30, 1), event(0, 0, 0))
         source.poll(0.05)
-        devices.ioctl_error = OSError()
+        devices.ioctl_error = OSError(5, "unreadable")
         devices.write("/dev/input/event0", event(0, 3, 0))
-        assert source.poll(0.05)[1] is True  # the key state is unknown, so it still counts as held
+        with pytest.raises(AgentTaskError, match="key state"):  # unknown is never "nothing held"
+            source.poll(0.05)
+        devices.ioctl_error = None
     finally:
         source.close()
+
+
+@posix
+def test_after_dropped_events_the_kernel_key_state_wins_over_the_older_events_in_the_batch(devices):
+    devices.add("/dev/input/event0")
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: ["/dev/input/event0"], opener=devices.opener)
+    source.open(lambda: None)
+    try:
+        devices.down = (30,)  # released in the batch, pressed again before the query, which discards that press
+        devices.write("/dev/input/event0", event(0, 3, 0), event(1, 30, 0), event(0, 0, 0))
+        assert source.poll(0.05) == (True, True)
+    finally:
+        source.close()
+
+
+@posix
+def test_an_unreadable_key_state_refuses_the_source_at_start(devices):
+    devices.add("/dev/input/event0")
+    devices.ioctl_error = OSError(5, "unreadable")
+    source = EvdevPresenceAPI(lambda: True, nodes=lambda: ["/dev/input/event0"], opener=devices.opener)
+    with pytest.raises(AgentTaskError, match="key state"):
+        source.open(lambda: None)
+    assert source._fds == {}
