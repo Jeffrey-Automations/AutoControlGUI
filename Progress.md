@@ -273,8 +273,13 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      排除留存的新版私有檔案；不能讓不識別新私有根的舊程式沿用新版資料庫／快取。
      須比對來源／成品雜湊，不能只看相同版本號；保留不明 journal，不重播副作用。
    - 瀏覽器統一使用 WebRunner（`je_web_runner`），來源 `D:\Codes\WebRunner`。
-     真實頁面驗收尚缺登入狀態、目前頁面身分、表單讀回、獨立 DOM 完成條件、來源限制、
-     上／下載權限與摘要、非預期視窗／對話框、逾時／取消及 session 清理證據。
+     2026-11-26 以真實 headless Chromium 對本機 loopback 頁面驗過（U-20261126-06）：登入狀態、頁面身分、表單讀回、
+     獨立 DOM 完成條件、舊觀察拒絕、來源限制、下載摘要、上傳不自動送出、根目錄拒絕、對話框轉人工、逾時與 session 清理。
+     `TODO`（WebRunner，另一個 repo，待維護者同意修改）：`BrowserSession.observe()` 的頁面文字取 `body.innerText`，沒有排除
+     `[data-secret]`，標記為祕密的可見文字會進入觀察並可能交給 planner；密碼欄的值沒有外洩。讀回與截圖路徑已排除。
+     `TODO`：上述在程序內執行，未經固定 helper；取消後狀態正確，但程序內的同步呼叫約 10 秒後才返回，helper 終止未驗。
+     驗收腳本未收進 repo（只在該次工作階段的暫存目錄）。
+     真實外部頁面（非 loopback）、helper 取消／終止與長時間 session 的證據仍缺。
 
 2. **P4／P2：四條流程的實際應用驗收**
    - 查詢／下載／歸檔：真實來源、完整下載、命名衝突、取消、摘要與獨立檔案清單驗證。
@@ -520,7 +525,7 @@ Jeffrey_RPA 的 test_je_facade → 推送 `dev`（會觸發 je_auto_control_dev 
      刪除操作遭自動審核拒絕（僅回覆 `blocked by policy`），保持原樣，不改用其他工具繞過。
    - 功能分支到正式環境的整合／部署仍未執行；正式工作樹與既有批次須保持可回復。
 
-**仍暫緩的驗收**：原生桌面、實際瀏覽器與 Android／iOS 真機驗收；WebRunner `Progress.md` #20
+**仍暫緩的驗收**：Android／iOS 真機驗收（原生桌面與實際瀏覽器已於 2026-11-26 在這台 Windows 恢復）；WebRunner `Progress.md` #20
 的原生雙向 bridge 驗收，以及 #21 的完整 24 小時驗收。只有使用者明確恢復後才可啟動，24 小時
 驗收須用新的 attempt 目錄與固定來源，短測／中斷紀錄不能代替完整結果。
 **範圍限制**：不新增付費依賴及收費功能；保持瀏覽器統一走 `je_web_runner`。
@@ -687,7 +692,7 @@ best-effort 觀察沒有 revision，也不承諾後續操作具原子性。原�
 目前以注入原生呼叫、真實 reader 邏輯與隱藏 Python helper 驗證，仍非原生驗收；
 UIA 的實際部署信任與原生驗收仍待完成；限定 root／祖先、逐欄失敗、受保護欄位及唯一 selector
 目前只有注入測試，helper 阻塞退休只有隱藏 Python 程序證據，仍須核實原生 COM 行為。
-DOM 來源已綁定受管瀏覽器 context 並逐欄回報（U-20261121-05，只對假 session 驗過，實際瀏覽器驗收仍待完成）；DOM 與 UIA best-effort 都不提供原子 revision。
+DOM 來源已綁定受管瀏覽器 context 並逐欄回報（U-20261121-05，真實 Chromium 的 loopback 驗收見 U-20261126-06）；DOM 與 UIA best-effort 都不提供原子 revision。
 
 M3 已加入內部受信任 `SemanticTarget` runtime 接點：封閉語意快照驗證、排除擷取時間的狀態比較、
 傳遞原始快照及 journal action ID 的提交介面、具 atomic／non_atomic 標記的回條，以及未知效果的
