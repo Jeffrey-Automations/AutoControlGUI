@@ -31,15 +31,11 @@ EOF 清理及前景視窗／滑鼠不受影響。建置與靜態匯入檢查不�
 
 ### 行程記憶體自有 fixture 原生驗收
 
-`TODO` — 原生執行仍暫緩。須先完成 Windows provider 的可信應用身分核對、自有 fixture 與受管權限整合，
-再驗證 ASLR、32／64 位配置、跨區段／guard／不可讀頁、程序退出、PID 重用、權限拒絕、
-取消及 handle 回收。以 fixture 的已知狀態比對語意結果，獨立觀測前景、焦點、滑鼠與輸入事件。
-目前 injected-provider 測試不算原生通過；設計見 [記憶體觀察契約](docs/process_memory_contract.md)。
-已有 `test/fixtures/native_memory/acceptance.py` 的靜態預檢與明確選用的 smoke 執行路徑，
-但原生執行尚未啟用；頁面故障、權限、PID 重用、背景不干擾及長時間資源驗收仍待完成。
-原生 fixture 已有固定 split／guard／noaccess／decommitted 頁面配置的建置前置能力；
-頁面 runner 已接上同一 handle 的 payload 邊界查詢、前半段實際讀回與封閉頁面屬性證據，
-並拒絕其他來源的相同錯誤；目前僅有注入測試，原生頁面配置與完整故障矩陣仍未驗收。
+`WIP` — 2026-11-26 在這台 Windows（x64）執行 `test/fixtures/native_memory/acceptance.py --execute`：一般往返與
+split／guard／noaccess／decommitted 四種頁面配置通過，清理都確認（U-20261126-04，修正了首跑發現的兩個缺陷）。
+映像雜湊取自自己的建置，沒有獨立審查者。仍缺：可信應用身分核對、32 位配置、程序退出、PID 重用、權限拒絕、
+取消、長時間資源與 handle 回收；前景不干擾未能判定（同時有另一個專案的 GUI 測試在切換前景；滑鼠位置與最後輸入
+時間在各次執行中都沒有變）。設計見 [記憶體觀察契約](docs/process_memory_contract.md)。
 
 ### 桌面行為驗收
 

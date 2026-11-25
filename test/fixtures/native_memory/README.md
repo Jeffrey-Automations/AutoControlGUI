@@ -2,7 +2,8 @@
 
 This x64 fixture supplies the schema-one buffers and correlated RPC contract used
 by the internal memory adapters. It is a separate build artifact from the Python
-fixture. Its runtime behavior and native memory acceptance have **not been run**.
+fixture. On 2026-11-26 the smoke round trip and the four page layouts below passed once
+on one x64 Windows 11 machine; full native memory acceptance has **not** been completed.
 
 The executable requires `--rpc --challenge <32 lowercase hex digits>`.
 It uses inherited input/output pipes, a 1,024-byte frame limit, and the closed
@@ -31,15 +32,15 @@ Each allocates two pages, copies the initial 16-byte payload across their bounda
 | `decommitted` | Read-only | Reserved, decommitted |
 
 Different readable protections in `split` prevent the two pages from forming one
-query region. Other layouts prepare reader refusals. All diagnostic modes allow
-bootstrap only and reject every control request before accessing the copied data.
+query region. Other layouts prepare reader refusals. Every diagnostic mode allows
+only bootstrap and the read-only `snapshot`, which reads the original static payload;
+any other request is rejected before accessing the copied data.
 The ordinary mode continues to use its original static payload and command ledger.
 Every exit path attempts to release the original allocation, including initialization
 and stdio failures; a failed release returns exit code 3.
 
-These layouts have been compiled and source-reviewed, not executed. The CLI below
-can select one with `--page-layout <layout>`. Selection alone remains static;
-execution still requires `--execute` after the native pause is lifted.
+The CLI below can select one with `--page-layout <layout>`. Selection alone remains static;
+execution still requires `--execute` while native acceptance is resumed in `Progress.md`.
 
 The page runner binds its private payload address only after launch/bootstrap
 validation. It observes the reader's existing region queries without adding OS
@@ -59,7 +60,7 @@ page cannot satisfy the case. Reports expose only the requested layout and close
 check booleans, never the private locations or memory contents. Page cases issue no
 state-changing control command. They require the expected read-only IPC snapshot
 and do not claim runtime task completion. The overall fault matrix
-stays unverified; only injected tests have exercised this runner so far.
+stays unverified.
 
 The allocation and protection rules follow Microsoft's
 [VirtualProtect](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotect)

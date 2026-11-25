@@ -327,9 +327,10 @@ static int initialize(int argc, char **argv) {
 
 static void dispatch(const Request *request) {
     if (!strcmp(request->operation, "bootstrap") && request->fields == 0) { bootstrap(); return; }
-    if (page_allocation) { error("invalid_request"); return; }
     if (strcmp(request->operation, "control")) { error("invalid_request"); return; }
+    /* snapshot() reads the static payload only, never the diagnostic pages. */
     if (!strcmp(request->command, "snapshot") && request->fields == COMMAND) snapshot();
+    else if (page_allocation) error("invalid_request");
     else if (!strcmp(request->command, "compare_set")) compare_set(request);
     else error("invalid_request");
 }

@@ -680,12 +680,14 @@ the reader. No raw executable bytes enter observations.
 Loaded addresses differ from file offsets, and relocations may change bytes; see
 Microsoft's [PE format specification](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format).
 This implementation rejects relocation of protected bytes instead of normalizing
-it. Padding to section alignment is conservatively projected as zero after raw
-data; its compatibility still requires native acceptance. A short read or padding
+it, with one exception the loader makes to every relocated image: the header's
+`ImageBase` must equal the measured base and is then compared as the file's value.
+Padding to section alignment is conservatively projected as zero after raw data;
+one x64 MSVC image has matched natively. A short read or padding
 mismatch refuses the image rather than dropping coverage. Matching these ranges
 is not atomic execution integrity, live page-protection evidence, DLL/source trust,
 or proof that no other executable mappings exist. x86/ARM64 image plans remain
-unsupported. Tests use synthetic mappings and static build-artifact inspection.
+unsupported. Unit tests use synthetic mappings and static build-artifact inspection.
 
 ### Owned fixture preparation
 
