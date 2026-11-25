@@ -21,6 +21,10 @@ from je_auto_control.utils.remote_desktop.ws_protocol import (
 )
 
 
+#: How long a closing WebSocket may spend on its CLOSE frame.
+_CLOSE_FRAME_TIMEOUT_S = 0.5
+
+
 class MessageChannel:
     """Abstract bidirectional typed-message endpoint."""
 
@@ -108,10 +112,21 @@ class WsMessageChannel(MessageChannel):
         self._sock.settimeout(timeout)
 
     def close(self) -> None:
-        try:
-            ws_send_close(self._sock, mask=self._mask)
-        except OSError:
-            pass
+        """Say goodbye if that costs nothing, then shut the socket down.
+
+        The CLOSE frame is a courtesy: sent while another thread is inside a
+        frame it would land in the middle of it, and into the buffer of a peer
+        that stopped reading it waited as long as that peer liked -- which is
+        how long the host's ``stop()`` then took.
+        """
+        if self._send_lock.acquire(blocking=False):
+            try:
+                self._sock.settimeout(_CLOSE_FRAME_TIMEOUT_S)
+                ws_send_close(self._sock, mask=self._mask)
+            except OSError:
+                pass
+            finally:
+                self._send_lock.release()
         try:
             self._sock.shutdown(socket.SHUT_RDWR)
         except OSError:

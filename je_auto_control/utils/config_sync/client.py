@@ -114,7 +114,7 @@ def _finite(value: Any, what: str) -> float:
     """``value`` as a finite float, or :class:`ConfigSyncError`."""
     try:
         number = float(value)
-    except (TypeError, ValueError) as error:
+    except (TypeError, ValueError, OverflowError) as error:
         raise ConfigSyncError(f"{what} must be a number, got {value!r}") from error
     if not math.isfinite(number):
         raise ConfigSyncError(f"{what} must be finite, got {value!r}")
@@ -279,7 +279,7 @@ class ConfigSyncClient:
             return {}
         try:
             return json.loads(response["text"])
-        except (json.JSONDecodeError, RecursionError) as error:
+        except (ValueError, RecursionError) as error:   # also the int-digit and nesting limits
             raise ConfigSyncError("config sync: invalid JSON reply") from error
 
     def _conflict(self, text: str) -> NoReturn:

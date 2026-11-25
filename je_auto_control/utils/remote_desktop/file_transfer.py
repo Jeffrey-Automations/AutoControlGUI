@@ -38,7 +38,7 @@ import uuid
 from concurrent.futures import CancelledError
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeGuard, Union
 
 from je_auto_control.utils.exception.cancellation import current_cancellation_token
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -56,6 +56,7 @@ _INVALID_TRANSFER_ID_MESSAGE = (
 DOWNLOAD_DIR_ENV = "JE_AUTOCONTROL_REMOTE_DOWNLOAD_DIR"
 
 _SEPARATORS = re.compile(r"[\\/]+")
+_TRANSFER_ID = re.compile(r"[0-9A-Za-z-]{%d}" % TRANSFER_ID_LEN)
 
 PathLike = Union[str, "os.PathLike[str]"]
 ProgressCallback = Callable[[str, int, int], None]
@@ -128,13 +129,21 @@ def encode_begin(transfer_id: str, dest_path: str, size: int) -> bytes:
     }, ensure_ascii=False).encode("utf-8")
 
 
+def _valid_transfer_id(value: object) -> TypeGuard[str]:
+    """36 ASCII letters, digits and dashes: the receiver builds its part file's name from it.
+
+    A separator in it raised past the receive loop, and on Windows a colon
+    sent the data to an alternate stream of a file nobody named.
+    """
+    return isinstance(value, str) and _TRANSFER_ID.fullmatch(value) is not None
+
+
 def decode_begin(payload: bytes) -> Tuple[str, str, int]:
     body = _decode_json(payload)
     transfer_id = body.get("transfer_id")
     dest_path = body.get("dest_path")
     size = body.get("size")
-    if (not isinstance(transfer_id, str)
-            or len(transfer_id) != TRANSFER_ID_LEN):
+    if not _valid_transfer_id(transfer_id):
         raise FileTransferError("FILE_BEGIN missing valid transfer_id")
     if not isinstance(dest_path, str) or not dest_path:
         raise FileTransferError("FILE_BEGIN missing dest_path")
@@ -170,8 +179,7 @@ def decode_end(payload: bytes) -> Tuple[str, str, Optional[str]]:
     body = _decode_json(payload)
     transfer_id = body.get("transfer_id")
     status = body.get("status", "ok")
-    if (not isinstance(transfer_id, str)
-            or len(transfer_id) != TRANSFER_ID_LEN):
+    if not _valid_transfer_id(transfer_id):
         raise FileTransferError("FILE_END missing valid transfer_id")
     if not isinstance(status, str):
         raise FileTransferError("FILE_END status must be a string")
@@ -182,7 +190,7 @@ def decode_end(payload: bytes) -> Tuple[str, str, Optional[str]]:
 def _decode_json(payload: bytes) -> Dict[str, Any]:
     try:
         body = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+    except (ValueError, RecursionError) as error:   # also the int-digit and nesting limits
         raise FileTransferError(f"invalid JSON: {error}") from error
     if not isinstance(body, dict):
         raise FileTransferError("payload must be a JSON object")
@@ -200,6 +208,7 @@ class _Incoming:
     handle: Any  # file object
     bytes_done: int = 0
     error: Optional[str] = None
+    ended: bool = False   # completed or aborted, and reported; guarded by the receiver's lock
 
 
 def _discard(part: Path) -> None:
@@ -273,8 +282,7 @@ class FileReceiver:
             incoming.error = "cancelled before it began"
             self._abort(incoming)
             return
-        if self._on_progress is not None:
-            self._on_progress(transfer_id, 0, total_size)
+        self._fire_progress(transfer_id, 0, total_size)
 
     def _destination(self, dest_path: str) -> Path:
         """Where ``dest_path`` is written, confined to ``base_dir`` when there is one."""
@@ -310,22 +318,23 @@ class FileReceiver:
             return
         try:
             incoming.handle.write(chunk)
-        except OSError as error:
-            incoming.error = str(error)
+        # ValueError: the file was closed by an abort() from another thread.
+        except (OSError, ValueError) as error:
+            incoming.error = incoming.error or str(error)
             self._abort(incoming)
             return
         incoming.bytes_done += len(chunk)
-        if self._on_progress is not None:
-            self._on_progress(
-                transfer_id, incoming.bytes_done, incoming.total_size,
-            )
+        self._fire_progress(
+            transfer_id, incoming.bytes_done, incoming.total_size,
+        )
 
     def handle_end(self, payload: bytes) -> None:
         transfer_id, status, error = decode_end(payload)
         with self._lock:
             incoming = self._active.pop(transfer_id, None)
-        if incoming is None:
-            return
+            if incoming is None or incoming.ended:
+                return
+            incoming.ended = True
         ok, message = self._commit(incoming, status == "ok", error)
         self._fire_complete(
             transfer_id, ok, message, str(incoming.dest_path),
@@ -376,17 +385,30 @@ class FileReceiver:
             self.abort(transfer_id, reason)
 
     def _abort(self, incoming: _Incoming) -> None:
+        with self._lock:
+            if incoming.ended:
+                return
+            incoming.ended = True
+            self._active.pop(incoming.transfer_id, None)
         try:
             incoming.handle.close()
         except OSError:
             pass
         _discard(incoming.part_path)
-        with self._lock:
-            self._active.pop(incoming.transfer_id, None)
         self._fire_complete(
             incoming.transfer_id, False, incoming.error,
             str(incoming.dest_path),
         )
+
+    def _fire_progress(self, transfer_id: str, done: int, total: int) -> None:
+        if self._on_progress is None:
+            return
+        try:
+            self._on_progress(transfer_id, done, total)
+        except Exception:  # noqa: BLE001  # reason: callback isolation, a caller's handler must not kill the receive loop
+            autocontrol_logger.exception(
+                "remote_desktop FileReceiver.on_progress callback raised"
+            )
 
     def _fire_complete(self, transfer_id: str, ok: bool,
                        error: Optional[str], dest_path: str) -> None:

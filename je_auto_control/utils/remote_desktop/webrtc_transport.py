@@ -211,13 +211,26 @@ def _get_cursor_position() -> Optional[Tuple[int, int]]:
             from Quartz import CGEventSourceGetMouseState
             location = CGEventSourceGetMouseState(0)
             return int(location.x), int(location.y)
-        try:
-            from Xlib import display as _xdisplay
-            data = _xdisplay.Display().screen().root.query_pointer()._data
-            return data["root_x"], data["root_y"]
-        except ImportError:
-            return None
+        return _x11_cursor_position()
     except (OSError, RuntimeError):
+        return None
+
+
+def _x11_cursor_position() -> Optional[Tuple[int, int]]:
+    try:
+        from Xlib import display as _xdisplay, error as _xerror
+    except ImportError:
+        return None
+    try:
+        # One per captured frame: left open, it was one X connection each.
+        display = _xdisplay.Display()
+        try:
+            data = display.screen().root.query_pointer()._data
+            return data["root_x"], data["root_y"]
+        finally:
+            display.close()
+    # Xlib's errors derive from Exception alone; they ended the video track.
+    except (_xerror.DisplayError, _xerror.ConnectionClosedError, _xerror.XError):
         return None
 
 
@@ -260,6 +273,17 @@ def _capture_frame(monitor: Dict[str, int]) -> "np.ndarray":
         img.height, img.width, 4,
     )
     return np.ascontiguousarray(arr[:, :, :3])
+
+
+def _close_thread_grabber() -> None:
+    """Release the calling thread's screen grabber; the next capture on it opens another."""
+    sct = getattr(_capture_local, "sct", None)
+    if sct is None:
+        return
+    del _capture_local.sct
+    close = getattr(sct, "close", None)
+    if callable(close):
+        close()
 
 
 class ScreenVideoTrack(VideoStreamTrack):
@@ -380,7 +404,14 @@ class ScreenVideoTrack(VideoStreamTrack):
         try:
             super().stop()
         finally:
-            self._executor.shutdown(wait=False, cancel_futures=True)
+            # The grabber belongs to the capture thread, which is the one that
+            # may release it: mss has no finalizer, so each session's thread
+            # left its device contexts behind.
+            try:
+                self._executor.submit(_close_thread_grabber)
+            except RuntimeError:
+                pass  # stopped before; that stop released it
+            self._executor.shutdown(wait=False)
 
 
 # --- ICE gathering helper -----------------------------------------------------

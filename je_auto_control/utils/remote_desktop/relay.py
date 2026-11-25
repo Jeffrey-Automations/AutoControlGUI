@@ -26,7 +26,7 @@ import select
 import socket
 import threading
 import time
-from typing import Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -39,6 +39,7 @@ _HANDSHAKE_TIMEOUT_S = 30.0
 # accept() 的輪詢間隔，用來定期檢查 _shutdown 旗標。
 # How long accept() blocks before re-checking the _shutdown flag.
 _ACCEPT_POLL_TIMEOUT_S = 0.5
+_ACCEPT_RETRY_S = 0.1
 # How long a pipe thread waits for readable data before re-checking the stop
 # flag. A blocking recv() can only be woken by the opposite thread's
 # dst.shutdown(); on some platforms/Python versions (observed on Linux +
@@ -63,12 +64,39 @@ def _read_exact(sock: socket.socket, length: int) -> bytes:
     return bytes(buf)
 
 
+def _send_all(dst: socket.socket, data: bytes, ended: Callable[[], bool]) -> bool:
+    """Write all of ``data`` to non-blocking ``dst``; ``False`` when ended while it takes no more.
+
+    A blocking ``sendall()`` to a peer that stopped reading saw no stop flag,
+    so a stopped relay kept that session's threads and sockets.
+    """
+    view = memoryview(data)
+    while view:
+        try:
+            _, writable, _ = select.select([], [dst], [], _PIPE_POLL_TIMEOUT_S)
+        except ValueError:
+            return False  # dst closed under us
+        if writable:
+            try:
+                view = view[dst.send(view):]
+            except BlockingIOError:
+                continue
+        elif ended():
+            return False
+    return True
+
+
 def _pipe(src: socket.socket, dst: socket.socket,
           stop_event: threading.Event,
           server_stop: Optional[threading.Event] = None) -> None:
     """Forward bytes from ``src`` to ``dst`` until either closes or the server stops."""
+    def ended() -> bool:
+        return stop_event.is_set() or (server_stop is not None and server_stop.is_set())
+
     try:
-        while not stop_event.is_set() and not (server_stop is not None and server_stop.is_set()):
+        # The peer pipe's recv() on this socket is guarded by select() too.
+        dst.setblocking(False)
+        while not ended():
             # Wait for readability with a timeout instead of a bare blocking
             # recv() so the loop always circles back to re-check stop_event
             # even if a cross-thread shutdown() fails to wake the recv().
@@ -79,10 +107,12 @@ def _pipe(src: socket.socket, dst: socket.socket,
                 break  # src closed under us
             if not readable:
                 continue
-            data = src.recv(_BUFFER_SIZE)
-            if not data:
+            try:
+                data = src.recv(_BUFFER_SIZE)
+            except BlockingIOError:
+                continue  # readable no longer
+            if not data or not _send_all(dst, data, ended):
                 break
-            dst.sendall(data)
     except OSError:
         pass
     finally:
@@ -213,8 +243,14 @@ class RelayServer:
                 client_sock, _address = listen.accept()
             except socket.timeout:
                 continue
-            except OSError:
-                return
+            except OSError as error:
+                if stop.is_set() or self._listen_sock is not listen:
+                    return
+                # An aborted connection is not the listener failing; ending
+                # the loop left a relay that reads as running and pairs nobody.
+                autocontrol_logger.info("relay accept failed: %r", error)
+                stop.wait(_ACCEPT_RETRY_S)
+                continue
             threading.Thread(
                 target=self._handle_client, args=(client_sock,),
                 name="relay-client", daemon=True,
@@ -258,6 +294,11 @@ class RelayServer:
     def _register_or_pair(self, role: int, session_id: bytes,
                           client_sock: socket.socket) -> None:
         with self._pending_lock:
+            if self._shutdown.is_set():
+                # stop() closed every parked peer under this lock; one that
+                # finished its handshake later stayed open for good.
+                client_sock.close()
+                return
             partner = self._pending.pop(session_id, None)
             if partner is not None and not _still_connected(partner[1]):
                 partner[1].close()

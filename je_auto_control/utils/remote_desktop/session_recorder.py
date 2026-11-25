@@ -76,8 +76,9 @@ class SessionRecorder:
             stream = container.add_stream(self._codec, rate=self._fps)
             if not isinstance(stream, av.video.stream.VideoStream):
                 raise ValueError("session recording requires a video codec")
-            stream.width = frame.width
-            stream.height = frame.height
+            # yuv420p needs even dimensions; the encoder refused an odd one.
+            stream.width = max(2, frame.width & ~1)
+            stream.height = max(2, frame.height & ~1)
             stream.pix_fmt = self._pixel_format
         except BaseException:
             self._failures += ("recorder.setup",)

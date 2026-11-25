@@ -10,7 +10,7 @@ module does not import it.
 import collections
 import json
 import threading
-from typing import TYPE_CHECKING, Deque, NoReturn, Optional, Any, Set, Tuple
+from typing import TYPE_CHECKING, Deque, List, NoReturn, Optional, Any, Set, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
@@ -50,6 +50,7 @@ class _ClientHandler:
     """Per-connection auth + input-receive + frame-send state."""
 
     _AUDIO_QUEUE_MAXLEN = 50  # ~2.5 s of buffered chunks at 50 ms each
+    _CURSOR_QUEUE_MAXLEN = 64  # ~2 s of updates at 30 Hz
 
     def __init__(self, host: "RemoteDesktopHost",
                  channel: MessageChannel, address: Tuple[Any, ...]) -> None:
@@ -65,6 +66,10 @@ class _ClientHandler:
         self._audio_lock = threading.Lock()
         self._audio_event = threading.Event()
         self._audio_sender_thread: Optional[threading.Thread] = None
+        # Cursor updates waiting for the sender thread; guarded by _frame_cond.
+        self._cursor_queue: Deque[bytes] = collections.deque(
+            maxlen=self._CURSOR_QUEUE_MAXLEN,
+        )
         self.authenticated = False
         #: What this viewer and the host have exchanged over the clipboard,
         #: so a forwarded change is not sent back to where it came from.
@@ -140,7 +145,7 @@ class _ClientHandler:
             return
         try:
             self._channel.send_typed(MessageType.FRAME, frame)
-        except OSError:
+        except (OSError, ProtocolError):
             pass
 
     def push_audio(self, chunk: bytes) -> None:
@@ -150,6 +155,12 @@ class _ClientHandler:
         with self._audio_lock:
             self._audio_queue.append(chunk)
         self._audio_event.set()
+
+    def push_cursor(self, payload: bytes) -> None:
+        """Enqueue a CURSOR payload for the sender thread; oldest dropped if full."""
+        with self._host._frame_cond:
+            self._cursor_queue.append(payload)
+            self._host._frame_cond.notify_all()
 
     def stop(self) -> None:
         """Signal threads, abandon this viewer's unfinished uploads, close the socket."""
@@ -242,27 +253,47 @@ class _ClientHandler:
         self._host._send_initial_cursor(self)
         self._send_initial_frame()
         last_sent = 0
-        while not self._shutdown.is_set():
-            with self._host._frame_cond:
-                while (not self._shutdown.is_set()
-                       and self._host._latest_seq <= last_sent):
-                    self._host._frame_cond.wait(timeout=0.5)
-                if self._shutdown.is_set():
-                    return
-                frame = self._host._latest_frame
-                seq = self._host._latest_seq
-            if frame is None:
-                continue
-            try:
-                self._channel.send_typed(MessageType.FRAME, frame)
-            except OSError as error:
-                autocontrol_logger.info(
-                    "remote_desktop send to %s failed: %r",
-                    self._address, error,
-                )
-                self.stop()
+        while True:
+            outgoing, last_sent = self._next_streamed(last_sent)
+            if self._shutdown.is_set():
                 return
-            last_sent = seq
+            for msg_type, payload in outgoing:
+                if not self._send_streamed(msg_type, payload):
+                    return
+
+    def _next_streamed(self, last_sent: int) -> Tuple[List[Tuple[MessageType, bytes]], int]:
+        """Wait for cursor updates or a frame newer than ``last_sent``; return them and the new mark."""
+        with self._host._frame_cond:
+            while (not self._shutdown.is_set() and not self._cursor_queue
+                   and self._host._latest_seq <= last_sent):
+                self._host._frame_cond.wait(timeout=0.5)
+            outgoing = [(MessageType.CURSOR, cursor) for cursor in self._cursor_queue]
+            self._cursor_queue.clear()
+            frame = self._host._latest_frame
+            seq = self._host._latest_seq
+        if frame is not None and seq > last_sent:
+            outgoing.append((MessageType.FRAME, frame))
+        return outgoing, seq
+
+    def _send_streamed(self, msg_type: MessageType, payload: bytes) -> bool:
+        """Send one streamed message; ``False`` once the connection is gone."""
+        try:
+            self._channel.send_typed(msg_type, payload)
+        except OSError as error:
+            autocontrol_logger.info(
+                "remote_desktop send to %s failed: %r",
+                self._address, error,
+            )
+            self.stop()
+            return False
+        except ProtocolError as error:
+            # Over the payload cap: that one frame is skipped. Raising ended
+            # this thread while the viewer stayed connected and in control.
+            autocontrol_logger.warning(
+                "remote_desktop %s to %s not sent: %r",
+                msg_type.name, self._address, error,
+            )
+        return True
 
     def _audio_send_loop(self) -> None:
         while not self._shutdown.is_set():
@@ -398,7 +429,7 @@ class _ClientHandler:
             return
         try:
             body = json.loads(payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except (ValueError, RecursionError):   # also the int-digit and nesting limits
             return
         if not isinstance(body, dict):
             return
@@ -440,7 +471,7 @@ class _ClientHandler:
     def _handle_input_payload(self, payload: bytes) -> None:
         try:
             message = json.loads(payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (ValueError, RecursionError) as error:
             autocontrol_logger.info(
                 "remote_desktop bad INPUT from %s: %r",
                 self._address, error,

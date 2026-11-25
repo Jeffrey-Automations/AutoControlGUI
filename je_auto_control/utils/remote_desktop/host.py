@@ -59,6 +59,8 @@ InputDispatcher = Callable[[Mapping[str, Any]], Any]
 # accept() 的輪詢間隔，用來定期檢查 _shutdown 旗標。
 # How long accept() blocks before re-checking the _shutdown flag.
 _ACCEPT_POLL_TIMEOUT_S = 0.5
+#: Pause after a failed accept(), so a lasting failure does not spin.
+_ACCEPT_RETRY_S = 0.1
 _FILE_MSG_TYPES = frozenset({
     MessageType.FILE_BEGIN, MessageType.FILE_CHUNK, MessageType.FILE_END,
 })
@@ -249,6 +251,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         # outlived stop()'s join would see it cleared and resume beside
         # the new run.
         self._shutdown = threading.Event()
+        self._resume_store.clear()   # a restart invalidates what the last run issued
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((self._bind, self._requested_port))
@@ -461,10 +464,11 @@ class RemoteDesktopHost(FrameProductionMixin):
         store signed this nonce — caller then falls back to the normal
         ``_verify_token`` path.
         """
-        for token, perm in self._resume_store.list_active().items():
+        for token in self._resume_store.list_active():
             if verify_response(token, nonce, payload):
-                self._resume_store.remove(token)
-                return perm
+                # consume() decides: of two connections that both got here
+                # with one token, only the one that removes it resumes.
+                return self._resume_store.consume(token)
         return None
 
     def _verify_token(self, nonce: bytes, payload: bytes) -> bool:
@@ -589,8 +593,15 @@ class RemoteDesktopHost(FrameProductionMixin):
                 client_sock, address = listen.accept()
             except socket.timeout:
                 continue
-            except OSError:
-                return
+            except OSError as error:
+                if stop.is_set() or listen.fileno() == -1:
+                    return
+                # A connection aborted before it was accepted, or no file
+                # descriptor left: returning here left a host that reads as
+                # running and takes nobody.
+                autocontrol_logger.info("remote_desktop accept failed: %r", error)
+                stop.wait(_ACCEPT_RETRY_S)
+                continue
             if not self._ip_allowed(address):
                 _close_quietly(client_sock)
                 continue

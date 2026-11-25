@@ -55,7 +55,7 @@ def load_or_create_viewer_id(path: Optional[Path] = None) -> str:
         try:
             existing = target.read_text(encoding="utf-8").strip()
             return validate_viewer_id(existing)
-        except (OSError, ViewerIdError):
+        except (OSError, ValueError):   # ViewerIdError, or bytes that are not UTF-8
             pass
     new_id = generate_viewer_id()
     try:

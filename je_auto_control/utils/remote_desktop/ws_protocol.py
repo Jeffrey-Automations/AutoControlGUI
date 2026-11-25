@@ -14,6 +14,7 @@ import os
 import socket
 import struct
 import threading
+import time
 from typing import Dict, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -119,15 +120,28 @@ def _read_http_message(sock: socket.socket) -> str:
     # blocks forever on bytes that already arrived. Loopback syscalls
     # are microseconds; ~150 of them per handshake is well below the
     # noise floor of the WS upgrade itself.
+    #
+    # The socket's timeout bounds the message as a whole: left to bound each
+    # read, a peer sending one byte at a time never reached it.
     buf = bytearray()
     terminator = b"\r\n\r\n"
-    while not buf.endswith(terminator):
-        chunk = sock.recv(1)
-        if not chunk:
-            raise WsProtocolError("connection closed during handshake")
-        buf.extend(chunk)
-        if len(buf) > MAX_HEADER_BYTES:
-            raise WsProtocolError("HTTP header too large")
+    timeout = sock.gettimeout()
+    deadline = None if timeout is None else time.monotonic() + timeout
+    try:
+        while not buf.endswith(terminator):
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise WsProtocolError("handshake timed out")
+                sock.settimeout(remaining)
+            chunk = sock.recv(1)
+            if not chunk:
+                raise WsProtocolError("connection closed during handshake")
+            buf.extend(chunk)
+            if len(buf) > MAX_HEADER_BYTES:
+                raise WsProtocolError("HTTP header too large")
+    finally:
+        sock.settimeout(timeout)
     return bytes(buf).decode("iso-8859-1")
 
 

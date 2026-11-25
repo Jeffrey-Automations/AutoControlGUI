@@ -104,3 +104,23 @@ def test_closing_the_usb_devices_tab_ends_the_enumeration(monkeypatch):
         assert tab._error_label.text() == ""
     finally:
         tab.deleteLater()
+
+
+def test_pyusb_without_libusb_falls_through_to_the_platform_tools(monkeypatch):
+    """Windows has pyusb wheels and no libusb: the list came back empty and the OS tool was never asked."""
+    import sys
+    from types import ModuleType
+
+    class NoBackendError(ValueError):
+        pass
+
+    def find(**_kwargs):
+        raise NoBackendError("No backend available")
+
+    core = ModuleType("usb.core")
+    core.NoBackendError, core.find = NoBackendError, find
+    package = ModuleType("usb")
+    package.core = core
+    monkeypatch.setitem(sys.modules, "usb", package)
+    monkeypatch.setitem(sys.modules, "usb.core", core)
+    assert usb_devices._try_pyusb() is None

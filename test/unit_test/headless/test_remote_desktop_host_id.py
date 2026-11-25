@@ -152,3 +152,23 @@ def test_registry_host_status_reports_host_id():
         assert status["running"] is True
     finally:
         registry.stop_host()
+
+
+def test_load_or_create_regenerates_a_file_that_is_not_text(tmp_path: Path):
+    """A non-UTF-8 file raised UnicodeDecodeError and kept the host from starting."""
+    target = tmp_path / "id"
+    target.write_bytes(b"\xff\xfe\x00damaged")
+    new_id = load_or_create_host_id(target)
+    assert validate_host_id(new_id) == new_id
+    assert target.read_text(encoding="utf-8").strip() == new_id
+
+
+def test_a_viewer_id_file_that_is_not_text_is_regenerated(tmp_path: Path):
+    from je_auto_control.utils.remote_desktop.viewer_id import (
+        load_or_create_viewer_id, validate_viewer_id,
+    )
+    target = tmp_path / "viewer_id"
+    target.write_bytes(b"\xff\xfe\x00damaged")
+    new_id = load_or_create_viewer_id(target)
+    assert validate_viewer_id(new_id) == new_id
+    assert target.read_text(encoding="utf-8").strip() == new_id

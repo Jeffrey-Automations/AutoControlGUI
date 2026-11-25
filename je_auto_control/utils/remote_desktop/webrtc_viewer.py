@@ -648,7 +648,7 @@ class WebRTCDesktopViewer:
             return
         try:
             data = json.loads(message)
-        except json.JSONDecodeError:
+        except (ValueError, RecursionError):   # also the int-digit and nesting limits
             return
         if not isinstance(data, dict):
             return

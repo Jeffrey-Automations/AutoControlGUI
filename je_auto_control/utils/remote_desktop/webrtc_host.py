@@ -526,7 +526,7 @@ class WebRTCDesktopHost(ViewerAuthMixin, MediaNegotiationMixin):
             return None
         try:
             data = json.loads(message)
-        except json.JSONDecodeError:
+        except (ValueError, RecursionError):   # also the int-digit and nesting limits
             autocontrol_logger.debug("webrtc host: bad json")
             return None
         return data if isinstance(data, dict) else None

@@ -20,7 +20,7 @@ import secrets
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.json_store.json_store import (
@@ -45,7 +45,7 @@ def load_or_create_host_fingerprint(path: Optional[Path] = None) -> str:
             existing = target.read_text(encoding="utf-8").strip()
             if existing and len(existing) == 64:
                 return existing
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             pass
     new_fp = secrets.token_hex(32)
     try:
@@ -222,19 +222,42 @@ def verify_dtls_fingerprint(sdp: str, expected_hex: str,
 
     ``expected_hex`` may be in either colon (``AB:CD:...``) or solid
     (``ABCD...``) form; comparison is case-insensitive.
+
+    Every section has to be pinned, not only the first: sections that are not
+    bundled each get their own DTLS transport, checked against that section's
+    fingerprints alone. The pinned line is no secret (it travels through the
+    signaling server), so an offer carrying it on a section that never
+    connects, next to one naming another certificate, used to pass here.
     """
-    actual = extract_dtls_fingerprint(sdp, algorithm)
-    if actual is None:
+    session, *sections = _fingerprints_by_section(sdp, algorithm.lower())
+    expected_normalized = expected_hex.replace(":", "").upper()
+    for actual in (value for section in (session, *sections) for value in section):
+        if actual != expected_normalized:
+            raise FingerprintMismatchError(
+                f"DTLS fingerprint mismatch: expected {expected_normalized[:16]}..., "
+                f"got {actual[:16]}...",
+            )
+    if not session and not (sections and all(sections)):
         raise FingerprintMismatchError(
             f"no {algorithm} DTLS fingerprint in offer",
         )
-    expected_normalized = expected_hex.replace(":", "").upper()
-    actual_normalized = actual.replace(":", "").upper()
-    if expected_normalized != actual_normalized:
-        raise FingerprintMismatchError(
-            f"DTLS fingerprint mismatch: expected {expected_normalized[:16]}..., "
-            f"got {actual_normalized[:16]}...",
-        )
+
+
+def _fingerprints_by_section(sdp: str, algorithm: str) -> List[List[str]]:
+    """The offer's ``algorithm`` fingerprints, session level first and then per ``m=`` section.
+
+    Lines, attribute names and the two fields are split exactly as aiortc's
+    SDP parser splits them, so nothing it will act on is missed here.
+    """
+    sections: List[List[str]] = [[]]
+    for line in sdp.splitlines() if isinstance(sdp, str) else ():
+        if line.startswith("m="):
+            sections.append([])
+        elif line.startswith("a=fingerprint:"):
+            fields = line.partition(":")[2].split()
+            if fields and fields[0].lower() == algorithm:
+                sections[-1].append("".join(fields[1:]).replace(":", "").upper())
+    return sections
 
 
 __all__ = [

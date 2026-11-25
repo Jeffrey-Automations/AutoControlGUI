@@ -163,6 +163,9 @@ class UsbPassthroughSession:
         self._claims: Dict[int, _ClaimState] = {}
         self._resume_index: Dict[str, int] = {}
         self._next_claim_id = 1
+        #: How often close_all() ran, so an OPEN that was in the backend
+        #: meanwhile does not leave a claim nobody will ever close.
+        self._closings = 0
         self._abuse = _AbuseTracker()
 
     @property
@@ -184,6 +187,7 @@ class UsbPassthroughSession:
     def close_all(self) -> None:
         """Release every outstanding claim — call on peer disconnect."""
         with self._lock:
+            self._closings += 1
             handles = [c.handle for c in self._claims.values()]
             self._claims.clear()
             self._resume_index.clear()
@@ -289,6 +293,8 @@ class UsbPassthroughSession:
                 serial = str(serial)
         except (KeyError, ValueError, TypeError) as error:
             return _opened_failure(frame.claim_id, f"bad OPEN payload: {error}")
+        with self._lock:
+            closings = self._closings
         decision = self._acl_decision(vendor_id, product_id, serial)
         if serial is None and self._has_serial_rules(vendor_id, product_id):
             # A rule scoped to one serial cannot be honoured if the viewer
@@ -300,14 +306,20 @@ class UsbPassthroughSession:
             return _opened_failure(
                 frame.claim_id, "denied by ACL policy",
             )
+        return self._claim_device(frame, vendor_id, product_id, serial, closings)
+
+    def _claim_device(self, frame: Frame, vendor_id: str, product_id: str,
+                      serial: Optional[str], closings: int) -> Frame:
+        """Open an admitted device and register the claim, or answer why not.
+
+        ``closings`` is how often the session had been closed when the OPEN
+        arrived: the operator's prompt and the device both take their time,
+        and a claim added after ``close_all()`` is one nobody will release.
+        """
         with self._lock:
-            if len(self._claims) >= self._max_claims:
-                self._audit("usb_open_rejected_max_claims",
-                            vendor_id, product_id, serial)
-                return _opened_failure(
-                    frame.claim_id,
-                    f"max concurrent claims reached ({self._max_claims})",
-                )
+            full = len(self._claims) >= self._max_claims
+        if full:
+            return self._max_claims_reached(frame, vendor_id, product_id, serial)
         try:
             handle = self._backend.open(
                 vendor_id=vendor_id, product_id=product_id, serial=serial,
@@ -318,14 +330,16 @@ class UsbPassthroughSession:
             return _opened_failure(frame.claim_id, str(error))
         resume_token = secrets.token_hex(16)
         with self._lock:
-            claim_id = self._allocate_claim_id_locked()
-            self._claims[claim_id] = _ClaimState(
-                handle=handle,
-                inbound_credits=self._initial_credits,
-                outbound_credits=self._initial_credits,
-                resume_token=resume_token,
-            )
-            self._resume_index[resume_token] = claim_id
+            # Re-checked: another OPEN may have run in the meantime.
+            closed = closings != self._closings
+            full = len(self._claims) >= self._max_claims
+            if not closed and not full:
+                claim_id = self._add_claim_locked(handle, resume_token)
+        if closed or full:
+            self._discard_handle(handle)
+            if closed:
+                return _opened_failure(frame.claim_id, "session closed while the device was opened")
+            return self._max_claims_reached(frame, vendor_id, product_id, serial)
         self._audit("usb_open_allowed", vendor_id, product_id, serial,
                     detail=f"claim_id={claim_id}")
         return Frame(
@@ -335,6 +349,35 @@ class UsbPassthroughSession:
                 "resume_token": resume_token,
             }),
         )
+
+    def _max_claims_reached(self, frame: Frame, vendor_id: str, product_id: str,
+                            serial: Optional[str]) -> Frame:
+        self._audit("usb_open_rejected_max_claims", vendor_id, product_id, serial)
+        return _opened_failure(
+            frame.claim_id,
+            f"max concurrent claims reached ({self._max_claims})",
+        )
+
+    def _add_claim_locked(self, handle: UsbHandle, resume_token: str) -> int:
+        """Register ``handle`` as a claim and return its id. Caller holds ``self._lock``."""
+        claim_id = self._allocate_claim_id_locked()
+        self._claims[claim_id] = _ClaimState(
+            handle=handle,
+            inbound_credits=self._initial_credits,
+            outbound_credits=self._initial_credits,
+            resume_token=resume_token,
+        )
+        self._resume_index[resume_token] = claim_id
+        return claim_id
+
+    @staticmethod
+    def _discard_handle(handle: UsbHandle) -> None:
+        try:
+            handle.close()
+        except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: best-effort cleanup; surface via logger
+            autocontrol_logger.warning(
+                "passthrough open: handle.close() raised %r", error,
+            )
 
     def _handle_resume(self, frame: Frame) -> Frame:
         """Re-bind a still-open claim to a reconnecting viewer.

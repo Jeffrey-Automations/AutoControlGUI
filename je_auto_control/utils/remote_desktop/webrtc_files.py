@@ -170,7 +170,7 @@ class FileTransferReceiver:
                          on_receipt: Optional[Callable[[FileReceiveReceipt], None]]) -> None:
         try:
             data = json.loads(raw)
-        except json.JSONDecodeError as error:
+        except (ValueError, RecursionError) as error:
             raise FileTransferError(f"bad envelope: {error}") from error
         if not isinstance(data, dict):
             raise FileTransferError("bad envelope: not an object")

@@ -113,9 +113,16 @@ class AcmeClient:
         self._directory = body
         return body
 
+    def _endpoint(self, name: str) -> str:
+        """The directory's URL for ``name``; :class:`AcmeError` when it lists none."""
+        url = self.directory().get(name)
+        if not isinstance(url, str) or not url:
+            raise AcmeError(f"directory lists no {name} URL")
+        return url
+
     def _fresh_nonce(self) -> str:
         """Fetch + cache a Replay-Nonce. Each POST consumes the cached one."""
-        url = self.directory()["newNonce"]
+        url = self._endpoint("newNonce")
         _status, _body, headers = self._http("HEAD", url)
         nonce = headers.get("Replay-Nonce") or headers.get("replay-nonce")
         if not nonce:
@@ -126,12 +133,12 @@ class AcmeClient:
 
     def new_account(self) -> str:
         """Register / look up the account; returns the kid URL."""
-        directory = self.directory()
+        url = self._endpoint("newAccount")
         payload: Dict[str, Any] = {"termsOfServiceAgreed": True}
         if self._contact_email:
             payload["contact"] = [f"mailto:{self._contact_email}"]
         status, body, headers = self._signed_post(
-            directory["newAccount"], payload, use_jwk=True,
+            url, payload, use_jwk=True,
         )
         if status not in (200, 201):
             raise AcmeError(
@@ -152,7 +159,7 @@ class AcmeClient:
             "identifiers": [{"type": "dns", "value": d} for d in domains],
         }
         status, body, headers = self._signed_post(
-            self.directory()["newOrder"], payload,
+            self._endpoint("newOrder"), payload,
         )
         if status not in (200, 201) or not isinstance(body, dict):
             raise AcmeError(f"new-order returned HTTP {status}: {body!r}")
@@ -329,10 +336,10 @@ class AcmeClient:
             headers["Content-Type"] = content_type
         if accept:
             headers["Accept"] = accept
-        request = urllib.request.Request(
-            url, data=body, method=method, headers=headers,
-        )
         try:
+            request = urllib.request.Request(
+                url, data=body, method=method, headers=headers,
+            )
             with urllib.request.urlopen(  # nosec B310  # NOSONAR python:S5332  # reason: configured directory URL, https in production
                     request, timeout=self._timeout,
             ) as response:
@@ -341,17 +348,25 @@ class AcmeClient:
                 resp_headers = dict(response.headers.items())
                 status = response.status
         except urllib.error.HTTPError as error:
-            raw = error.read() or b""
+            raw = _error_body(method, url, error)
             ct = error.headers.get("Content-Type", "") if error.headers else ""
             resp_headers = (
                 dict(error.headers.items()) if error.headers else {}
             )
             status = error.code
-        except (OSError, http.client.HTTPException) as error:
-            # URLError, a timeout, a dropped connection: the CA is
-            # unreachable, which callers handle as AcmeError.
+        except (OSError, ValueError, http.client.HTTPException) as error:
+            # URLError, a timeout, a dropped connection, a URL the CA handed
+            # out that is none: all of them the CA failing, as AcmeError.
             raise AcmeError(f"ACME {method} {url} failed: {error!r}") from error
         return status, _decode_body(raw, ct), resp_headers
+
+
+def _error_body(method: str, url: str, error: urllib.error.HTTPError) -> bytes:
+    """The body of an HTTP error reply; reading it can fail like the request itself."""
+    try:
+        return error.read() or b""
+    except (OSError, http.client.HTTPException) as failure:
+        raise AcmeError(f"ACME {method} {url} failed: {failure!r}") from failure
 
 
 def _decode_body(raw: bytes, content_type: str) -> Any:
@@ -360,7 +375,7 @@ def _decode_body(raw: bytes, content_type: str) -> Any:
         return raw
     try:
         return json.loads(raw.decode("utf-8")) if raw else {}
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (ValueError, RecursionError):   # also the int-digit and nesting limits
         return raw
 
 

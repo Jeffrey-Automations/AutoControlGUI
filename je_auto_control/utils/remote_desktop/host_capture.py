@@ -15,6 +15,7 @@ from typing import (
     TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple,
 )
 
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop.protocol import MessageType
 from je_auto_control.utils.remote_desktop.video_codec import (
@@ -136,7 +137,7 @@ def _default_cursor_provider(origin: Tuple[int, int] = (0, 0)) -> CursorProvider
             return None
         try:
             position = get_mouse_position()
-        except (OSError, RuntimeError, AttributeError):
+        except (OSError, RuntimeError, AttributeError, AutoControlException):
             return None
         if position is None:
             return None
@@ -214,19 +215,17 @@ class FrameProductionMixin:
                 return
 
     def _broadcast_cursor(self, payload: bytes) -> None:
-        """Send a CURSOR message to every authenticated client.
+        """Hand a CURSOR message to every authenticated client's sender thread.
 
-        Errors per-client are swallowed — a flaky viewer should not
-        kill the cursor stream to healthy peers.
+        Never written here: this runs on the one cursor thread, and a viewer
+        that stopped reading held it inside its full socket buffer, freezing
+        the cursor of every other viewer.
         """
         with self._clients_lock:
             clients = [c for c in self._clients
                        if c.authenticated and not c._shutdown.is_set()]
         for client in clients:
-            try:
-                client._channel.send_typed(MessageType.CURSOR, payload)
-            except OSError:
-                continue
+            client.push_cursor(payload)
 
     def broadcast_viewer_cursor(self, viewer_id: str,
                                 x: int, y: int) -> int:
@@ -245,14 +244,9 @@ class FrameProductionMixin:
         with self._clients_lock:
             clients = [c for c in self._clients
                        if c.authenticated and not c._shutdown.is_set()]
-        sent = 0
         for client in clients:
-            try:
-                client._channel.send_typed(MessageType.CURSOR, payload)
-                sent += 1
-            except OSError:
-                continue
-        return sent
+            client.push_cursor(payload)
+        return len(clients)
 
     def _send_initial_cursor(self, client: "_ClientHandler") -> None:
         """Push the latest known cursor position to a fresh client.
@@ -277,7 +271,7 @@ class FrameProductionMixin:
         while not stop.is_set():
             try:
                 frame = self._frame_provider()
-            except (OSError, RuntimeError, ValueError) as error:
+            except (OSError, RuntimeError, ValueError, AutoControlException) as error:
                 autocontrol_logger.warning(
                     "remote_desktop frame capture failed: %r", error,
                 )
@@ -315,7 +309,7 @@ class FrameProductionMixin:
         tag = bytes([codec_tag(provider.name)])
         try:
             packets = provider.encode_jpeg(jpeg_bytes)
-        except (OSError, RuntimeError, ValueError) as error:
+        except Exception as error:  # noqa: BLE001  # reason: the provider is pluggable, and PyAV's errors derive from Exception alone; one frame is lost, not the capture loop
             autocontrol_logger.warning(
                 "remote_desktop codec %s failed: %r", provider.name, error,
             )

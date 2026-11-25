@@ -428,3 +428,11 @@ def test_a_platform_that_cannot_send_sas_says_so_rather_than_raising(
     host._handle_send_sas()
     assert host.types_sent() == ["sas_fail"]
     assert "Windows-only" in host.sent[-1]["error"]
+
+
+def test_the_usb_session_is_told_which_viewer_was_admitted(bridge):
+    """The USB session reads ``_viewer_id``; nothing set it, so its audit rows named nobody."""
+    host = _Host()
+    host._handle_auth({"token": "secret", "viewer_id": "viewer-9"})
+    assert host._authenticated
+    assert host._viewer_id == "viewer-9"

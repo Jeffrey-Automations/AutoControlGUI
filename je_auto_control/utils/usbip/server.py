@@ -29,6 +29,7 @@ _MAX_TRANSFER_BUFFER_BYTES = 16 * 1024 * 1024
 # accept() 的輪詢間隔,用來定期檢查 _stop 旗標。
 # How long accept() blocks before re-checking the _stop flag.
 _ACCEPT_POLL_TIMEOUT_S = 0.5
+_ACCEPT_RETRY_S = 0.1
 
 
 def default_port() -> int:
@@ -115,8 +116,14 @@ class UsbIpServer:
                 client_sock, _address = listen.accept()
             except socket.timeout:
                 continue
-            except OSError:
-                return
+            except OSError as error:
+                if stop.is_set() or self._listen_sock is not listen:
+                    return
+                # An aborted connection is not the listener failing; ending
+                # the loop left a server that reads as running.
+                autocontrol_logger.info("usbip accept failed: %r", error)
+                stop.wait(_ACCEPT_RETRY_S)
+                continue
             worker = threading.Thread(
                 target=self._handle_client, args=(client_sock, stop),
                 name="usbip-client", daemon=True,
@@ -133,7 +140,8 @@ class UsbIpServer:
         try:
             client_sock.settimeout(_CLIENT_READ_TIMEOUT_S)
             self._serve(client_sock, stop)
-        except (OSError, UsbIpError) as error:
+        # ValueError covers UsbIpError and pyusb's NoBackendError.
+        except (OSError, ValueError, RuntimeError) as error:
             autocontrol_logger.info("usbip client error: %r", error)
         finally:
             try:

@@ -330,3 +330,46 @@ def test_a_reused_valid_authorization_needs_no_challenge(monkeypatch, account_ke
     )
     assert b"BEGIN CERTIFICATE" in cert_pem
     assert published == []
+
+
+@pytest.mark.parametrize("missing", ["newNonce", "newAccount"])
+def test_a_directory_without_an_endpoint_is_an_acme_error(monkeypatch, account_key, missing):
+    from je_auto_control.utils.acme_v2 import client as module
+    directory = {"newNonce": "https://acme.example/nonce", "newAccount": "https://acme.example/acct"}
+    del directory[missing]
+    client = AcmeClient(directory_url="https://acme.example/directory", account_key=account_key)
+    client._directory = directory
+    client._nonce = None if missing == "newNonce" else "n"
+    monkeypatch.setattr(module, "sign_compact", lambda **_kwargs: {})
+    with pytest.raises(AcmeError, match=missing):
+        client.new_account()
+
+
+def test_an_error_body_that_cannot_be_read_is_an_acme_error(monkeypatch, account_key):
+    import urllib.error
+    import urllib.request
+
+    class _Dropped(urllib.error.HTTPError):
+        def read(self, *_args):
+            raise TimeoutError("timed out")
+
+    def urlopen(request, timeout=None):
+        raise _Dropped(request.full_url, 500, "error", {}, None)
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    client = AcmeClient(directory_url="https://acme.example/directory", account_key=account_key)
+    with pytest.raises(AcmeError):
+        client.directory()
+
+
+@pytest.mark.parametrize("url", ["acct/1", "http://[broken"])
+def test_a_url_the_server_made_up_is_an_acme_error(account_key, url):
+    client = AcmeClient(directory_url="https://acme.example/directory", account_key=account_key)
+    with pytest.raises(AcmeError):
+        client._http("GET", url)
+
+
+@pytest.mark.parametrize("raw", [b"[" * 100_000, b"1" * 5000], ids=["nested", "huge-int"])
+def test_json_the_parser_gives_up_on_stays_bytes(raw):
+    from je_auto_control.utils.acme_v2.client import _decode_body
+    assert _decode_body(raw, "application/json") == raw

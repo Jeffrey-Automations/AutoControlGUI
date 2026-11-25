@@ -67,6 +67,17 @@ def _device_key(device: UsbDevice) -> _DeviceKey:
     )
 
 
+def _enumeration_failed(result: Any) -> bool:
+    """Whether the platform tool failed: its empty list is no reading of the bus.
+
+    Diffing it reported every device as removed, and as added by the next poll.
+    """
+    error = getattr(result, "error", None)
+    if error:
+        autocontrol_logger.warning("usb hotplug enumeration failed: %s", error)
+    return bool(error)
+
+
 class UsbHotplugWatcher:
     """Diff successive USB enumerations and emit add/remove events."""
 
@@ -165,46 +176,55 @@ class UsbHotplugWatcher:
         # Prime the snapshot without emitting events for already-present
         # devices — the watcher tracks *changes from now*, not the
         # initial inventory.
+        primed = False
+        while True:
+            try:
+                if primed:
+                    self._diff_and_record()
+                else:
+                    # Retried until it succeeds: diffing against the empty
+                    # snapshot of a failed enumeration reported every device
+                    # already present as added.
+                    primed = self._prime(stop)
+            except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: enumeration may fail per-OS; keep the loop alive across it
+                autocontrol_logger.warning(
+                    "usb hotplug poll: %r", error,
+                )
+            if stop.wait(self._interval):
+                return
+
+    def _prime(self, stop: threading.Event) -> bool:
+        """Take the baseline snapshot; True once there is one to diff against."""
         with self._lock:
             epoch = self._snapshot_epoch
-        try:
-            initial = self._enumerator()
-            with self._lifecycle_lock:
-                # Superseded, not merely stopped: once a newer run exists its
-                # snapshot is the one that counts. A run that was only stopped
-                # still primes, so start(); stop(); poll_once() reports changes
-                # since start() and not the whole inventory -- whether the
-                # stop landed before or after this enumeration returned.
-                if stop is not self._stop:
-                    return
-                with self._lock:
-                    # ...unless a poll already wrote a newer reading while
-                    # this enumeration was running: stop() gives up after
-                    # _STOP_JOIN_TIMEOUT_S, so poll_once() can land first, and
-                    # priming over it would report its devices as removed next.
-                    if self._snapshot_epoch != epoch:
-                        return
+        initial = self._enumerator()
+        if _enumeration_failed(initial):
+            return False
+        with self._lifecycle_lock:
+            # Superseded, not merely stopped: once a newer run exists its
+            # snapshot is the one that counts. A run that was only stopped
+            # still primes, so start(); stop(); poll_once() reports changes
+            # since start() and not the whole inventory -- whether the
+            # stop landed before or after this enumeration returned.
+            if stop is not self._stop:
+                return True
+            with self._lock:
+                # ...unless a poll already wrote a newer reading while
+                # this enumeration was running: stop() gives up after
+                # _STOP_JOIN_TIMEOUT_S, so poll_once() can land first, and
+                # priming over it would report its devices as removed next.
+                # A reset() lands here too, and must not end the poller.
+                if self._snapshot_epoch == epoch:
                     self._snapshot = {
                         _device_key(dev): dev for dev in initial.devices
                     }
                     self._snapshot_epoch += 1
-        except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: enumeration may fail per-OS
-            autocontrol_logger.warning(
-                "usb hotplug initial enumeration: %r", error,
-            )
-        while not stop.is_set():
-            stop.wait(self._interval)
-            if stop.is_set():
-                return
-            try:
-                self._diff_and_record()
-            except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: keep the loop alive across enumeration failures
-                autocontrol_logger.warning(
-                    "usb hotplug poll: %r", error,
-                )
+        return True
 
     def _diff_and_record(self) -> List[UsbEvent]:
         result = self._enumerator()
+        if _enumeration_failed(result):
+            return []
         current: Dict[_DeviceKey, UsbDevice] = {
             _device_key(dev): dev for dev in result.devices
         }

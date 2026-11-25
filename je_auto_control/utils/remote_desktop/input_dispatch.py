@@ -61,7 +61,7 @@ def dispatch_input(message: Mapping[str, Any], *, origin: Tuple[int, int] = (0, 
             f"input message must be a mapping, got {type(message).__name__}"
         )
     action = message.get("action")
-    if action not in _ALLOWED_ACTIONS:
+    if not isinstance(action, str) or action not in _ALLOWED_ACTIONS:
         raise InputDispatchError(f"unknown action: {action!r}")
     if action == "ping":
         return None

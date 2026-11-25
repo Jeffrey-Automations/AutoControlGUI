@@ -163,3 +163,55 @@ def test_closing_the_channel_releases_every_claim():
     assert backend.open_handle_count == 1
     channel.handlers["close"]()
     assert backend.open_handle_count == 0
+
+
+# --- claims and the end of the session (2026-11-26 review) ----------------------
+
+def test_a_device_opened_while_the_session_closed_is_released():
+    """close_all() had run by the time the slow open returned, so nothing could reach the handle again."""
+    backend = FakeUsbBackend(devices=[_DEVICE])
+    session = UsbPassthroughSession(backend)
+    real_open = backend.open
+
+    def open_slowly(**kwargs):
+        handle = real_open(**kwargs)
+        session.close_all()
+        return handle
+
+    backend.open = open_slowly
+    assert _open(session)["ok"] is False
+    assert session.active_claim_count == 0
+    assert backend.open_handle_count == 0
+
+
+def test_concurrent_opens_stay_within_max_claims():
+    backend = FakeUsbBackend(devices=[_DEVICE])
+    session = UsbPassthroughSession(backend, max_claims=1)
+    real_open = backend.open
+    nested = []
+
+    def open_and_race(**kwargs):
+        if not nested:
+            nested.append(None)
+            nested[0] = _open(session)      # another thread's OPEN, between check and claim
+        return real_open(**kwargs)
+
+    backend.open = open_and_race
+    assert _open(session)["ok"] is False
+    assert nested[0]["ok"] is True
+    assert session.active_claim_count == 1
+    assert backend.open_handle_count == 1
+
+
+def test_a_device_approved_after_the_session_closed_is_not_claimed(tmp_path):
+    """The operator may answer the prompt long after the viewer left."""
+    backend = FakeUsbBackend(devices=[_DEVICE])
+    rule = AclRule(vendor_id="1050", product_id="0407", prompt_on_open=True)
+
+    def approve_late(*_device):
+        session.close_all()
+        return True
+
+    session = UsbPassthroughSession(backend, acl=_acl(tmp_path, rules=[rule]), prompt_callback=approve_late)
+    assert _open(session)["ok"] is False
+    assert backend.open_handle_count == 0

@@ -184,22 +184,11 @@ class AuditLog:
             host_id: Optional[str] = None,
             viewer_id: Optional[str] = None,
             detail: Optional[str] = None) -> None:
-        ts = datetime.now(timezone.utc).isoformat()
+        row = tuple(_storable(text) for text in (event_type, host_id, viewer_id, detail))
         with self._lock:
             try:
                 self._conn.execute("BEGIN IMMEDIATE")
-                prev_hash = self._read_last_hash_locked()
-                row_hash = _compute_row_hash(
-                    prev_hash, ts, event_type, host_id, viewer_id, detail,
-                )
-                self._conn.execute(
-                    "INSERT INTO events"
-                    " (ts, event_type, host_id, viewer_id, detail,"
-                    "  prev_hash, row_hash)"
-                    " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (ts, event_type, host_id, viewer_id, detail,
-                     prev_hash, row_hash),
-                )
+                self._insert_locked(*row)
                 self._conn.execute("COMMIT")
                 self._maybe_prune_locked()
             except SQLITE_ERRORS as error:
@@ -207,11 +196,31 @@ class AuditLog:
                     self._conn.execute("ROLLBACK")
                 autocontrol_logger.warning("audit log insert: %r", error)
 
+    def _insert_locked(self, event_type: Optional[str], host_id: Optional[str] = None,
+                       viewer_id: Optional[str] = None, detail: Optional[str] = None) -> None:
+        """Link and insert one row; the caller holds the lock and a write transaction."""
+        ts = datetime.now(timezone.utc).isoformat()
+        prev_hash = self._read_last_hash_locked()
+        row_hash = _compute_row_hash(
+            prev_hash, ts, event_type, host_id, viewer_id, detail,
+        )
+        self._conn.execute(
+            "INSERT INTO events"
+            " (ts, event_type, host_id, viewer_id, detail,"
+            "  prev_hash, row_hash)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (ts, event_type, host_id, viewer_id, detail,
+             prev_hash, row_hash),
+        )
+
     def _maybe_prune_locked(self) -> None:
         cur = self._conn.execute("SELECT COUNT(*) FROM events")
         (count,) = cur.fetchone()
         if count <= _MAX_ROWS:
             return
+        # One write transaction: another process pruning between the anchor
+        # being read and stored left an anchor for rows already cut.
+        self._conn.execute("BEGIN IMMEDIATE")
         # Keep the most recent ``_PRUNE_TARGET`` rows. The chain stays
         # valid for kept rows: each surviving row's prev_hash still
         # matches the row above it. The first survivor's prev_hash names a
@@ -229,6 +238,7 @@ class AuditLog:
             "SELECT id FROM events ORDER BY id DESC LIMIT 1 OFFSET ?)",
             (_PRUNE_TARGET,),
         )
+        self._conn.execute("COMMIT")
 
     def query(self, *,
               event_type: Optional[str] = None,
@@ -260,14 +270,23 @@ class AuditLog:
         """Wipe the table, leaving one ``audit_log_cleared`` event. Returns the rows deleted.
 
         A clear used to leave nothing behind, so a wiped log verified as a
-        clean empty one. The new chain starts with the event that says so.
+        clean empty one. The new chain starts with the event that says so,
+        in the same transaction: a clear that cannot record itself raises
+        :class:`AuditLogError` and deletes nothing.
         """
         with self._lock:
-            cur = self._conn.execute("SELECT COUNT(*) FROM events")
-            (count,) = cur.fetchone()
-            self._conn.execute("DELETE FROM events")
-            self._set_anchor_locked(_GENESIS_HASH)
-        self.log(_CLEARED_EVENT, detail=f"{int(count)} rows deleted")
+            try:
+                self._conn.execute("BEGIN IMMEDIATE")
+                cur = self._conn.execute("SELECT COUNT(*) FROM events")
+                (count,) = cur.fetchone()
+                self._conn.execute("DELETE FROM events")
+                self._set_anchor_locked(_GENESIS_HASH)
+                self._insert_locked(_CLEARED_EVENT, detail=f"{int(count)} rows deleted")
+                self._conn.execute("COMMIT")
+            except SQLITE_ERRORS as error:
+                if self._conn.in_transaction:
+                    self._conn.execute("ROLLBACK")
+                raise AuditLogError(f"cannot clear audit log {self._path}: {error}") from error
         return int(count)
 
     def close(self) -> None:
@@ -278,7 +297,18 @@ class AuditLog:
                 pass
 
 
-def _compute_row_hash(prev_hash: Optional[str], ts: str, event_type: str,
+def _storable(text: Optional[str]) -> Optional[str]:
+    """``text`` with lone surrogates escaped: JSON can carry one, SQLite cannot store it.
+
+    A peer picks its own ``viewer_id``; the encoding error left the write
+    transaction open, which cost the *next* event its row as well.
+    """
+    if not isinstance(text, str):
+        return text
+    return text.encode("utf-8", "backslashreplace").decode("utf-8")
+
+
+def _compute_row_hash(prev_hash: Optional[str], ts: str, event_type: Optional[str],
                       host_id: Optional[str], viewer_id: Optional[str],
                       detail: Optional[str]) -> str:
     canonical = json.dumps(

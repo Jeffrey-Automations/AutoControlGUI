@@ -27,7 +27,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -96,8 +96,15 @@ def write_default_config(path: Optional[Path] = None) -> Path:
     return target
 
 
-def run_daemon(config: HostServiceConfig) -> None:
-    """Block forever: publish offer → wait for answer → accept → loop."""
+def run_daemon(config: HostServiceConfig,
+               stopped: Optional[Callable[[], bool]] = None) -> None:
+    """Block until ``stopped()``: publish offer → wait for answer → accept → loop.
+
+    Without ``stopped`` only Ctrl-C ends it. The Windows service needs the
+    other way: its stop request set a flag nothing read, so the service sat
+    in STOP_PENDING until the process was killed.
+    """
+    halted = stopped or (lambda: False)
     from je_auto_control.utils.remote_desktop import default_trust_list
     from je_auto_control.utils.remote_desktop.multi_viewer import MultiViewerHost
     from je_auto_control.utils.remote_desktop.webrtc_transport import WebRTCConfig
@@ -116,20 +123,30 @@ def run_daemon(config: HostServiceConfig) -> None:
         "host_service: daemon up; host_id=%s server=%s",
         config.host_id, config.server_url,
     )
-    while True:
+    while not halted():
         try:
-            _serve_one_viewer(multi, config)
-            time.sleep(config.poll_interval_s)
+            _serve_one_viewer(multi, config, halted)
+            _pause(config.poll_interval_s, halted)
         except KeyboardInterrupt:
-            autocontrol_logger.info("host_service: shutting down")
-            multi.stop_all()
-            return
+            break
         except Exception as error:  # noqa: BLE001  # reason: a daemon must survive ANY transient error (signaling/aiortc/av/ValueError) and retry, not exit the loop
+            if halted():
+                break
             autocontrol_logger.warning("host_service loop: %r", error)
-            time.sleep(min(30.0, config.poll_interval_s * 5))
+            _pause(min(30.0, config.poll_interval_s * 5), halted)
+    autocontrol_logger.info("host_service: shutting down")
+    multi.stop_all()
 
 
-def _serve_one_viewer(multi: Any, config: HostServiceConfig) -> None:
+def _pause(seconds: float, halted: Callable[[], bool]) -> None:
+    """Sleep ``seconds``, or less once ``halted()``."""
+    deadline = time.monotonic() + seconds
+    while not halted() and time.monotonic() < deadline:
+        time.sleep(min(0.5, max(0.0, deadline - time.monotonic())))
+
+
+def _serve_one_viewer(multi: Any, config: HostServiceConfig,
+                      halted: Optional[Callable[[], bool]] = None) -> None:
     """Publish one offer, wait for its answer, and connect the viewer.
 
     Any failure after the offer exists stops that session before the error
@@ -148,6 +165,7 @@ def _serve_one_viewer(multi: Any, config: HostServiceConfig) -> None:
             config.server_url, config.host_id,
             secret=config.server_secret,
             timeout_s=300.0,
+            cancelled=halted,
         )
         multi.accept_session_answer(session_id, answer)
     except BaseException:
@@ -422,7 +440,7 @@ if sys.platform == "win32":  # pragma: no cover - Windows-only
                 except (OSError, ValueError):
                     logging.exception("config load failed")
                     return
-                run_daemon(config)
+                run_daemon(config, lambda: not self._running)
     except ImportError:
         _WindowsService = None  # type: ignore[misc, assignment]
 else:

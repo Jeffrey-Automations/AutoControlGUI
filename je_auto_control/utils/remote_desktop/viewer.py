@@ -41,46 +41,37 @@ _DEFAULT_CONNECT_TIMEOUT_S = 5.0
 _NOT_CONNECTED_MESSAGE = "viewer is not connected"
 
 
+def _auth_ok_body(payload: bytes) -> Dict[str, Any]:
+    """The AUTH_OK JSON object; ``{}`` for an empty or unreadable payload."""
+    try:
+        body = json.loads(payload.decode("utf-8")) if payload else {}
+    except (ValueError, RecursionError):   # also the int-digit and nesting limits
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
 def _extract_host_id(payload: bytes) -> Optional[str]:
     """Pull ``host_id`` out of an AUTH_OK payload (JSON or empty)."""
-    if not payload:
-        return None
-    try:
-        body = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None
-    value = body.get("host_id") if isinstance(body, dict) else None
+    value = _auth_ok_body(payload).get("host_id")
     return value if isinstance(value, str) else None
 
 
 def _extract_resume_info(payload: bytes) -> Tuple[Optional[str], Optional[float]]:
     """Pull ``(resume_token, resume_ttl)`` from an AUTH_OK JSON payload."""
-    if not payload:
-        return None, None
-    try:
-        body = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None, None
-    if not isinstance(body, dict):
-        return None, None
+    body = _auth_ok_body(payload)
     token = body.get("resume_token")
     ttl = body.get("resume_ttl")
     token = token if isinstance(token, str) else None
-    ttl = float(ttl) if isinstance(ttl, (int, float)) else None
+    try:
+        ttl = float(ttl) if isinstance(ttl, (int, float)) else None
+    except OverflowError:   # an integer no float can hold
+        ttl = None
     return token, ttl
 
 
 def _extract_codec(payload: bytes) -> Optional[str]:
     """Phase 6.8: pull the negotiated codec name from AUTH_OK JSON."""
-    if not payload:
-        return None
-    try:
-        body = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None
-    if not isinstance(body, dict):
-        return None
-    codec = body.get("codec")
+    codec = _auth_ok_body(payload).get("codec")
     return codec if isinstance(codec, str) else None
 
 
@@ -217,18 +208,19 @@ class RemoteDesktopViewer:
         # budget is ample; callers needing longer simply pass a larger
         # timeout.
         raw_sock.settimeout(float(timeout))
+        sock = raw_sock
         try:
             sock = self._maybe_wrap_tls(raw_sock)
             channel = self._build_channel(sock)
             self._handshake(channel)
-        except (AuthenticationError, ProtocolError, OSError):
-            # ProtocolError covers WsProtocolError, its subclass, which the
-            # WebSocket handshake in the WS viewer subclass raises; otherwise
-            # the raw socket / TLS fd would leak on a failed WS upgrade.
-            try:
-                raw_sock.close()
-            except OSError:
-                pass
+        except BaseException:  # reason: re-raised; no failure may leave the connection open
+            # Both: wrap_socket() detaches raw_sock, and closing only that
+            # one left the TLS connection open.
+            for opened in (sock, raw_sock):
+                try:
+                    opened.close()
+                except OSError:
+                    pass
             raise
         channel.settimeout(None)
         self._sock = sock
@@ -312,6 +304,12 @@ class RemoteDesktopViewer:
             receiver.join(timeout=timeout)
         self._receiver = None
         self._connected = False
+        self._abort_incoming_files()
+
+    def _abort_incoming_files(self) -> None:
+        """Nobody will finish them: their part files and open handles used to stay behind."""
+        if self._file_receiver is not None:
+            self._file_receiver.abort_all("connection ended")
 
     def send_input(self, action: Mapping[str, Any]) -> None:
         """Queue ``action`` to be sent as an INPUT message; returns without waiting for the socket.
@@ -469,7 +467,10 @@ class RemoteDesktopViewer:
             raise AuthenticationError(
                 f"expected AUTH_CHALLENGE, got {msg_type.name}"
             )
-        response = compute_response(self._token, payload)
+        try:
+            response = compute_response(self._token, payload)
+        except ValueError as error:
+            raise AuthenticationError(f"unusable AUTH_CHALLENGE: {error}") from error
         channel.send_typed(MessageType.AUTH_RESPONSE, response)
         msg_type, payload = channel.read_typed()
         if msg_type is MessageType.AUTH_OK:
@@ -512,6 +513,7 @@ class RemoteDesktopViewer:
                 queue = self._input_queue
                 if queue is not None:
                     queue.close(timeout=0.0)        # nothing more can be delivered
+                self._abort_incoming_files()
 
     def _read_and_dispatch(self, channel: MessageChannel) -> bool:
         """Read one typed message and dispatch it; return False on disconnect."""
@@ -649,9 +651,8 @@ class RemoteDesktopViewer:
             raise RuntimeError(_NOT_CONNECTED_MESSAGE)
         if not isinstance(text, str) or not text:
             return
-        import time as _time
         payload = json.dumps(
-            {"sender": sender, "text": text, "ts": _time.time()},
+            {"sender": sender, "text": text, "ts": _time_module.time()},
         ).encode("utf-8")
         self._channel.send_typed(MessageType.CHAT, payload)
 
@@ -660,7 +661,7 @@ class RemoteDesktopViewer:
         del msg_type
         try:
             body = json.loads(payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except (ValueError, RecursionError):
             body = {"backend": "invalid", "devices": []}
         if not isinstance(body, dict):
             body = {"backend": "invalid", "devices": []}
@@ -675,7 +676,7 @@ class RemoteDesktopViewer:
             return
         try:
             body = json.loads(payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except (ValueError, RecursionError):
             return
         if not isinstance(body, dict):
             return
@@ -695,7 +696,7 @@ class RemoteDesktopViewer:
         del msg_type
         try:
             body = json.loads(payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except (ValueError, RecursionError):
             return
         if not isinstance(body, dict):
             return

@@ -423,3 +423,91 @@ def test_wait_for_ice_gathering_gives_up_and_sends_what_it_has():
     pc = FakePeerConnection()
     asyncio.run(wait_for_ice_gathering(pc, timeout=0.05))
     assert pc.iceGatheringState == "new"
+
+
+# --- native capture resources (2026-11-26 review) ---------------------------------
+
+def test_track_stop_closes_the_grabber_its_capture_thread_opened(monkeypatch):
+    """mss has no finalizer: each session's capture thread left its device contexts behind."""
+    class _Grabber:
+        def __init__(self):
+            self.opened_on = threading.get_ident()
+            self.closed_on = None
+
+        def grab(self, monitor):
+            class _Shot:
+                width, height = monitor["width"], monitor["height"]
+                bgra = bytes(width * height * 4)
+            return _Shot()
+
+        def close(self):
+            self.closed_on = threading.get_ident()
+            closed.set()
+
+    closed = threading.Event()
+    grabbers = []
+
+    def build():
+        grabbers.append(_Grabber())
+        return grabbers[-1]
+
+    monkeypatch.setattr(transport, "mss_grabber", build)
+    track = ScreenVideoTrack(region=(0, 0, 4, 4), show_cursor=False)
+    asyncio.run(track.recv())
+    track.stop()
+    assert closed.wait(3.0)
+    assert [grabber.closed_on for grabber in grabbers] == [grabbers[0].opened_on]
+
+
+def _fake_xlib(monkeypatch, display_class):
+    import sys
+    from types import ModuleType
+
+    class DisplayError(Exception):
+        pass
+
+    error = ModuleType("Xlib.error")
+    error.DisplayError = DisplayError
+    error.XError = type("XError", (Exception,), {})
+    error.ConnectionClosedError = type("ConnectionClosedError", (Exception,), {})
+    display = ModuleType("Xlib.display")
+    display.Display = display_class
+    package = ModuleType("Xlib")
+    package.display, package.error = display, error
+    for name, module in (("Xlib", package), ("Xlib.display", display), ("Xlib.error", error)):
+        monkeypatch.setitem(sys.modules, name, module)
+    monkeypatch.setattr(transport.sys, "platform", "linux")
+    return DisplayError
+
+
+def test_the_x11_cursor_lookup_closes_its_display(monkeypatch):
+    """One X connection was opened per captured frame and never closed."""
+    class _Display:
+        closed = 0
+
+        def screen(self):
+            return self
+
+        @property
+        def root(self):
+            return self
+
+        def query_pointer(self):
+            self._data = {"root_x": 3, "root_y": 4}
+            return self
+
+        def close(self):
+            _Display.closed += 1
+
+    _fake_xlib(monkeypatch, _Display)
+    assert transport._get_cursor_position() == (3, 4)
+    assert _Display.closed == 1
+
+
+def test_a_display_that_cannot_be_opened_is_no_cursor(monkeypatch):
+    """Xlib's own error ended the video track on a session without an X server."""
+    def refuse():
+        raise error()
+
+    error = _fake_xlib(monkeypatch, refuse)
+    assert transport._get_cursor_position() is None
