@@ -121,6 +121,14 @@ def test_a_trust_import_of_the_wrong_shape_is_reported(monkeypatch, tmp_path, qa
     assert len(qapp.messages) == 1
 
 
+@pytest.mark.parametrize("panel_cls", ["_WebRTCHostPanel", "_WebRTCViewerPanel"])
+@pytest.mark.parametrize("field", ["_token_edit", "_secret_edit"])
+def test_webrtc_tokens_are_masked_with_reveal_and_copy(monkeypatch, panel_cls, field):
+    from headless._masked_secret import assert_masked_secret
+    panel = getattr(webrtc_panel, panel_cls)()
+    assert_masked_secret(getattr(panel, field), monkeypatch)
+
+
 # --- viewer side ------------------------------------------------------------------------------------------
 
 def test_stop_cancels_a_pending_reconnect(monkeypatch, qapp):

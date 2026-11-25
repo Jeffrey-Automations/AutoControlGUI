@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QPushButton, QSizePolicy, QSpinBox, QTableWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui.adaptive.flow_layout import flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -123,8 +124,7 @@ class _HostUiMixin(_HostPanelPart):
         regen.clicked.connect(self._on_regen_id)
         form.addRow(self._tr(QLabel(), "rd_webrtc_host_id_label"), _row(self._host_id_edit, regen))
         self._secret_edit = QLineEdit()
-        self._secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        form.addRow(self._tr(QLabel(), "rd_webrtc_secret_label"), self._secret_edit)
+        form.addRow(self._tr(QLabel(), "rd_webrtc_secret_label"), SecretField(self._secret_edit, self._tr))
         self._publish_btn = self._tr(
             QPushButton(), "rd_webrtc_publish_via_server",
         )
@@ -167,7 +167,7 @@ class _HostUiMixin(_HostPanelPart):
         group = self._tr(QGroupBox(), "rd_webrtc_config_group")
         form = QFormLayout()
         self._token_edit = self._tr(QLineEdit(), "rd_token_placeholder")
-        form.addRow(self._tr(QLabel(), "rd_token_label"), self._token_edit)
+        form.addRow(self._tr(QLabel(), "rd_token_label"), SecretField(self._token_edit, self._tr))
         self._monitor_combo = QComboBox()
         self._populate_monitor_combo()
         self._monitor_combo.currentIndexChanged.connect(

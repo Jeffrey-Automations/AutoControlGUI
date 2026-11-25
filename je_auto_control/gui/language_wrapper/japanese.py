@@ -1431,6 +1431,8 @@ japanese_word_dict = {
     "rd_quick_remote_machine": "リモートに接続",
     "rd_quick_your_id": "自分の ID：",
     "rd_quick_copy_id": "ID をコピー",
+    "secret_field_show": "表示",
+    "secret_field_copy": "コピー",
     "rd_quick_host_token": "トークン（相手に共有）：",
     "rd_quick_generate": "生成",
     "rd_quick_start_host": "ホスト開始",

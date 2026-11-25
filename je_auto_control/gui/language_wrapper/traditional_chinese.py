@@ -1400,6 +1400,8 @@ traditional_chinese_word_dict = {
     "rd_quick_remote_machine": "連線到遠端",
     "rd_quick_your_id": "本機 ID：",
     "rd_quick_copy_id": "複製 ID",
+    "secret_field_show": "顯示",
+    "secret_field_copy": "複製",
     "rd_quick_host_token": "Token（分享給遠端）：",
     "rd_quick_generate": "產生",
     "rd_quick_start_host": "開始被遠端",

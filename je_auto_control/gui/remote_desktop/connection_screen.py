@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import as_plain, decoded_image
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui._dispose import release_resources
@@ -127,13 +128,11 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._host_id_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._host_badge = _StatusBadge()
         self._viewer_badge = _StatusBadge()
-        self._host_token = QLineEdit()
-        self._host_token.setEchoMode(QLineEdit.EchoMode.Password)
+        self._host_token = QLineEdit()          # masked by its SecretField, as is the viewer's token
         self._connect_target = QLineEdit()
         self._connect_target.setStyleSheet(_BIG_INPUT_CSS)
         self._connect_target.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._connect_token = QLineEdit()
-        self._connect_token.setEchoMode(QLineEdit.EchoMode.Password)
         self._recent = QListWidget()
         self._recent.itemActivated.connect(self._on_recent_activated)
         # Phase 6.1: right-click a recent entry → "Wake host" via
@@ -236,7 +235,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
 
         layout.addWidget(self._tr(QLabel(), "rd_quick_host_token"))
         token_row = QHBoxLayout()
-        token_row.addWidget(self._host_token, stretch=1)
+        token_row.addWidget(SecretField(self._host_token, self._tr), stretch=1)
         gen_btn = self._tr(QPushButton(), "rd_quick_generate")
         gen_btn.clicked.connect(self._generate_token)
         token_row.addWidget(gen_btn)
@@ -276,7 +275,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         layout.addWidget(self._connect_target)
 
         layout.addWidget(self._tr(QLabel(), "rd_quick_viewer_token"))
-        layout.addWidget(self._connect_token)
+        layout.addWidget(SecretField(self._connect_token, self._tr))
 
         layout.addWidget(self._viewer_badge)
 

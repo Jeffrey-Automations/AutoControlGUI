@@ -85,6 +85,32 @@ def test_shared_token_mode_shows_the_token(tab):
     assert tab._shared_token is None
 
 
+def test_the_token_input_is_masked_with_reveal(tab, monkeypatch):
+    from headless._masked_secret import assert_masked_secret
+    # The tab's commands live in its Actions menu, which already copies the token.
+    assert_masked_secret(tab._token_input, monkeypatch, copyable=False)
+
+
+def test_the_active_token_is_masked_until_revealed(tab):
+    from PySide6.QtWidgets import QLineEdit
+    field = tab._token_value.parentWidget()
+    assert tab._token_value.echoMode() == QLineEdit.EchoMode.Normal, "the '-' placeholder is not a secret"
+    tab._port_input.setValue(0)
+    tab._token_input.setText("shared-secret")
+    tab._audit_check.setChecked(False)
+    tab._on_start()
+    assert settle_op(tab._server_op)
+    assert tab._token_value.echoMode() == QLineEdit.EchoMode.Password
+    assert field.reveal.isEnabled() and not field.copy.isVisibleTo(field)
+    field.reveal.setChecked(True)
+    assert tab._token_value.echoMode() == QLineEdit.EchoMode.Normal
+    field.reveal.setChecked(False)
+    tab._on_stop()
+    assert settle_op(tab._server_op)
+    assert tab._token_value.echoMode() == QLineEdit.EchoMode.Normal
+    assert not field.reveal.isEnabled()
+
+
 def test_rbac_mode_names_the_user_store_instead_of_a_refused_token(tab, tmp_path):
     path = tmp_path / "users.json"
     token = UserStore(path).add_user(user_id="alice", display_name="Alice", role=Role.ADMIN)

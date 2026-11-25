@@ -1533,6 +1533,8 @@ english_word_dict = {
     "rd_quick_remote_machine": "Connect to remote",
     "rd_quick_your_id": "Your ID:",
     "rd_quick_copy_id": "Copy ID",
+    "secret_field_show": "Show",
+    "secret_field_copy": "Copy",
     "rd_quick_host_token": "Token (share with viewer):",
     "rd_quick_generate": "Generate",
     "rd_quick_start_host": "Start hosting",

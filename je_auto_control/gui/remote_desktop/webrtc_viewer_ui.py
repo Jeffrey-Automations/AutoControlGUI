@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QPushButton, QSpinBox, QTextEdit, QVBoxLayout,
 )
 
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -227,8 +228,7 @@ class _ViewerUiMixin(_ViewerPanelPart):
         self._host_id_edit = self._tr(QLineEdit(), "rd_webrtc_host_id_placeholder")
         form.addRow(self._tr(QLabel(), "rd_webrtc_host_id_label"), self._host_id_edit)
         self._secret_edit = QLineEdit()
-        self._secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        form.addRow(self._tr(QLabel(), "rd_webrtc_secret_label"), self._secret_edit)
+        form.addRow(self._tr(QLabel(), "rd_webrtc_secret_label"), SecretField(self._secret_edit, self._tr))
         self._connect_btn = self._tr(QPushButton(), "rd_webrtc_connect_via_server")
         self._connect_btn.clicked.connect(self._on_connect_via_server)
         self._lan_browse_btn = self._tr(QPushButton(), "rd_webrtc_lan_browse")
@@ -242,7 +242,7 @@ class _ViewerUiMixin(_ViewerPanelPart):
         layout = QVBoxLayout()
         form = QFormLayout()
         self._token_edit = self._tr(QLineEdit(), "rd_token_placeholder")
-        form.addRow(self._tr(QLabel(), "rd_token_label"), self._token_edit)
+        form.addRow(self._tr(QLabel(), "rd_token_label"), SecretField(self._token_edit, self._tr))
         self._bandwidth_combo = QComboBox()
         for key, info in BANDWIDTH_PRESETS.items():
             self._bandwidth_combo.addItem(info["label"], key)

@@ -17,6 +17,7 @@ from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import as_plain, decoded_image
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui.remote_desktop._connect_task import connect_viewer
 from je_auto_control.gui.remote_desktop._helpers import (
@@ -171,7 +172,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             ("rd_transport_label", self._transport)))))
 
         token_form = QFormLayout()
-        token_form.addRow(self._tr(QLabel(), "rd_token_label"), self._token)
+        token_form.addRow(self._tr(QLabel(), "rd_token_label"), SecretField(self._token, self._tr))
         card_layout.addLayout(token_form)
 
         card.setLayout(card_layout)

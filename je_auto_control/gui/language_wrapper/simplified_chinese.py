@@ -1392,6 +1392,8 @@ simplified_chinese_word_dict = {
     "rd_quick_remote_machine": "连线到远端",
     "rd_quick_your_id": "本机 ID：",
     "rd_quick_copy_id": "复制 ID",
+    "secret_field_show": "显示",
+    "secret_field_copy": "复制",
     "rd_quick_host_token": "Token（分享给远端）：",
     "rd_quick_generate": "生成",
     "rd_quick_start_host": "开始被远程",

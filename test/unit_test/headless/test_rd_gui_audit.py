@@ -250,6 +250,24 @@ def test_remote_file_rows_survive_entries_of_the_wrong_shape():
     assert [table.item(row, 1).text() for row in range(2)] == ["big", "inf"]
 
 
+# --- tokens are masked like Quick Connect's ---------------------------------------------------------------------
+
+@pytest.mark.parametrize("build, field", [
+    (lambda: host_panel._HostPanel(), "_token"),
+    (lambda: viewer_panel._ViewerPanel(), "_token"),
+    (lambda: connection_screen.QuickConnectScreen(), "_host_token"),
+    (lambda: connection_screen.QuickConnectScreen(), "_connect_token"),
+], ids=["host", "viewer", "quick-host", "quick-viewer"])
+def test_remote_desktop_tokens_are_masked_with_reveal_and_copy(monkeypatch, build, field):
+    from headless._masked_secret import assert_masked_secret
+    panel = build()
+    try:
+        assert_masked_secret(getattr(panel, field), monkeypatch)
+    finally:
+        panel.dispose()
+        panel.deleteLater()
+
+
 def test_short_fingerprints_accept_any_stored_value():
     from je_auto_control.gui.remote_desktop._helpers import _format_last_seen, _short_fp
     assert _short_fp(12345) == "12345"

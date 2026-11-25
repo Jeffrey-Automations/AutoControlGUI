@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
@@ -54,8 +55,12 @@ class RestApiTab(TranslatableMixin, QWidget):
         self._audit_check.setChecked(True)
         self._url_value = QLabel("-")
         self._url_value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self._token_value = QLabel("-")
-        self._token_value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        # The active token is masked until Show is pressed; a note or "-" is shown in clear.
+        self._token_value = QLineEdit()
+        self._token_value.setReadOnly(True)
+        self._token_value.setFrame(False)
+        self._token_field = SecretField(self._token_value, self._tr, copyable=False)  # Actions > Copy token
+        self._token_field.set_value("-", secret=False)
         self._status_label = QLabel()
         # Start replaces a running server and Stop joins its thread: both off the GUI thread.
         self._server_op = SlowOp(self)
@@ -110,7 +115,7 @@ class RestApiTab(TranslatableMixin, QWidget):
         layout.addLayout(flow_of(field_pair(self._tr(QLabel(), "rest_host"), self._host_input),
                                  field_pair(self._tr(QLabel(), "rest_port"), self._port_input)))
         form = QFormLayout()
-        form.addRow(self._tr(QLabel(), "rest_token"), self._token_input)
+        form.addRow(self._tr(QLabel(), "rest_token"), SecretField(self._token_input, self._tr, copyable=False))
         layout.addLayout(form)
         self._tr(self._audit_check, "rest_enable_audit")
         layout.addWidget(self._audit_check)
@@ -174,7 +179,7 @@ class RestApiTab(TranslatableMixin, QWidget):
         layout = QVBoxLayout(group)
         form = QFormLayout()
         form.addRow(self._tr(QLabel(), "rest_url"), self._url_value)
-        form.addRow(self._tr(QLabel(), "rest_active_token"), self._token_value)
+        form.addRow(self._tr(QLabel(), "rest_active_token"), self._token_field)
         layout.addLayout(form)
         self._status_label.setWordWrap(True)
         set_role(self._status_label, "hint")
@@ -228,7 +233,7 @@ class RestApiTab(TranslatableMixin, QWidget):
             # holds until the previous server has been joined.
             self._shared_token = None
             self._url_value.setText("-")
-            self._token_value.setText("-")
+            self._token_field.set_value("-", secret=False)
             self._status_label.setText(_t(self._pending_key))
             return
         status = rest_api_registry.status()
@@ -238,18 +243,18 @@ class RestApiTab(TranslatableMixin, QWidget):
         self._shared_token = None
         if not status["running"]:
             self._url_value.setText("-")
-            self._token_value.setText("-")
+            self._token_field.set_value("-", secret=False)
             self._status_label.setText(_t("rest_stopped"))
             return
         self._url_value.setText(status["url"])
         if rbac:
             users_path = status.get("users_path")
-            self._token_value.setText(
-                _t("rest_token_rbac").format(path=users_path) if users_path else "-")
+            self._token_field.set_value(
+                _t("rest_token_rbac").format(path=users_path) if users_path else "-", secret=False)
             self._status_label.setText(_t("rest_running_rbac"))
             return
         self._shared_token = status["token"]
-        self._token_value.setText(status["token"] or "-")
+        self._token_field.set_value(status["token"] or "-", secret=bool(status["token"]))
         self._status_label.setText(_t("rest_running"))
 
 

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import decoded_image
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -170,7 +171,7 @@ class _HostPanel(TranslatableMixin, QWidget):
         id_row.addWidget(self._badge)
         form.addRow(self._tr(QLabel(), "rd_host_id_label"), id_row)
         token_row = QHBoxLayout()
-        token_row.addWidget(self._token, stretch=1)
+        token_row.addWidget(SecretField(self._token, self._tr), stretch=1)
         gen_btn = self._tr(QPushButton(), "rd_token_generate")
         gen_btn.clicked.connect(self._generate_token)
         token_row.addWidget(gen_btn)
