@@ -137,3 +137,33 @@ def test_an_unknown_mouse_button_is_refused():
     from je_auto_control.osx.mouse import osx_mouse as mouse
     with pytest.raises(AutoControlMouseException):
         mouse.press_mouse(10, 10, 99)
+
+
+def test_a_uinput_click_commits_the_press_before_the_release(monkeypatch):
+    """Both edges in one SYN frame: libinput compares frames, saw no change, and lost the click."""
+    import importlib
+    import struct
+    import types
+    stub = types.ModuleType("x11_linux_mouse_control")
+    stub.position = lambda: (0, 0)
+    for index, name in enumerate(("left", "middle", "right"), start=1):
+        setattr(stub, f"x11_linux_mouse_{name}", index)
+    for index, name in enumerate(("up", "down", "left", "right"), start=4):
+        setattr(stub, f"x11_linux_scroll_direction_{name}", index)
+    backend = "je_auto_control.linux_with_x11.mouse.x11_linux_mouse_control"
+    package = "je_auto_control.linux_with_x11.uinput.mouse"
+    monkeypatch.setitem(sys.modules, backend, stub)
+    monkeypatch.delitem(sys.modules, package, raising=False)
+    mouse = importlib.import_module(package)
+    from je_auto_control.linux_with_x11.uinput import _device
+    written = []
+    monkeypatch.setattr(_device, "_ensure_fd", lambda: 3)
+    monkeypatch.setattr(_device.os, "write", lambda fd, data: written.append(data))
+    try:
+        mouse.click_mouse(1)
+    finally:
+        sys.modules.pop(package, None)
+    events = [struct.unpack("@llHHi", data)[2:] for data in written]
+    syn = (_device.EV_SYN, _device.SYN_REPORT, 0)
+    assert events == [(_device.EV_KEY, _device.BTN_LEFT, 1), syn,
+                      (_device.EV_KEY, _device.BTN_LEFT, 0), syn]

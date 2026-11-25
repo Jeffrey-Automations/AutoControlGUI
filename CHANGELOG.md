@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Windows: arrow, navigation, right Ctrl and AltGr keys are sent as extended keys, a refused
+  cursor move raises `AutoControlMouseException`, and `AC_check_key_is_press` reports only keys
+  that are down now. A single-colour template is refused as not found. `enumerate_monitors`
+  marks the monitor the system names as primary, which need not be the first.
+
 - Browser task observations no longer contain text a page marks `data-secret`: such a
   document's page text is empty, and elements touching marked content have no name.
 

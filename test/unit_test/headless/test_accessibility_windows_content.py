@@ -106,6 +106,7 @@ def _control(pattern_id=None, interface_name="", pattern=None, **kwargs):
     if pattern_id is not None:
         patterns[pattern_id] = Unknown(interface_name, pattern or Pattern())
     kwargs.setdefault("rect", Rect(0, 0, 1, 1))
+    kwargs.setdefault("properties", {_IS_PASSWORD: False})
     return RawElement(patterns=patterns, **kwargs)
 
 
@@ -809,3 +810,25 @@ def test_focus_wait_observes_stop_and_releases_handler(backend, monkeypatch, shi
     assert len(polls) == (2 if shield else 1)
     assert all(interval is not None and 0 < interval <= 0.1 for interval in polls)
     assert backend._automation.focus_handlers == []
+
+
+# --- password fields ----------------------------------------------------------
+
+def test_the_legacy_bridge_does_not_hand_back_a_password(backend, found):
+    _with(found, LEGACY, "IUIAutomationLegacyIAccessiblePattern",
+          Pattern(CurrentName="Password", CurrentValue="hunter2", CurrentDescription="",
+                  CurrentDefaultAction="", CurrentRole=42, CurrentState=0),
+          properties={_IS_PASSWORD: True})
+    info = backend.legacy_info(name="Password")
+    assert info["name"] == "Password"
+    assert info["value"] is None
+
+
+@pytest.mark.parametrize("method", ["document_text", "visible_text", "selected_text"])
+def test_the_text_pattern_does_not_hand_back_a_password(backend, found, method):
+    ranges = ElementArray([Pattern()])
+    ranges.GetElement(0).GetText = lambda _limit: "hunter2"
+    _with(found, TEXT, "IUIAutomationTextPattern",
+          _text_pattern(document="hunter2", selection=ranges, visible=ranges),
+          properties={_IS_PASSWORD: True})
+    assert getattr(backend, method)(name="Password") is None

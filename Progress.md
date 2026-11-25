@@ -52,6 +52,10 @@ split／guard／noaccess／decommitted 四種頁面配置通過，清理都確�
   `post_key` 每個字只到一次、DWM cloak 過濾與最大化視窗的還原都已驗；還沒驗的：另一個 DPI 的螢幕上的還原（只有一個螢幕）、
   工作列在左或上時最大化視窗存下的還原矩形（工作區座標換算只有單元測試，U-20261113-05）、
   WinUI（新版記事本）／Chromium 等非原生編輯控制項、零面積過濾（有標題列的視窗被系統夾到 202×56，到不了零）。
+- **平台後端審查（U-20261126-14）的原生驗收**：Windows 延伸鍵（方向鍵、右 Ctrl、AltGr）、游標拒絕、`is_key_down`，X11／macOS／uinput／Android 的修正都只用替身驗過。
+- **平台後端審查留下、要真機或付費 API 才能確認的**：macOS 拖曳只送 `MouseMoved`；X11 快捷鍵被別的程式占用時仍記為已註冊；libei `_region_point` 在負原點可能落到左螢幕；
+  Interception 的 Pause 送成右 Ctrl；macOS／Linux 快捷鍵的腳本跑在監聽執行緒上；提升權限程序的 `app_name` 可能為空；OpenAI VLM 座標沒有換回原尺寸；
+  PaddleOCR 3.x 可能拒收現有參數；`_win_get` 沒有以 `GlobalSize` 限界；X11 16-bit visual 的 `get_pixel` 會 `IndexError`。
 - **X11／Wayland**：大寫與 Shift 標點的判斷假設 `keysym_to_keycode` 把大寫字母對到小寫的 keycode，沒有對著 X server 跑過；
   `post_key_to_window` 依 keymap 的 Shift 層加 `ShiftMask`（U-20261113-04）也只對 stub keymap 測過。
 

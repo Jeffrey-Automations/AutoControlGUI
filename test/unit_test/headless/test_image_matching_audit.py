@@ -125,3 +125,30 @@ def test_palette_and_la_images_become_true_luminance():
     assert visual_match._to_gray(palette).tolist() == [[76, 29]]
     la = Image.new("LA", (2, 1), (200, 255))
     assert visual_match._to_gray(la).tolist() == [[200, 200]]
+
+
+def _flat_search(monkeypatch, value):
+    from je_auto_control.utils.cv2_utils import template_detection
+    screen = RNG.integers(0, 255, (120, 160), dtype=np.uint8)
+    monkeypatch.setattr(template_detection, "grab_logical",
+                        lambda *args, **kwargs: (screen, 0, 0))
+    return template_detection, np.full((12, 12), value, np.uint8)
+
+
+def test_a_single_colour_template_is_never_found_on_screen(monkeypatch):
+    """Zero variance scores 1.0 everywhere: ``locate_and_click`` clicked the corner of the screen."""
+    from je_auto_control.utils.exception.exceptions import ImageNotFoundException
+    detection, flat = _flat_search(monkeypatch, 77)
+    for find in (detection.find_image, detection.find_image_multi):
+        with pytest.raises(ImageNotFoundException, match="single colour"):
+            find(flat, 0.9)
+
+
+def test_a_single_colour_template_is_never_found_on_a_device():
+    from PIL import Image
+    from je_auto_control.utils.exception.exceptions import ImageNotFoundException
+    from je_auto_control.wrapper.device_frame import DeviceFrame
+    screen = Image.fromarray(RNG.integers(0, 255, (120, 160, 3), dtype=np.uint8))
+    frame = DeviceFrame(image=screen, point_size=screen.size)
+    with pytest.raises(ImageNotFoundException, match="single colour"):
+        frame.locate_image(np.full((12, 12), 77, np.uint8))

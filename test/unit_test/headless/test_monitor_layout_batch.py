@@ -87,3 +87,30 @@ def test_facade_exports():
                  "virtual_bounds", "remap_point", "to_local", "to_virtual"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_the_primary_monitor_is_the_one_the_system_names(monkeypatch):
+    """mss lists monitors in device order: the first one was taken for the primary."""
+    import contextlib
+    from types import SimpleNamespace
+    from je_auto_control.utils.cv2_utils import screen_grabber
+    rows = [
+        {"left": -1280, "top": 0, "width": 3200, "height": 1080},
+        {"left": -1280, "top": 0, "width": 1280, "height": 1024, "is_primary": False},
+        {"left": 0, "top": 0, "width": 1920, "height": 1080, "is_primary": True},
+    ]
+    monkeypatch.setattr(screen_grabber, "mss_grabber",
+                        lambda: contextlib.nullcontext(SimpleNamespace(monitors=rows)))
+    monitors = enumerate_monitors()
+    assert [monitor.primary for monitor in monitors] == [False, True]
+    assert primary_monitor(monitors).bounds == (0, 0, 1920, 1080)
+
+
+def test_without_a_primary_flag_the_first_monitor_is_still_the_primary(monkeypatch):
+    import contextlib
+    from types import SimpleNamespace
+    from je_auto_control.utils.cv2_utils import screen_grabber
+    rows = [{"left": 0, "top": 0, "width": 2, "height": 2}] * 3
+    monkeypatch.setattr(screen_grabber, "mss_grabber",
+                        lambda: contextlib.nullcontext(SimpleNamespace(monitors=rows)))
+    assert [monitor.primary for monitor in enumerate_monitors()] == [True, False]

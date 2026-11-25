@@ -230,3 +230,64 @@ def test_an_isochronous_urb_is_refused_and_the_connection_goes_on(imported):
     assert status == -95
     imported.sendall(_submit(9, -1))
     assert _recv(imported, 48 + 4)[-4:] == b"PONG"
+
+
+@pytest.mark.parametrize("failure", [
+    subprocess.TimeoutExpired(cmd="xclip", timeout=5),
+    subprocess.CalledProcessError(1, ["xclip"]),
+    OSError("exec format error"),
+])
+def test_linux_clipboard_images_fail_inside_the_framework_family(monkeypatch, failure):
+    """``TimeoutExpired`` / ``CalledProcessError`` escaped the executor and ended the run."""
+    from je_auto_control.utils.clipboard import clipboard
+    monkeypatch.setattr(clipboard.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    def fails(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(clipboard.subprocess, "run", fails)
+    with pytest.raises(AutoControlException):
+        clipboard._linux_set_image(b"png")  # noqa: SLF001
+    with pytest.raises(AutoControlException):
+        clipboard._linux_get_image()  # noqa: SLF001
+
+
+def test_a_failed_linux_image_write_is_reported(monkeypatch):
+    from je_auto_control.utils.clipboard import clipboard
+    monkeypatch.setattr(clipboard.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(clipboard.subprocess, "run", lambda *a, **k: _completed(1))
+    with pytest.raises(AutoControlException):
+        clipboard._linux_set_image(b"png")  # noqa: SLF001
+
+
+def test_writing_the_linux_clipboard_does_not_wait_for_the_owner_process(monkeypatch, tmp_path):
+    """``xclip -i`` forks a child that keeps the selection and its stdout open.
+
+    Capturing that stdout waited for the child, so every write ended in a timeout
+    although the text was already on the clipboard.
+    """
+    import sys
+    import time
+    from je_auto_control.utils.clipboard import clipboard
+    tool = tmp_path / "fake_xclip.py"
+    tool.write_text(
+        "import subprocess, sys\n"
+        "sys.stdin.buffer.read()\n"
+        "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(4)'],\n"
+        "                 stdin=subprocess.DEVNULL, stdout=sys.stdout, stderr=sys.stderr)\n",
+        encoding="utf-8")
+    monkeypatch.setattr(clipboard, "_linux_cmd", lambda: [sys.executable, str(tool)])
+    started = time.monotonic()
+    clipboard._linux_set("text")  # noqa: SLF001
+    assert time.monotonic() - started < 3.5
+
+
+def test_a_failing_linux_clipboard_write_still_says_why(monkeypatch, tmp_path):
+    import sys
+    from je_auto_control.utils.clipboard import clipboard
+    tool = tmp_path / "fake_xclip.py"
+    tool.write_text("import sys\nsys.stdin.buffer.read()\nsys.exit('Error: cannot open display')\n",
+                    encoding="utf-8")
+    monkeypatch.setattr(clipboard, "_linux_cmd", lambda: [sys.executable, str(tool)])
+    with pytest.raises(AutoControlException, match="cannot open display"):
+        clipboard._linux_set("text")  # noqa: SLF001

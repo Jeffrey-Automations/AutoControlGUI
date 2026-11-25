@@ -45,6 +45,7 @@ def _prepare(image: Any, detect_threshold: float,
     require_je_open_cv()
     cv2 = require_cv2()
     template = _gray_template(cv2, image)
+    reject_flat_template(template)
     owner = current_locator_frame()
     if owner is None:
         grab_image, origin_x, origin_y = grab_logical(screen_region, all_screens=all_screens)
@@ -105,6 +106,19 @@ def _gray_template(cv2: Any, image: Any) -> Any:
         return _to_gray(cv2, image)
     except (ValueError, TypeError, cv2.error) as error:
         raise ImageNotFoundException(f"cannot read template image: {image!r}") from error
+
+
+def reject_flat_template(template: Any) -> None:
+    """Refuse a single-colour template, which scores 1.0 at every position.
+
+    Normalised correlation divides by the template's variance; with none,
+    OpenCV reports a perfect match everywhere and the first position -- the
+    corner of the screen -- was located, and clicked.
+    """
+    if template.size and template.min() == template.max():
+        raise ImageNotFoundException(
+            "template is a single colour, which matches everywhere; "
+            "crop a region with a pattern or text in it")
 
 
 def _draw(frame: Any, boxes: Sequence[Sequence[int]]) -> Any:

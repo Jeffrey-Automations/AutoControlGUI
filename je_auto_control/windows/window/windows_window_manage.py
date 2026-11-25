@@ -11,6 +11,8 @@ from typing import Any, List, Optional, Tuple
 # 相容用途：舊版本從這個模組匯出共用的 user32。
 # Compatibility: older code imported the shared user32 from this module.
 from je_auto_control.windows.core.utils.win32_ctype_input import user32  # noqa: F401
+#: Keys the keyboard driver reports with the extended-key bit (lParam bit 24).
+from je_auto_control.windows.core.utils.win32_vk import WIN32_EXTENDED_VIRTUAL_KEYS as _EXTENDED_KEYS
 
 # 這個模組刻意持有自己的 user32 handle，而不是共用上面那個：底下每個函式都要
 # 設 argtypes/restype，而那是設在**函式物件**上的，共用同一個 handle 會讓設定
@@ -498,11 +500,6 @@ def deepest_child_at(hwnd: int, x: int, y: int) -> int:
     return current
 
 
-#: Keys the keyboard driver reports with the extended-key bit (lParam bit 24).
-_EXTENDED_KEYS = frozenset({
-    0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,   # page up/down, end, home, arrows
-    0x2D, 0x2E, 0x5B, 0x5C, 0x5D, 0x6F, 0x90, 0xA3, 0xA5,
-})
 _KEY_EXTENDED = 1 << 24
 _KEY_UP_BITS = 0xC0000000      # previous state down + transition (released)
 

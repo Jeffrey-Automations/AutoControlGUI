@@ -135,18 +135,25 @@ def remap_point(src: Monitor, dst: Monitor, local_x: int,
 def _mss_rows() -> List[Dict[str, Any]]:
     from je_auto_control.utils.cv2_utils.screen_grabber import mss_grabber
     with mss_grabber() as screen:
-        monitors = screen.monitors
-    return [{"x": int(m["left"]), "y": int(m["top"]),
-             "width": int(m["width"]), "height": int(m["height"])}
-            for m in monitors[1:]]                    # [0] is the combined desktop
+        monitors = screen.monitors[1:]                # [0] is the combined desktop
+    rows: List[Dict[str, Any]] = [
+        {"x": int(m["left"]), "y": int(m["top"]),
+         "width": int(m["width"]), "height": int(m["height"])} for m in monitors]
+    if any(m.get("is_primary") for m in monitors):
+        # mss lists monitors in device order, so the first one need not be
+        # the primary; where it says which one is, that is the answer.
+        for row, m in zip(rows, monitors):
+            row["primary"] = bool(m.get("is_primary"))
+    return rows
 
 
 def enumerate_monitors(provider: Optional[MonitorRows] = None) -> List[Monitor]:
-    """Return the connected monitors as ``Monitor`` objects, primary-first index 0.
+    """Return the connected monitors as ``Monitor`` objects, in the system's order.
 
     ``provider`` yields raw ``{x, y, width, height[, scale, primary, work_area]}``
-    rows; the default reads them from ``mss``. Injecting a provider makes the whole
-    module headless-testable.
+    rows; the default reads them from ``mss``. A row that does not say whether it is
+    ``primary`` is when it is the first. Injecting a provider makes the whole module
+    headless-testable.
     """
     rows = (provider or _mss_rows)()
     monitors: List[Monitor] = []

@@ -314,3 +314,19 @@ def test_the_clipboard_commands_offer_the_allowance_and_pass_it_only_when_set(mo
     monkeypatch.setattr(mobile_commands.extensions, "mobile_extension", lambda _session: _OldAdapter())
     assert mobile_commands._get_clipboard(object()) == "old"
     assert seen == ["plain"]
+
+
+def test_an_inner_class_activity_reaches_am_unexpanded():
+    """The device shell expanded ``$Settings`` to nothing and started another component."""
+    import shlex
+    from je_auto_control.android import apps
+    sent = []
+
+    class Adb:
+        def shell(self, command):
+            sent.append(command)
+            return "Starting: Intent"
+
+    apps.launch(Adb(), "com.example.shop/.Main$Settings")
+    assert shlex.split(sent[0]) == ["am", "start", "-n", "com.example.shop/.Main$Settings"]
+    assert "'" in sent[0], "unquoted, the shell expands the dollar sign"

@@ -469,7 +469,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
                                 ) if raw else None
         if pattern is None:
             return None
-        return _read_legacy(pattern)
+        return _read_legacy(pattern, hide_value=is_password(raw))
 
     def legacy_default_action(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
                               automation_id: _Opt = None) -> bool:
@@ -602,7 +602,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
     def _text_pattern(self, name: _Opt, role: _Opt, app_name: _Opt, automation_id: _Opt) -> Any:
         """Find a control and return its IUIAutomationTextPattern, or None."""
         raw = self._find_raw(name, role, app_name, automation_id)
-        if not raw:
+        if not raw or is_password(raw):     # as get_value: a password's text never leaves
             return None
         return self._pattern(raw, _UIA_TEXT_PATTERN_ID,
                              "IUIAutomationTextPattern")

@@ -13,6 +13,7 @@ Covers audit findings:
 """
 import ctypes
 import sys
+import types
 from ctypes import wintypes
 
 import pytest
@@ -82,3 +83,66 @@ def test_finding8_sendinput_argtypes_applied():
     from je_auto_control.windows.core.utils import win32_ctype_input as mod
 
     assert mod.user32.SendInput.argtypes == (wintypes.UINT, ctypes.c_void_p, ctypes.c_int)
+
+
+def test_a_refused_cursor_move_is_an_error(monkeypatch):
+    """A locked desktop refuses SetCursorPos; the move was reported done and the click went elsewhere."""
+    from je_auto_control.utils.exception.exceptions import AutoControlMouseException
+    from je_auto_control.windows.mouse import win32_ctype_mouse_control as mouse
+    monkeypatch.setattr(mouse, "_set_cursor_pos", lambda x, y: 0)
+    with pytest.raises(AutoControlMouseException):
+        mouse.set_position(10, 20)
+    monkeypatch.setattr(mouse, "_set_cursor_pos", lambda x, y: 1)
+    mouse.set_position(10, 20)
+
+
+def _sent_key_flags(monkeypatch, keycode):
+    """The dwFlags of the press and the release the keyboard backend builds; nothing is sent."""
+    from je_auto_control.windows.keyboard import win32_ctype_keyboard_control as keyboard
+    flags = []
+    monkeypatch.setattr(keyboard, "SendInput",
+                        lambda count, pointer, size: flags.append(pointer._obj.ki.dwFlags))
+    keyboard.press_key(keycode)
+    keyboard.release_key(keycode)
+    return flags
+
+
+_EXTENDED, _KEY_UP = 0x0001, 0x0002
+
+
+@pytest.mark.parametrize("keycode", [0x21, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E,
+                                     0x5B, 0x5D, 0x6F, 0x90, 0xA3, 0xA5])
+def test_extended_keys_are_sent_as_extended(monkeypatch, keycode):
+    """Without the flag an arrow is the numeric keypad's: Shift+Left selected nothing with NumLock on."""
+    assert _sent_key_flags(monkeypatch, keycode) == [_EXTENDED, _EXTENDED | _KEY_UP]
+
+
+@pytest.mark.parametrize("keycode", [0x41, 0x0D, 0x10, 0x11, 0x64, 0xA0, 0xA2, 0xA4])
+def test_ordinary_keys_are_not_sent_as_extended(monkeypatch, keycode):
+    assert _sent_key_flags(monkeypatch, keycode) == [0, _KEY_UP]
+
+
+def test_interception_sends_arrows_and_navigation_keys_with_their_prefix():
+    """MapVirtualKeyW gives the arrows no 0xE0 prefix, so the driver was sent the keypad's keys."""
+    from je_auto_control.windows.interception import _dll
+    for keycode in (0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E, 0xA3, 0x6F):
+        assert _dll.vk_to_scancode(keycode)[1] is True, hex(keycode)
+    # At the driver NumLock itself is the plain 0x45; E0 45 is no key at all.
+    for keycode in (0x41, 0x64, 0x90, 0x0D):
+        assert _dll.vk_to_scancode(keycode)[1] is False, hex(keycode)
+
+
+def test_a_key_tapped_earlier_is_not_reported_as_held(monkeypatch):
+    """GetAsyncKeyState's low bit means "since the last call": a released key read as pressed."""
+    from je_auto_control.windows.core.utils import win32_keypress_check
+    from je_auto_control.wrapper import auto_control_keyboard
+    state = {"value": 0x0001}
+    monkeypatch.setattr(win32_keypress_check.ctypes, "windll", types.SimpleNamespace(
+        user32=types.SimpleNamespace(GetAsyncKeyState=lambda code: state["value"])))
+    monkeypatch.setattr(auto_control_keyboard, "keyboard_check", win32_keypress_check)
+    assert auto_control_keyboard.check_key_is_press(0x41) is False
+    state["value"] = -32768          # the SHORT 0x8000, sign-extended
+    assert auto_control_keyboard.check_key_is_press(0x41) is True
+    # The panic key keeps the sticky bit: a tap shorter than its poll still counts.
+    state["value"] = 0x0001
+    assert win32_keypress_check.check_key_is_press(0x41) is True

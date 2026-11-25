@@ -127,3 +127,26 @@ def test_unavailable_errors_are_in_the_framework_family():
     for error in (AccessibilityNotAvailableError, OCRBackendNotAvailableError):
         assert issubclass(error, AutoControlException)
         assert issubclass(error, RuntimeError)
+
+
+@pytest.mark.parametrize("poll", [30.0, float("inf")])
+def test_wait_for_text_never_sleeps_past_its_timeout(monkeypatch, poll):
+    """``poll=30`` with ``timeout=0.2`` waited 30 seconds; ``poll=inf`` raised OverflowError."""
+    from je_auto_control.utils.exception.exceptions import AutoControlActionException
+    from je_auto_control.utils.ocr import ocr_engine
+    slept = []
+
+    def absent(*args, **kwargs):
+        raise AutoControlActionException("not there")
+
+    def pause(seconds, sleep=None):
+        slept.append(seconds)
+        import time
+        time.sleep(min(seconds, 0.3))
+
+    monkeypatch.setattr(ocr_engine, "locate_text_center", absent)
+    monkeypatch.setattr(ocr_engine, "pause", pause)
+    with pytest.raises(AutoControlActionException, match="timeout"):
+        ocr_engine.wait_for_text("nope", timeout=0.2, poll=poll)
+    assert slept
+    assert max(slept) <= 0.2

@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,615 |
-| 程式碼總行數 | 248,314 |
+| 程式碼總行數 | 248,431 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -193,7 +193,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `wrapper/_platform_wayland.py` | 63 | Wayland 後端組裝（libei／ydotool／grim）。 |
 | `wrapper/_input_observer.py` | 30 | Optional context-local native input announcements; legacy callers remain unaffected. |
 | `wrapper/auto_control_mouse.py` | 606 | 滑鼠 API：位置讀寫、按下／放開／點擊、捲動、座標前處理、送訊息給指定視窗。 |
-| `wrapper/auto_control_keyboard.py` | 566 | 鍵盤 API：鍵表查詢、`keyboard_key_name` 反查標準鍵名（不回別名）、按下／放開／敲擊、`write` 字串、`hotkey` 組合鍵、按鍵狀態偵測。**`type_keyboard` 與 `hotkey` 的放開走 `finally`**（見下）。 |
+| `wrapper/auto_control_keyboard.py` | 570 | 鍵盤 API：鍵表查詢、`keyboard_key_name` 反查標準鍵名（不回別名）、按下／放開／敲擊、`write` 字串、`hotkey` 組合鍵、按鍵狀態偵測。**`type_keyboard` 與 `hotkey` 的放開走 `finally`**（見下）。 |
 | `wrapper/auto_control_screen.py` | 111 | 螢幕 API：`screen_size`、`screenshot`（可指定區域）、`get_pixel`。 |
 | `wrapper/auto_control_image.py` | 89 | 影像 API：`locate_all_image`、`locate_image_center`、`locate_and_click`。 |
 | `wrapper/auto_control_record.py` | 124 | 錄製 API：`record`／`stop_record`／`record_to_json`（支援 stop event 與逾時）。 |
@@ -202,21 +202,21 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.3 平台後端
 
-#### Windows（`windows/`，24 檔／2,366 行）
+#### Windows（`windows/`，24 檔／2,405 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `core/utils/win32_ctype_input.py` | 76 | `SendInput` 的 ctypes 結構定義與送出。 |
-| `core/utils/win32_vk.py` | 205 | Windows 虛擬鍵碼對照表。 |
-| `core/utils/win32_keypress_check.py` | 21 | `GetAsyncKeyState` 按鍵狀態查詢。 |
-| `mouse/win32_ctype_mouse_control.py` | 220 | 滑鼠事件產生（含多螢幕絕對座標換算）。 |
-| `keyboard/win32_ctype_keyboard_control.py` | 98 | 鍵盤事件產生。 |
+| `core/utils/win32_vk.py` | 211 | Windows 虛擬鍵碼對照表。 |
+| `core/utils/win32_keypress_check.py` | 34 | `GetAsyncKeyState` 按鍵狀態查詢。 |
+| `mouse/win32_ctype_mouse_control.py` | 224 | 滑鼠事件產生（含多螢幕絕對座標換算）。 |
+| `keyboard/win32_ctype_keyboard_control.py` | 111 | 鍵盤事件產生。 |
 | `record/win32_input_hook.py` | 258 | 單一一組低階鍵鼠 hook（`WH_KEYBOARD_LL`／`WH_MOUSE_LL`）＋訊息迴圈，產生帶時間戳的事件時間軸；停止時以 `PostThreadMessageW(WM_QUIT)` 收掉執行緒，不會每錄一次就漏一條。 |
 | `record/win32_record.py` | 41 | 把 `win32_input_hook` 的時間軸轉成 action list（含按鍵放開、滾輪與間隔）；整形本體與 macOS 共用 `utils/input_macro/recorder_base.py`。 |
 | `screen/win32_screen.py` | 171 | 螢幕尺寸與像素讀取。**每支 Win32 函式都明寫 argtypes/restype**（HDC 是指標寬度，走預設的 c_int 會截斷，錯誤會沉默地擴散到 GetPixel／ReleaseDC），並持有自己的 user32／gdi32 handle。import 時呼叫 `SetProcessDPIAware()`——**行程層級且不可還原**，實體↔邏輯座標換算請走 `utils/monitor_layout`。 |
-| `window/windows_window_manage.py` | 569 | 視窗列舉／聚焦／關閉／最小化／幾何／所屬行程 PID／投遞式輸入（`auto_control_window` 的實作）。**每支 Win32 函式都明寫 argtypes/restype**，並持有自己的 user32 handle，避免把原型外溢到別的模組；hwnd 一律是 int。 |
+| `window/windows_window_manage.py` | 566 | 視窗列舉／聚焦／關閉／最小化／幾何／所屬行程 PID／投遞式輸入（`auto_control_window` 的實作）。**每支 Win32 函式都明寫 argtypes/restype**，並持有自己的 user32 handle，避免把原型外溢到別的模組；hwnd 一律是 int。 |
 | `message/window_message.py` | 97 | 直接對視窗送 `WM_*` 訊息（背景輸入）。 |
-| `interception/_dll.py` | 232 | `interception.dll` 的延遲 ctypes 載入與結構定義。 |
+| `interception/_dll.py` | 238 | `interception.dll` 的延遲 ctypes 載入與結構定義。 |
 | `interception/keyboard.py` | 70 | 經 Interception 驅動的鍵盤輸入（繞過部分反自動化偵測）。 |
 | `interception/mouse.py` | 160 | 經 Interception 驅動的滑鼠輸入。 |
 
@@ -347,14 +347,14 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.3 排程、觸發與背景監看
 
-> 11 個套件、約 4,446 行。
+> 11 個套件、約 4,472 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
-| `utils/hotkey/` | 867 | 全域熱鍵守護行程，把 OS 層熱鍵綁到 action 檔（Win/macOS/X11 三後端） |
+| `utils/hotkey/` | 879 | 全域熱鍵守護行程，把 OS 層熱鍵綁到 action 檔（Win/macOS/X11 三後端） |
 | `utils/idle_keepawake/` | 245 | 偵測使用者閒置時間並在無人值守執行期間阻止系統睡眠 |
 | `utils/lock_session/` | 167 | 鎖定工作站、等待解鎖並分類鎖定狀態轉換 |
-| `utils/observer/` | 256 | 反應式畫面觀察者；每條規則涵蓋 predicate／handler 的秘密遮罩與隔離 |
+| `utils/observer/` | 270 | 反應式畫面觀察者；每條規則涵蓋 predicate／handler 的秘密遮罩與隔離 |
 | `utils/recurrence/` | 470 | RFC 5545 重複規則解析與發生時間展開 |
 | `utils/scheduler/` | 512 | 間隔式與 cron 式的 action JSON 排程器 |
 | `utils/session_guard/` | 62 | 驅動輸入前先偵測工作階段是否已鎖定／非互動 |
@@ -394,7 +394,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.5 影像辨識與畫面分析
 
-> 37 個套件、約 6,582 行。
+> 37 個套件、約 6,605 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -404,7 +404,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/color_region/` | 106 | 以顏色定位畫面區域（遮罩 + 連通元件） |
 | `utils/color_stats/` | 103 | 區域顏色統計：平均色與主色 |
 | `utils/coordinate_space/` | 93 | 模型網格座標與實體像素之間的座標空間對映 |
-| `utils/cv2_utils/` | 1,090 | OpenCV 基礎層：擷取後端選擇（`screen_grabber`，Pillow／mss 或平台後端）、截圖、`[left, top, right, bottom]` 區域擷取（`region_capture`，Windows 經 `grab_logical` 涵蓋所有螢幕）、樣板比對（走 `grab_logical`，涵蓋所有螢幕）、螢幕錄影、影片錄製（兩者都經 `frame_clock` 依 fps 配速）、連通元件、影像堆疊的取用口（`optional`，Windows arm64 沒有 wheel 時語意報錯）、非 ASCII 路徑也讀寫得到的影像檔存取（`image_file`） |
+| `utils/cv2_utils/` | 1,106 | OpenCV 基礎層：擷取後端選擇（`screen_grabber`，Pillow／mss 或平台後端）、截圖、`[left, top, right, bottom]` 區域擷取（`region_capture`，Windows 經 `grab_logical` 涵蓋所有螢幕）、樣板比對（走 `grab_logical`，涵蓋所有螢幕）、螢幕錄影、影片錄製（兩者都經 `frame_clock` 依 fps 配速）、連通元件、影像堆疊的取用口（`optional`，Windows arm64 沒有 wheel 時語意報錯）、非 ASCII 路徑也讀寫得到的影像檔存取（`image_file`） |
 | `utils/edge_lines/` | 131 | 以 Hough 轉換偵測線條／格線／分隔線 |
 | `utils/edge_match/` | 117 | 邊緣形狀（Chamfer／距離轉換）樣板比對 |
 | `utils/feature_match/` | 146 | ORB 特徵比對：在旋轉／縮放／主題變更下定位樣板 |
@@ -418,7 +418,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/match_ensemble/` | 66 | 多樣板共識比對（多張參考圖投票到同一位置） |
 | `utils/match_stability/` | 69 | 比對前的靜止閘門與跨影格的比對持續性 |
 | `utils/match_trust/` | 154 | 樣板比對可信度評分（次峰比 + peak-to-sidelobe） |
-| `utils/monitor_layout/` | 558 | 多螢幕／虛擬桌面幾何（在哪個螢幕、位置、重映射）＋ `logical_frame` 以滑鼠座標空間擷取畫面 |
+| `utils/monitor_layout/` | 565 | 多螢幕／虛擬桌面幾何（在哪個螢幕、位置、重映射）＋ `logical_frame` 以滑鼠座標空間擷取畫面 |
 | `utils/motion_regions/` | 77 | 兩影格間的局部變化／活動偵測（absdiff） |
 | `utils/perceptual_diff/` | 203 | 感知式（YIQ）影像差異，抑制反鋸齒邊緣誤報 |
 | `utils/preprocess/` | 276 | OCR／比對前的影像前處理（灰階、二值化、去傾斜…） |
@@ -438,7 +438,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.6 OCR 與文字理解
 
-> 19 個套件、約 3,832 行。
+> 19 個套件、約 3,837 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -451,7 +451,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/guardrail/` | 117 | 針對畫面／OCR 文字的啟發式 prompt-injection 防護 |
 | `utils/heading_segment/` | 71 | 判定 OCR 行是標題或內文，建出文件大綱 |
 | `utils/near_dup/` | 108 | 近似重複文字偵測（SimHash／MinHash） |
-| `utils/ocr/` | 1,393 | OCR 引擎門面 + 三個後端（Tesseract／EasyOCR／PaddleOCR）、版面結構化與跨詞比對（`text_span`）、Tesseract 的尋找／設定／健康檢查（`tesseract_setup`） |
+| `utils/ocr/` | 1,398 | OCR 引擎門面 + 三個後端（Tesseract／EasyOCR／PaddleOCR）、版面結構化與跨詞比對（`text_span`）、Tesseract 的尋找／設定／健康檢查（`tesseract_setup`） |
 | `utils/pii_text/` | 141 | 自由文字中的 PII 偵測與遮蔽（email／電話／SSN／卡號／IP／IBAN） |
 | `utils/readability/` | 140 | 可讀性評分（Flesch、Flesch-Kincaid、Gunning Fog、SMOG、ARI） |
 | `utils/reading_flow/` | 165 | 以遞迴 XY-cut 推導欄位感知的閱讀順序 |
@@ -464,12 +464,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.7 無障礙樹與原生控制項
 
-> 16 個套件、約 5,069 行。
+> 16 個套件、約 5,075 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a11y_audit/` | 362 | 以無障礙樹 + OCR 進行無障礙與 i18n 稽核 |
-| `utils/accessibility/` | 3,518 | 跨平台無障礙樹定位與錄製；Windows UIA／macOS AX／null 三後端。支援限定視窗（換搜尋起點，不是過濾）、逐節點可中斷走訪、`IUIAutomation2` 連線逾時、名稱子字串比對與排序、`control_get_state` 一次讀完值／勾選／選取／數值（密碼欄位不回內容） |
+| `utils/accessibility/` | 3,524 | 跨平台無障礙樹定位與錄製；Windows UIA／macOS AX／null 三後端。支援限定視窗（換搜尋起點，不是過濾）、逐節點可中斷走訪、`IUIAutomation2` 連線逾時、名稱子字串比對與排序、`control_get_state` 一次讀完值／勾選／選取／數值（密碼欄位不回內容） |
 | `utils/ax_events/` | 35 | 反應式 UIA 事件等待（focus-changed） |
 | `utils/ax_props/` | 44 | 讀取豐富 UIA 屬性（enabled／offscreen／help／status／快捷鍵） |
 | `utils/ax_text/` | 105 | 透過 UIA TextPattern 取得原生文字（讀取／尋找／選取／屬性） |
@@ -707,11 +707,11 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.16 系統、視窗與剪貼簿
 
-> 16 個套件、約 2,760 行。
+> 16 個套件、約 2,771 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
-| `utils/clipboard/` | 461 | 跨平台無頭剪貼簿存取（文字 + 影像）＋ `win32_clipboard_api.py`：**所有剪貼簿格式共用的 Win32 原型與 open/alloc/lock 流程**（`open_clipboard()` 會等過短暫被別的行程佔住的剪貼簿——Win32 一次只允許一個行程開啟，別人正在複製就必然失敗）（`argtypes` 只宣告一半曾讓四支 writer 在 64 位元上必然丟 `OverflowError`，見 CHANGELOG）。`set_clipboard_image` 同時接受 PNG 位元組與檔案路徑——先前這個名字在本子套件裡有**兩份不同簽章的實作**（`clipboard.py` 吃 bytes、`clipboard_image.py` 吃路徑），匯錯來源只會在執行期才炸，已合併成一支 |
+| `utils/clipboard/` | 472 | 跨平台無頭剪貼簿存取（文字 + 影像）＋ `win32_clipboard_api.py`：**所有剪貼簿格式共用的 Win32 原型與 open/alloc/lock 流程**（`open_clipboard()` 會等過短暫被別的行程佔住的剪貼簿——Win32 一次只允許一個行程開啟，別人正在複製就必然失敗）（`argtypes` 只宣告一半曾讓四支 writer 在 64 位元上必然丟 `OverflowError`，見 CHANGELOG）。`set_clipboard_image` 同時接受 PNG 位元組與檔案路徑——先前這個名字在本子套件裡有**兩份不同簽章的實作**（`clipboard.py` 吃 bytes、`clipboard_image.py` 吃路徑），匯錯來源只會在執行期才炸，已合併成一支 |
 | `utils/clipboard_files/` | 118 | 剪貼簿檔案清單（CF_HDROP）：純 DROPFILES 封裝 + Win32 存取 |
 | `utils/clipboard_formats/` | 156 | 檢視與分類剪貼簿可用格式（純分類／差異 + Win32 列舉） |
 | `utils/clipboard_history/` | 114 | 剪貼簿歷史：環形緩衝 + 背景輪詢器 |
@@ -926,7 +926,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `rest_registry.py` | 91 | 保存執行中 REST 伺服器的行程級單例，狀態包含 RBAC 模式並隱去停用的共用 token。 |
 | `__main__.py` | 66 | `python -m je_auto_control.utils.rest_api` 進入點。 |
 
-#### `utils/cv2_utils/`（1,090 行）— 擷取、影像與共用定位 frame
+#### `utils/cv2_utils/`（1,106 行）— 擷取、影像與共用定位 frame
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -938,9 +938,9 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cv2_utils/optional.py` | 36 | Name the missing image-stack wheel instead of raising ``ModuleNotFoundError``. |
 | `utils/cv2_utils/region_capture.py` | 64 | Capture a ``[left, top, right, bottom]`` screen region on whichever monitor holds it. |
 | `utils/cv2_utils/screen_grabber.py` | 229 | One place that decides how this platform's pixels are read. |
-| `utils/cv2_utils/screen_record.py` | 125 | Internal image/capture utilities. |
+| `utils/cv2_utils/screen_record.py` | 127 | Internal image/capture utilities. |
 | `utils/cv2_utils/screenshot.py` | 95 | Internal image/capture utilities. |
-| `utils/cv2_utils/template_detection.py` | 184 | Locate a template image on screen, in the coordinates the mouse takes. |
+| `utils/cv2_utils/template_detection.py` | 198 | Locate a template image on screen, in the coordinates the mouse takes. |
 | `utils/cv2_utils/video_recording.py` | 76 | Internal image/capture utilities. |
 
 #### `utils/config_sync/`（8,577 行）— 持久化、因果模型與本機重送
@@ -1623,22 +1623,22 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `utils/executor/` | 11 | 10,855 |
 | `utils/usb/` | 20 | 5,069 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,178 |
-| `utils/accessibility/` | 17 | 3,518 |
-| `wrapper/` | 25 | 6,095 |
-| `windows/` | 24 | 2,366 |
+| `utils/accessibility/` | 17 | 3,524 |
+| `wrapper/` | 25 | 6,101 |
+| `windows/` | 24 | 2,405 |
 | `utils/rest_api/` | 8 | 2,251 |
 | `utils/agent/` | 13 | 2,254 |
 | `linux_with_x11/` | 19 | 1,382 |
 | `linux_wayland/` | 25 | 4,503 |
 | `utils/triggers/` | 4 | 1,446 |
-| `utils/ocr/` | 10 | 1,393 |
+| `utils/ocr/` | 10 | 1,398 |
 | `utils/usbip/` | 5 | 1,008 |
 | `utils/assertion/` | 3 | 888 |
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
-| `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 112,971 |
-| **總計** | **1,603** | **247,569** |
+| `utils/hotkey/` | 7 | 879 |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 113,020 |
+| **總計** | **1,603** | **247,686** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

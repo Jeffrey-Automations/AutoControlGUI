@@ -149,7 +149,9 @@ class DeviceFrame:
                 f"detect_threshold must be between 0 and 1, got {detect_threshold!r}")
         from je_auto_control.utils.cv2_utils.optional import require_cv2
         cv2 = require_cv2()
+        from je_auto_control.utils.cv2_utils.template_detection import reject_flat_template
         needle = _gray_template(cv2, template)
+        reject_flat_template(needle)
         haystack = _gray(cv2, self.image)
         if needle.shape[0] > haystack.shape[0] or needle.shape[1] > haystack.shape[1]:
             raise ImageNotFoundException("template is larger than the device frame")

@@ -22,7 +22,7 @@ from je_auto_control.utils.ocr.backends import (
     OCRBackend, OCRBackendNotAvailableError, get_backend,
 )
 from je_auto_control.utils.ocr.text_span import find_spans
-from je_auto_control.utils.timeouts import deadline_after
+from je_auto_control.utils.timeouts import clamp_poll_interval, deadline_after
 
 
 _image_grab = None
@@ -192,8 +192,12 @@ def wait_for_text(target: str,
                   case_sensitive: bool = False,
                   backend: Optional[str | OCRBackend] = None,
                   ) -> Tuple[int, int]:
-    """Poll until ``target`` appears on screen; raise on timeout."""
-    poll = max(0.05, float(poll))
+    """Poll until ``target`` appears on screen; raise on timeout.
+
+    ``poll`` is clamped to a finite interval and never sleeps past
+    ``timeout``, as :func:`wait_for_window`'s is.
+    """
+    poll = clamp_poll_interval(poll)
     deadline = deadline_after(time.monotonic(), timeout)
     # Look first, then check the clock: with timeout=0 the loop never ran.
     while True:
@@ -201,9 +205,10 @@ def wait_for_text(target: str,
             return locate_text_center(target, lang, region, min_confidence,
                                       case_sensitive, backend=backend)
         except AutoControlActionException:
-            if time.monotonic() >= deadline:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 break
-            pause(poll, time.sleep)
+            pause(min(poll, remaining), time.sleep)
     raise AutoControlActionException(f"OCR: wait_for_text timeout: {target!r}")
 
 

@@ -85,10 +85,10 @@ def click_mouse(mouse_keycode: int,
     if x is not None and y is not None:
         set_position(int(x), int(y))
     btn = _evdev_button(mouse_keycode)
-    emit_combo([
-        (EV_KEY, btn, 1),
-        (EV_KEY, btn, 0),
-    ])
+    # One SYN frame per edge: libinput compares the button state of two
+    # frames, and a press and release inside one left nothing to see.
+    emit(EV_KEY, btn, 1)
+    emit(EV_KEY, btn, 0)
 
 
 _OPPOSITE = {

@@ -93,7 +93,9 @@ class ScreenRecordThread(threading.Thread):
         # is honoured instead of being overwritten by run() (which would leave
         # the recorder unstoppable and the VideoWriter never released).
         self._stop_event = threading.Event()
-        self.resolution = resolution
+        # The checked integers: values that only convert to int (strings from
+        # an action file) reached cv2.resize, which refused them mid-recording.
+        self.resolution = (width, height)
 
     def run(self) -> None:
         try:

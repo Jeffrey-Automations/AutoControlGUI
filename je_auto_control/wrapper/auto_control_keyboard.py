@@ -12,7 +12,7 @@ import re
 import sys
 import warnings
 from contextlib import contextmanager
-from typing import Iterator, Optional, Sequence, Tuple
+from typing import Callable, Iterator, Optional, Sequence, Tuple
 
 from je_auto_control.utils.exception.exception_tags import (
     keyboard_press_key_error_message, keyboard_release_key_error_message,
@@ -279,7 +279,11 @@ def check_key_is_press(keycode: int | str) -> Optional[bool]:
                 f"check_key_is_press: {table_cant_find_key_error_message}, keycode={keycode}")
             return None
         record_action_to_list("check_key_is_press", {"keycode": keycode})
-        return keyboard_check.check_key_is_press(keycode=get_key_code)
+        # Windows' own answer also covers a press since the last call (the panic
+        # key needs that); this one is asked whether the key is down now.
+        is_down: Callable[..., bool] = getattr(
+            keyboard_check, "is_key_down", keyboard_check.check_key_is_press)
+        return is_down(keycode=get_key_code)
     except (OSError, RuntimeError, AttributeError, TypeError, ValueError) as error:
         record_action_to_list("check_key_is_press", {"keycode": keycode}, repr(error))
         autocontrol_logger.error(f"check_key_is_press failed: {repr(error)}")

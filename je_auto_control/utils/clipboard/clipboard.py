@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess  # nosec B404  # reason: required for pbcopy/pbpaste/xclip/xsel
 import sys
+import tempfile
 from io import BytesIO
 from typing import Optional
 
@@ -142,7 +143,7 @@ def _mac_get() -> str:
 
 
 def _mac_set(text: str) -> None:
-    _checked(_run_tool(["pbcopy"], text.encode("utf-8")))
+    _checked(_feed_tool(["pbcopy"], text.encode("utf-8")))
 
 
 class ClipboardError(AutoControlException, RuntimeError):
@@ -153,12 +154,30 @@ class ClipboardError(AutoControlException, RuntimeError):
     """
 
 
-def _run_tool(argv: list[str], data: Optional[bytes] = None) -> "subprocess.CompletedProcess[bytes]":
-    """Run a clipboard tool with a 5 s limit; its failure is a :class:`ClipboardError`."""
+def _run_tool(argv: list[str]) -> "subprocess.CompletedProcess[bytes]":
+    """Run a tool that prints the clipboard, with a 5 s limit; its failure is a :class:`ClipboardError`."""
     try:
         # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
-        return subprocess.run(argv, input=data, capture_output=True, check=False, timeout=5)  # nosec B603  # reason: fixed clipboard tool argv
-    except (OSError, subprocess.TimeoutExpired) as error:
+        return subprocess.run(argv, capture_output=True, check=False, timeout=5)  # nosec B603  # reason: fixed clipboard tool argv
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ClipboardError(f"{argv[0]} failed: {error!r}") from error
+
+
+def _feed_tool(argv: list[str], data: bytes) -> "subprocess.CompletedProcess[bytes]":
+    """Run a tool that takes the new clipboard on stdin; limits and failures as :func:`_run_tool`.
+
+    Nothing is read from a pipe: ``xclip -i`` forks a child that owns the
+    selection and keeps the inherited stdout and stderr open, so a captured
+    run waited for that child and timed out on a write that had worked.
+    """
+    try:
+        with tempfile.TemporaryFile() as errors:
+            # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
+            result = subprocess.run(argv, input=data, stdout=subprocess.DEVNULL, stderr=errors,  # nosec B603  # reason: fixed clipboard tool argv
+                                    check=False, timeout=5)
+            errors.seek(0)
+            return subprocess.CompletedProcess(argv, result.returncode, b"", errors.read())
+    except (OSError, subprocess.SubprocessError) as error:
         raise ClipboardError(f"{argv[0]} failed: {error!r}") from error
 
 
@@ -196,7 +215,7 @@ def _linux_set(text: str) -> None:
     if cmd is None:
         raise RuntimeError("Install xclip or xsel for Linux clipboard support")
     write_cmd = cmd + ["-i"] if cmd[0] == "xclip" else cmd + ["--input"]
-    _checked(_run_tool(write_cmd, text.encode("utf-8")))
+    _checked(_feed_tool(write_cmd, text.encode("utf-8")))
 
 
 # === Image clipboard backends ===============================================
@@ -268,11 +287,7 @@ def _mac_set_image(_png_bytes: bytes) -> None:
 def _linux_get_image() -> Optional[bytes]:
     if not shutil.which("xclip"):
         raise RuntimeError("Install xclip for Linux clipboard image support")
-    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
-    result = subprocess.run(  # nosec B603 B607  # reason: hard-coded argv to xclip
-        ["xclip", "-selection", "clipboard", "-t", "image/png", "-o"],
-        capture_output=True, check=False, timeout=5,
-    )
+    result = _run_tool(["xclip", "-selection", "clipboard", "-t", "image/png", "-o"])
     if result.returncode != 0 or not result.stdout:
         return None
     return result.stdout
@@ -281,8 +296,4 @@ def _linux_get_image() -> Optional[bytes]:
 def _linux_set_image(png_bytes: bytes) -> None:
     if not shutil.which("xclip"):
         raise RuntimeError("Install xclip for Linux clipboard image support")
-    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
-    subprocess.run(  # nosec B603 B607  # reason: hard-coded argv to xclip
-        ["xclip", "-selection", "clipboard", "-t", "image/png", "-i"],
-        input=png_bytes, check=True, timeout=5,
-    )
+    _checked(_feed_tool(["xclip", "-selection", "clipboard", "-t", "image/png", "-i"], png_bytes))
