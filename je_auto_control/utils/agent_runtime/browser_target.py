@@ -209,7 +209,8 @@ class BrowserTarget:
 
     def verify_browser(self, clause: Mapping[str, Any]) -> bool:
         """Check only a criterion pinned in this session's task, using fresh explicit SDK reads."""
-        if self._spec is None or self._session is None or clause not in self._spec.success_criteria:
+        if (self._spec is None or self._session is None
+                or clause not in (*self._spec.success_criteria, *self._spec.resume_conditions)):
             raise AgentTaskError("browser verification criterion is outside the owned task")
         from je_auto_control.utils.agent_runtime.browser_verification import evaluate_browser_clause
         try:

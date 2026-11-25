@@ -252,3 +252,29 @@ def test_trigger_event_variable_is_scoped_through_owned_file_helper_and_completi
         assert (tmp_path / (key + ".json")).is_file()
     finally:
         runtime.close()
+
+
+def test_cron_without_any_matching_date_is_refused_in_the_framework_family(runtime):
+    with pytest.raises(AgentTaskError, match="cron"):
+        register(runtime, "cron", config={"expression": "0 0 30 2 *"})
+    assert runtime.triggers.list() == {"triggers": []}
+
+
+def test_a_timezone_removed_after_registration_faults_only_its_own_trigger(runtime, monkeypatch):
+    from je_auto_control.utils.agent_runtime import task_triggers
+    broken = register(runtime, "cron", config={"expression": "* * * * *", "timezone": "UTC"})
+    healthy = register(runtime, "interval", config={"seconds": 60})
+    with runtime.store.connection(write=True) as connection:
+        connection.execute("UPDATE agent_triggers SET next_run=1")
+    original = task_triggers.next_due
+
+    def unavailable(kind, config, now):
+        if kind == "cron":
+            raise KeyError("No time zone found")
+        return original(kind, config, now)
+
+    monkeypatch.setattr(task_triggers, "next_due", unavailable)
+    runtime.triggers.poll()
+    states = {row["id"]: row for row in runtime.triggers.list()["triggers"]}
+    assert states[broken]["enabled"] == 0 and "KeyError" in states[broken]["error"]
+    assert states[healthy]["enabled"] == 1 and states[healthy]["next_run"] > 1

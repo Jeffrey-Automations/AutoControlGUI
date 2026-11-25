@@ -235,3 +235,28 @@ def test_step_budget_exhaustion_does_not_pin_input_owner(managed):
     assert runtime.get(task.task_id).state == "failed"
     second = runtime.submit(specification())
     assert runtime.observe(second.task_id).observation_id
+
+
+def test_result_criterion_compares_a_list_value_as_json(managed):
+    runtime, target = managed
+    target.perform = lambda _name, _arguments: {"names": ["a", {"b": ["c"]}]}
+    task = runtime.submit(specification(success_criteria=[
+        {"kind": "result_equals", "key": "names", "value": ["a", {"b": ["c"]}]}]))
+    frame = runtime.observe(task.task_id)
+    runtime.act(task.task_id, {"tool": "AC_increment", "observation_id": frame.observation_id})
+    assert runtime.finish(task.task_id).state == "succeeded"
+
+
+@pytest.mark.parametrize("change", [
+    {"success_criteria": [{"kind": 1}]}, {"success_criteria": [{"kind": []}]},
+    {"resume_conditions": [{"kind": {"a": 1}}]},
+    {"mode": "skill", "actions": [{"tool": "AC_increment", "capture": {"a": 1}}]},
+    {"mode": "skill", "actions": [{"tool": "AC_increment", "expect_capture": ["a"]}]},
+    *[{"mode": "skill", "allowed_tools": ["AC_browser_navigate"], "options": {"allowed_origins": origins},
+       "actions": [{"tool": "AC_browser_navigate", "arguments": {"url": "https://example.test/"}}]}
+      for origins in (3, [3])],
+])
+def test_submission_refuses_malformed_clause_and_capture_types(managed, change):
+    runtime, _target = managed
+    with pytest.raises(AgentTaskError):
+        runtime.submit(specification(**change))

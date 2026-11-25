@@ -47,6 +47,8 @@ def expected(action: Mapping[str, Any], values: Mapping[str, Any]) -> tuple[bool
     if "expect_result" in action:
         return True, thaw(action["expect_result"])
     if "expect_capture" in action:
+        if action["expect_capture"] not in values:
+            raise AgentTaskError("expected workflow capture is missing")
         return True, transformed(values[action["expect_capture"]], action.get("transform", "identity"))
     return False, None
 

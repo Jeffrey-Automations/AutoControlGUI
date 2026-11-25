@@ -287,3 +287,14 @@ def test_public_skill_api_and_http_service_share_verified_publication(tmp_path, 
         assert accepted["publication"]["task_id"] == trial["task_id"]
     finally:
         service.close()
+
+
+@pytest.mark.parametrize("criteria", [[{}], [3], [{"kind": []}]])
+def test_malformed_validation_criteria_are_refused_in_the_framework_family(managed, criteria):
+    runtime, _editor = managed
+    task = runtime.submit({"goal": "set field", "target": "editor", "mode": "skill", "allowed_tools": ["AC_edit"],
+        "actions": [{"tool": "AC_edit", "arguments": {"value": "done"}}],
+        "success_criteria": [{"kind": "actions_complete"}]})
+    assert run_task(runtime, task.task_id).state == "succeeded"
+    with pytest.raises(AgentTaskError):
+        runtime.skills.control("record", {"task_id": task.task_id, "name": "x", "validation_criteria": criteria})

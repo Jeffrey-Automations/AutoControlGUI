@@ -215,3 +215,13 @@ def test_archive_preview_rejects_nonportable_or_escaping_filenames(tmp_path, nam
     with pytest.raises(AgentTaskError):
         draft_agent_workflow("download_archive", {"roots": [str(tmp_path)], "directory": str(tmp_path),
             "files": [{"url": "http://127.0.0.1/report", "name": name}]})
+
+
+def test_csv_row_without_a_mapped_value_is_refused_instead_of_typing_none(tmp_path):
+    source = tmp_path / "rows.csv"
+    source.write_text("name,city\nAda,London\nGrace\n", encoding="utf-8")
+    with pytest.raises(AgentTaskError) as refused:
+        draft_agent_workflow("batch_form", {"roots": [str(tmp_path)], "apps": ["fixture"],
+            "source": str(source), "window_title": "Form",
+            "fields": [{"column": "city", "selector": selector("City")}], **commit_config()})
+    assert "no value" in str(refused.value.__cause__)

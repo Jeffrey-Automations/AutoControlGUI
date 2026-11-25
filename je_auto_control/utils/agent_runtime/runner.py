@@ -32,7 +32,7 @@ def run_task(runtime: Any, task_id: str, *, backend: Any = None) -> AgentTaskRes
     except AgentTaskError as error:
         state = runtime.get(task_id).state
         if state not in TERMINAL and state not in {"paused", "waiting_user", "cancelling", "pausing"}:
-            runtime.store.update(task_id, "waiting_user", reason=str(error))
+            runtime.store.transition(task_id, state, "waiting_user", reason=str(error))
         runtime._retire(task_id)
         return runtime.get(task_id)
 

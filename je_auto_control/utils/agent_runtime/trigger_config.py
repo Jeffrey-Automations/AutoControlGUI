@@ -33,13 +33,13 @@ def _interval(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def _cron(config: dict[str, Any]) -> dict[str, Any]:
-    from je_auto_control.utils.scheduler.cron import parse_cron
+    from je_auto_control.utils.scheduler.cron import next_match, parse_cron
     expression, timezone = config.get("expression"), config.get("timezone", "UTC")
     if not isinstance(expression, str) or len(expression) > 128 or not isinstance(timezone, str):
         raise AgentTaskError("cron requires a bounded expression and timezone")
     try:
-        parse_cron(expression)
-        _timezone(timezone)
+        # The first due time is computed at registration; an expression no date matches has none.
+        next_match(parse_cron(expression), dt.datetime.now(_timezone(timezone)))
     except (ValueError, ZoneInfoNotFoundError) as error:
         raise AgentTaskError("cron expression or timezone is unavailable") from error
     return {"expression": expression, "timezone": timezone}

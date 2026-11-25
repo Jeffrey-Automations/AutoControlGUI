@@ -65,7 +65,7 @@ def recording_template(runtime: Any, row: dict[str, Any], criteria: Any = None, 
     if not any(clause["kind"] == "actions_complete" for clause in spec["success_criteria"]):
         spec["success_criteria"].append({"kind": "actions_complete"})
     if criteria is not None:
-        if not isinstance(criteria, list) or not criteria:
+        if not isinstance(criteria, list) or not criteria or not all(isinstance(item, dict) for item in criteria):
             raise AgentTaskError("additional skill validation criteria must be a nonempty array")
         spec["success_criteria"].extend(detached(criteria))
     if not independent_evidence(spec):
@@ -96,7 +96,7 @@ def assert_verified(row: dict[str, Any]) -> None:
 
 def independent_evidence(spec: dict[str, Any]) -> bool:
     """Accept explicit evidence or reviewed semantic read-back, never dispatch-only completion."""
-    if any(clause["kind"] != "actions_complete" for clause in spec["success_criteria"]):
+    if any(clause.get("kind") != "actions_complete" for clause in spec["success_criteria"]):
         return True
     return any(_read_back(action)
                and ("expect_result" in action or "expect_capture" in action) for action in spec["actions"])

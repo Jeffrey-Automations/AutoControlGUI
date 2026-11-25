@@ -14,6 +14,9 @@ from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 
+_ERRORS = (AutoControlException, OSError, RuntimeError, ValueError, TypeError, LookupError)
+
+
 def default_connection_path() -> Path:
     """Resolve the per-user connection file at use time, including isolated test homes."""
     return Path.home() / ".je_auto_control" / "agent_runtime.json"
@@ -74,14 +77,14 @@ class AgentRuntimeService:
         while not self._stop.wait(0.25):
             try:
                 self.runtime.maintain()
-            except (AutoControlException, OSError, RuntimeError, ValueError, TypeError) as error:
+            except _ERRORS as error:
                 autocontrol_logger.warning("agent lease maintenance needs review: %s", type(error).__name__)
 
     def _poll_triggers(self) -> None:
         while not self._stop.wait(1):
             try:
                 self.runtime.triggers.poll()
-            except (AutoControlException, OSError, RuntimeError, ValueError, TypeError) as error:
+            except _ERRORS as error:
                 autocontrol_logger.warning("agent trigger polling needs review: %s", type(error).__name__)
 
     def status(self) -> dict[str, Any]:

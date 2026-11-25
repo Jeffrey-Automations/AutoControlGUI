@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,615 |
-| 程式碼總行數 | 248,870 |
+| 程式碼總行數 | 249,293 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -517,13 +517,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 60,662 行。
+> 14 個套件、約 60,761 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,268 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 33,432 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 33,531 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 178 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -538,16 +538,16 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.10 遠端桌面與 USB
 
-> 6 個套件、約 32,370 行。
+> 6 個套件、約 32,679 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/admin/` | 483 | 多主機管理主控台：平行輪詢 N 個 AutoControl REST 端點 |
 | `utils/config_sync/` | 8,577 | 持久化設定與條件交易：`contract.py` 管理有限 JSON 與協定例外；`store.py` 以 SQLite 原子比較版本／記錄重送收據；`routes.py` 提供第二版 HTTP 與明確盲寫相容；`commands.py` 共用 AC／MCP／Builder；`client.py` 條件提交，另有因果模型、peer ledger 與本機 SQLite outbox；第三版 /causal 交易已接上確認／退休／回收與刪除憑證；client／outbox 已接上原請求重送、有界 CAS 重合併及原子快照確認；持久化控制、原子本機 full-resync／舊待送退役與歷史收據已接上。本機資產工具另提供 manifest、整版雜湊驗證與不可變目錄發布；七種來源 adapters 保存可攜因果 profiles；workspace INI 與 GUI 共用偏好正規化。來源／outbox 與原子 full-resync 基準已由 SyncWorkspace 協調；引用資產以不可變分塊／完整 hash 收據、具驗證 HTTP 與完整 profile 串流發布接上；Sync UI 仍屬 C3。 |
 | `utils/device_matrix/` | 236 | 行動裝置矩陣：同一 action list 於多台裝置平行執行 |
-| `utils/remote_desktop/` | 16,997 | **遠端桌面子系統**：TCP／WebSocket／WebRTC 三條傳輸路徑、主機與檢視端、訊令伺服器、TURN／中繼、多檢視者、錄影、信任清單、TOTP、稽核鏈；私有選用功能模組保留整組匯入結果。 |
-| `utils/usb/` | 5,069 | 跨平台 USB 列舉／熱插拔／裝置直通（WinUSB、IOKit、libusb 後端 + ACL + WebRTC DataChannel 通道） |
-| `utils/usbip/` | 1,008 | USB/IP 線路協定主機端（協定封包、TCP 伺服器、libusb URB 後端） |
+| `utils/remote_desktop/` | 17,233 | **遠端桌面子系統**：TCP／WebSocket／WebRTC 三條傳輸路徑、主機與檢視端、訊令伺服器、TURN／中繼、多檢視者、錄影、信任清單、TOTP、稽核鏈；私有選用功能模組保留整組匯入結果。 |
+| `utils/usb/` | 5,134 | 跨平台 USB 列舉／熱插拔／裝置直通（WinUSB、IOKit、libusb 後端 + ACL + WebRTC DataChannel 通道） |
+| `utils/usbip/` | 1,016 | USB/IP 線路協定主機端（協定封包、TCP 伺服器、libusb URB 後端） |
 
 > **2026-10-09 第三輪新增的模組**（各自的子套件列在 §5.4 的原表格裡，這裡只列檔名與職責）：
 > `utils/executor/run_control.py`（可停止的執行：`StopToken`、`stoppable_run`、`AC_run_stoppable`／`AC_stop_execution`／`AC_list_executions`）、
@@ -563,11 +563,11 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.11 伺服器、網路協定與外部整合
 
-> 24 個套件、約 7,858 行。
+> 24 個套件、約 7,873 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
-| `utils/acme_v2/` | 617 | 完整 ACME v2 用戶端（RFC 8555），不依賴 certbot |
+| `utils/acme_v2/` | 632 | 完整 ACME v2 用戶端（RFC 8555），不依賴 certbot |
 | `utils/chatops/` | 949 | Chat-ops bot：接收 Slack／Discord／webhook 的 slash 指令並路由到動作 |
 | `utils/cookie_jar/` | 203 | RFC 6265 cookie jar |
 | `utils/email_send/` | 118 | SMTP 寄信（email 觸發器的發送端搭檔） |
@@ -825,7 +825,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `rate_limit.py` | 48 | 工具呼叫的 token bucket 限流。 |
 | `__main__.py` | 126 | `je_auto_control_mcp` console script 進入點。 |
 
-#### `utils/remote_desktop/`（16,997 行／77 檔）
+#### `utils/remote_desktop/`（17,233 行／77 檔）
 
 三條傳輸路徑並存：**TCP**（JPEG 影格）、**WebSocket**（同協定換傳輸）、**WebRTC**（aiortc 視訊 + DataChannel）。
 `_export_bindings.py` 保存產生的來源對照；`_optional/` 分別管理 WebRTC、錄影、多檢視者、
@@ -839,20 +839,20 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `webrtc_retirement.py` | 191 | 序列化 peer 世代、保留未完成的停止 future，區分待完成與失敗清理。 |
 | `webrtc_media_owners.py` | 249 | 保留 peer 媒體建構失敗及未完成子資源，提供快取的 slot 清理結果。 |
 | `webrtc_peer_cleanup.py` | 168 | 逐項清理 host／viewer 的原始資源，保留失敗項目並等候影格任務結束。 |
-| `host.py` | 702 | TCP 主機：接受迴圈、TLS 包裝、連線／認證握手、音訊與剪貼簿廣播、檔案推送、單次 token。 |
-| `viewer.py` | 748 | TCP 檢視端。 |
-| `host_service.py` | 561 | 無頭 WebRTC 主機執行器 + 多平台服務安裝器。 |
-| `host_client.py` | 466 | TCP 主機的每連線處理器：一個檢視端一個實例,擁有它的認證交換、sender／audio／receiver 三條執行緒,以及入站訊息的路由表。 |
+| `host.py` | 713 | TCP 主機：接受迴圈、TLS 包裝、連線／認證握手、音訊與剪貼簿廣播、檔案推送、單次 token。 |
+| `viewer.py` | 749 | TCP 檢視端。 |
+| `host_service.py` | 579 | 無頭 WebRTC 主機執行器 + 多平台服務安裝器。 |
+| `host_client.py` | 497 | TCP 主機的每連線處理器：一個檢視端一個實例,擁有它的認證交換、sender／audio／receiver 三條執行緒,以及入站訊息的路由表。 |
 | `registry.py` | 581 | `AC_remote_*` 指令使用的行程級單例。 |
-| `webrtc_transport.py` | 422 | 共用 WebRTC 管線：asyncio 橋接執行緒、螢幕視訊軌、設定。 |
+| `webrtc_transport.py` | 453 | 共用 WebRTC 管線：asyncio 橋接執行緒、螢幕視訊軌、設定。 |
 | `multi_viewer.py` | 523 | 每個連入檢視端各跑一個 `WebRTCDesktopHost` 的協調器。 |
 | `signaling_server.py` | 393 | WebRTC SDP rendezvous、持久化設定及具驗證的資產 chunk／blob 路由；CLI 提供 config／asset store 路徑與明確舊版寫入相容。 |
-| `audit_log.py` | 387 | SQLite 雜湊鏈稽核記錄。 |
-| `host_capture.py` | 324 | TCP 主機的影格與游標產生：螢幕列舉、監視器索引轉擷取區域、預設 JPEG／游標 provider,以及 `FrameProductionMixin`（游標輪詢、擷取迴圈、上線編碼）。 |
-| `ws_protocol.py` | 318 | 最小 RFC 6455 WebSocket 框架與握手。 |
-| `file_transfer.py` | 484 | 分塊檔案傳輸。 |
-| `relay.py` | 316 | NAT 穿透失敗時的 TCP 中繼。 |
-| `fingerprint.py` | 246 | TOFU 主機指紋驗證。 |
+| `audit_log.py` | 417 | SQLite 雜湊鏈稽核記錄。 |
+| `host_capture.py` | 318 | TCP 主機的影格與游標產生：螢幕列舉、監視器索引轉擷取區域、預設 JPEG／游標 provider,以及 `FrameProductionMixin`（游標輪詢、擷取迴圈、上線編碼）。 |
+| `ws_protocol.py` | 332 | 最小 RFC 6455 WebSocket 框架與握手。 |
+| `file_transfer.py` | 506 | 分塊檔案傳輸。 |
+| `relay.py` | 357 | NAT 穿透失敗時的 TCP 中繼。 |
+| `fingerprint.py` | 269 | TOFU 主機指紋驗證。 |
 | `turn_config.py` | 249 | coturn 設定產生器。 |
 | `presence.py` | 240 | 多檢視者的執行緒安全在場註冊表。 |
 | `jpeg_recorder_encrypted.py` | 239 | AES-GCM 加密版 session 錄影。 |
@@ -866,7 +866,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `webrtc_file_write.py` | 209 | Bounded observable DataChannel writes preserve caller cancellation and serialize file producers. |
 | `webrtc_file_tasks.py` | 147 | Run remote inbox pushes outside the event loop while preserving connection ownership and cooperative cancellation. |
 | `webrtc_files.py` | 422 | 專屬 DataChannel 的分塊檔案傳輸、可選校驗與原子發布確認。 |
-| `webrtc_host_auth.py` | 255 | 檢視端認證與核准：token 檢查、信任清單／IP 白名單自動放行、手動接受／拒絕、SAS、逾時關閉。 |
+| `webrtc_host_auth.py` | 257 | 檢視端認證與核准：token 檢查、信任清單／IP 白名單自動放行、手動接受／拒絕、SAS、逾時關閉。 |
 | `lan_discovery.py` | 387 | mDNS／Zeroconf 區網探索。 |
 | `video_codec.py` | 197 | TCP／WS 路徑的可插拔視訊編解碼。 |
 | `webrtc_host_media.py` | 261 | 重新協商與 recvonly 軌管理。aiortc 沒有 `removeTransceiver`,所以開／關不對稱——開是加軌重新 offer,關只能設 inactive 並停掉 receiver。 |
@@ -878,24 +878,24 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `trust_list.py` | 139 | 自動接受的檢視端信任清單。 |
 | `webrtc_inspector.py` | 138 | 行程級的 `StatsSnapshot` 滾動視窗。 |
 | `input_dispatch.py` | 161 | 在主機端套用輸入訊息。 |
-| `session_recorder.py` | 186 | 以 PyAV 把 WebRTC 影格錄成 mp4。 |
+| `session_recorder.py` | 187 | 以 PyAV 把 WebRTC 影格錄成 mp4。 |
 | `totp.py` | 159 | RFC 6238 TOTP（零外部相依）。 |
 | `file_receipts.py` | 29 | Immutable local publication receipts keep received bytes distinct from later edits to their target path. |
 | `clipboard_delivery.py` | 62 | Deliver clipboard data under its captured local authority and concrete connection owner. Once-bound ClipboardReceiver weakly pins the origin; queued deliveries keep the concrete peer alive without a registration self-cycle. |
 | `file_sync.py` | 388 | 內容摘要鏡像、固定接收收據、離線重試、停止工作擁有權與不可變交接基準。 |
-| `transport.py` | 126 | 可插拔的型別化訊息傳輸。 |
+| `transport.py` | 141 | 可插拔的型別化訊息傳輸。 |
 | `host_access.py` | 112 | TCP 主機的檢視端核准與存取控制：`PendingViewer`、權限字串、分享碼的 TOTP 候選值、IP 白名單。`host` 與 `host_client` 共用,所以獨立成模組。 |
 | `protocol.py` | 99 | 長度前綴的 TCP 框架。 |
 | `resume_tokens.py` / `session_quality_cache.py` / `rate_limit.py` | 94 / 85 / 84 | 快速重連 token、每 session 品質快取、檢視端限流。 |
 | `host_id.py` / `viewer_id.py` | 83 / 79 | 主機與檢視端的持久身分。 |
-| `permissions.py` / `clipboard_sync.py` / `wake_on_lan.py` / `session_actions.py` / `auth.py` | 64 / 137 / 56 / 40 / 28 | 逐 session 權限、剪貼簿同步、WOL、SAS 注入與螢幕遮蔽、HMAC 挑戰回應。 |
+| `permissions.py` / `clipboard_sync.py` / `wake_on_lan.py` / `session_actions.py` / `auth.py` | 64 / 139 / 56 / 40 / 28 | 逐 session 權限、剪貼簿同步、WOL、SAS 注入與螢幕遮蔽、HMAC 挑戰回應。 |
 | `ws_host.py` / `ws_viewer.py` / `jpeg_recorder.py` | 41 / 30 / 146 | WebSocket 傳輸變體與 TCP 路徑錄影。 |
 
-#### `utils/usb/`（5,069 行）與 `utils/usbip/`（1,008 行）
+#### `utils/usb/`（5,134 行）與 `utils/usbip/`（1,016 行）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
-| `usb/passthrough/session.py` | 690 | 逐 peer 的 USB 直通 session。 |
+| `usb/passthrough/session.py` | 733 | 逐 peer 的 USB 直通 session。 |
 | `usb/passthrough/viewer_client.py` | 552 | 檢視端的直通協定用戶端。 |
 | `usb/passthrough/backend.py` | 488 | 後端 ABC + libusb 實作。 |
 | `usb/passthrough/winusb_backend.py` | 488 | Windows WinUSB 後端（ctypes）。 |
@@ -907,10 +907,10 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `usb/passthrough/descriptor.py` | 134 | USB 標準裝置描述元解析。 |
 | `usb/passthrough/key_provider.py` | 125 | ACL 的可插拔 HMAC 金鑰來源。 |
 | `usb/passthrough/commands.py` | 150 | 無頭直通指令（單一真實來源）。 |
-| `usb/usb_devices.py` | 308 | 跨平台 USB 裝置列舉。 |
-| `usb/usb_watcher.py` | 308 | 輪詢式 USB 熱插拔監看。 |
+| `usb/usb_devices.py` | 310 | 跨平台 USB 裝置列舉。 |
+| `usb/usb_watcher.py` | 328 | 輪詢式 USB 熱插拔監看。 |
 | `usbip/protocol.py` | 342 | USB/IP 線路格式封裝／解析。 |
-| `usbip/server.py` | 295 | USB/IP 主機端 TCP 伺服器。 |
+| `usbip/server.py` | 303 | USB/IP 主機端 TCP 伺服器。 |
 | `usbip/libusb_backend.py` | 224 | 以 PyUSB／libusb 執行 URB 的正式後端。 |
 | `usbip/backend.py` | 87 | 可插拔 URB 執行後端。 |
 
@@ -1053,7 +1053,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（33,432 行／241 檔）
+#### `utils/agent_runtime/`（33,531 行／241 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1083,7 +1083,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `browser_readonly_scope.py` | 35 | Narrow a frozen browser to a host-admitted verification scope without replacing input authority. |
 | `browser_retirement.py` | 51 | Exact live SDK retirement descriptions; serialized context IDs never grant authority. |
 | `browser_secrets.py` | 66 | Keep text a page marks `data-secret` out of a browser observation. |
-| `browser_target.py` | 224 | Own a WebRunner SDK session inside a managed helper, without importing browser engines. |
+| `browser_target.py` | 225 | Own a WebRunner SDK session inside a managed helper, without importing browser engines. |
 | `browser_transfers.py` | 101 | Rooted file snapshots and atomic publication around WebRunner-owned browser transfers. |
 | `browser_validation.py` | 35 | Pure browser text and URL bounds shared without loading SDK or command dispatch. |
 | `browser_verification.py` | 91 | Pinned browser completion clauses use fresh bounded SDK reads, never agent claims or previews. |
@@ -1098,11 +1098,11 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `control_admission.py` | 29 | Closed runtime stop requests share a bounded reserve separate from ordinary HTTP polling. |
 | `dag_admission.py` | 80 | Trusted local DAG admission records bind original ownership, caller authority and a live attempt. |
 | `dag_batch_recording.py` | 93 | Durable dispatch claims and independent destination verification for one managed DAG batch. |
-| `dag_batches.py` | 369 | Owner-scoped graph lifecycle and runtime-owned task/artifact host adapters. |
+| `dag_batches.py` | 379 | Owner-scoped graph lifecycle and runtime-owned task/artifact host adapters. |
 | `dag_continuation.py` | 345 | Whole-graph review and one-shot continuation approval never replay a possible delivery. |
 | `dag_continuation_evidence.py` | 171 | Bounded read-only destination evidence for explicit whole-batch continuation decisions. |
 | `dag_continuation_plan.py` | 91 | Explicit per-node decisions preserve graph scope and never reset a possible delivery claim. |
-| `dag_jobs.py` | 140 | Service-owned durable DAG deliveries never replay an interrupted coordinator attempt. |
+| `dag_jobs.py` | 144 | Service-owned durable DAG deliveries never replay an interrupted coordinator attempt. |
 | `dag_local.py` | 98 | Closed local-node transport admits claimed DAG work under the original owner's authority. |
 | `dag_retention.py` | 127 | Expire settled DAG records while retaining unresolved input and referenced recovery evidence. |
 | `dag_service_client.py` | 53 | Runtime-bound batch coordination and destination calls refresh both approving and original owners. |
@@ -1111,7 +1111,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `document_launch.py` | 46 | Bounded document handoff runs outside the disposable native input helper's process tree. |
 | `dom_observation.py` | 196 | Normalize host-declared DOM fields of a managed browser session into the shared observation report. |
 | `errors.py` | 27 | Typed failures for managed tasks, observations and control ownership. |
-| `evidence.py` | 215 | Service-owned task provenance, redacted artifacts and thirty-day metadata retention. |
+| `evidence.py` | 221 | Service-owned task provenance, redacted artifacts and thirty-day metadata retention. |
 | `evidence_cache.py` | 92 | Database-bound evidence paths never turn historical journal references into filesystem ownership. |
 | `evidence_handoff.py` | 376 | Explicit revocable evidence-only grants preserve ordinary task ownership and input isolation. |
 | `file_dialog_scope.py` | 62 | Bind the existing file-dialog executor to one task-owned window and rooted absolute path. |
@@ -1123,7 +1123,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `ios_adapter.py` | 298 | Bridge a WebDriverAgent session into the owned remote worker only with an explicit trusted control provider. |
 | `input_journal.py` | 96 | Durable resource witnesses prevent input transfer after an unreviewed host crash. |
 | `input_ledger.py` | 88 | Host-owned press announcements and acknowledged releases survive helper termination. |
-| `jobs.py` | 109 | Durable background dispatch over the existing fenced WorkQueue implementation. |
+| `jobs.py` | 131 | Durable background dispatch over the existing fenced WorkQueue implementation. |
 | `local_evidence.py` | 29 | Bind server-side batch evidence to its owning runtime without global client discovery. |
 | `manifest_evidence.py` | 51 | Independently re-read archive manifests and their scoped files at task completion. |
 | `model_tools.py` | 65 | Local-model schemas expose observation references without changing legacy executor signatures. |
@@ -1146,8 +1146,8 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `path_identity.py` | 32 | Resolve a path for identity checks without mistaking Windows' extended-length spelling for a redirect. |
 | `parent_watch.py` | 25 | POSIX helpers retire their own live process group when the owning parent disappears. |
 | `readiness.py` | 85 | Passive readiness of the desktop, presence source, devices, browser and models; never a grant or evidence. |
-| `resume_gate.py` | 84 | A task's first action waits until a fresh observation passes every declared resume condition. |
-| `policy.py` | 132 | Explicit task scopes, rooted data paths and secret-safe durable payloads. |
+| `resume_gate.py` | 88 | A task's first action waits until a fresh observation passes every declared resume condition. |
+| `policy.py` | 140 | Explicit task scopes, rooted data paths and secret-safe durable payloads. |
 | `presence_channel_darwin.py` | 321 | Own authenticated macOS stream channels and protected listeners, with the Linux lease owner. |
 | `presence_channel_linux.py` | 434 | Own authenticated Linux packet channels, bounded leases and protected listeners. |
 | `presence_endpoint_darwin.py` | 113 | Own protected macOS socket paths, reusing the Linux identity checks where POSIX allows. |
@@ -1166,7 +1166,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `presence_peer_linux.py` | 218 | Retain Linux connected-process evidence only; no desktop session or input authority. |
 | `presence_pipe_darwin.py` | 142 | macOS presence transport behind the Windows pipe's interface; its endpoint arrives only through the owned launch. |
 | `presence_pipe_linux.py` | 211 | Linux presence transport behind the Windows pipe's interface; its endpoint arrives only through the owned launch. |
-| `presence_pipe_windows.py` | 209 | Secured local byte pipes for owned helpers; no desktop observation or runtime binding. |
+| `presence_pipe_windows.py` | 215 | Secured local byte pipes for owned helpers; no desktop observation or runtime binding. |
 | `presence_pool.py` | 404 | Host-only shared presence ownership; task cancellation never cancels another runtime's source. |
 | `presence_protocol.py` | 74 | Per-connection sequences and issued-token ownership; shared source lifetime remains separate. |
 | `presence_reader.py` | 246 | Fresh presence checks inside owned input helpers, with bounded callers and an independent watchdog. |
@@ -1188,7 +1188,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `remote_journal.py` | 170 | Fence remote effects durably; retiring a local writer never certifies a remote device idle. |
 | `remote_target.py` | 178 | Internal owned remote-helper lifecycle, without assuming ADB or WDA retirement guarantees. |
 | `remote_worker.py` | 215 | Owned remote SDK worker with closed RPC, refreshed authority and ACK-gated finite effects. |
-| `retention.py` | 71 | Thirty-day cleanup of stopped tasks and exclusively owned runtime artifacts. |
+| `retention.py` | 86 | Thirty-day cleanup of stopped tasks and exclusively owned runtime artifacts. |
 | `routes.py` | 165 | Authenticated REST adapters for the runtime explicitly owned by a server. |
 | `runner.py` | 118 | Autonomous skill/local-model driver over exactly the external task operations. |
 | `retained_browser.py` | 148 | Bounded effect-task ownership of actual permanently read-only browser helper processes. |
@@ -1238,8 +1238,8 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `semantic_verification.py` | 92 | Compare fresh semantic readback with a confirmed operation's original target witness. |
 | `semantic_native_target.py` | 85 | Owned semantic helper proxy that refuses every desktop input event. |
 | `semantic_worker.py` | 83 | Validate grounded helper requests against the worker's immutable task scope. |
-| `runtime_lock.py` | 78 | Cross-process ownership for one runtime database; imports never acquire locks. |
-| `service.py` | 115 | Explicit local runtime service lifecycle over the existing authenticated REST server. |
+| `runtime_lock.py` | 86 | Cross-process ownership for one runtime database; imports never acquire locks. |
+| `service.py` | 118 | Explicit local runtime service lifecycle over the existing authenticated REST server. |
 | `skill_completion.py` | 129 | Private read-only evidence for skill recording and publication preserves original workflow identity. |
 | `skill_execution.py` | 115 | Exact original skill effects across real reviewed recovery, without granting input or replacing trials. |
 | `skill_parameters.py` | 110 | Explicit typed parameter slots modify data values without widening a skill's authority. |
@@ -1270,7 +1270,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `transfer_lineage.py` | 156 | Bind artifact authority to real bounded recovery ancestry and original accepted DAG admission. |
 | `transfer_models.py` | 191 | Portable criterion selections and immutable descriptors for reviewed outcome transfers. |
 | `transfer_privacy.py` | 53 | Exclude actual host private stores and evidence roots without reserving ordinary output basenames. |
-| `transfer_protocol.py` | 171 | Runtime-owned transfer serialization coordinates source consent and service-owned destination imports. |
+| `transfer_protocol.py` | 180 | Runtime-owned transfer serialization coordinates source consent and service-owned destination imports. |
 | `transfer_transport.py` | 151 | Bounded source reads and management replies use an injected adapter without foreign task authority. |
 | `transfer_management.py` | 103 | Closed management envelopes validate foreign source and destination replies before retaining consent. |
 | `transfer_evidence_management.py` | 85 | Closed management projections validate portable evidence consent without importing foreign authority. |
@@ -1283,13 +1283,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `trigger_history.py` | 89 | Renewed trigger lineages share accepted event tombstones and outstanding-task limits. |
 | `trigger_reauthorization.py` | 150 | Explicitly replace a trigger's unavailable origins while retaining its event history and template. |
 | `trigger_registration.py` | 21 | Insert normal and explicitly renewed trigger templates through one bounded transaction contract. |
-| `verification.py` | 177 | Deterministic completion evidence with explicit passed, failed and unknown states. |
+| `verification.py` | 178 | Deterministic completion evidence with explicit passed, failed and unknown states. |
 | `window_pixels.py` | 118 | Capture only an identified Windows window, with no desktop-pixel fallback. |
 | `workflow_desktop.py` | 70 | Reviewed semantic control and document operations within the current task's application scope. |
 | `wire_data.py` | 46 | Resource-free bounded JSON and budget primitives shared by host models and owned transports. |
 | `workflow_files.py` | 128 | Rooted, bounded and idempotent download/archive operations for managed workflows. |
 | `workflow_specs.py` | 245 | Compile four reviewed workflows into inspectable, bounded managed-task specifications. |
-| `workflow_values.py` | 90 | Resolve receipt-backed workflow variables and compare explicit per-step expectations. |
+| `workflow_values.py` | 92 | Resolve receipt-backed workflow variables and compare explicit per-step expectations. |
 | `workflow_wait.py` | 31 | Bounded, cancellable semantic read-back polling never repeats an input operation. |
 | `workspace_scope.py` | 36 | Bounded workspace bootstrap only focuses explicitly approved application windows. |
 
@@ -1619,9 +1619,9 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | --- | ---: | ---: |
 | `gui/` | 167 | 44,372 |
 | `utils/mcp_server/` | 63 | 22,424 |
-| `utils/remote_desktop/` | 77 | 16,997 |
+| `utils/remote_desktop/` | 77 | 17,233 |
 | `utils/executor/` | 11 | 10,855 |
-| `utils/usb/` | 20 | 5,069 |
+| `utils/usb/` | 20 | 5,134 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,178 |
 | `utils/accessibility/` | 17 | 3,524 |
 | `wrapper/` | 25 | 6,101 |
@@ -1632,13 +1632,13 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `linux_wayland/` | 25 | 4,503 |
 | `utils/triggers/` | 4 | 1,446 |
 | `utils/ocr/` | 10 | 1,398 |
-| `utils/usbip/` | 5 | 1,008 |
+| `utils/usbip/` | 5 | 1,016 |
 | `utils/assertion/` | 3 | 910 |
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 113,423 |
-| **總計** | **1,603** | **248,125** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 113,537 |
+| **總計** | **1,603** | **248,548** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

@@ -1,6 +1,8 @@
 """Managed batches pin the whole graph and claim before any possible task delivery."""
 import pytest
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from unittest.mock import Mock
 
@@ -222,3 +224,44 @@ def test_nested_managed_operation_is_refused_before_batch_client_contact(monkeyp
     with pytest.raises(AgentTaskError, match="cannot coordinate"):
         run_dag(definition, batch_id="registered-batch")
     client.assert_not_called()
+
+
+def test_an_unreadable_batch_cannot_keep_emergency_stop_from_cancelling_tasks(runtime):
+    value = runtime.batches.control("register", {"definition": graph()})
+    runtime.batches.control("begin", {"batch_id": value["batch_id"], "definition": graph(), "max_parallel": 4})
+    with runtime.store.connection(write=True) as connection:
+        connection.execute("UPDATE agent_dag_batches SET graph_hash='changed' WHERE id=?", (value["batch_id"],))
+    queued = runtime.submit(task()["spec"]).task_id
+    result = runtime.stop_all()
+    assert runtime.get(queued).state == "cancelled"
+    assert result["requested"] == 1
+    assert result["cleanup_errors"] == [{"batch_id": value["batch_id"], "error": "AgentTaskError"}]
+
+
+def test_emergency_stop_cancels_running_tasks_before_waiting_for_a_batch_operation(runtime):
+    value = runtime.batches.control("register", {"definition": graph()})
+    runtime.batches.control("begin", {"batch_id": value["batch_id"], "definition": graph(), "max_parallel": 4})
+    running = runtime.submit(task()["spec"]).task_id
+    owned, release = threading.Event(), threading.Event()
+
+    def slow_operation():
+        with runtime._lock("dag:" + value["batch_id"]):
+            owned.set()
+            assert release.wait(10)
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        operation = workers.submit(slow_operation)
+        try:
+            assert owned.wait(5)
+            stopping = workers.submit(runtime.stop_all)
+            for _attempt in range(300):
+                if runtime._token(running).is_cancelled:
+                    break
+                threading.Event().wait(0.01)
+            assert runtime._token(running).is_cancelled
+            assert not stopping.done(), "the batch fence still waits for its running operation"
+        finally:
+            release.set()
+        operation.result(timeout=5)
+        assert stopping.result(timeout=5)["requested"] == 1
+    assert runtime.get(running).state == "cancelled"

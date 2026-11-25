@@ -26,7 +26,9 @@ from je_auto_control.utils.agent_runtime.policy import (
     TaskPolicy, durable_payload, canonical_spec, owns_task, validate_root_snapshot,
 )
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
-from je_auto_control.utils.agent_runtime.runtime_lock import RuntimeLock, close_runtime_ownership, retire_runtime_inputs
+from je_auto_control.utils.agent_runtime.runtime_lock import (
+    RuntimeLock, cancel_tokens, close_runtime_ownership, retire_runtime_inputs,
+)
 from je_auto_control.utils.agent_runtime.presence_host import RuntimePresence
 from je_auto_control.utils.agent_runtime.retained_browser import RetainedBrowsers
 from je_auto_control.utils.agent_runtime.retained_browser_runtime import retire_target, maintain_retained
@@ -293,7 +295,7 @@ class AgentRuntime:
         except AgentTaskError as error:
             paused = self.pause(row["id"])
             if paused.state == "paused":
-                self.store.update(row["id"], "paused", reason=f"task scope requires review: {error}")
+                self.store.transition(row["id"], "paused", "paused", reason=f"task scope requires review: {error}")
             raise
 
         def checkpoint() -> None:
@@ -333,7 +335,7 @@ class AgentRuntime:
         except AgentHumanReview as error:
             state = self.store.get(task_id)["state"]
             if state not in TERMINAL and state not in {"pausing", "cancelling"}:
-                self.store.update(task_id, "waiting_user", reason=str(error), verification=error.reports)
+                self.store.transition(task_id, state, "waiting_user", reason=str(error), verification=error.reports)
             raise
         finally:
             with self._mutex:
@@ -454,7 +456,7 @@ class AgentRuntime:
                 status = "uncertain" if receipt["status"] == "dispatched" else "failed"
                 self.store.settle(action_id, status, {"error": type(error).__name__})
             if not self._token(task_id).is_cancelled:
-                self.store.update(task_id, "waiting_user", reason="action outcome requires review")
+                self.store.transition(task_id, "running", "waiting_user", reason="action outcome requires review")
             raise
         finally:
             self._settle_control(task_id)
@@ -531,11 +533,10 @@ class AgentRuntime:
 
     def stop_all(self) -> dict[str, Any]:
         """Cancel every visible task; operators cannot stop another principal's work."""
-        self.batches.stop_all()
-        identifiers = self._visible_live_ids()
-        for task_id in identifiers:
-            self._stop_final[task_id] = "cancelled"
-            self._token(task_id).cancel()
+        # Input stops first: fencing a batch waits for that batch's running operation, which can be a slow host.
+        cancel_tokens(self._stop_final, self._token, self._visible_live_ids())
+        errors = self.batches.stop_all()
+        identifiers = cancel_tokens(self._stop_final, self._token, self._visible_live_ids())
         with self.store.connection(write=True) as connection:
             connection.executemany("UPDATE agent_tasks SET state='cancelling',updated=? WHERE id=? "
                 "AND state NOT IN ('succeeded','failed','cancelled','timed_out')",
@@ -543,7 +544,6 @@ class AgentRuntime:
         queued = self._cancel_without_input(identifiers)
         snapshots = self._stop_snapshots([task_id for task_id in identifiers[:1000] if task_id in queued])
         results: List[dict[str, Any]] = []
-        errors: List[dict[str, str]] = []
         for task_id in identifiers:
             if task_id in queued:
                 if task_id in snapshots:
@@ -651,10 +651,11 @@ class AgentRuntime:
                 raise AgentTaskError("uncertain actions require reconciliation before resume")
             owner = AuthorizationContext(**row["owner"]) if row["owner"] else None
             with DeferredAuthorization(owner).scope():
+                if not self.store.transition(task_id, row["state"], "queued"):
+                    raise AgentTaskError("task was stopped again before it could resume")
                 self._tokens.pop(task_id, None)
                 self._stop_final.pop(task_id, None)
                 self._observations.pop(task_id, None)
-                self.store.update(task_id, "queued")
             return self.get(task_id)
 
     def close(self) -> None:
@@ -670,33 +671,32 @@ class AgentRuntime:
     def maintain(self) -> None:
         """Expire abandoned leases and retire revoked owners even between client requests."""
         for task_id, lease in list(self._leases.items()):
-            row = self.store.get(task_id)
-            if row["state"] in TERMINAL:
-                self._retire(task_id)
-                continue
-            if self.clock.remaining(row) <= 0:
-                self._stop_owned(task_id, lease, "timed_out")
-                continue
-            owner = AuthorizationContext(**row["owner"]) if row["owner"] else None
             try:
-                validate_root_snapshot(row["spec"]["roots"])
-                validate_origins(AgentTaskSpec.from_dict(row["spec"]))
-                self.target_profiles.check(AgentTaskSpec.from_dict(row["spec"]))
-                check_task_authority(self, task_id)
-                with DeferredAuthorization(owner).scope():
-                    # reason: entering the scope re-checks the owner's current rights; nothing runs inside it
-                    pass
-            except (AutoControlException, OSError, ValueError):
-                self._stop_owned(task_id, lease, "cancelled",
-                                 reason="owner authorization or origin scope requires review")
+                self._maintain_lease(task_id, lease)
+            except _ERRORS as error:  # one owner's failed cleanup cannot leave the others' limits unenforced
+                autocontrol_logger.warning("agent lease maintenance needs review: %s", type(error).__name__)
         maintain_retained(self)
         self._settle_stopped()
         self.evidence.flush()
         if self._transfers is not None or AgentTransfers.maintenance_pending(self.store):
             self.transfers.maintain()
         if time.monotonic() >= self._next_retention:
-            self.prune()
             self._next_retention = time.monotonic() + 3600
+            self.prune()
+
+    def _maintain_lease(self, task_id: str, lease: ControlLease) -> None:
+        row = self.store.get(task_id)
+        if row["state"] in TERMINAL:
+            self._retire(task_id)
+        elif self.clock.remaining(row) <= 0:
+            self._stop_owned(task_id, lease, "timed_out")
+        else:
+            try:
+                validate_origins(AgentTaskSpec.from_dict(self._retained_source(task_id)["spec"]))
+                check_task_authority(self, task_id)
+            except (AutoControlException, OSError, ValueError):
+                self._stop_owned(task_id, lease, "cancelled",
+                                 reason="owner authorization or origin scope requires review")
 
     def _stop_owned(self, task_id: str, lease: ControlLease, settled: str, *,
                     reason: str = "", pending: str = 'cancelling', report: bool = True) -> AgentTaskResult | None:

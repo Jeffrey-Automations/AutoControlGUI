@@ -205,3 +205,50 @@ def test_retention_refuses_unrecognized_cache_files(runtime):
     with pytest.raises(AgentTaskError, match="unrecognized"):
         instance.prune()
     assert unknown.exists()
+
+
+def test_reconciliation_refuses_a_non_text_decision(runtime):
+    instance, target = runtime
+    task = instance.submit(spec())
+    target.fail = True
+    with pytest.raises(AgentTaskError):
+        act(instance, task.task_id)
+    receipt = instance.store.actions(task.task_id)[-1]
+    with pytest.raises(AgentTaskError, match="decision"):
+        instance.reconcile(task.task_id, {"action_id": receipt["id"], "decision": [], "note": "reviewed"})
+
+
+def test_non_text_capture_leaves_the_row_pending_and_the_report_published(runtime):
+    instance, _target = runtime
+    task = instance.submit(spec(mode="skill", success_criteria=[{"kind": "actions_complete"}], actions=[
+        {"tool": "AC_increment", "arguments": {}, "capture": "value", "row": "1"},
+        {"tool": "AC_increment", "arguments": {}, "expect_capture": "value", "row": "2"}]))
+    assert run_task(instance, task.task_id).state == "waiting_user"
+    rows = instance.receipts(task.task_id)["rows"]
+    assert rows == [{"row": "1", "status": "success"}, {"row": "2", "status": "pending"}]
+
+
+def test_a_task_whose_cache_needs_review_does_not_hold_back_other_retention(runtime):
+    instance, _target = runtime
+    kept, removed = (instance.submit(spec()).task_id for _index in range(2))
+    for task in (kept, removed):
+        instance.cancel(task)
+    with instance.store.connection(write=True) as connection:
+        connection.execute("UPDATE agent_tasks SET updated=? WHERE id=?", (1, kept))
+        connection.execute("UPDATE agent_tasks SET updated=? WHERE id=?", (2, removed))
+    (instance.evidence.directory(kept) / "user-notes.txt").write_text("mine", encoding="utf-8")
+    with pytest.raises(AgentTaskError, match="unrecognized"):
+        instance.prune()
+    assert instance.get(kept).state == "cancelled"
+    with pytest.raises(AgentTaskError):
+        instance.get(removed)
+
+
+def test_a_damaged_pending_report_does_not_stop_the_others(runtime):
+    instance, _target = runtime
+    damaged, healthy = (instance.submit(spec()).task_id for _index in range(2))
+    instance.evidence.defer([damaged, healthy])
+    (instance.evidence.directory(damaged) / "journal.jsonl").unlink()
+    instance.maintain()
+    assert instance.evidence.metadata(damaged)["report_pending"] is True
+    assert instance.evidence.metadata(healthy)["report_pending"] is False

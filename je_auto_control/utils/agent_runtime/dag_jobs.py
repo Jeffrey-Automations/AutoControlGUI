@@ -11,6 +11,7 @@ from typing import Any
 from je_auto_control.utils.agent_runtime.dag_service_client import DagServiceClient
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 from je_auto_control.utils.work_queue.work_queue import WorkQueue
 
@@ -82,11 +83,14 @@ class BackgroundDags:
 
     def _drain(self) -> None:
         while not self._stop.is_set():
-            item = self.queue.get_next()
-            if item is None:
-                self._stop.wait(0.1)
-                continue
-            self._run(item)
+            try:
+                item = self.queue.get_next()
+                if item is not None:
+                    self._run(item)
+                    continue
+            except _ERRORS as error:  # an unrecorded outcome leaves its claim in place and must not end the worker
+                autocontrol_logger.warning("background DAG worker requires review: %s", type(error).__name__)
+            self._stop.wait(0.1)
 
     def _run(self, item: Any) -> None:
         client = DagServiceClient(self.runtime, item.data)

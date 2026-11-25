@@ -27,6 +27,7 @@ from je_auto_control.utils.dag.inspection import inspect_definition
 from je_auto_control.utils.dag.managed_tasks import (
     task_host_binding, registered_transfer_private_files, registered_transfer_binding, registered_host_transfer,
 )
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.rbac.authorization import AuthorizationContext, current_authorization
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
@@ -38,6 +39,7 @@ _FIELDS = {"register": {"definition"}, "get": {"batch_id"}, "list": set(),
            "inspect": {"batch_id"}, "run_background": {"batch_id", "definition", "max_parallel"},
            "local_task": {"batch_id", "attempt", "node_id", "operation", "body"}}
 _FIELDS.update(CONTINUATION_FIELDS)
+_ERRORS = (AutoControlException, OSError, RuntimeError, ValueError, TypeError, LookupError)
 
 
 def _request(operation: Any, value: Any) -> dict[str, Any]:
@@ -196,15 +198,23 @@ class DagBatches:
         jobs.enqueue(started, batch["owner"], actor)
         return self._describe(self._row(batch["id"]))
 
-    def stop_all(self) -> None:
-        """Fence visible active/approved coordinators before stop-all snapshots destination tasks."""
+    def stop_all(self) -> list[dict[str, str]]:
+        """Fence visible active/approved coordinators before stop-all snapshots destination tasks.
+
+        A batch that cannot be fenced is returned, not raised: it must not keep the tasks from stopping.
+        """
+        errors = []
         with self.runtime.store.connection() as connection:
             rows = connection.execute("SELECT id,owner FROM agent_dag_batches b "
                 "WHERE state IN ('running','approved') OR EXISTS (SELECT 1 FROM agent_dag_approvals a "
                 "WHERE a.batch_id=b.id AND a.state IN ('provisional','starting'))").fetchall()
         for row in rows:
             if owns_task(json.loads(row["owner"]), current_authorization()):
-                self.control("pause_batch", {"batch_id": row["id"]})
+                try:
+                    self.control("pause_batch", {"batch_id": row["id"]})
+                except _ERRORS as error:
+                    errors.append({"batch_id": row["id"], "error": type(error).__name__})
+        return errors
 
     def _row(self, identifier: str, *, connection: Any = None) -> dict[str, Any]:
         # pylint: disable-next=protected-access  # reason: closed runtimes cannot accept new coordinator work

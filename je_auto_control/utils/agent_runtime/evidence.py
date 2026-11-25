@@ -16,11 +16,14 @@ from je_auto_control.utils.agent_runtime.evidence_cache import EvidenceCache
 from je_auto_control.utils.agent_runtime.models import AgentTaskSpec, TERMINAL
 from je_auto_control.utils.agent_runtime.policy import durable_payload
 from je_auto_control.utils.agent_runtime.receipts import row_report
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.json_store.json_store import atomic_write_text
+from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.run_history.history_store import HistoryStore
 from je_auto_control.utils.sqlite_support import last_row_id
 
 _JOURNAL_NAME = 'journal.jsonl'
+_ERRORS = (AutoControlException, OSError, RuntimeError, ValueError, TypeError, LookupError)
 
 
 class TaskEvidence:
@@ -113,7 +116,10 @@ class TaskEvidence:
             identifiers = [row[0] for row in connection.execute("SELECT task_id FROM agent_evidence_pending LIMIT ?",
                                                                (limit,))]
         for task_id in identifiers:
-            self.publish(task_id)
+            try:
+                self.publish(task_id)
+            except _ERRORS as error:  # it stays pending; one damaged record cannot stop the rest of maintenance
+                autocontrol_logger.warning("agent task report needs review: %s", type(error).__name__)
 
     def action(self, task_id: str, receipt: dict[str, Any], *, finished: bool = False) -> None:
         """Mirror receipt certainty into the existing append-only action journal."""

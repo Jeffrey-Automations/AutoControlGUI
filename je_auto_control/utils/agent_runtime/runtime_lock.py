@@ -69,6 +69,14 @@ def retire_runtime_inputs(controller: Any, task_ids: list[str], token: Callable[
     browsers.close()
 
 
+def cancel_tokens(final: dict[str, str], token: Callable[[str], Any], task_ids: list[str]) -> list[str]:
+    """Cancel every task's host token at once, before any durable or lock-bound step of a stop can wait."""
+    for task_id in task_ids:
+        final[task_id] = 'cancelled'
+        token(task_id).cancel()
+    return task_ids
+
+
 def _lock(stream: Any) -> None:
     if sys.platform == "win32":
         import msvcrt
