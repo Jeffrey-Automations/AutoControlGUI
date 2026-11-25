@@ -158,6 +158,10 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   `ResourceProfiler` 執行中的樣本無上限；LLM planner 請求（60 秒加 SDK 重試）不理會 stop；`create_project_dir` 靜默覆寫既有檔案；
   `text_diff.apply_unified` 在檔尾之後插入不報錯；截圖遮蔽逐 OCR token 比對，拆成四段的卡號不會被遮；`set_of_marks._last_marks` 全程序共用；
   `lock_session._run_argv` 沒有 subprocess 逾時。`DECIDE`：`Outbox` 永遠保留已送出的項目（修剪會改變 `to_dict`／`save`）。
+- **utils A–L 審查留下的（U-20261126-16）**：`TODO`：`json_store._file_lock` 判定過期鎖時有競爭，兩個等待者可同時接手（需改成帶擁有者 token）；
+  `http_cassette` 以 `want_bytes=True` 錄製時 `save()` 失敗且內容未遮蔽。`DECIDE`：`AssetStore` 用非嚴格 `SharedJsonDict`，手改壞的檔案會在下次 `set()` 被抹掉。
+- **`DECIDE`（agent_runtime 審查）**：`ReadOnlyWorker` 無法設定任何桌面任務（基底 worker 要求在場綁定，而主機刻意不傳），桌面唯讀完成驗證目前完全不能用；
+  修法是一處覆寫，但等於移除一個拒絕條件。
 - **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；
   私鑰支援選用通行碼加密，未設定時仍是明文 PEM（0600，Windows 上沒驗權限位元）；遷移模式開著時 HMAC 簽章會被接受。
 - **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：

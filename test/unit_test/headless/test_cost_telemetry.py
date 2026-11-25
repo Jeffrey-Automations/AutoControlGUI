@@ -194,3 +194,34 @@ def test_facade_exports_cost_api():
                   "estimate_llm_usd", "record_llm_call",
                   "summarise_llm_costs"):
         assert hasattr(ac, name)
+
+
+def test_summary_counts_every_recorded_call(temp_store: CostStore):
+    """The default summary read only the newest 1000 events, so totals stopped growing."""
+    for _ in range(1005):
+        temp_store.record(provider="p", model="m", input_tokens=1, output_tokens=2,
+                          estimated_usd=0.5)
+    summary = temp_store.summarise()
+    assert summary.total_calls == 1005
+    assert summary.total_usd == pytest.approx(502.5)
+    assert len(temp_store.list_events()) == 1000
+
+
+def test_a_line_torn_inside_a_character_is_skipped(temp_store: CostStore):
+    """A write cut inside a UTF-8 sequence made every later read raise."""
+    temp_store.record(provider="p", model="m", input_tokens=1, output_tokens=1, label="\u00e9")
+    with open(temp_store.path, "ab") as handle:
+        handle.write('{"label":"\u00e9'.encode("utf-8")[:-1])
+    temp_store.record(provider="p", model="m", input_tokens=1, output_tokens=1)
+    assert [event.label for event in temp_store.list_events()] == ["\u00e9", None]
+
+
+@pytest.mark.parametrize("field, value", [
+    ("timestamp", 5), ("estimated_usd", "x"), ("input_tokens", None), ("model", ["m"]),
+])
+def test_an_event_of_the_wrong_types_is_skipped(temp_store: CostStore, field, value):
+    import json
+    good = temp_store.record(provider="p", model="m", input_tokens=1, output_tokens=1)
+    with open(temp_store.path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps({**good.to_dict(), field: value}) + "\n")
+    assert temp_store.summarise().total_calls == 1

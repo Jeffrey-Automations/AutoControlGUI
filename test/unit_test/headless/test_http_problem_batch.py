@@ -98,3 +98,9 @@ def test_facade_exports():
                  "parse_problem", "raise_for_problem"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_a_deeply_nested_problem_body_is_no_problem_document():
+    """http_request survives such a body (json is None); parsing it again did not."""
+    assert parse_problem({"headers": {"Content-Type": "application/problem+json"},
+                          "json": None, "text": "[" * 200_000}) is None

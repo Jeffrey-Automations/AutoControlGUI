@@ -178,6 +178,9 @@ class ABStore:
             raw = self._path.read_text(encoding="utf-8-sig")
         except FileNotFoundError:
             return None
+        except UnicodeDecodeError as error:
+            quarantine_file(self._path, "A/B locator stats", repr(error))
+            return None
         try:
             return json.loads(raw)
         except ValueError as error:

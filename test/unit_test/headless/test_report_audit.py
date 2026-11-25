@@ -65,3 +65,11 @@ def test_exception_text_is_not_quoted_twice(records):
     record_action_to_list("ok", None, None)
     exceptions = [row["program_exception"] for row in test_record_instance.test_record_list]
     assert exceptions == ["ValueError('boom')", "None"]
+
+
+def test_a_value_that_is_not_text_is_a_report_error(tmp_path, monkeypatch):
+    """A lone surrogate raised UnicodeEncodeError where the module promises its own error."""
+    monkeypatch.setattr(test_record_instance, "test_record_list", [{
+        "function_name": "write", "local_param": "\ud800", "time": "t", "program_exception": "None"}])
+    with pytest.raises(AutoControlHTMLException):
+        generate_html_report(str(tmp_path / "report"))

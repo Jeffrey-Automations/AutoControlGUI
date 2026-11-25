@@ -81,3 +81,30 @@ def test_only_space_and_tab_are_trimmed():
     assert parsed["name"] == "a"
     assert parsed["value"] == f"b{nbsp}"
     assert parse_set_cookie("a=b\t;\tHttpOnly")["attributes"] == {"httponly": ""}
+
+
+def test_a_max_age_longer_than_int_reads_is_still_a_max_age():
+    assert CookieJar().update("a=b; Max-Age=" + "9" * 5000).to_dict() == {"a": "b"}
+    assert CookieJar({"a": "b"}).update("a=c; Max-Age=-" + "9" * 5000).to_dict() == {}
+    assert CookieJar({"a": "b"}).update("a=c; Max-Age=" + "0" * 5000).to_dict() == {}
+    assert CookieJar({"a": "b"}).update("a=c; Max-Age=-0").to_dict() == {}
+    assert CookieJar().update("a=b; Max-Age=010").to_dict() == {"a": "b"}
+
+
+def test_a_failed_save_keeps_the_previous_session(tmp_path, monkeypatch):
+    """The file holds session cookies: created 0600 and replaced whole, like other credentials."""
+    import os
+    import stat
+    from je_auto_control.utils.json_store import json_store
+    path = tmp_path / "jar.json"
+    CookieJar({"session": "first"}).save(str(path))
+    if os.name == "posix":
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+    def full_disk(_source, _destination):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(json_store, "_replace", full_disk)
+    with pytest.raises(OSError):
+        CookieJar({"session": "second"}).save(str(path))
+    assert CookieJar.load(str(path)).to_dict() == {"session": "first"}

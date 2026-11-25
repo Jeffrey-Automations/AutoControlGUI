@@ -45,6 +45,16 @@ def _stop_requested(stop_event: Optional[threading.Event],
     return stopped
 
 
+def _job_count(reply: Any) -> Optional[int]:
+    """How many jobs a ``/jobs`` reply lists; ``None`` when it has no list.
+
+    A host answering ``{"jobs": null}`` raised ``TypeError`` out of the pool,
+    which failed the round for every host.
+    """
+    jobs = reply.get("jobs", []) if isinstance(reply, dict) else None
+    return len(jobs) if isinstance(jobs, list) else None
+
+
 class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
     """Turn every 3xx into an error instead of following it.
 
@@ -268,7 +278,7 @@ class AdminConsoleClient:
         return HostStatus(
             label=host.label, base_url=host.base_url, healthy=True,
             latency_ms=latency, sessions=sessions,
-            job_count=len(jobs.get("jobs", [])) if isinstance(jobs, dict) else None,
+            job_count=_job_count(jobs),
         )
 
     def _safe_get(self, host: AdminHost, path: str) -> Optional[Dict[str, Any]]:

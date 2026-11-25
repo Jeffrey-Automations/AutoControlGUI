@@ -109,23 +109,51 @@ def read_json_dict(path: Optional[str | Path]) -> Dict[str, Any]:
     """Return the JSON object at ``path``, or ``{}`` if missing/unreadable."""
     if path is None:
         return {}
-    file_path = Path(path)
-    if not file_path.is_file():
-        return {}
     try:
-        # utf-8-sig: a file saved by an editor with a BOM read as unreadable,
-        # so the next update() wrote back only its own key.
-        data = json.loads(file_path.read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):
+        return _read_dict(Path(path))
+    except OSError:
+        return {}
+
+
+def _read_text(path: Path) -> Optional[str]:
+    """The file's text, ``None`` when there is no such file.
+
+    Opening a file another process is replacing is a ``PermissionError`` on
+    Windows, so it is tried again as :func:`_replace` does: a reader that gave
+    up at once saw an empty store.
+    """
+    deadline = time.monotonic() + _REPLACE_WAIT_S
+    while True:
+        try:
+            # utf-8-sig: a file saved by an editor with a BOM read as unreadable,
+            # so the next update() wrote back only its own key.
+            return path.read_text(encoding="utf-8-sig")
+        except (FileNotFoundError, NotADirectoryError, IsADirectoryError):
+            return None
+        except PermissionError:
+            if path.is_dir():
+                return None
+            if time.monotonic() > deadline:
+                raise
+            time.sleep(0.01)
+
+
+def _read_dict(path: Path) -> Dict[str, Any]:
+    """The JSON object at ``path``; ``{}`` when missing or damaged, ``OSError`` when it cannot be read."""
+    try:
+        text = _read_text(path)
+        data = json.loads(text) if text is not None else {}
+    except ValueError:
         return {}
     return data if isinstance(data, dict) else {}
 
 
 def _read_json_object(path: Path) -> Dict[str, Any]:
     """The JSON object at ``path`` (``{}`` if missing); anything else raises ``ValueError``."""
-    if not path.is_file():
+    text = _read_text(path)
+    if text is None:
         return {}
-    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    data = json.loads(text)
     if not isinstance(data, dict):
         raise ValueError(f"{path} does not hold a JSON object")
     return data
@@ -193,6 +221,8 @@ class SharedJsonDict:
     By default an unreadable file reads as empty. With ``strict`` it raises
     ``ValueError`` instead -- for stores of user-authored content (skills,
     locators) where writing back an empty dict would erase the file.
+    An :meth:`update` that cannot read the file at all (``OSError``: locked, no
+    permission) raises either way: that says nothing about what it holds.
     """
 
     def __init__(self, path: Optional[str | Path], *,
@@ -225,7 +255,7 @@ class SharedJsonDict:
             with self._memory_lock:
                 return mutate(self._memory)
         with _file_lock(self._path):
-            data = self._load(self._path)
+            data = _read_json_object(self._path) if self._strict else _read_dict(self._path)
             result = mutate(data)
             write_json_dict(self._path, data)
         return result

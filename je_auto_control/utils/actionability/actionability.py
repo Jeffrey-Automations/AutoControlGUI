@@ -17,6 +17,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
 from je_auto_control.utils.executor.run_control import pause
+from je_auto_control.utils.timeouts import deadline_after
 
 Bbox = Tuple[int, int, int, int]
 BboxProvider = Callable[[], Optional[Bbox]]
@@ -159,7 +160,7 @@ def wait_actionable(bbox_provider: BboxProvider, *,
     cfg = config or GateConfig()
     tracker = _StabilityTracker(region_sampler, cfg.stable_for_s)
     start = cfg.clock()
-    deadline = start + cfg.timeout_s
+    deadline = deadline_after(start, cfg.timeout_s, "timeout_s")
     while True:
         now = cfg.clock()
         visible, stable, enabled, receives, point = _evaluate(

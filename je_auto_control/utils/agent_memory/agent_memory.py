@@ -20,8 +20,9 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ContextManager, Dict, List, Optional
 
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.sqlite_support import (
-    autocommit_connection, last_row_id,
+    autocommit_connection, last_row_id, sqlite_errors_as,
 )
 
 if TYPE_CHECKING:  # reason: sqlite3 types are named only in annotations
@@ -67,9 +68,14 @@ def _row_to_episode(row: "sqlite3.Row", score: float = 0.0) -> Episode:
         created=float(row["created"]), score=score)
 
 
+class AgentMemoryError(AutoControlException):
+    """The episode database could not be opened or used."""
+
+
 class AgentMemory:
     """A SQLite-backed store of agent episodes with keyword recall."""
 
+    @sqlite_errors_as(AgentMemoryError)
     def __init__(self, db_path: str) -> None:
         self._db_path = db_path
         self._ensure_schema()
@@ -85,6 +91,7 @@ class AgentMemory:
                 "steps TEXT NOT NULL, outcome TEXT DEFAULT '', "
                 "tags TEXT DEFAULT '[]', created REAL NOT NULL)")
 
+    @sqlite_errors_as(AgentMemoryError)
     def remember(self, goal: str, *, steps: Optional[List[Any]] = None,
                  outcome: str = "",
                  tags: Optional[List[str]] = None) -> int:
@@ -103,6 +110,7 @@ class AgentMemory:
                  time.time()))
             return last_row_id(cur)
 
+    @sqlite_errors_as(AgentMemoryError)
     def get(self, episode_id: int) -> Optional[Episode]:
         """Return an episode by id or ``None``."""
         with self._connect() as conn:
@@ -110,6 +118,7 @@ class AgentMemory:
                                (int(episode_id),)).fetchone()
         return _row_to_episode(row) if row is not None else None
 
+    @sqlite_errors_as(AgentMemoryError)
     def forget(self, episode_id: int) -> bool:
         """Delete an episode; return whether it existed."""
         with self._connect() as conn:
@@ -117,6 +126,7 @@ class AgentMemory:
                                (int(episode_id),))
             return cur.rowcount > 0
 
+    @sqlite_errors_as(AgentMemoryError)
     def recent(self, limit: int = 10) -> List[Episode]:
         """Return the most recently stored episodes (newest first)."""
         with self._connect() as conn:
@@ -125,6 +135,7 @@ class AgentMemory:
                 (int(limit),)).fetchall()
         return [_row_to_episode(row) for row in rows]
 
+    @sqlite_errors_as(AgentMemoryError)
     def recall(self, query: str, *, limit: int = 5) -> List[Episode]:
         """Return episodes most relevant to ``query`` (keyword TF score).
 
@@ -144,6 +155,7 @@ class AgentMemory:
         scored.sort(key=lambda ep: (ep.score, ep.created), reverse=True)
         return scored[: max(0, int(limit))]
 
+    @sqlite_errors_as(AgentMemoryError)
     def stats(self) -> Dict[str, int]:
         """Return ``{"episodes": N}`` for dashboards."""
         with self._connect() as conn:

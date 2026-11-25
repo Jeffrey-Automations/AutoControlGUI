@@ -75,6 +75,10 @@ def _host_of(url: str) -> Optional[str]:
     ascii_host = _ascii_name(unquote(host).lower())
     if ascii_host is None:
         return None
+    # http.client splits the decoded host again: "evil.com%3a80" connects to
+    # evil.com, and "%5b::1%5d" to ::1, while neither text is on a deny list.
+    if any(char in ascii_host for char in ":[]") and _canonical_ip(ascii_host) is None:
+        return None
     host = ascii_host.rstrip(".")
     return _canonical_ip(host) or host or None
 

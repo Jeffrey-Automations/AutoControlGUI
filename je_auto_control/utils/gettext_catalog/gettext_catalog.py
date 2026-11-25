@@ -268,12 +268,17 @@ def _append(entry: Dict[str, object], field: Optional[object],
         plurals[field] = plurals.get(field, "") + value
 
 
+# Only CR / LF end a line: str.splitlines() also splits on U+2028, U+0085, VT and
+# FF, which a quoted string may hold, and the translation was cut there.
+_LINE_END = re.compile(r"\r\n|\r|\n")
+
+
 def _parse_block(block: str) -> Optional[Dict[str, object]]:
     """Parse one ``.po`` entry into a field dict."""
     entry: Dict[str, object] = {}
     field: Optional[object] = None
     fuzzy = False
-    for line in block.splitlines():
+    for line in _LINE_END.split(block):
         stripped = line.strip()
         if stripped.startswith("#,"):
             fuzzy = fuzzy or "fuzzy" in (flag.strip() for flag in stripped[2:].split(","))
@@ -336,7 +341,7 @@ def _entry_blocks(text: str) -> Iterator[str]:
     """
     block: List[str] = []
     has_msgstr = False
-    for line in text.splitlines():
+    for line in _LINE_END.split(text):
         stripped = line.strip()
         if has_msgstr and (not stripped or stripped.startswith(("#", "msgctxt ", "msgid "))):
             yield "\n".join(block)
@@ -359,5 +364,5 @@ def parse_po(text: str) -> GettextCatalog:
 
 
 def parse_po_file(path: str) -> GettextCatalog:
-    """Read and parse a ``.po`` file into a catalog."""
-    return parse_po(Path(path).read_text(encoding="utf-8"))
+    """Read and parse a ``.po`` file into a catalog (a UTF-8 byte-order mark is skipped)."""
+    return parse_po(Path(path).read_text(encoding="utf-8-sig"))

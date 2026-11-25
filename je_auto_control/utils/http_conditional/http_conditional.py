@@ -80,7 +80,9 @@ def _age_header(headers: Mapping[str, Any]) -> int:
     value = _header(headers, "age").strip()
     if not (value.isascii() and value.isdigit()):
         return 0
-    return min(int(value), _MAX_AGE_SECONDS)
+    digits = value.lstrip("0")
+    # int() refuses more than 4300 digits; such a value overflows anyway.
+    return _MAX_AGE_SECONDS if len(digits) > 10 else min(int(digits or "0"), _MAX_AGE_SECONDS)
 
 
 def store_validators(response: Mapping[str, Any]) -> Dict[str, Any]:

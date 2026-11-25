@@ -98,7 +98,7 @@ def parse_problem(response: Mapping[str, Any]) -> Optional[ProblemDetails]:
     if document is None and response.get("text"):
         try:
             document = json.loads(response["text"])
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, RecursionError):   # RecursionError: nested thousands deep
             return None
     if not isinstance(document, dict):
         return None

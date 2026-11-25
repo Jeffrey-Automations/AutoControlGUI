@@ -107,3 +107,15 @@ def test_facade_exports():
                  "request_fingerprint"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_expired_keys_do_not_accumulate():
+    """An idempotency key is used once, so an expired record was never looked up again."""
+    now = [0.0]
+    store = IdempotencyStore(clock=lambda: now[0], ttl=10)
+    for number in range(500):
+        store.begin(f"key-{number}")
+        store.complete(f"key-{number}", "done")
+        now[0] += 1
+    assert len(store.to_dict()) < 50
+    assert store.get("key-499")["response"] == "done"

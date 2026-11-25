@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-16 | 2026-11-26 | Review and fix the utils subpackages A to L | #review #fix #security #rbac | [2026-11-c](2026-11-c.md) |
 | U-20261126-15 | 2026-11-26 | Review and fix the utils subpackages L to Z | #review #fix #stop #security | [2026-11-c](2026-11-c.md) |
 | U-20261126-14 | 2026-11-26 | Review and fix the platform backends | #review #fix #windows #linux #macos #android | [2026-11-c](2026-11-c.md) |
 | U-20261126-13 | 2026-11-26 | Review and fix the servers and the executor | #review #fix #mcp #rbac #executor #security | [2026-11-c](2026-11-c.md) |

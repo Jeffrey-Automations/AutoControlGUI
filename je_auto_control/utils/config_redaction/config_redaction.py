@@ -57,8 +57,8 @@ _TEXT_PATTERNS = (
     re.compile(r"(?i)(" + _CREDENTIAL_KEY_NAMES + r"[\"']?\s*[=:]\s*[\"']?)[^\s,;\"']+"),
     # --password hunter2 (a CLI flag followed by its value)
     re.compile(r"(?i)(--(?:[a-z0-9]+[_-])*" + _CREDENTIAL_KEY_NAMES + r"\s+)(?!-)[^\s\"']+"),
-    # scheme://user:password@host
-    re.compile(r"(?i)(\b[a-z][a-z0-9+.-]*://[^/\s:@]+:)[^/\s@]+(?=@)"),
+    # scheme://user:password@host, and scheme://:password@host (the usual Redis URL)
+    re.compile(r"(?i)(\b[a-z][a-z0-9+.-]*://[^/\s:@]*:)[^/\s@]+(?=@)"),
 )
 
 

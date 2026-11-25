@@ -156,3 +156,62 @@ def test_assert_text_regex(monkeypatch):
     )
     result = assert_text(r"\d{5}", regex=True, present=True)
     assert result.passed is True
+
+
+def test_a_failed_screenshot_does_not_replace_the_verdict(monkeypatch):
+    """AutoControlScreenException escaped, so raise_on_error=False swallowed the assertion."""
+    import je_auto_control.wrapper.auto_control_screen as screen
+    from je_auto_control.utils.assertion.assertions import assert_process
+    from je_auto_control.utils.assertion import assertions
+    from je_auto_control.utils.exception.exceptions import AutoControlScreenException
+
+    def no_screen(*_args, **_kwargs):
+        raise AutoControlScreenException("locked")
+
+    monkeypatch.setattr(screen, "screenshot", no_screen)
+    monkeypatch.setattr(assertions, "_running_process_names", lambda _name: [])
+    with pytest.raises(AutoControlAssertionException):
+        assert_process("nothing", capture_on_fail=True)
+
+
+@pytest.mark.parametrize("error", [OSError("screen grab failed"), RuntimeError("no backend")])
+def test_an_image_is_not_absent_because_the_screen_could_not_be_read(monkeypatch, error):
+    import je_auto_control.wrapper.auto_control_image as img
+
+    def broken(_path, _threshold):
+        raise error
+
+    monkeypatch.setattr(img, "locate_image_center", broken)
+    result = assert_image("button.png", present=False, raise_on_fail=False)
+    assert result.passed is False
+    assert str(error) in result.message
+    with pytest.raises(AutoControlAssertionException):
+        assert_image("button.png", present=False)
+
+
+def test_a_cancelled_image_assertion_stays_cancelled(monkeypatch):
+    import je_auto_control.wrapper.auto_control_image as img
+    from je_auto_control.utils.exception.control_signals import OperationCancelledError
+
+    def cancelled(_path, _threshold):
+        raise OperationCancelledError(1)
+
+    monkeypatch.setattr(img, "locate_image_center", cancelled)
+    with pytest.raises(OperationCancelledError):
+        assert_image("button.png", present=False)
+
+
+def test_an_invalid_pattern_stays_inside_the_executors_containment(monkeypatch):
+    """re.error derives from Exception alone and ended the whole action list."""
+    import je_auto_control.utils.clipboard.clipboard as clipboard
+    from je_auto_control.utils.assertion.assertions import assert_clipboard, assert_variable
+    from je_auto_control.utils.expect_poll import to_match_regex
+    monkeypatch.setattr(clipboard, "get_clipboard", lambda: "text")
+    with pytest.raises(ValueError, match="invalid"):
+        assert_variable("x", op="regex", expected="(")
+    with pytest.raises(ValueError, match="invalid"):
+        assert_clipboard("(", mode="regex")
+    with pytest.raises(ValueError, match="invalid"):
+        assert_text("(", regex=True)
+    with pytest.raises(ValueError, match="invalid"):
+        to_match_regex("(")

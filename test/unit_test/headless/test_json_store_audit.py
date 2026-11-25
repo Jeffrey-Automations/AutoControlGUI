@@ -7,6 +7,7 @@ so one failed read led to every stored count being overwritten, and the
 JSON-lines logs appended onto a torn last line and lost the new record too.
 """
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -85,3 +86,54 @@ def test_a_failed_first_read_does_not_wipe_the_locator_counts(tmp_path, monkeypa
         store.record(target_id="t", strategy="s", succeeded=True, elapsed_ms=1.0)
     stats = store.record(target_id="t", strategy="s", succeeded=True, elapsed_ms=1.0)
     assert stats.successes == 6
+
+
+def test_a_reader_waits_out_a_writer_instead_of_reading_empty(tmp_path, monkeypatch):
+    """Windows refuses to open a file another process is replacing; that is not an empty store."""
+    path = tmp_path / "store.json"
+    store = json_store.SharedJsonDict(path)
+    store.update(lambda data: data.update(kept=1))
+    original, refused = Path.read_text, []
+
+    def busy(self, *args, **kwargs):
+        if self == path and len(refused) < 3:
+            refused.append(1)
+            raise PermissionError(13, "in use")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", busy)
+    assert store.read() == {"kept": 1}
+    refused.clear()
+    store.update(lambda data: data.update(added=2))
+    assert store.read() == {"kept": 1, "added": 2}
+
+
+def test_concurrent_readers_never_see_an_empty_store(tmp_path):
+    path = tmp_path / "store.json"
+    store = json_store.SharedJsonDict(path)
+    store.update(lambda data: data.update(kept=1))
+    empty, done = [], threading.Event()
+
+    def read():
+        while not done.is_set():
+            if "kept" not in store.read():
+                empty.append(1)
+
+    reader = threading.Thread(target=read)
+    reader.start()
+    try:
+        for number in range(40):
+            store.update(lambda data, value=number: data.update(n=value))
+    finally:
+        done.set()
+        reader.join()
+    assert empty == []
+
+
+def test_an_ab_stats_file_that_is_not_utf8_is_set_aside(tmp_path):
+    path = tmp_path / "ab.json"
+    path.write_bytes(b"\xff\xfe not utf-8")
+    store = ABStore(path)
+    store.record(target_id="t", strategy="s", succeeded=True, elapsed_ms=1.0)
+    assert store.report("t").strategies[0].successes == 1
+    assert len(list(tmp_path.glob("ab.json.corrupt-*"))) == 1

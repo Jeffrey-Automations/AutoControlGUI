@@ -115,12 +115,14 @@ def _check_match_on(match_on: Sequence[str]) -> None:
 
 def _matches(recorded: Mapping[str, Any], call: Mapping[str, Any],
              match_on: Sequence[str]) -> bool:
-    view = _request_view(call)
+    # Both sides through the same view (it is idempotent): a hand-written
+    # cassette, or one saved before requests were masked, matched nothing.
+    view, taped = _request_view(call), _request_view(recorded)
     for field in match_on:
         if field == "headers":
             if not _headers_match(recorded.get("headers", {}), dict(call.get("headers") or {})):
                 return False
-        elif recorded.get(field) != view[field]:
+        elif taped[field] != view[field]:
             return False
     return True
 
@@ -162,6 +164,9 @@ class Cassette:
         # http_request also hands every Set-Cookie back in its own list.
         if isinstance(recorded_response.get("set_cookie"), list):
             recorded_response["set_cookie"] = [REDACTED] * len(recorded_response["set_cookie"])
+        # The URL the response came from repeats the request's query string.
+        if "url" in recorded_response:
+            recorded_response["url"] = _redacted_url(recorded_response["url"])
         if "json" in recorded_response:
             recorded_response["json"] = _redacted_json(recorded_response["json"])
         if isinstance(recorded_response.get("text"), str):

@@ -6,8 +6,11 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+from je_auto_control.utils.exception.control_signals import raise_if_run_interrupted
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.executor.flow_control import LoopBreak, LoopContinue
+from je_auto_control.utils.executor.run_control import ExecutionStopped, checkpoint
 
 
 @dataclass
@@ -97,7 +100,11 @@ class AgentLoop:
                  screenshot_fn: Optional[Callable[[], Optional[bytes]]] = None,
                  budget: Optional[AgentBudget] = None,
                  stop_event: Optional[threading.Event] = None) -> None:
-        """``stop_event``, once set, ends the run before its next step."""
+        """``stop_event``, once set, ends the run before its next step.
+
+        A stop of the surrounding stoppable run, or a cancellation, ends it
+        too -- by raising, as it would in any other command.
+        """
         self._backend = backend
         self._tool_runner = tool_runner or _default_tool_runner
         self._screenshot_fn = screenshot_fn or _default_screenshot
@@ -128,6 +135,8 @@ class AgentLoop:
             if self._stop_event is not None and self._stop_event.is_set():
                 result.final_message = "stopped"
                 return
+            cancellation_checkpoint()
+            checkpoint()
             if time.monotonic() - started_at > self._budget.wall_seconds:
                 result.final_message = "wall_seconds budget exhausted"
                 return
@@ -180,6 +189,10 @@ class AgentLoop:
         ):
             try:
                 step.result = self._tool_runner(tool, args)
+            except ExecutionStopped:
+                # Recorded as a step, a stop only made the loop ask the model
+                # again, for every step left in the budget.
+                raise
             # A failing AC_* tool raises AutoControl*Exception (all subclass
             # AutoControlException), and a hallucinated kwarg raises TypeError.
             # Record the error per-step so the loop keeps going instead of
@@ -190,6 +203,7 @@ class AgentLoop:
             except (AutoControlException, TypeError, ValueError, RuntimeError, OSError,
                     LookupError, AttributeError, ArithmeticError,
                     LoopBreak, LoopContinue) as error:
+                raise_if_run_interrupted(error)
                 step.error = f"{type(error).__name__}: {error}"
         return step
 

@@ -151,3 +151,20 @@ def test_one_bad_entry_does_not_lose_the_good_ones(tmp_path):
     made = AdminConsoleClient(persist_path=path)
     labels = [h.label for h in made.list_hosts()]
     assert labels == ["good"]
+
+
+@pytest.mark.parametrize("jobs", [None, 3, "many", {}])
+def test_an_odd_jobs_reply_does_not_fail_every_host(client, monkeypatch, jobs):
+    """``len(None)`` escaped the pool and the whole round was lost to one host."""
+    client.add_host("odd", "http://odd.invalid", "t")
+    client.add_host("good", "http://good.invalid", "t")
+
+    def reply(host, path):
+        if path == "/sessions":
+            return {}
+        return {"jobs": jobs if host.label == "odd" else [1, 2]}
+    monkeypatch.setattr(client, "_http_get", reply)
+    statuses = {status.label: status for status in client.poll_all()}
+    assert statuses["good"].job_count == 2
+    assert statuses["odd"].healthy is True
+    assert statuses["odd"].job_count is None

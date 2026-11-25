@@ -19,7 +19,7 @@ from typing import Any, List, Optional, Sequence, Tuple
 from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.visual_match.visual_match import (
     Match, _contain_cv2_error, _haystack_gray, _haystack_gray_with_origin, _nms,
-    _resize, _to_gray, _to_screen,
+    _resize, _select_candidates, _to_gray, _to_screen,
 )
 from je_auto_control.utils.visual_match.image_source import ImageSource
 
@@ -84,16 +84,17 @@ def edge_match_all(template: ImageSource, *,
                    region: Optional[Sequence[int]] = None,
                    canny: Sequence[int] = _DEFAULT_CANNY, min_score: float = 0.7,
                    max_results: int = 20, nms_iou: float = 0.3) -> List[Match]:
-    """Return every edge-shape match >= ``min_score`` (scale 1.0), overlaps removed (NMS)."""
-    import numpy as np
+    """Return every edge-shape match >= ``min_score`` (scale 1.0), overlaps removed (NMS).
+
+    Candidates are capped before NMS as ``match_template_all`` caps them: with a
+    low ``min_score`` every position went into a quadratic NMS.
+    """
     scene_gray, origin_x, origin_y = _haystack_gray_with_origin(haystack, region)
     score_map, size = _chamfer_score_map(_to_gray(template), scene_gray, canny)
     if score_map is None:
         return []
-    ys, xs = np.nonzero(score_map >= float(min_score))
-    candidates = [Match(int(x) + origin_x, int(y) + origin_y, size[0], size[1],
-                        round(float(score_map[y, x]), 4), 1.0)
-                  for y, x in zip(ys, xs)]
+    candidates = _select_candidates(score_map, float(min_score), size[0], size[1],
+                                    int(max_results), (origin_x, origin_y))
     return _nms(candidates, float(nms_iou))[:int(max_results)]
 
 

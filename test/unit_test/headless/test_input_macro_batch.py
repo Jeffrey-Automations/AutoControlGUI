@@ -61,3 +61,39 @@ def test_facade_exports():
     for attr in ("replay_timeline", "run_sequence"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+@pytest.mark.parametrize("run", [
+    lambda sink: run_sequence([{"op": "repeat", "times": 100,
+                                "steps": [{"op": "press", "key": "a"}, {"op": "release", "key": "a"}]}],
+                              sink=sink),
+    lambda sink: replay_timeline([{"op": "press", "key": "a"}, {"op": "release", "key": "a"}] * 100,
+                                 sink=sink),
+], ids=["sequence", "timeline"])
+def test_a_stop_ends_a_macro_that_never_waits(run):
+    """Only a wait looked at the stop, so a macro without one ran to its end."""
+    from je_auto_control.utils.executor.run_control import ExecutionStopped, StopToken, stoppable_run
+    token, sent = StopToken("macro"), []
+
+    def sink(event):
+        sent.append(event["op"])
+        if len(sent) == 3:
+            token.stop("test")
+
+    with stoppable_run(token=token), pytest.raises(ExecutionStopped):
+        run(sink)
+    assert sent == ["press", "release", "press", "release"]   # the held key is let go
+
+
+def test_a_cancellation_ends_a_macro_that_never_waits():
+    from concurrent.futures import CancelledError
+    from je_auto_control.utils.exception.cancellation import CancellationToken, cancellation_scope
+    token, sent = CancellationToken(1), []
+
+    def sink(event):
+        sent.append(event["op"])
+        token.cancel()
+
+    with cancellation_scope(token), pytest.raises(CancelledError):
+        run_sequence([{"op": "key", "key": "a"}] * 10, sink=sink)
+    assert sent == ["key"]

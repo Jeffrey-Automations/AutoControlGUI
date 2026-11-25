@@ -168,7 +168,7 @@ def generate_html_report(html_name: str = "default_name") -> None:
     with _lock:  # 使用 with 確保 Lock 正確釋放 Ensure lock is released properly
         try:
             write_report(html_name + ".html", new_html_string)
-        except OSError as error:
+        except (OSError, ValueError) as error:   # ValueError: a lone surrogate cannot be encoded
             # Only logging it made a missing report look like a written one.
             raise AutoControlHTMLException(
                 f"cannot write report {html_name + '.html'!r}: {error!r}") from error

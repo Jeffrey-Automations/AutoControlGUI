@@ -12,6 +12,12 @@ run. An ``AC_android_*`` / ``AC_ios_*`` step that names no ``serial`` / ``url``
 therefore reaches the device its worker is running, never a process-wide
 default another worker could have set.
 
+The workers run as part of the caller: under its identity (a stored user is
+re-read on the worker, as for other delayed work), its command guards and its
+cancellation, and inside its stoppable run. A stop or a cancellation ends the
+devices still running and is raised to the caller instead of being recorded as
+a device's failure.
+
 The action list addresses the current device through a bound variable, e.g.
 ``${device.serial}`` / ``${device.url}``, so the same script targets every
 device::
@@ -27,10 +33,17 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+from je_auto_control.utils.exception.control_signals import raise_if_run_interrupted
 from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.executor.run_control import (
+    ExecutionStopped, StopToken, bound_stop_token, checkpoint, current_stop_token, shield_depth,
+)
+from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 from je_auto_control.wrapper.device_context import (
     DeviceContext, DeviceError, DeviceSession, open_device, use_device,
 )
@@ -124,8 +137,9 @@ def _final_app_state(session: Optional[DeviceSession], device: Dict[str, Any]) -
 
 
 def _run_one_device(actions: List[Any], device: Dict[str, Any],
-                    index: int, var_name: str) -> DeviceResult:
-    """Run ``actions`` against a single device on a fresh executor."""
+                    index: int, var_name: str,
+                    authority: DeferredAuthorization) -> DeviceResult:
+    """Run ``actions`` against a single device on a fresh executor, as the caller."""
     from je_auto_control.utils.executor.action_executor import Executor
     runner = Executor()
     runner.variables.set(var_name, device)
@@ -134,26 +148,43 @@ def _run_one_device(actions: List[Any], device: Dict[str, Any],
     started = time.monotonic()
     session: Optional[DeviceSession] = None
     try:
-        context = DeviceContext.from_spec(device)
-        if context is None:
-            # Not a mobile spec: nothing to bind, the list runs as written.
-            runner.execute_action(actions, raise_on_error=True)
-            return DeviceResult(device_id, platform, True, time.monotonic() - started)
-        session = open_device(context)
-        with use_device(session):
-            app_state = _run_with_app(runner, actions, session, device)
+        cancellation_checkpoint()
+        checkpoint()
+        app_state: Optional[str] = None
+        # A pool thread starts outside the caller's scopes: without its
+        # identity a privileged command in the list ran unchecked.
+        with authority.context_scope():
+            context = DeviceContext.from_spec(device)
+            if context is None:
+                # Not a mobile spec: nothing to bind, the list runs as written.
+                runner.execute_action(actions, raise_on_error=True)
+            else:
+                session = open_device(context)
+                with use_device(session):
+                    app_state = _run_with_app(runner, actions, session, device)
         return DeviceResult(device_id, platform, True,
                             time.monotonic() - started, app_state=app_state)
+    except ExecutionStopped:
+        raise   # the caller's run was stopped: not an outcome of this device
     # The executor's own containment set: an ImageNotFoundException or a
     # KeyError on one device used to abort the whole matrix.
     except (AutoControlException, OSError, RuntimeError, ArithmeticError,
             AttributeError, TypeError, ValueError, LookupError) as error:
+        raise_if_run_interrupted(error)
         return DeviceResult(device_id, platform, False,
                             time.monotonic() - started, repr(error),
                             app_state=_final_app_state(session, device))
     finally:
         if session is not None:
             session.close()
+
+
+def _run_stoppable(token: Optional[StopToken], shield: int, actions: List[Any],
+                   device: Dict[str, Any], index: int, var_name: str,
+                   authority: DeferredAuthorization) -> DeviceResult:
+    """:func:`_run_one_device` on a pool thread, as part of the caller's stoppable run."""
+    with bound_stop_token(token, shield):
+        return _run_one_device(actions, device, index, var_name, authority)
 
 
 def run_on_devices(actions: List[Any],
@@ -178,9 +209,13 @@ def run_on_devices(actions: List[Any],
         raise ValueError(f"device specs must be objects; not at index {bad}")
     workers = max(1, min(int(max_parallel), len(devices)))
     report = MatrixReport()
+    # Captured here: a pool thread sees none of it unless it is handed over.
+    authority = DeferredAuthorization.capture()
+    token, shield = current_stop_token(), shield_depth()
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [
-            pool.submit(_run_one_device, actions, device, index, var_name)
+            pool.submit(copy_context().run, _run_stoppable, token, shield,
+                        actions, device, index, var_name, authority)
             for index, device in enumerate(devices)
         ]
         report.results = [future.result() for future in futures]
