@@ -65,6 +65,11 @@ def _allows_fields(selected: tuple[str, ...], allowed: tuple[str, ...]) -> bool:
     return bool(selected) and len(set(selected)) == len(selected) and set(selected) <= set(allowed)
 
 
+def _reviewed_for(expected: ProcessIdentity, probe: ReviewedProbe) -> bool:
+    return (expected.executable == probe.executable and expected.version in probe.versions
+            and expected.architecture in probe.architectures)
+
+
 @dataclass
 class _Operation:
     expected: ProcessIdentity
@@ -72,11 +77,21 @@ class _Operation:
     checkpoint: Callable[[], None]
     clock: Callable[[], float]
     deadline: float
+    poll: Callable[[], None]
     bytes_read: int = 0
     regions_read: int = 0
 
     def check(self) -> None:
+        """Between metadata queries: the caller's poll, which may be lighter than its checkpoint."""
+        self.poll()
+        self._expire()
+
+    def authorize(self) -> None:
+        """The caller's full checkpoint: before the target's memory is read and before bytes are used."""
         self.checkpoint()
+        self._expire()
+
+    def _expire(self) -> None:
         if self.clock() >= self.deadline:
             _fail(FailureReason.DEADLINE_EXCEEDED)
 
@@ -112,6 +127,7 @@ class _Operation:
             count = min(size - len(collected), region.base + region.size - current)
             self.bytes_read += count
             self.regions_read += 1
+            self.authorize()
             chunk = _provider_call(functools.partial(handle.read, current, count))
             self.check()
             if type(chunk) is not bytes or len(chunk) != count:
@@ -251,22 +267,28 @@ class ProcessMemoryReader:
         return success and not self.pending_cleanup
 
     def observe(self, expected: ProcessIdentity, probe: ReviewedProbe, fields: tuple[str, ...], *,
-                target_id: str, checkpoint: Callable[[], None] = cancellation_checkpoint) -> ObservationResult:
-        """Query semantic fields under a host-reviewed probe and the runtime's live checkpoint."""
+                target_id: str, checkpoint: Callable[[], None] = cancellation_checkpoint,
+                poll: Callable[[], None] | None = None) -> ObservationResult:
+        """Query semantic fields under a host-reviewed probe and the runtime's live checkpoint.
+
+        ``poll`` may replace the checkpoint between identity and region queries, where a full one can be
+        a durable write; the checkpoint itself still runs before the target is opened, before every read
+        of its memory, before the bytes are decoded and before a result is returned.
+        """
         selected = tuple(fields)
         if not _allows_fields(selected, probe.fields):
             return ObservationFailure(FailureReason.SCOPE_DENIED)
         _identifier(target_id)
-        if (expected.executable != probe.executable or expected.version not in probe.versions
-                or expected.architecture not in probe.architectures):
+        if not _reviewed_for(expected, probe):
             return ObservationFailure(FailureReason.UNSUPPORTED)
         started = self._clock()
-        operation = _Operation(expected, probe, checkpoint, self._clock, started + probe.timeout)
+        operation = _Operation(expected, probe, checkpoint, self._clock, started + probe.timeout,
+                               poll or checkpoint)
         handle: ProcessHandle | None = None
         retired = True
         result: ObservationResult
         try:
-            operation.check()
+            operation.authorize()
             handle = _provider_call(lambda: self._provider.open_readonly(expected))
             result = self._collect(handle, operation, selected, target_id, started)
         except _ObservationFailed as error:
@@ -278,7 +300,7 @@ class ProcessMemoryReader:
             return ObservationFailure(FailureReason.CLEANUP_FAILED, retired=False)
         if isinstance(result, Observation):
             try:
-                operation.check()
+                operation.authorize()
             except _ObservationFailed as error:
                 return ObservationFailure(error.reason)
         return result
@@ -298,6 +320,7 @@ class ProcessMemoryReader:
         if plan.sequence_address is not None:
             if operation.read(handle, plan.sequence_address, 8) != before:
                 _fail(FailureReason.INCONSISTENT_SNAPSHOT)
+        operation.authorize()
         try:
             values = _values(probe.decode(raw, fields), fields, probe.max_value_bytes)
         except Exception as error:  # reason: decoder failures must not disclose captured bytes

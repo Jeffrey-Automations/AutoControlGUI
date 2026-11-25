@@ -22,6 +22,9 @@ configuration. The package is intentionally absent from the facade, executor,
 MCP, REST and GUI registries until those boundaries have real policy integration.
 
 The runtime adapter must pass its live `TaskOperation.checkpoint` into `observe`.
+It may also pass a lighter `poll` for use between identity and region queries; the
+full checkpoint still runs before the target is opened, before every read of its
+memory, before decoding and before a result is returned.
 The default checkpoint only checks cooperative cancellation; it is not an
 authorization check. Calling the internal reader does not authorize reading a
 process. Existing desktop foreground and input-presence gates are unchanged.

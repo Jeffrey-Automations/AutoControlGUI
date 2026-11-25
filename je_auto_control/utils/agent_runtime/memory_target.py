@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import threading
 from typing import Any, Mapping, Protocol
 
-from je_auto_control.utils.agent_runtime.context import authorization_key, current_operation
+from je_auto_control.utils.agent_runtime.capture_checkpoint import capture_checkpoint
+from je_auto_control.utils.agent_runtime.context import TaskOperation, authorization_key, current_operation
 from je_auto_control.utils.agent_runtime.errors import AgentObservationStale, AgentTaskError
 from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
 from je_auto_control.utils.agent_runtime.policy import TaskPolicy
@@ -79,16 +80,22 @@ class MemorySemanticTarget(SemanticTarget):
                 self._owner = authorization_key(operation.owner)
             return result
 
-    def _checkpoint(self) -> None:
+    def _validate(self) -> TaskOperation:
         operation = current_operation()
         if (self._terminal or self._spec is None or operation is None
                 or operation.spec != self._spec):
             raise AgentTaskError("memory target is outside its live managed task")
         if authorization_key(operation.owner) != self._owner:
             raise AgentTaskError("memory target belongs to a different owner")
-        operation.checkpoint()
+        return operation
+
+    def _checkpoint(self) -> None:
+        self._validate().checkpoint()
         if self._reader.pending_cleanup:
             raise MemoryObservationError(FailureReason.CLEANUP_FAILED)
+
+    def _validate_read(self) -> None:
+        self._validate()
 
     def observe(self) -> dict[str, Any]:
         """Publish only successful allowlisted semantic fields; preserve explicit read failures."""
@@ -96,7 +103,8 @@ class MemorySemanticTarget(SemanticTarget):
             self._checkpoint()
             binding = self._binding
             result = self._reader.observe(binding.identity, binding.probe, binding.fields,
-                                          target_id=binding.target_id, checkpoint=self._checkpoint)
+                                          target_id=binding.target_id, checkpoint=self._checkpoint,
+                                          poll=capture_checkpoint(self._validate_read, self._checkpoint))
             if isinstance(result, ObservationFailure):
                 raise MemoryObservationError(result.reason)
             return SemanticSnapshot.from_memory(result).to_dict()

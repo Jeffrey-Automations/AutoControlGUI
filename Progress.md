@@ -164,10 +164,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - **free-threaded**：呼叫者身分、綁定的裝置、自愈的執行標記與 stop token 都改成只在設定它的執行緒上有效（`utils/thread_bound.py`）。
   這台機器沒有 free-threaded 直譯器：驗證用的是模擬繼承與真的 `-X thread_inherit_context=1`（3.14.7，GIL 開著）；`free-threaded-scope` job（3.14t）是第一次真的跑。
 - **Windows 的版面鍵名**（`slash` 等 8 個）只在美式配置上實際呼叫過。
-- **寫死 1 秒的讀取期限在慢的 Windows runner 上間歇超時**：`service_target` 與 `fixture_observations` 的讀取期限是 1 秒，
-  期限內每個 checkpoint 都有耐久寫入。run 44879498130 的 `test_agent_service_runtime.py` 兩項（`deadline_exceeded`）與
-  run 44881798736 的 `test_agent_fixture_observations.py` 兩項各失敗一次，同檔其他 run 都通過；未在本機重現。
-  不放寬產品期限；待決定測試是否改用可注入的期限。
 
 ---
 

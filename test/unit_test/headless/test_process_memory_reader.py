@@ -649,3 +649,38 @@ def test_a_view_kept_past_resolve_reads_nothing():
     with pytest.raises(MemoryObservationError):
         kept[0].main_module()
     assert handle.reads == [(ADDRESS, SCHEMA.size)]
+
+
+@pytest.mark.parametrize("reviewed", [probe(), probe(resolve=lambda identity, view: ReadPlan(
+    ADDRESS, SCHEMA.size, ADDRESS - 8))])
+def test_a_poll_replaces_the_checkpoint_only_between_queries(reviewed):
+    events, provider = [], Provider()
+    handle = provider.handles[0]
+    original = handle.read
+
+    def read(address, size):
+        events.append("read")
+        return original(address, size)
+    handle.read = read
+    result = observe(provider, reviewed, checkpoint=lambda: events.append("full"), poll=lambda: events.append("poll"))
+    assert isinstance(result, Observation)
+    assert events[0] == "full" and events[-1] == "full"  # before opening, before publishing
+    assert events.count("full") < events.count("poll")
+    for index, event in enumerate(events):
+        if event == "read":
+            assert events[index - 1] == "full"  # nothing lighter ever precedes a read of the target
+
+
+def test_a_checkpoint_that_fails_after_the_first_read_stops_the_next_one_despite_a_silent_poll():
+    provider = Provider()
+    handle = provider.handles[0]
+    revoked = []
+    handle.after_read = lambda: revoked.append(True)
+
+    def checkpoint():
+        if revoked:
+            raise OperationCancelledError("revoked")
+    with pytest.raises(OperationCancelledError):
+        observe(provider, probe(resolve=lambda identity, view: ReadPlan(ADDRESS, SCHEMA.size, ADDRESS - 8)),
+                checkpoint=checkpoint, poll=lambda: None)
+    assert len(handle.reads) == 1 and handle.closed == 1

@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-07 | 2026-11-26 | Stop charging durable checkpoints to the read deadline | #incident #ci #memory #agent | [2026-11-c](2026-11-c.md) |
 | U-20261126-06 | 2026-11-26 | Drive the managed browser target in real Chromium | #browser #acceptance #webrunner | [2026-11-c](2026-11-c.md) |
 | U-20261126-05 | 2026-11-26 | Run the owned UI fixture and fix what it found | #incident #uia #acceptance | [2026-11-c](2026-11-c.md) |
 | U-20261126-04 | 2026-11-26 | Run the native memory fixture and fix what it found | #incident #memory #acceptance | [2026-11-c](2026-11-c.md) |

@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,612 |
-| 程式碼總行數 | 247,452 |
+| Python 模組總數（含周邊子專案） | 1,613 |
+| 程式碼總行數 | 247,509 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -325,7 +325,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.2 框架基礎設施
 
-> 15 個套件、約 6,165 行。
+> 15 個套件、約 6,188 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -341,7 +341,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/package_manager/` | 198 | 動態載入套件並把 executor 注入其中；載入前先過套件閘門（允許清單加上只能從 Python 呼叫的開關，工作區 X-12） |
 | `utils/path_guard/` | 267 | 命令列及伺服器的路徑邊界、客戶端根目錄隔離與受管任務來源政策紀錄 |
 | `utils/platform_id/` | 62 | 作業系統家族的單一判定點。`sys.platform` 原本在一百多處跟字面清單比對，而那些清單都沒有 BSD；`is_x11_unix()` 問的是「這是不是 X11 unix」，這才是守衛一直想問的問題 |
-| `utils/process_memory/` | 2,317 | 內部受審 probe 的有界語意觀察、typed Windows provider、獨立映像檔觀測、自有啟動加釘選雜湊的 attestor 與失敗 handle 回收；檔案證據不等於載入程式碼身分，原生驗收及 runtime 整合待完成 |
+| `utils/process_memory/` | 2,340 | 內部受審 probe 的有界語意觀察、typed Windows provider、獨立映像檔觀測、自有啟動加釘選雜湊的 attestor 與失敗 handle 回收；檔案證據不等於載入程式碼身分，原生驗收及 runtime 整合待完成 |
 | `utils/shell_process/` | 312 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
 | `utils/start_exe/` | 36 | 啟動另一個執行檔行程 |
 
@@ -517,13 +517,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 60,298 行。
+> 14 個套件、約 60,332 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,254 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 33,181 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 33,215 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 166 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -732,7 +732,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 上表以子套件為單位；以下把行數最大的幾個子系統展開到檔案層。
 
-#### `utils/process_memory/`（2,317 行／15 檔）
+#### `utils/process_memory/`（2,340 行／15 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -742,7 +742,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `pe_image.py` | 232 | Derive complete executable-range checks from a pinned, supported PE32+ baseline. |
 | `image_guard.py` | 43 | Check pinned executable bytes through the same bounded resolver view as semantic data. |
 | `fixture_probe.py` | 92 | Version-one fixture decoding and challenge-bound resolution for reviewed launches. |
-| `reader.py` | 312 | Adapter-owned semantic observations with bounded reads and retained cleanup ownership. |
+| `reader.py` | 335 | Adapter-owned semantic observations with bounded reads and retained cleanup ownership. |
 | `windows.py` | 194 | Owned Windows read handles with measured native facts and reviewed application attestation. |
 | `windows_facts.py` | 55 | Measure native birth, session and architecture through a retained process handle. |
 | `windows_image.py` | 326 | Observe an image file while retaining its process and deny-write/delete file leases. |
@@ -1053,7 +1053,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（33,181 行／238 檔）
+#### `utils/agent_runtime/`（33,215 行／239 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1205,7 +1205,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_service_session.py` | 227 | Own one retained service handle, serialized queries and non-replayed control attempts. |
 | `service_operations.py` | 80 | Bound service requests and retain acceptance receipts without claiming completion. |
 | `service_observation.py` | 121 | Bind best-effort service reports and acceptance receipts to one retained owner. |
-| `service_target.py` | 202 | Apply managed task authority to one host-selected retained service controller. |
+| `service_target.py` | 204 | Apply managed task authority to one host-selected retained service controller. |
 | `service_verification.py` | 47 | Verify a post-acceptance SCM report without inferring atomicity, health or causality. |
 | `target_dispatch.py` | 55 | Dispatch explicit service evidence separately from existing semantic and ordinary targets. |
 | `service_native_target.py` | 133 | Pin service helper evidence to one background process and same-user service lease. |
@@ -1213,7 +1213,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `service_worker.py` | 66 | Validate service-specific bootstrap, configuration and observed helper dispatch. |
 | `service_deployment.py` | 66 | Load a closed service deployment while keeping profile construction free of file access. |
 | `service_entrypoint.py` | 80 | Serve a pinned service deployment through the fixed background worker lifecycle. |
-| `uia_target.py` | 151 | Expose scoped UI fixture observations under managed authority without granting actions. |
+| `uia_target.py` | 143 | Expose scoped UI fixture observations under managed authority without granting actions. |
 | `fixture_launch.py` | 52 | Measure an owned fixture channel's launch handle before binding its private bootstrap. |
 | `fixture_target.py` | 287 | Own pinned fixture startup, guarded semantic reads and retryable resource retirement. |
 | `pinned_deployment.py` | 90 | Validate bounded host-pinned deployment bytes before following artifact references. |
@@ -1226,8 +1226,9 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `fixture_control.py` | 141 | Owned fixture RPC transport with bounded requests and retained process retirement. |
 | `fixture_commands.py` | 157 | Ground one owned fixture command in reviewed memory evidence and strict IPC receipts. |
 | `fixture_observations.py` | 57 | Corroborate reviewed fixture memory with its retained launch-bound read-only IPC source. |
-| `memory_target.py` | 137 | Bind a managed semantic target to one reviewed reader and background command owner. |
+| `memory_target.py` | 145 | Bind a managed semantic target to one reviewed reader and background command owner. |
 | `semantic_target.py` | 136 | Trusted semantic target dispatch with versioned snapshots and stable grounding. |
+| `capture_checkpoint.py` | 32 | Check scope at every step of a read-only capture and the full runtime state at a bounded rate. |
 | `capture_metadata.py` | 65 | Validate source provenance and capture intervals without claiming field completeness. |
 | `semantic_snapshot.py` | 100 | Closed complete semantic snapshots shared by single-source and reconciled observations. |
 | `partial_observation.py` | 57 | Keep successful scalar fields and explicit per-field failures without action authority. |
@@ -1634,8 +1635,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 867 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,072 | 112,593 |
-| **總計** | **1,600** | **246,707** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,073 | 112,650 |
+| **總計** | **1,601** | **246,764** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

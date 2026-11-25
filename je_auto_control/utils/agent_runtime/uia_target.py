@@ -6,6 +6,7 @@ import threading
 import time
 from typing import Any, Callable, ClassVar, Mapping, NoReturn
 
+from .capture_checkpoint import capture_checkpoint
 from .context import TaskOperation, authorization_key, current_operation
 from .errors import AgentTaskError
 from .models import AgentTaskSpec
@@ -13,8 +14,6 @@ from .observation_report import ObservationReport
 from .scoped_uia import ScopedUiaSource, UiaField
 from .semantic_target import SemanticSnapshot, SemanticTarget
 from .uia_launch import BoundUiaWindow
-
-_CAPTURE_CHECK_INTERVAL = 0.05
 
 UIA_FIELDS = ("document_id", "duplicate", "empty", "enabled", "job_status", "password")
 UIA_SELECTORS = (UiaField("document_id", "1001", "value"), UiaField("job_status", "1002", "value"),
@@ -87,14 +86,7 @@ class UiaObservationTarget(SemanticTarget):
         unthrottled checkpoint that follows the capture, so a revocation during reads is
         still seen before publication, within one interval.
         """
-        last = [float("-inf")]
-
-        def check() -> None:
-            self._validate(operation)
-            if time.monotonic() - last[0] >= _CAPTURE_CHECK_INTERVAL:
-                self._checkpoint(operation)
-                last[0] = time.monotonic()
-        return check
+        return capture_checkpoint(lambda: self._validate(operation), lambda: self._checkpoint(operation))
 
     def ready(self, spec: AgentTaskSpec) -> tuple[bool, str]:
         """Acquire only after pinning this managed task; retain cleanup after failed acquisition."""
