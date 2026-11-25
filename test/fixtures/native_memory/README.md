@@ -180,10 +180,12 @@ The event-aware pump follows
 [MsgWaitForMultipleObjects](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjects).
 The parent styles follow Microsoft's
 [extended-window-style contract](https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles).
-Child IDs do not prove UIA AutomationId mapping or hidden-control exposure.
-Those properties, password behavior, cleanup and foreground noninterference remain
-unverified until native acceptance resumes. The internal `OwnedUiaLauncher` consumes that bootstrap through a receive-only
+Run natively on one Windows 11 machine on 2026-11-26: child IDs are the AutomationIds, and UIA does
+not list the children of the hidden parent, but an element taken from a child's own HWND is complete
+and has that parent as its ancestor, so the scoped reader also starts from the bound window's child
+windows. `uia_acceptance.py --build <dir> --sha256 <hash> --execute` repeats the check (it needs
+`comtypes`); it sends no input and fails if the fixture ever owned the foreground window. The internal `OwnedUiaLauncher` consumes that bootstrap through a receive-only
 owned channel. It rechecks process facts through the retained launch handle and
 the window owner through GetWindowThreadProcessId. Injected native calls and hidden
-Python helpers cover this binding, not native HWND behavior. The scoped UIA reader,
-managed assembly and per-field report results remain pending in Progress.md.
+Python helpers cover this binding in unit tests; worker deployment trust remains in
+Progress.md.

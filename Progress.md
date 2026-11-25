@@ -21,13 +21,10 @@ Android／iOS 真機、WebRunner 原生雙向 bridge、付費 API 與完整 24 �
 
 ### 自有 UI 觀察 fixture 的限定範圍讀取
 
-`TODO` — `test/fixtures/native_memory/uia_fixture.c` 的原生執行仍暫緩。
-尚須核實固定 UIA worker 的可信交付、Python／COM／DLL 相依與原生啟動環境。
-部署 pin、零動作 profile 與受管 worker 已有注入／隱藏 Python helper 證據，不能據此宣告原生信任成立。
-指定 HWND 的 root／祖先核實、逐欄報告與受管唯讀 adapter 目前只有注入呼叫驗證；
-隱藏 Python helper 的阻塞退休測試不能證明原生 COM、HWND 與 provider 行為。
-解除暫緩後才驗證 hidden controls 的 UIA 暴露與 AutomationId、空值／停用／密碼／重複 selector、
-EOF 清理及前景視窗／滑鼠不受影響。建置與靜態匯入檢查不算上述驗收。
+`WIP` — 2026-11-26 在這台 Windows 以 `uia_acceptance.py --execute` 通過（U-20261126-05，修正了首跑發現的兩個缺陷）：
+hidden controls 的值／空值／停用／密碼／重複 selector、同一身分兩次擷取、EOF 清理，且 fixture 視窗從未成為前景。
+仍缺：固定 UIA worker 的可信交付、Python／COM／DLL 相依與原生啟動環境（本次在程序內直接執行 target，未經 worker，
+comtypes 來自專案環境以外的隔離目錄）；部署 pin 只核對自己的建置。
 
 ### 行程記憶體自有 fixture 原生驗收
 

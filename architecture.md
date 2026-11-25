@@ -1600,7 +1600,8 @@ only one correlated startup; `uia_launch.py` binds its HWND to retained launch
 facts and `windows_window.py` supplies the single typed owner query. The binding
 borrows the launcher and image leases; it cannot grant UIA action authority.
 
-`scoped_uia.py` reads fixed host selectors beneath that binding, verifies bounded
+`scoped_uia.py` reads fixed host selectors beneath that binding (also from its child windows,
+which UIA leaves out of a hidden window's tree), verifies bounded
 ancestry around field reads and retains the first verified root runtime identity.
 `capture_metadata.py` shares capture validation with complete snapshots and
 `partial_observation.py`; report version 3 preserves successful fields beside

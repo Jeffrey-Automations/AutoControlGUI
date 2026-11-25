@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import functools
 import sys
 import threading
 import time
@@ -48,6 +49,15 @@ class UiaField:
                 or len(self.automation_id.encode("utf-8")) > 1024
                 or type(self.property) is not str or self.property not in _PROPERTIES):
             raise AgentTaskError("invalid host UIA field selector")
+
+
+@dataclass
+class _Walk:
+    """Nodes matched so far, every runtime identity visited, and the node count."""
+
+    matches: dict[str, list[Any]]
+    seen: set[tuple[int, ...]]
+    visited: int = 0
 
 
 class ScopedUiaSource:
@@ -138,37 +148,63 @@ class ScopedUiaSource:
                 raise AgentObservationStale("UIA element left the bound window")
         raise _ReadFailure("budget_exceeded")
 
+    def _selector(self, node: Any, check: Callable[[], None]) -> str:
+        """The node's AutomationId; empty, which no selector can be, when it does not have one."""
+        try:
+            selector = self._property(node, _AUTOMATION_ID, check)
+        except _ReadFailure as error:
+            if error.reason != "unsupported":
+                raise
+            return ""
+        if type(selector) is not str:
+            raise _ReadFailure("unreadable")
+        try:
+            size = len(selector.encode("utf-8"))
+        except UnicodeEncodeError:
+            raise _ReadFailure("unreadable") from None
+        if size > 1024:
+            raise _ReadFailure("budget_exceeded")
+        return selector
+
     def _matches(self, root: Any, identity: tuple[int, ...],
                  check: Callable[[], None]) -> dict[str, list[Any]]:
-        matches: dict[str, list[Any]] = {item.automation_id: [] for item in self._fields}
+        """Walk the bound window's tree, then any child window the tree leaves out.
+
+        UIA does not list the children of a hidden window, but an element taken from such a
+        child's own HWND is complete and still has the bound window as its ancestor.
+        """
+        walk = _Walk({item.automation_id: [] for item in self._fields}, set())
+        self._descend(root, identity, walk, check)
+        children = self._binding.children()
+        check()
+        for hwnd in children:
+            node = self._call(functools.partial(self._automation.ElementFromHandle, hwnd), check)
+            self._member(node, identity, check)
+            if self._runtime(node, check) not in walk.seen:
+                self._descend(node, identity, walk, check)
+        return walk.matches
+
+    def _descend(self, root: Any, identity: tuple[int, ...], walk: _Walk, check: Callable[[], None]) -> None:
         walker = self._call(lambda: self._automation.RawViewWalker, check)
-        pending, visited = [root], 0
+        pending = [root]
         while pending:
             node = pending.pop()
-            visited += 1
-            if visited > self._budget:
+            walk.visited += 1
+            if walk.visited > self._budget:
                 raise _ReadFailure("budget_exceeded")
             self._member(node, identity, check)
-            selector = self._property(node, _AUTOMATION_ID, check)
-            if type(selector) is not str:
-                raise _ReadFailure("unreadable")
-            try:
-                selector_size = len(selector.encode("utf-8"))
-            except UnicodeEncodeError:
-                raise _ReadFailure("unreadable") from None
-            if selector_size > 1024:
-                raise _ReadFailure("budget_exceeded")
-            if selector in matches:
-                matches[selector].append(node)
+            walk.seen.add(self._runtime(node, check))
+            selector = self._selector(node, check)
+            if selector in walk.matches:
+                walk.matches[selector].append(node)
             self._member(node, identity, check)
             child = self._call(lambda: walker.GetFirstChildElement(node), check)
             while child:
                 self._member(child, identity, check)
                 pending.append(child)
-                if visited + len(pending) > self._budget:
+                if walk.visited + len(pending) > self._budget:
                     raise _ReadFailure("budget_exceeded")
                 child = self._call(lambda: walker.GetNextSiblingElement(child), check)
-        return matches
 
     def _value(self, node: Any, item: UiaField, identity: tuple[int, ...],
                check: Callable[[], None]) -> str | bool:

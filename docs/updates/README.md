@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-05 | 2026-11-26 | Run the owned UI fixture and fix what it found | #incident #uia #acceptance | [2026-11-c](2026-11-c.md) |
 | U-20261126-04 | 2026-11-26 | Run the native memory fixture and fix what it found | #incident #memory #acceptance | [2026-11-c](2026-11-c.md) |
 | U-20261126-03 | 2026-11-26 | Close the gaps left by the evdev and walker correction | #incident #presence #accessibility | [2026-11-c](2026-11-c.md) |
 | U-20261126-02 | 2026-11-26 | Bind Wayland captures to their managed operation | #done #wayland #agent | [2026-11-c](2026-11-c.md) |
