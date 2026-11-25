@@ -124,3 +124,57 @@ def test_interpolate_unknown_secret_raises(monkeypatch, tmp_path):
     fresh.initialize("pw")
     with pytest.raises(ValueError, match="Unknown secret"):
         interpolate_value("${secrets.missing}", {})
+
+
+def _rewrite(path, **changes):
+    import json
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.update(changes)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+@pytest.mark.parametrize("token", [5, ["x"], "é"])
+def test_a_damaged_item_is_a_store_error(manager, vault_path, token):
+    """A number raised AttributeError, and a non-ASCII token UnicodeEncodeError, outside the family."""
+    manager.initialize("hunter2")
+    manager.set("API", "value")
+    _rewrite(vault_path, items={"API": token})
+    with pytest.raises(SecretStoreError):
+        manager.get("API")
+
+
+@pytest.mark.parametrize("changes", [{"verifier": "é"}, {"iterations": 2 ** 64}])
+def test_vault_fields_the_crypto_cannot_take_are_a_store_error(manager, vault_path, changes):
+    manager.initialize("hunter2")
+    _rewrite(vault_path, **changes)
+    with pytest.raises(SecretStoreError):
+        SecretManager(path=vault_path).unlock("hunter2")
+
+
+def test_destroy_waits_for_a_write_in_progress(manager, vault_path, monkeypatch):
+    """Deleted between another manager's read and its write, the vault came back with its secrets."""
+    import threading
+    from je_auto_control.utils.secrets import secret_store
+    manager.initialize("hunter2")
+    other = SecretManager(path=vault_path)
+    writing, real_write = threading.Event(), secret_store._atomic_write
+
+    def slow_write(path, payload):
+        destroyer.start()
+        destroyer.join(timeout=0.5)
+        writing.set()
+        real_write(path, payload)
+
+    destroyer = threading.Thread(target=other.destroy)
+    monkeypatch.setattr(secret_store, "_atomic_write", slow_write)
+    writer = threading.Thread(target=manager.set, args=("API", "value"))
+    writer.start()
+    assert writing.wait(timeout=5)
+    writer.join(timeout=10)
+    destroyer.join(timeout=10)
+    assert not vault_path.exists()
+
+
+def test_destroying_a_vault_that_was_never_created_writes_nothing(tmp_path):
+    SecretManager(path=tmp_path / "none" / "vault.json").destroy()
+    assert list(tmp_path.iterdir()) == []

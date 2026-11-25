@@ -173,3 +173,39 @@ def test_save_action_log_empty_writes_empty_file(tmp_path):
     target = save_action_log([], tmp_path / "actions.jsonl")
     assert target.exists()
     assert target.read_text(encoding="utf-8") == ""
+
+
+@pytest.mark.parametrize("filename", ["../outside.jpg", "sub/../../outside.jpg"])
+def test_a_manifest_cannot_name_a_frame_outside_its_recording(tmp_path, filename):
+    """The filename comes from manifest.json, and any file the process can read was returned."""
+    from je_auto_control.utils.exception.exceptions import AutoControlException
+    (tmp_path / "outside.jpg").write_bytes(b"private")
+    recording = tmp_path / "recording"
+    recording.mkdir()
+    body = {"entries": [{"timestamp": 1.0, "filename": filename, "size": 7}]}
+    (recording / "manifest.json").write_text(json.dumps(body), encoding="utf-8")
+    player = TimelinePlayer(recording)
+    with pytest.raises(AutoControlException):
+        player.load_frame_bytes(player.at_step(0).frame)
+
+
+def test_a_manifest_cannot_name_a_frame_by_absolute_path(tmp_path):
+    from je_auto_control.utils.exception.exceptions import AutoControlException
+    outside = tmp_path / "outside.jpg"
+    outside.write_bytes(b"private")
+    recording = tmp_path / "recording"
+    recording.mkdir()
+    body = {"entries": [{"timestamp": 1.0, "filename": str(outside), "size": 7}]}
+    (recording / "manifest.json").write_text(json.dumps(body), encoding="utf-8")
+    player = TimelinePlayer(recording)
+    with pytest.raises(AutoControlException):
+        player.load_frame_bytes(player.at_step(0).frame)
+
+
+def test_a_malformed_action_line_is_skipped_like_a_torn_one(tmp_path):
+    """One line with a null timestamp made the whole recording unopenable."""
+    lines = [{"timestamp": 1.0, "action_name": "a"}, {"timestamp": None, "action_name": "b"},
+             {"timestamp": 2.0, "action_name": "c", "args": 5}, {"timestamp": 3.0, "action_name": "d"}]
+    path = tmp_path / "actions.jsonl"
+    path.write_bytes(chr(10).join(json.dumps(line) for line in lines).encode("utf-8") + bytes([10, 0xE4, 0xB8]))
+    assert [event.action_name for event in load_action_log(path)] == ["a", "d"]

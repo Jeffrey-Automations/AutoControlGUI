@@ -97,6 +97,8 @@ def notify(title: str, message: str,
         if completed.returncode != 0:
             return NotifyResult(False, system, f"notifier exited {completed.returncode}")
         return NotifyResult(True, system, "sent")
-    except (OSError, subprocess.SubprocessError) as error:
+    # ValueError: text a process cannot be given (a NUL, or on Windows more
+    # than an environment variable holds).
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
         autocontrol_logger.warning("notify failed: %r", error)
         return NotifyResult(False, system, repr(error))

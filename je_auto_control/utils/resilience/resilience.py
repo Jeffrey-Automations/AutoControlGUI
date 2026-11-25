@@ -19,11 +19,22 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Tuple, Type
 
+from je_auto_control.utils.exception.control_signals import is_run_interruption
 from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.executor.run_control import ExecutionStopped, pause
+
+
+def _is_control_signal(error: BaseException) -> bool:
+    """Whether ``error`` ends the run (a stop or cancellation) rather than failing the call."""
+    return isinstance(error, ExecutionStopped) or is_run_interruption(error)
 
 
 class CircuitOpenError(AutoControlException, RuntimeError):
     """Raised by :class:`CircuitBreaker` when the circuit is open."""
+
+
+def _default_sleep(seconds: float) -> None:
+    pause(seconds, time.sleep)
 
 
 @dataclass
@@ -38,8 +49,12 @@ class RetryPolicy:
     def run(self, func: Callable[..., Any], *args: Any,
             sleep: Optional[Callable[[float], None]] = None,
             **kwargs: Any) -> Any:
-        """Call ``func`` until it succeeds or attempts are exhausted."""
-        sleeper = sleep or time.sleep
+        """Call ``func`` until it succeeds or attempts are exhausted.
+
+        A stop or cancellation is raised at once, never retried, and a stop
+        wakes the default back-off sleep.
+        """
+        sleeper = sleep or _default_sleep
         attempts = max(1, int(self.max_attempts))
         delay = self.backoff
         if self.max_backoff is not None:
@@ -49,6 +64,8 @@ class RetryPolicy:
             try:
                 return func(*args, **kwargs)
             except self.exceptions as error:
+                if _is_control_signal(error):
+                    raise
                 last_error = error
                 if attempt >= attempts:
                     break
@@ -110,14 +127,15 @@ class CircuitBreaker:
             self._trial_in_flight = self._trial_in_flight or trial
         try:
             result = func(*args, **kwargs)
-        except Exception:
-            self._settle(trial, succeeded=False)
-            raise
-        except BaseException:
-            # KeyboardInterrupt / SystemExit are not a verdict on the service,
-            # but the trial slot must be freed: left set, every later call was
-            # refused for good.
-            self._release_trial(trial)
+        except BaseException as error:
+            # A stop, a cancellation and KeyboardInterrupt / SystemExit are not
+            # a verdict on the service (stopping runs opened the circuit for
+            # every other caller), but the trial slot must be freed: left set,
+            # every later call was refused for good.
+            if _is_control_signal(error) or not isinstance(error, Exception):
+                self._release_trial(trial)
+            else:
+                self._settle(trial, succeeded=False)
             raise
         self._settle(trial, succeeded=True)
         return result

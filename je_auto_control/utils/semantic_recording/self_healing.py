@@ -21,9 +21,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from je_auto_control.utils.exception.control_signals import raise_if_run_interrupted
 from je_auto_control.utils.exception.exceptions import (
     AutoControlAssertionException, AutoControlException,
 )
+from je_auto_control.utils.executor.run_control import ExecutionStopped
 
 
 _CLICK_ACTIONS = frozenset({
@@ -107,14 +109,16 @@ class SelfHealingReplayer:
                         attempts=attempts, healed=healed,
                     )
                 last_error = "verify_step returned False"
-            except AutoControlAssertionException:
+            except (AutoControlAssertionException, ExecutionStopped):
                 # A failed assertion is a verdict, not a mislocated element:
                 # it was "healed" to a new position and could end in success.
+                # A stopped run must not be healed and clicked again at all.
                 raise
             except (AutoControlException, LookupError,
                     RuntimeError, OSError, ValueError) as error:
                 # A framework failure (locate / assert / action) is a step
                 # failure to be retried and healed, not an escape from replay().
+                raise_if_run_interrupted(error)
                 last_error = f"{type(error).__name__}: {error}"
             if attempts > self._max_retries:
                 break
@@ -138,10 +142,11 @@ class SelfHealingReplayer:
         """
         try:
             return self._heal(action), None
-        except AutoControlAssertionException:
+        except (AutoControlAssertionException, ExecutionStopped):
             raise
         except (AutoControlException, LookupError, RuntimeError, OSError,
                 ValueError, TypeError, OverflowError) as error:
+            raise_if_run_interrupted(error)
             return None, f"heal failed: {type(error).__name__}: {error}"
 
     def _heal(self,

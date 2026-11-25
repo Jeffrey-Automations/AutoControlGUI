@@ -14,6 +14,8 @@ import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
+from je_auto_control.utils.exception.control_signals import is_run_interruption
+from je_auto_control.utils.executor.run_control import ExecutionStopped
 from je_auto_control.utils.json_store.json_store import atomic_write_text
 
 Sink = Callable[[Any], Any]
@@ -53,7 +55,8 @@ class Outbox:
         """Deliver up to ``max_batch`` pending entries via ``sink``.
 
         On a sink exception the entry is retried until ``max_attempts``, then
-        dead-lettered. Returns ``{sent, failed, remaining}``.
+        dead-lettered. Returns ``{sent, failed, remaining}``. A stop or
+        cancellation is not a failed delivery: it ends the drain and is raised.
         """
         with self._lock:
             return self._drain(sink, max_batch, max_attempts)
@@ -67,6 +70,9 @@ class Outbox:
             try:
                 sink(entry["event"])
             except Exception as error:  # noqa: BLE001  # pylint: disable=broad-exception-caught  # reason: counts as a failed attempt
+                if isinstance(error, ExecutionStopped) or is_run_interruption(error):
+                    entry["attempts"] -= 1
+                    raise
                 if entry["attempts"] >= max_attempts:
                     entry["status"] = "failed"
                     entry["error"] = str(error)

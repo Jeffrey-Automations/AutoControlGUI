@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,615 |
-| 程式碼總行數 | 248,431 |
+| 程式碼總行數 | 248,645 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -293,7 +293,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 19,682 行。
+> 25 個套件、約 19,708 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -315,17 +315,17 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/plugin_sdk/` | 80 | 外掛 SDK：透過 entry points 發佈／載入第三方 `AC_*` 指令 |
 | `utils/project/` | 185 | 專案腳手架：建立目錄結構與範本 action 檔 |
 | `utils/recording_edit/` | 165 | 不重錄的前提下裁切／過濾／縮放已錄製的 action list |
-| `utils/saga/` | 103 | Saga 協調器：失敗時以 LIFO 補償動作回滾 |
+| `utils/saga/` | 115 | Saga 協調器：失敗時以 LIFO 補償動作回滾 |
 | `utils/script_vars/` | 377 | 執行期變數作用域、插值與 context-local vault guard；受管操作拒絕隱式秘密存取 |
 | `utils/skill_library/` | 145 | 具名可重用 action 序列（skill）的持久化倉庫 |
-| `utils/state_machine/` | 290 | 宣告式有限狀態機驅動 action JSON；預設動作跨狀態共享單次執行範圍 |
+| `utils/state_machine/` | 304 | 宣告式有限狀態機驅動 action JSON；預設動作跨狀態共享單次執行範圍 |
 | `utils/stubs/` | 325 | 為 `AC_*` 指令面產生型別 stub |
 | `utils/test_record/` | 72 | 全域測試紀錄單例，記錄每個動作的參數與例外 |
 | `utils/work_queue/` | 290 | 交易式工作佇列（dispatcher／performer），支撐大量批次執行 |
 
 ### 5.4.2 框架基礎設施
 
-> 15 個套件、約 6,188 行。
+> 15 個套件、約 6,219 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -342,12 +342,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/path_guard/` | 267 | 命令列及伺服器的路徑邊界、客戶端根目錄隔離與受管任務來源政策紀錄 |
 | `utils/platform_id/` | 62 | 作業系統家族的單一判定點。`sys.platform` 原本在一百多處跟字面清單比對，而那些清單都沒有 BSD；`is_x11_unix()` 問的是「這是不是 X11 unix」，這才是守衛一直想問的問題 |
 | `utils/process_memory/` | 2,340 | 內部受審 probe 的有界語意觀察、typed Windows provider、獨立映像檔觀測、自有啟動加釘選雜湊的 attestor 與失敗 handle 回收；檔案證據不等於載入程式碼身分，原生驗收及 runtime 整合待完成 |
-| `utils/shell_process/` | 312 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
+| `utils/shell_process/` | 343 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
 | `utils/start_exe/` | 36 | 啟動另一個執行檔行程 |
 
 ### 5.4.3 排程、觸發與背景監看
 
-> 11 個套件、約 4,472 行。
+> 11 個套件、約 4,484 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -355,7 +355,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/idle_keepawake/` | 245 | 偵測使用者閒置時間並在無人值守執行期間阻止系統睡眠 |
 | `utils/lock_session/` | 167 | 鎖定工作站、等待解鎖並分類鎖定狀態轉換 |
 | `utils/observer/` | 270 | 反應式畫面觀察者；每條規則涵蓋 predicate／handler 的秘密遮罩與隔離 |
-| `utils/recurrence/` | 470 | RFC 5545 重複規則解析與發生時間展開 |
+| `utils/recurrence/` | 482 | RFC 5545 重複規則解析與發生時間展開 |
 | `utils/scheduler/` | 512 | 間隔式與 cron 式的 action JSON 排程器 |
 | `utils/session_guard/` | 62 | 驅動輸入前先偵測工作階段是否已鎖定／非互動 |
 | `utils/triggers/` | 1,446 | 事件驅動觸發引擎：影像／視窗／像素／檔案／webhook／IMAP 郵件 |
@@ -394,7 +394,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.5 影像辨識與畫面分析
 
-> 37 個套件、約 6,605 行。
+> 37 個套件、約 6,612 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -433,7 +433,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/subpixel_match/` | 108 | 以二次曲面擬合做次像素級比對精修 |
 | `utils/theme_normalize/` | 94 | 主題無關的影像正規化，讓亮色樣板能配對深色模式 |
 | `utils/video_report/` | 171 | 影片步驟疊圖報告：把截圖加字幕串成操作導覽影片 |
-| `utils/visual_match/` | 535 | 會回傳信心值的樣板比對（分數、多尺度、find-all + NMS）；擷取走 `grab_logical`，命中座標已加回虛擬桌面原點，單色樣板直接拒收；`image_source.py` 是比對與影像分析模組共用的 `ImageSource` 別名（型別契約允許的 numpy 陣列 `Any` 邊界，列在 `SDK_ANY_ADAPTERS`） |
+| `utils/visual_match/` | 542 | 會回傳信心值的樣板比對（分數、多尺度、find-all + NMS）；擷取走 `grab_logical`，命中座標已加回虛擬桌面原點，單色樣板直接拒收；`image_source.py` 是比對與影像分析模組共用的 `ImageSource` 別名（型別契約允許的 numpy 陣列 `Any` 邊界，列在 `SDK_ANY_ADAPTERS`） |
 | `utils/visual_regression/` | 251 | 桌面 GUI 的視覺回歸測試（黃金圖比對） |
 
 ### 5.4.6 OCR 與文字理解
@@ -487,7 +487,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.8 元素定位、自我修復與智慧等待
 
-> 23 個套件、約 6,345 行。
+> 23 個套件、約 6,361 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -510,10 +510,10 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/observation_delta/` | 122 | token 預算內的觀察差異：兩個 UI 影格之間變了什麼 |
 | `utils/screen_state/` | 191 | 語義畫面狀態：快照／差異與結構化畫面描述 |
 | `utils/scroll_find/` | 103 | 捲動直到目標影像／文字可見 |
-| `utils/self_healing/` | 2,237 | 執行時自癒定位與固定 PNG 版本比較、明確母體／延遲／來源報告 |
-| `utils/semantic_recording/` | 502 | 為錄製內容加上語義錨點，支援換機重播與自癒重播 |
+| `utils/self_healing/` | 2,240 | 執行時自癒定位與固定 PNG 版本比較、明確母體／延遲／來源報告 |
+| `utils/semantic_recording/` | 513 | 為錄製內容加上語義錨點，支援換機重播與自癒重播 |
 | `utils/settle_detector/` | 79 | 以純函式介面判定 UI 是否已靜止 |
-| `utils/smart_waits/` | 663 | 智慧等待：以影格差異取代 `time.sleep` |
+| `utils/smart_waits/` | 665 | 智慧等待：以影格差異取代 `time.sleep` |
 
 ### 5.4.9 AI / Agent / LLM
 
@@ -563,7 +563,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.11 伺服器、網路協定與外部整合
 
-> 24 個套件、約 7,829 行。
+> 24 個套件、約 7,840 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -580,21 +580,21 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/jwt/` | 271 | JWT（HMAC 家族）編碼、解碼與 claim 驗證 |
 | `utils/link_header/` | 176 | RFC 8288 Link header 解析與分頁 |
 | `utils/multipart/` | 224 | multipart/form-data 建構與解析 |
-| `utils/notify/` | 106 | 跨平台桌面通知 |
+| `utils/notify/` | 108 | 跨平台桌面通知 |
 | `utils/notify_channels/` | 105 | 對外聊天／webhook 通知（Slack／Discord／Teams／raw） |
 | `utils/otp/` | 37 | TOTP 一次性密碼產生（自動化 2FA 登入） |
-| `utils/outbox/` | 107 | 交易式 outbox，保證至少一次的事件投遞 |
+| `utils/outbox/` | 113 | 交易式 outbox，保證至少一次的事件投遞 |
 | `utils/pytest_plugin/` | 283 | pytest 外掛 + BDD step library（`pytest11` entry point） |
 | `utils/rest_api/` | 2,251 | 純標準庫 REST 前端：路由、Bearer 驗證、限流、Prometheus 指標、OpenAPI 3.1 產生 |
 | `utils/socket_server/` | 169 | 執行 action JSON 的執行緒式 TCP 指令伺服器（預設綁 127.0.0.1） |
-| `utils/sse_client/` | 142 | Server-Sent Events 用戶端解析 |
+| `utils/sse_client/` | 145 | Server-Sent Events 用戶端解析 |
 | `utils/tls_acme/` | 475 | TLS 自動化：HTTP-01 挑戰伺服器、金鑰／CSR、自動續期 |
 | `utils/url_canon/` | 194 | RFC 3986 URL 正規化與查詢字串工具 |
 | `utils/webrunner_bridge/` | 208 | 把 action JSON 橋接到 WebRunner（`je_web_runner`） |
 
 ### 5.4.12 報表、可觀測性與測試治理
 
-> 34 個套件、約 7,993 行。
+> 34 個套件、約 8,013 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -628,14 +628,14 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/step_timeline/` | 87 | 每次執行的步驟瀑布圖與瓶頸（關鍵路徑）步驟排名 |
 | `utils/test_select/` | 134 | 以執行歷史做風險導向的測試選取 |
 | `utils/test_shard/` | 106 | 以耗時為權重的套件切分與分片結果合併 |
-| `utils/test_suite/` | 550 | QA 套件編排：把扁平 action list 評分為測試案例 + CI 報表 |
-| `utils/time_travel/` | 388 | 錄製 session 的時光回溯除錯（控制器 + 播放器） |
+| `utils/test_suite/` | 560 | QA 套件編排：把扁平 action list 評分為測試案例 + CI 報表 |
+| `utils/time_travel/` | 398 | 錄製 session 的時光回溯除錯（控制器 + 播放器） |
 | `utils/timeseries/` | 175 | 時間序列轉換（rate／降採樣／重採樣） |
 | `utils/trace_context/` | 224 | W3C Trace Context 傳遞 |
 
 ### 5.4.13 資料來源、結構驗證與 i18n
 
-> 24 個套件、約 5,201 行。
+> 24 個套件、約 5,224 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -656,7 +656,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/locale_collation/` | 139 | 地區感知字串排序（決定性多層排序鍵） |
 | `utils/locale_parse/` | 80 | 地區感知數字／貨幣／日期解析與格式化（選用 babel） |
 | `utils/message_format/` | 389 | ICU-lite MessageFormat（plural／select／selectordinal） |
-| `utils/office/` | 198 | Office 文件無頭讀寫（Excel／Word／PowerPoint） |
+| `utils/office/` | 221 | Office 文件無頭讀寫（Excel／Word／PowerPoint） |
 | `utils/pdf/` | 120 | PDF 讀取與斷言（選用 pypdf 後端） |
 | `utils/referential/` | 83 | 跨資料集的參照完整性檢查 |
 | `utils/schema_compat/` | 177 | JSON Schema 相容性分級 |
@@ -666,7 +666,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.14 安全、機密與合規
 
-> 13 個套件、約 4,790 行。
+> 13 個套件、約 4,799 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -679,14 +679,14 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/redaction/` | 508 | 截圖遮蔽層：規則偵測 + 政策 + 協調器（上傳 VLM 前先遮） |
 | `utils/sbom/` | 170 | SBOM（CycloneDX）產生 |
 | `utils/secret_ref/` | 242 | URI scheme 形式的值參照解析 |
-| `utils/secrets/` | 376 | 加密機密儲存庫，供 `${secrets.NAME}` 解析 |
+| `utils/secrets/` | 385 | 加密機密儲存庫，供 `${secrets.NAME}` 解析 |
 | `utils/secrets_scan/` | 138 | 掃描 action JSON／資料中應入庫卻硬編碼的機密 |
 | `utils/vex/` | 178 | OpenVEX 陳述撰寫與漏洞分類處置 |
 | `utils/vuln_scan/` | 276 | 以 OSV 比對 SBOM 元件的漏洞（純標準庫） |
 
 ### 5.4.15 韌性、流量控制與設定
 
-> 14 個套件、約 2,162 行。
+> 14 個套件、約 2,188 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -701,13 +701,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/layered_config/` | 114 | 分層設定解析 |
 | `utils/optimistic/` | 135 | 樂觀併發的版本化儲存 |
 | `utils/rate_limit/` | 234 | 用戶端限流：token bucket、滑動視窗、throttle |
-| `utils/resilience/` | 146 | 韌性原語：退避重試與斷路器 |
-| `utils/retry_budget/` | 171 | 重試預算：以牆鐘期限與 full jitter 約束重試 |
-| `utils/sequence_gap/` | 90 | 逐串流的序號缺口偵測 |
+| `utils/resilience/` | 164 | 韌性原語：退避重試與斷路器 |
+| `utils/retry_budget/` | 175 | 重試預算：以牆鐘期限與 full jitter 約束重試 |
+| `utils/sequence_gap/` | 94 | 逐串流的序號缺口偵測 |
 
 ### 5.4.16 系統、視窗與剪貼簿
 
-> 16 個套件、約 2,771 行。
+> 16 個套件、約 2,804 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -721,7 +721,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/file_drop/` | 124 | 以 WM_DROPFILES 把檔案拖放到視窗 |
 | `utils/rich_clipboard/` | 133 | 豐富剪貼簿格式 — HTML（CF_HTML）建構／解析／存取 |
 | `utils/shell_open/` | 99 | Open files with their registered applications and delegate URLs to WebRunner. |
-| `utils/system_volume/` | 219 | 讀取與控制系統主音量與靜音狀態 |
+| `utils/system_volume/` | 252 | 讀取與控制系統主音量與靜音狀態 |
 | `utils/trash/` | 93 | 把檔案移到系統資源回收筒（可復原刪除） |
 | `utils/window_capture/` | 422 | 逐視窗截圖、視窗版面儲存／還原、貼齊與排列 |
 | `utils/window_geometry/` | 87 | 視窗客戶區幾何（外框內縮、client→screen 對映） |
@@ -1031,12 +1031,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/codegen/journal_commands.py` | 13 | 日誌候選的 JSON executor 轉接與明確匯出。 |
 | `utils/codegen/journal_cli.py` | 26 | CLI --from-log 模式、JSON 審閱輸出與可選 ZIP。 |
 
-#### `utils/self_healing/`（2,237 行）— 執行時定位與固定影像比較
+#### `utils/self_healing/`（2,240 行）— 執行時定位與固定影像比較
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/self_healing/__init__.py` | 57 | 定位、比較模型、策略與報告的公開介面。 |
-| `utils/self_healing/locator.py` | 392 | 樣板／VLM 定位、明確點擊後驗證；取消與 assertion 原樣傳遞。 |
+| `utils/self_healing/locator.py` | 395 | 樣板／VLM 定位、明確點擊後驗證；取消與 assertion 原樣傳遞。 |
 | `utils/self_healing/requests.py` | 109 | 不可變操作與驗證請求；嚴格欄位與區域驗證。 |
 | `utils/self_healing/verification.py` | 51 | 點擊前檢查後端、點擊後隔離舊影像並驗證。 |
 | `utils/self_healing/commands.py` | 74 | 巢狀 JSON 請求、路徑政策與明確失敗的指令轉接。 |
@@ -1637,8 +1637,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 113,020 |
-| **總計** | **1,603** | **247,686** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 113,234 |
+| **總計** | **1,603** | **247,900** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

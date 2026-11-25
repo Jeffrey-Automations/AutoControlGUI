@@ -14,6 +14,7 @@ is unit-testable on synthetic arrays without a real screen; only the default
 """
 import dataclasses
 import functools
+import os
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Dict, List, Optional, ParamSpec, Protocol, Sequence, Tuple, TypeVar
 
@@ -105,7 +106,7 @@ def _to_gray(source: ImageSource) -> Any:
     if hasattr(source, "shape"):
         array = np.asarray(source)
     elif isinstance(source, (str, bytes)) or hasattr(source, "__fspath__"):
-        array = _imread(str(source), cv2.IMREAD_COLOR)
+        array = _imread(os.fsdecode(source), cv2.IMREAD_COLOR)
         if array is None:
             raise ValueError(f"could not read image: {source!r}")
         is_bgr = True
@@ -214,10 +215,14 @@ def _imread(path: str, flags: int) -> Any:
 FLAT_TEMPLATE_STD = 1.0
 
 
+def _is_flat(template: Any) -> bool:
+    import numpy as np
+    return float(np.asarray(template, dtype=np.float64).std()) < FLAT_TEMPLATE_STD
+
+
 def _reject_flat_template(template: Any) -> None:
     """Raise if ``template`` is too uniform for normalised correlation."""
-    import numpy as np
-    if float(np.asarray(template, dtype=np.float64).std()) < FLAT_TEMPLATE_STD:
+    if _is_flat(template):
         raise AutoControlFlatTemplateException(
             "template is almost a single colour, so normalised correlation "
             "cannot locate it; crop a region with a pattern or text in it")
@@ -293,7 +298,9 @@ def match_template(template: ImageSource, *, haystack: Optional[ImageSource] = N
     best: Optional[Match] = None
     for scale in scales:
         scaled = _resize(tmpl, float(scale))
-        if scaled.shape[0] > hay.shape[0] or scaled.shape[1] > hay.shape[1]:
+        # A scale that averages the pattern away leaves a flat template, which
+        # scores 1.0 at (0, 0): nothing to match at that scale.
+        if scaled.shape[0] > hay.shape[0] or scaled.shape[1] > hay.shape[1] or _is_flat(scaled):
             continue
         _, max_val, _, max_loc = cv2.minMaxLoc(stoppable_call(cv2.matchTemplate, hay, scaled,
                                                                  metric))
@@ -424,7 +431,7 @@ def _load_unchanged(source: ImageSource) -> Tuple[Any, bool]:
     if hasattr(source, "shape"):
         return np.asarray(source), False
     if isinstance(source, (str, bytes)) or hasattr(source, "__fspath__"):
-        array = _imread(str(source), cv2.IMREAD_UNCHANGED)
+        array = _imread(os.fsdecode(source), cv2.IMREAD_UNCHANGED)
         if array is None:
             raise ValueError(f"could not read image: {source!r}")
         return array, True

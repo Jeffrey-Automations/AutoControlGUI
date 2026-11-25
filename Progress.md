@@ -154,6 +154,10 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   - `TODO`：使用者檔只在單一程序內序列化（CLI 與伺服器同時改仍互蓋）；`RestAuthGate._buckets` 依來源 IP 無上限成長；
     MCP 在准入前拒絕的呼叫沒有稽核（`AuditLogger` 說每次都有）；`ac_jwt_decode` 沒有 `leeway`；
     尚未追查 `AC_agent_task_*`／`AC_agent_dag` 的參數會不會在 runtime 再展開一次；上述未讀檔案待審。
+- **utils L–Z 審查留下的（U-20261126-15）**：`TODO`：`gui/trace_replay_tab.py:163` 直接接上 manifest 的檔名（與 player 同一根因）；
+  `ResourceProfiler` 執行中的樣本無上限；LLM planner 請求（60 秒加 SDK 重試）不理會 stop；`create_project_dir` 靜默覆寫既有檔案；
+  `text_diff.apply_unified` 在檔尾之後插入不報錯；截圖遮蔽逐 OCR token 比對，拆成四段的卡號不會被遮；`set_of_marks._last_marks` 全程序共用；
+  `lock_session._run_argv` 沒有 subprocess 逾時。`DECIDE`：`Outbox` 永遠保留已送出的項目（修剪會改變 `to_dict`／`save`）。
 - **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；
   私鑰支援選用通行碼加密，未設定時仍是明文 PEM（0600，Windows 上沒驗權限位元）；遷移模式開著時 HMAC 簽章會被接受。
 - **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：

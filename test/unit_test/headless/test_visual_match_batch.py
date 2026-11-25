@@ -155,3 +155,22 @@ def test_facade_exports():
         assert hasattr(ac, attr)
         assert attr in ac.__all__
     assert callable(best_matches)
+
+
+def test_a_bytes_path_names_the_same_file(tmp_path):
+    """str(b"...") is the repr, so a bytes path -- an accepted source -- was never found."""
+    import os
+    import cv2
+    rng = np.random.default_rng(3)
+    hay = rng.integers(0, 255, (60, 60), dtype=np.uint8)
+    path = tmp_path / "template.png"
+    assert cv2.imwrite(str(path), hay[10:30, 20:40])
+    found = match_template(os.fsencode(str(path)), haystack=hay)
+    assert (found.x, found.y) == (20, 10)
+
+
+def test_a_scale_that_leaves_nothing_to_match_is_not_a_match():
+    """A checkerboard scaled to one grey pixel scored 1.0 at (0, 0): a click at a random place."""
+    board = np.indices((20, 20)).sum(axis=0) % 2 * 255
+    hay = np.random.default_rng(4).integers(0, 255, (60, 60), dtype=np.uint8)
+    assert match_template(board.astype(np.uint8), haystack=hay, scales=(0.05,)) is None

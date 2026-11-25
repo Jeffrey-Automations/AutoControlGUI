@@ -82,3 +82,26 @@ def test_facade_exports():
                  "write_presentation"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_a_control_character_is_an_action_error(tmp_path):
+    """openpyxl's IllegalCharacterError derives from Exception only and aborted the script."""
+    pytest.importorskip("openpyxl")
+    from je_auto_control.utils.exception.exceptions import AutoControlActionException
+    with pytest.raises(AutoControlActionException):
+        write_workbook(str(tmp_path / "out.xlsx"), [{"a": "bell" + chr(7)}])
+
+
+def test_a_damaged_sheet_is_an_action_error(tmp_path):
+    """The sheet is parsed while its rows are read: an XML ParseError (a SyntaxError) escaped."""
+    import zipfile
+    pytest.importorskip("openpyxl")
+    from je_auto_control.utils.exception.exceptions import AutoControlActionException
+    good, bad = tmp_path / "good.xlsx", tmp_path / "bad.xlsx"
+    write_workbook(str(good), [{"a": 1}, {"a": 2}])
+    with zipfile.ZipFile(good) as source, zipfile.ZipFile(bad, "w") as target:
+        for name in source.namelist():
+            data = source.read(name)
+            target.writestr(name, data[:len(data) // 2] if name.endswith("sheet1.xml") else data)
+    with pytest.raises(AutoControlActionException):
+        read_workbook(str(bad))

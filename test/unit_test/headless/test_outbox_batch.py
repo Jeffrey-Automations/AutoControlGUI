@@ -105,3 +105,26 @@ def test_wiring():
 def test_facade_exports():
     assert hasattr(ac, "Outbox")
     assert "Outbox" in ac.__all__
+
+
+def test_a_stop_or_cancel_ends_the_drain_without_spending_an_attempt():
+    """A stop counted as a failed delivery for every entry left in the batch, up to dead-lettering it."""
+    from concurrent.futures import CancelledError
+    import pytest
+    from je_auto_control.utils.exception.control_signals import OperationCancelledError
+    from je_auto_control.utils.executor.run_control import ExecutionStopped
+    for signal in (ExecutionStopped("run"), OperationCancelledError("request"), CancelledError()):
+        box = Outbox()
+        box.enqueue({"n": 1})
+        box.enqueue({"n": 2})
+        seen = []
+
+        def sink(event, raised=signal, calls=seen):
+            calls.append(event)
+            raise raised
+
+        with pytest.raises(type(signal)):
+            box.drain(sink, max_attempts=1)
+        assert seen == [{"n": 1}]
+        assert [entry["attempts"] for entry in box.pending()] == [0, 0]
+        assert box.dead_letters() == []

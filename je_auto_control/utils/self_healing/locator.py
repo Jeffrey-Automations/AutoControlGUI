@@ -25,6 +25,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 from je_auto_control.utils.exception.exceptions import (
     AutoControlException, AutoControlAssertionException, ImageNotFoundException,
 )
+from je_auto_control.utils.executor.run_control import ExecutionStopped
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.cv2_utils.locator_frame import locator_frame_scope
 from je_auto_control.utils.self_healing.runtime_evidence import AttemptEvidence, attempt_evidence
@@ -278,6 +279,8 @@ def _settle_failure(outcome: HealOutcome, call: _LocateCall, evidence: AttemptEv
     # pylint: disable-next=import-outside-toplevel  # reason: run outcomes import the executor during facade setup
     from je_auto_control.utils.run_history.run_outcome import _ordinary_error_text, raise_if_run_interrupted
     raise_if_run_interrupted(error)
+    if isinstance(error, ExecutionStopped):
+        raise error  # a stop is an interruption too: no completion event
     detail = (f"{type(error).__name__}: assertion interrupted operation"
               if isinstance(error, AutoControlAssertionException) else _ordinary_error_text(error))
     evidence.operation_status = "verification_error" if verification else "error"
@@ -334,11 +337,11 @@ def _try_vlm(description: Optional[str],
 
 
 def _failure_detail(error: Exception) -> str:
-    """Propagate cancellation and framework assertions before formatting a miss."""
+    """Propagate a stop, cancellation and framework assertions before formatting a miss."""
     # pylint: disable-next=import-outside-toplevel  # reason: run outcomes import the executor during facade setup
     from je_auto_control.utils.run_history.run_outcome import _ordinary_error_text, raise_if_run_interrupted
     raise_if_run_interrupted(error)
-    if isinstance(error, AutoControlAssertionException):
+    if isinstance(error, (AutoControlAssertionException, ExecutionStopped)):
         raise error
     return _ordinary_error_text(error)
 

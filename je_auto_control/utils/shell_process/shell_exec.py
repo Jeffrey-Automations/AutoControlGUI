@@ -93,7 +93,12 @@ def _kill_tree(process: subprocess.Popen[bytes]) -> None:
     """Kill ``process`` and everything it started."""
     if sys.platform == "win32":
         taskkill = [_taskkill_path(), "/T", "/F", "/PID", str(process.pid)]
-        subprocess.run(taskkill, capture_output=True, timeout=10, check=False)  # nosec B603  # nosemgrep  # reason: fixed system tool, our child's pid
+        try:
+            subprocess.run(taskkill, capture_output=True, timeout=10, check=False)  # nosec B603  # nosemgrep  # reason: fixed system tool, our child's pid
+        # Its failure replaced the stop or timeout being raised, and the
+        # program itself was then not killed below.
+        except (OSError, subprocess.SubprocessError) as error:
+            autocontrol_logger.error("taskkill failed: %r", error)
     else:
         try:
             os.killpg(process.pid, signal.SIGKILL)
@@ -106,6 +111,9 @@ def _kill_tree(process: subprocess.Popen[bytes]) -> None:
 
 
 _STOP_POLL_SECONDS = 0.1
+#: Output lines a manager keeps until they are read; the oldest make room.
+MAX_QUEUED_LINES = 10_000
+_READER_JOIN_SECONDS = 1.0
 
 
 def _communicate_stoppable(process: subprocess.Popen[bytes], argv: str | List[str], timeout_s: float,
@@ -252,7 +260,17 @@ class ShellManager:
             pass
 
         if self.process and self.process.poll() is not None:
+            self._join_readers()
             self.exit_program()
+
+    def _join_readers(self) -> None:
+        """Let the readers finish what an ended program left in its pipes.
+
+        Bounded: a program of its own that it left running can hold them open.
+        """
+        for reader in (self.read_program_output_from_thread, self.read_program_error_output_from_thread):
+            if reader is not None:
+                reader.join(timeout=_READER_JOIN_SECONDS)
 
     def exit_program(self) -> None:
         """
@@ -299,14 +317,27 @@ class ShellManager:
     def _read_stream(self, stream: Optional[IO[bytes]], target_queue: queue.Queue[str]) -> None:
 
         """
-        Read stream line by line and put into queue.
+        Read stream line by line and put into queue, keeping the newest ``MAX_QUEUED_LINES``.
         讀取輸出流並放入 queue
+
+        Nothing reads the queue of a program ``start_exe`` launched, so a
+        chatty one grew it in memory for as long as it ran.
         """
         while self.still_run_shell and stream:
             line = stream.readline(self.program_buffer)
             if not line:
                 break
+            _make_room(target_queue)
             target_queue.put_nowait(line.decode(self.program_encoding, "replace"))
+
+
+def _make_room(lines: queue.Queue[str]) -> None:
+    """Drop the oldest lines until one more fits in ``MAX_QUEUED_LINES``."""
+    while lines.qsize() >= MAX_QUEUED_LINES:
+        try:
+            lines.get_nowait()
+        except queue.Empty:
+            return
 
 
 default_shell_manager = ShellManager()

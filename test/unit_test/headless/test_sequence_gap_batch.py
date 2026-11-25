@@ -63,3 +63,29 @@ def test_wiring():
 def test_facade_exports():
     assert hasattr(ac, "SequenceTracker")
     assert "SequenceTracker" in ac.__all__
+
+
+def test_two_threads_observing_one_number_get_one_ok(monkeypatch):
+    """AC_sequence_observe shares a named tracker between server threads; both were told "ok"."""
+    import threading
+    tracker = SequenceTracker()
+    tracker.observe("s", 1)
+    inside, go_on = threading.Event(), threading.Event()
+    real_advance = tracker._advance
+
+    def slow_advance(state, seq):
+        inside.set()
+        go_on.wait(timeout=0.5)
+        return real_advance(state, seq)
+
+    monkeypatch.setattr(tracker, "_advance", slow_advance)
+    statuses = []
+    threads = [threading.Thread(target=lambda: statuses.append(tracker.observe("s", 2)["status"])) for _ in range(2)]
+    threads[0].start()
+    assert inside.wait(timeout=5)
+    threads[1].start()
+    threads[1].join(timeout=0.2)
+    go_on.set()
+    for thread in threads:
+        thread.join(timeout=5)
+    assert sorted(statuses) == ["duplicate", "ok"]

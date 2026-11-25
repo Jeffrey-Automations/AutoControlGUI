@@ -404,7 +404,9 @@ def wait_until_port(host: str, port: int, *,
     samples = 0
     while time.monotonic() < deadline:
         samples += 1
-        if probe(str(host), int(port), float(connect_timeout_s)):
+        # No longer than the time left: one connect held the wait past its cap.
+        left = max(deadline - time.monotonic(), 0.001)
+        if probe(str(host), int(port), min(float(connect_timeout_s), left)):
             return _finish(True, f"port {host}:{port} open", started, samples)
         _pause(deadline, poll_interval_s)
     return _finish(False, f"timeout waiting for {host}:{port}",

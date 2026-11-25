@@ -15,6 +15,9 @@ the rollback continues. Imports no ``PySide6``.
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from je_auto_control.utils.exception.control_signals import is_run_interruption
+from je_auto_control.utils.executor.run_control import ExecutionStopped, shielded
+
 
 @dataclass
 class SagaResult:
@@ -59,7 +62,13 @@ class Saga:
             result.compensated.append(name)
 
     def run(self) -> SagaResult:
-        """Run steps forward; on failure compensate completed steps LIFO."""
+        """Run steps forward; on failure compensate completed steps LIFO.
+
+        A stop or cancellation rolls back too, and is then raised: reported as
+        a failed step it let the caller carry on. The rollback is shielded from
+        a stop already requested (each compensation would only raise it again);
+        a second stop request ends it.
+        """
         result = SagaResult(ok=True)
         for index, (name, action, _compensation) in enumerate(self._steps):
             try:
@@ -68,7 +77,10 @@ class Saga:
                 result.ok = False
                 result.failed_step = name
                 result.error = str(error)
-                self._compensate(index, result)
+                with shielded():
+                    self._compensate(index, result)
+                if isinstance(error, ExecutionStopped) or is_run_interruption(error):
+                    raise
                 return result
             result.completed.append(name)
         return result

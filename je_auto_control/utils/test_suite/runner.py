@@ -29,7 +29,8 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 from je_auto_control.utils.exception.exceptions import (
     AutoControlAssertionException, AutoControlException,
 )
-from je_auto_control.utils.executor.run_control import ExecutionStopped
+from je_auto_control.utils.exception.control_signals import raise_if_run_interrupted
+from je_auto_control.utils.executor.run_control import ExecutionStopped, shielded
 from je_auto_control.utils.test_suite.result import (
     STATUS_ERROR, STATUS_FAILED, STATUS_PASSED, STATUS_SKIPPED,
     TestCaseResult, TestSuiteResult,
@@ -103,10 +104,12 @@ def _run_actions(executor: Any, actions: List[Any]) -> Tuple[str, str]:
     except AutoControlAssertionException as error:
         return STATUS_FAILED, str(error)
     except (AutoControlException, LookupError, AttributeError, ArithmeticError,
-            OSError, RuntimeError, TypeError, ValueError) as error:
+            OSError, RuntimeError, TypeError, ValueError, ImportError) as error:
         # Mirrors the executor's raise_on_error re-raise set: the framework
         # family (incl. AutoControlActionNullException), plus LookupError /
-        # AttributeError from block handlers subscripting a bad action.
+        # AttributeError from block handlers subscripting a bad action and
+        # ImportError from a command whose optional package is missing.
+        raise_if_run_interrupted(error)  # a cancelled MCP call is a RuntimeError
         return STATUS_ERROR, repr(error)
 
 
@@ -195,7 +198,11 @@ def _run_setup(executor: Any, setup: Optional[List[Any]]) -> Optional[str]:
 def _run_teardown(executor: Any, teardown: Optional[List[Any]]) -> None:
     """Run the optional teardown block; failures are swallowed by design."""
     if teardown:
-        _run_actions(executor, teardown)
+        # Also while a stop unwinds, as an AC_try ``finally``: every action
+        # raised the same stop, so nothing the suite set up was cleaned. A
+        # second stop request ends it.
+        with shielded():
+            _run_actions(executor, teardown)
 
 
 def _run_all_cases(executor: Any, spec: Dict[str, Any],
@@ -231,8 +238,11 @@ def _run_case_spec(executor: Any, case_spec: Dict[str, Any],
     """Expand and run one case spec; a bad case scores *error*, never aborts."""
     try:
         expanded = _expand_cases(case_spec)
-    except (AutoControlException, OSError, LookupError,
+    except ExecutionStopped:
+        raise  # the whole suite was stopped: not this case's error
+    except (AutoControlException, OSError, LookupError, ImportError,
             RuntimeError, TypeError, ValueError) as error:
+        raise_if_run_interrupted(error)
         result.cases.append(_error_case_result(case_spec, error))
         return
     for name, sub_spec, binding in expanded:

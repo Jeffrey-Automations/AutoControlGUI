@@ -11,8 +11,9 @@ Those libraries are an **optional** dependency: install them with
 :class:`RuntimeError` when the backing library is missing, so the core
 package stays lean and import-time stays Qt-free / dependency-free.
 """
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterator, List
 
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
 
@@ -71,6 +72,26 @@ def _opened(kind: str, path: str, loader: Any) -> Any:
         raise AutoControlActionException(f"cannot read {kind} {existing}: {error}") from error
 
 
+# Errors the executor contains as they are (a missing sheet is a KeyError).
+_CONTAINED = (OSError, LookupError, RuntimeError, ValueError, TypeError, AttributeError)
+
+
+@contextmanager
+def _as_action_errors(what: str) -> Iterator[None]:
+    """Raise the library's own errors as the action family, as :func:`_opened` does.
+
+    A read-only workbook is parsed while its rows are read (an XML
+    ``ParseError`` is a ``SyntaxError``), and openpyxl's
+    ``IllegalCharacterError`` for a control character is a bare ``Exception``.
+    """
+    try:
+        yield
+    except _CONTAINED:
+        raise
+    except Exception as error:  # noqa: BLE001  # reason: openpyxl / zipfile / XML errors derive from Exception only; re-raised as the action family
+        raise AutoControlActionException(f"{what}: {error}") from error
+
+
 # --- Excel (.xlsx) --------------------------------------------------------
 
 def read_workbook(path: str, sheet: str = "") -> List[Dict[str, Any]]:
@@ -82,13 +103,14 @@ def read_workbook(path: str, sheet: str = "") -> List[Dict[str, Any]]:
     workbook = _opened("workbook", path, lambda existing: openpyxl.load_workbook(
         filename=existing, read_only=True, data_only=True))
     try:
-        worksheet = workbook[sheet] if sheet else workbook.active
-        rows_iter = worksheet.iter_rows(values_only=True)
-        header = next(rows_iter, None)
-        if header is None:
-            return []
-        keys = [str(cell) for cell in header]
-        return [dict(zip(keys, values)) for values in rows_iter]
+        with _as_action_errors(f"cannot read workbook {path}"):
+            worksheet = workbook[sheet] if sheet else workbook.active
+            rows_iter = worksheet.iter_rows(values_only=True)
+            header = next(rows_iter, None)
+            if header is None:
+                return []
+            keys = [str(cell) for cell in header]
+            return [dict(zip(keys, values)) for values in rows_iter]
     finally:
         workbook.close()
 
@@ -109,9 +131,10 @@ def write_workbook(path: str, rows: List[Dict[str, Any]],
     if rows:
         # Keys missing from the first row were dropped from every row.
         keys = list(dict.fromkeys(key for row in rows for key in row))
-        _append_as_data(worksheet, keys)
-        for row in rows:
-            _append_as_data(worksheet, [row.get(key) for key in keys])
+        with _as_action_errors(f"cannot write workbook {path}"):
+            _append_as_data(worksheet, keys)
+            for row in rows:
+                _append_as_data(worksheet, [row.get(key) for key in keys])
     target = Path(path).expanduser()
     workbook.save(str(target))
     return str(target.resolve())

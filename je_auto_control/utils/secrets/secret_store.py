@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 _VERIFIER_PLAINTEXT = b"autocontrol-vault-v1"
 _KEY_ITERATIONS = 600_000
 _SALT_BYTES = 16
+_MAX_ITERATIONS = 2 ** 31 - 1  # what pbkdf2_hmac takes (a C long)
 
 
 def _fernet_types() -> Tuple[Type["Fernet"], Type["InvalidToken"]]:
@@ -108,12 +109,13 @@ def _check_vault_fields(data: Dict[str, Any]) -> None:
     ``iterations: 0`` a ``ValueError``, both outside the family.
     """
     iterations = data.get("iterations", _KEY_ITERATIONS)
+    verifier = data.get("verifier")
     fields_ok = (
         isinstance(data.get("salt"), str)
-        and isinstance(data.get("verifier"), str)
+        and isinstance(verifier, str) and verifier.isascii()
         and isinstance(data.get("items", {}), dict)
         and isinstance(iterations, int) and not isinstance(iterations, bool)
-        and iterations > 0
+        and 0 < iterations <= _MAX_ITERATIONS
     )
     if not fields_ok:
         raise SecretStoreError("vault fields are missing or invalid")
@@ -257,7 +259,9 @@ class SecretManager:
             _, invalid_token = _fernet_types()
             try:
                 value = fernet.decrypt(token.encode("ascii")).decode("utf-8")
-            except invalid_token as error:
+            # AttributeError / UnicodeError: an edited file holds something
+            # other than a token here.
+            except (invalid_token, AttributeError, UnicodeError) as error:
                 raise SecretStoreError(
                     f"secret {name!r} failed integrity check"
                 ) from error
@@ -310,10 +314,15 @@ class SecretManager:
         """Delete the vault file (after confirming via direct call)."""
         with self._lock:
             self.lock()
-            try:
-                self._path.unlink()
-            except FileNotFoundError:
-                pass
+            if not self._path.parent.is_dir():
+                return
+            # Under the vault's lock file: deleted between another manager's
+            # read and its write, the vault came back with its secrets.
+            with self._vault_locked():
+                try:
+                    self._path.unlink()
+                except FileNotFoundError:
+                    pass
 
     @contextmanager
     def _vault_locked(self) -> Iterator[None]:

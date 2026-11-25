@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from je_auto_control.utils.exception.control_signals import raise_if_run_interrupted
+
 
 _CLICK_ACTIONS = frozenset({
     "mouse_press", "mouse_release", "mouse_click",
@@ -39,7 +41,8 @@ class AnchorLocator:
     def locate(self, anchor: Mapping[str, Any]) -> Optional[Tuple[int, int]]:
         try:
             return self._backend(anchor)
-        except (RuntimeError, OSError):
+        except (RuntimeError, OSError) as error:
+            raise_if_run_interrupted(error)  # a cancelled MCP call is a RuntimeError
             return None
 
 

@@ -110,3 +110,48 @@ def test_facade_exports():
     for attr in ("Saga", "SagaResult", "run_saga"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_a_stop_or_cancel_rolls_back_and_then_propagates():
+    """A stop was reported as an ordinary failed step, so the caller carried on."""
+    from concurrent.futures import CancelledError
+    import pytest
+    from je_auto_control.utils.exception.control_signals import OperationCancelledError
+    from je_auto_control.utils.executor.run_control import ExecutionStopped
+    for signal in (ExecutionStopped("run"), OperationCancelledError("request"), CancelledError()):
+        log = []
+
+        def interrupted(raised=signal):
+            raise raised
+
+        saga = Saga().step("a", lambda: log.append("a"), lambda: log.append("undo-a")).step("b", interrupted)
+        with pytest.raises(type(signal)) as caught:
+            saga.run()
+        assert caught.value is signal
+        assert log == ["a", "undo-a"]
+
+
+def test_rollback_runs_to_its_end_while_a_stop_unwinds():
+    """Each compensation raised the same stop at its first checkpoint, so nothing was undone."""
+    import pytest
+    from je_auto_control.utils.executor.run_control import (
+        ExecutionStopped, StopToken, checkpoint, stoppable_run,
+    )
+    token = StopToken("saga-stop")
+    log = []
+
+    def undo(name):
+        def run():
+            checkpoint()
+            log.append(name)
+        return run
+
+    def stop_here():
+        token.stop("test")
+        checkpoint()
+
+    saga = Saga().step("a", lambda: None, undo("a")).step("b", lambda: None, undo("b")).step("c", stop_here)
+    with stoppable_run(token=token):
+        with pytest.raises(ExecutionStopped):
+            saga.run()
+    assert log == ["b", "a"]

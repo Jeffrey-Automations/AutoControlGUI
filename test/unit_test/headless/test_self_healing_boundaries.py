@@ -138,3 +138,38 @@ def test_successful_fallback_keeps_original_outcome_and_masks_only_audit(monkeyp
     assert stored.template_path == stored.description == "***"
     assert "ordinary miss" in stored.image_error
     assert secret not in log.path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("entry", [self_heal_locate, self_heal_click])
+@pytest.mark.parametrize("strategy", ["image", "vlm", "click"])
+def test_a_stop_never_falls_back_clicks_or_logs(monkeypatch, tmp_path, entry, strategy):
+    """ExecutionStopped is an AutoControlException, so a stop was recorded as a locator miss."""
+    from je_auto_control.utils.executor.run_control import ExecutionStopped
+    if strategy == "click" and entry is self_heal_locate:
+        pytest.skip("locate never clicks")
+    signal = ExecutionStopped("run", "probe")
+    calls = []
+    log = HealEventLog(tmp_path / "events.jsonl")
+
+    def step(name, result):
+        def run(*_args, **_kwargs):
+            calls.append(name)
+            if strategy == name:
+                raise signal
+            return result
+        return run
+
+    def image(*_args, **_kwargs):
+        calls.append("image")
+        if strategy == "image":
+            raise signal
+        raise ImageNotFoundException("missing")
+
+    monkeypatch.setattr("je_auto_control.wrapper.auto_control_image.locate_image_center", image)
+    monkeypatch.setattr("je_auto_control.utils.vision.vlm_api.locate_by_description", step("vlm", (4, 5)))
+    monkeypatch.setattr("je_auto_control.utils.self_healing.locator._click_at", step("click", None))
+    with pytest.raises(ExecutionStopped) as caught:
+        entry(template_path="probe.png", description="probe", log=log)
+    assert caught.value is signal
+    assert calls == ["image", "vlm", "click"][:["image", "vlm", "click"].index(strategy) + 1]
+    assert not log.path.exists()

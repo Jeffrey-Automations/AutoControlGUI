@@ -1,7 +1,11 @@
 """Headless tests for system volume / mute control (injected fake driver)."""
+import sys
+
 import pytest
 
 import je_auto_control as ac
+from je_auto_control.utils.exception.exceptions import AutoControlActionException
+from je_auto_control.utils.system_volume import system_volume as volume_module
 from je_auto_control.utils.system_volume import (
     change_volume, clamp_percent, get_volume, is_muted, mute,
     percent_to_scalar, scalar_to_percent, set_mute, set_volume, toggle_mute,
@@ -123,3 +127,34 @@ def test_facade_exports():
                  "set_mute", "mute", "unmute", "toggle_mute"):
         assert hasattr(ac, name)
         assert name in ac.__all__
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="COMError is Windows-only")
+def test_a_host_without_an_audio_device_is_an_action_error(monkeypatch):
+    """COMError derives from Exception only, so AC_get_volume aborted the script on a server."""
+    from _ctypes import COMError
+
+    class NoDevice:
+        def __init__(self):
+            raise COMError(-2147023728, "element not found", None)
+
+    monkeypatch.setattr(volume_module, "_PycawDriver", NoDevice)
+    with pytest.raises(AutoControlActionException):
+        get_volume()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="COMError is Windows-only")
+@pytest.mark.parametrize("call", ["get_scalar", "get_mute", "set_scalar", "set_mute"])
+def test_a_device_that_goes_away_is_an_action_error(call):
+    from _ctypes import COMError
+
+    class Gone:
+        def __getattr__(self, _name):
+            def method(*_args):
+                raise COMError(-2004287484, "device invalidated", None)
+            return method
+
+    driver = volume_module._PycawDriver.__new__(volume_module._PycawDriver)
+    driver._volume = Gone()
+    with pytest.raises(AutoControlActionException):
+        getattr(driver, call)(*([0.5] if call.startswith("set") else []))
