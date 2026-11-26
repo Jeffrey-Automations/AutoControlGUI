@@ -48,6 +48,10 @@ refuse ``secret://`` with ``SecretRefError``: secret values never enter those
 records. Reference ``${secrets.NAME}`` in the step that needs the value, or call
 ``resolve_ref`` from Python.
 
+An ``env://`` value is returned, but registered with the run's secret mask: the
+log, the journal and the MCP audit show ``***`` for it, and the logged result
+and the Script Builder result pane mask ``value`` / ``resolved``.
+
 ``RefResolver`` takes two optional restrictions, both off unless given:
 ``env_allowlist`` (the only variable names ``env://`` may read, ``fnmatch``
 patterns allowed) and ``path_policy`` (a ``PathPolicy`` whose roots ``file://``

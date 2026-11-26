@@ -183,6 +183,10 @@ Run History 提供只读日志查看。使用 **操作 → 使用所选执行的
 
 `${secrets.NAME}` 解析后的值会在 executor 执行期间的应用程序诊断中遮罩，包括嵌套动作及本机 parallel／DAG。CLI／REST／MCP 请求与排程、trigger、hotkey、email 执行会将遮罩保留到错误处理及 audit／history 写入完成；报表记录保存遮罩后的快照。DAG 会将拥有者的遮罩保留到 node 诊断完成，包括独立调用与自定义 local runner。watchdog、observer 与 callback executor 会将遮罩保留到最后的错误处理；独立规则彼此隔离。CLI stderr 会遮罩，API 结果、抛出的异常与 CLI 结果数据保留原始值。遮罩于拥有者的请求或执行结束时清除。中止的 history 记为 `error`，journal 步骤保持 `cancelled`，不再获取错误截图。取消会穿过非严格执行、恢复／重试、回调与本机 worker；history 结算失败也不会取代原始硬中止信号。
 
+生成的文档保留引用本身。`AC_generate_sop`（`actions`、`title`）与 `AC_generate_code`（`source`）会替换已知的 `${var}`，包括以变量组成的 `source` 路径；但 `${secrets.NAME}`、尚未绑定的名称（文档描述的步骤自己设置的循环变量）、嵌套占位符，以及存放本次运行已解析为密钥之值的变量，都按原样写出，不会展开密钥，也不会因 *Unknown variable* 失败。`AC_resolve_ref`／`AC_resolve_refs`（以及 `ac_resolve_ref`／`ac_resolve_refs`）获取的 `env://` 值原样返回给调用端，但会像保险库的值一样登记到本次运行的遮罩，所以该次运行剩余的期间日志、journal 与 MCP 审计都显示 `***`；`AC_resolve_ref` 的 `value` 与 `AC_resolve_refs` 的 `resolved` 在记录的结果与 Script Builder 结果窗格中也会遮罩，窗格可显示一次原值。`file://` 的值不会登记。
+
+`AC_cas_put`／`AC_cas_get`、`AC_dedup_check`、`AC_idempotency_begin`／`_complete`／`_release`、`AC_bulkhead_run`、`AC_sequence_observe` 与 `AC_outbox_enqueue`／`AC_outbox_pending`（以及对应的 MCP 工具）背后的具名内存 registry，每个最多保存 `MAX_REGISTRY_NAMES`（1,024）个名称。达到上限时已有名称照常运作，也不会淘汰任何状态；新名称（包括读取从未写入过的名称）会抛出指出该 registry 的 `RegistryFullError`。这些 registry 都没有删除或重置命令，名称在进程结束时释放。
+
 ## 命令行界面
 
 每次 `je_auto_control run`（包括 `--dry-run` 与未带 `--var`）使用独立变量作用域。顶层 `run_from_description` 与 `StateMachine.run()` 也会隔离变量，同一次执行内的动作与状态仍可共享；嵌套调用沿用已有的执行作用域。自行创建的 `Executor()` 保留自己的变量。

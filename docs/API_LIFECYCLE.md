@@ -840,6 +840,14 @@ repository has driven a real phone, not because the code is unfinished.
 - MCP HTTP `resources/subscribe` belongs to the session that sent it and is
   delivered on that session's `GET` stream; without a session it is refused
   with `-32600` instead of answering `{}`.
+- A named executor registry (behind `AC_cas_put`, `AC_dedup_check`,
+  `AC_idempotency_begin`, `AC_bulkhead_run`, `AC_sequence_observe`,
+  `AC_outbox_enqueue`) refuses a new name once it holds `MAX_REGISTRY_NAMES`
+  (1,024) names, raising `RegistryFullError` (an `AutoControlActionException`);
+  both are exported from `je_auto_control` (beta). Existing names keep working.
+- A voice command or macro step runs only if both its registrant and the current
+  caller may run it; a refused step is an `AuthorizationError`, and so is
+  `AC_define_macro` for a name another principal owns.
 - `python -m mypy` holds every module written since v0.0.225 to
   `disallow_untyped_defs` and `disallow_any_generics`; see
   `test/verify/typing_strict_baseline.txt` for the modules that predate that.

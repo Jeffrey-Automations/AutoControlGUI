@@ -313,6 +313,9 @@ Bearer token 也可從 ``JE_AUTOCONTROL_MCP_TOKEN`` 環境變數讀取。
 同一個檔案。未設定存放檔的有效工具 session 會使用 operator 身分；主機管理工具需要
 已驗證的管理員。stdio 傳輸沒有 bearer token，其有效工具 session 也受相同 operator 範圍約束。
 
+session 存下的東西也保留這個身分：它註冊的語音指令（``ac_voice_register``）或定義的 macro，之後由 GUI 或
+Python 觸發時仍受 operator 限制，因為每個步驟必須註冊者與觸發者都有權執行；之後的 session 也不能重新定義它的 macro。
+
 - 工具預設依 ``readOnlyHint`` 使用 ``read_data``，否則為 ``drive_input``，另有明確
   的 capability 覆寫。敏感讀取需要 ``drive_input`` （operator／admin）：剪貼簿與歷史、
   本機文件／資料／SQL、dotenv 與參照解析、JWT／OTP 產生、持久存放區讀取、對外

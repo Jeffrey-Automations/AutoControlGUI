@@ -34,6 +34,29 @@
 - MCP HTTP: `resources/subscribe` belongs to the session that sent it and `notifications/resources/updated`
   is delivered on that session's `GET` stream (dropped while none is open); ending the session releases its
   subscriptions. A request without a session is refused with `-32600` instead of answered `{}`.
+- Voice commands and macros now run each step only if both the principal who registered them and
+  the current caller may run it. A flow that relied on dispatching someone else's voice command or
+  macro with the dispatcher's own rights (an admin speaking an operator's phrase, or the GUI or
+  Python calling a restricted user's macro) now records an `AuthorizationError` for every step the
+  registrant may not run; register or define the list as a principal with those rights.
+  `AC_define_macro` refuses to redefine a macro another principal owns; only the owner or trusted
+  local code may. Anonymous MCP sessions act as an `mcp:<session>` operator, so even with RBAC off
+  their macros and voice commands keep operator limits, and a reconnected MCP session can no longer
+  redefine a macro an earlier session defined (redefine it from trusted local code, or use a new name).
+
+- The named registries behind `AC_cas_put`, `AC_dedup_check`, `AC_idempotency_begin`,
+  `AC_bulkhead_run`, `AC_sequence_observe` and `AC_outbox_enqueue` hold at most 1,024 names each
+  (`MAX_REGISTRY_NAMES`); a new name past that raises `RegistryFullError`. Existing names keep
+  working and are released only when the process ends. Both names are exported from the facade.
+
+- `AC_generate_sop` and `AC_generate_code` no longer expand `${secrets.NAME}` into the generated
+  file and result, and a name not yet bound (a loop variable) is kept as written instead of failing
+  with "Unknown variable". Generated documents that used to contain the expanded secret value now
+  contain the `${secrets.NAME}` reference; known `${var}` placeholders are still substituted.
+
+- `env://` values returned by `AC_resolve_ref` / `AC_resolve_refs` are masked for the rest of the run
+  in logs, the journal and the MCP audit, and `value` / `resolved` are masked in the logged result and
+  the Script Builder result pane; the executor record and the MCP result still carry the value.
 
 - GUI: translated table and list cells follow a language switch, and 58 message-box titles,
   validation messages and result lines that were hard-coded English are translated.

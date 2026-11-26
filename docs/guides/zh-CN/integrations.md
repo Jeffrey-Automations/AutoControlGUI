@@ -104,6 +104,8 @@ RBAC viewer 不会取得列管的敏感读取工具，即使 MCP `readOnlyHint` 
 
 间隔／cron 调度、触发器、热键、watchdog 规则、webhook、e-mail 触发器与 observer 回调会保留注册者身份。每次触发重新检查来源用户文件与角色；已删除的用户、无法使用的来源文件与 viewer 不能执行后台工作。启动 daemon 不会改变已有工作的所有者。所有者信息不保存 RBAC bearer token；未带 `store_path` 的显式 Python `AuthorizationContext` 保留角色快照，未在 RBAC 下注册的工作会清除 worker 原有身份。observer／watchdog 回调使用独立变量作用域，watchdog 动作失败不会算成成功消除弹窗。嵌套回调会保留调用端的失败计数；webhook 所有者被撤销权限时响应 HTTP 403 与 `fired: false`。
 
+语音命令与 macro 也是保存的动作列表，但由其他人触发。`AC_voice_register` 与 `AC_define_macro`（以及 `ac_voice_register`）会记下注册者；`AC_voice_dispatch`／`AC_call_macro`（以及 `ac_voice_dispatch`）执行每个步骤时，包括嵌套内容与 `AC_parallel` 分支，都要求注册者与当前调用端同时具备该步骤需要的权限。被拒绝的步骤记为 `AuthorizationError`，列表其余部分按一般失败步骤的规则继续。来自用户文件的注册者会在触发时重新读取，所以已删除的用户注册的命令不再执行。executor 的 macro 表由所有服务器共享，因此每个身份只能重新定义自己的 macro；受信任的本机代码（没有 RBAC 作用域）可以重新定义任何 macro，它定义的 macro 也不能被用户替换。匿名 MCP session 本来就以 `mcp:<session>` operator 身份执行，所以即使 RBAC 关闭，它们的语音命令与 macro 在 GUI 或 Python 触发时仍受 operator 限制，重新连接的 session 也不能重新定义前一个 session 的 macro。RBAC 关闭且没有 MCP session 时行为不变。
+
 ### 远程桌面的线路协议
 
 TCP host 在发送 `AUTH_FAIL` 前就释放认证失败的 client 名额。Viewer 即使因错误 token、错误握手消息或拒绝批准而失败，也能立即重试，不必等待 socket 清理或日志完成；待处理握手仍有独立的资源上限。

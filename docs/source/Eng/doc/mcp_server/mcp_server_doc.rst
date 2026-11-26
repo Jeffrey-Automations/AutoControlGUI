@@ -351,6 +351,11 @@ share one file. Without a store, live MCP tool sessions use an operator principa
 host-management tools require an authenticated administrator. The stdio transport has no
 bearer token and uses the same operator ceiling for its live tool sessions.
 
+That principal is kept by what a session stores: a voice command it registers
+(``ac_voice_register``) or a macro it defines keeps operator limits when the GUI
+or Python later dispatches it, because each step must be allowed for both the
+registrant and the dispatcher, and a later session cannot redefine its macro.
+
 - A tool defaults to ``read_data`` for ``readOnlyHint`` and ``drive_input``
   otherwise, with explicit capability overrides. Sensitive reads require
   ``drive_input`` (operator/admin): clipboard and history, local document/data/SQL

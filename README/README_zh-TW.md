@@ -97,6 +97,8 @@ MCP 的 `tools/call` 以可停止的執行進行，列為 `mcp-…`。`notificat
 
 REST 主機資料讀取與對應 MCP 權限一致：排程、遠端 session、USB passthrough 狀態、loopback／remote 裝置清單及診斷需要 `read_data`。對應已註冊的狀態指令、`AC_probe_capabilities` 與 `AC_diagnose` 會在執行提供者之前檢查權限。唯讀標記不授予 viewer 存取權；operator／admin 仍可使用。USB 列舉／事件、保留的 inspector 統計與程序 metrics 也需要 `read_data`；`AC_list_usb_devices`、`AC_usb_recent_events`、`AC_inspector_recent`、`AC_inspector_summary` 同樣檢查此權限。Dashboard 各面板分別顯示缺少的權限並清除舊資料；session 重新整理成功後也會清除先前的錯誤狀態。未列入權限表格的 executor 指令仍屬另一項審查範圍。
 
+語音指令（`AC_voice_register`）與 macro（`AC_define_macro`）保留註冊者的權限：觸發或呼叫時，每個步驟必須註冊者與目前呼叫端都有權執行才會執行，因此存下的動作清單不會借用 admin 的權限，也不會在 GUI 或 Python 觸發時不經檢查就執行。只有 macro 的擁有者或受信任的本機程式碼可以重新定義它。匿名 MCP session 以受限的 operator 身分執行，所以即使 RBAC 關閉也適用；沒有 RBAC 且不經 MCP 時行為不變。每個具名 executor registry（`AC_cas_put`、`AC_dedup_check`、`AC_idempotency_begin`、`AC_bulkhead_run`、`AC_sequence_observe`、`AC_outbox_enqueue` 背後的 store、window、bulkhead、tracker 與 outbox）最多保存 1,024 個名稱（`MAX_REGISTRY_NAMES`）：既有名稱照常運作，新名稱會拋出 `RegistryFullError`，名稱只在程序結束時釋放。`AC_generate_sop` 與 `AC_generate_code` 會代換已知的 `${var}`，但 `${secrets.NAME}` 與尚未綁定的名稱（例如迴圈變數）照原樣寫出。`AC_resolve_ref`／`AC_resolve_refs` 取得的 `env://` 值仍回傳給呼叫端，但在該次執行剩下的期間，日誌、journal 與 MCP 稽核中都會遮罩，記錄的結果與 Script Builder 結果窗格也會遮罩。
+
 主機唯讀模式對外部提供的目錄及後續註冊套用相同限制，接收請求及重新核對身分後的呼叫都檢查混合用途參數。MCP 設定的失敗截圖需要可寫入的工具及重新核對後具輸入操作權限的呼叫者；唯讀呼叫與 viewer 不會觸發截圖。這不表示所有相依套件或診斷讀取均無初始化副作用。
 
 內部 Windows 行程記憶體準備工作新增映像檔量測，透過保留的唯讀 handle 執行有界雜湊並保留失敗清理供重試。這只是觀測到的檔案證據，不是已載入程式碼或 fixture 的身分證明；原生驗收尚未完成，且不提供任意位址記憶體工具。詳見[契約](../docs/process_memory_contract.md)。

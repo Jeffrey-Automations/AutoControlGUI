@@ -28,3 +28,6 @@
 未知指令則退回為可讀的名稱形式。使用者內容會做 HTML 轉義。對應
 ``AC_generate_sop`` / ``ac_generate_sop``(給 ``path`` 時寫檔,否則回傳
 結構化文件)。
+
+以 ``AC_generate_sop`` 執行時，``actions`` 與 ``title`` 中已知的 ``${var}`` 會代換，
+``${secrets.NAME}`` 與尚未綁定的名稱照原樣寫出。

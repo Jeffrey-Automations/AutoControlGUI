@@ -30,3 +30,7 @@ argument appended; unknown commands fall back to a readable form of the
 name. User content is HTML-escaped. Exposed as ``AC_generate_sop`` /
 ``ac_generate_sop`` (writes a file when ``path`` is given, else returns the
 structured document).
+
+Run as ``AC_generate_sop``, known ``${var}`` placeholders in ``actions`` and
+``title`` are substituted, while ``${secrets.NAME}`` and names not bound yet
+are written as they are.

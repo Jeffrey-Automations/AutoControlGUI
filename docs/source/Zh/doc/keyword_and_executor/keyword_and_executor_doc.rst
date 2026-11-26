@@ -167,3 +167,31 @@ JSON 陣列（關鍵字），由執行者解析並執行。
    from je_auto_control import executor
 
    print(executor.event_dict)
+
+
+存下的動作清單、具名 registry 與產生的文件
+==========================================
+
+**語音指令與 macro 同時檢查兩方權限。** ``AC_voice_register`` 與 ``AC_define_macro``
+會記下註冊動作清單的人。``AC_voice_dispatch`` 或 ``AC_call_macro`` 執行它時，每個步驟（包含巢狀內容與
+``AC_parallel`` 分支）都必須註冊者與目前呼叫端同時具備該步驟需要的權限才會執行；被拒絕的步驟記為
+``AuthorizationError``。因此存下的清單不會借用 admin 的權限，也不會在 GUI 或 Python 觸發時不經檢查就執行。
+來自使用者檔的註冊者會在觸發時重新讀取，所以已刪除使用者的清單不再執行。macro 表由所有伺服器共用：
+每個身分只能重新定義自己的 macro；受信任的本機程式碼（沒有 RBAC 範圍）可以重新定義任何 macro，它定義的 macro
+也不能被使用者取代。匿名 MCP session 以 ``mcp:<session>`` operator 身分執行，所以即使 RBAC 關閉也適用；
+不在 RBAC 與 MCP 之下時行為不變。
+
+**具名 registry 有上限。** ``AC_cas_put`` / ``AC_cas_get``、``AC_dedup_check``、
+``AC_idempotency_begin`` / ``_complete`` / ``_release``、``AC_bulkhead_run``、``AC_sequence_observe``
+與 ``AC_outbox_enqueue`` / ``AC_outbox_pending`` 背後的 store 每個最多保存 ``MAX_REGISTRY_NAMES``
+（1,024）個名稱。達到上限時既有名稱照常運作，也不會淘汰任何狀態；新名稱（包含讀取從未寫入過的名稱）會拋出指出該
+registry 的 ``RegistryFullError``。這些 registry 都沒有刪除或重設指令，名稱在程序結束時釋放。
+
+**產生的文件保留參照。** ``AC_generate_sop``（``actions``、``title``）與 ``AC_generate_code``（``source``）
+會代換已知的 ``${var}``（包含以變數組成的 ``source`` 路徑），但 ``${secrets.NAME}``、尚未綁定的名稱
+（文件描述的步驟自己設定的迴圈變數）、巢狀佔位符，以及存放本次執行已解析為機密之值的變數，都照原樣寫出。
+
+**解析出的 env:// 值會遮罩。** ``AC_resolve_ref`` 與 ``AC_resolve_refs`` 仍把 ``env://`` 值回傳給呼叫端，
+但會登記到本次執行的機密遮罩，所以該次執行剩下的期間日誌、journal 與 MCP 稽核都顯示 ``***``。
+``AC_resolve_ref`` 的 ``value`` 與 ``AC_resolve_refs`` 的 ``resolved`` 在記錄的結果與 Script Builder
+結果窗格中也會遮罩。``file://`` 的值不會登記。

@@ -180,3 +180,44 @@ To inspect the current executor command dictionary:
    from je_auto_control import executor
 
    print(executor.event_dict)
+
+
+Stored Action Lists, Named Registries and Generated Documents
+=============================================================
+
+**Voice commands and macros run with both authorities.** ``AC_voice_register``
+and ``AC_define_macro`` record who registered the action list. When
+``AC_voice_dispatch`` or ``AC_call_macro`` runs it, every step -- nested bodies
+and ``AC_parallel`` branches included -- runs only if both that registrant and
+the current caller have the capability the step needs; a refused step is
+recorded as an ``AuthorizationError``. A stored list therefore neither borrows
+an administrator's rights nor runs unchecked when the GUI or Python dispatches
+it. A store-backed registrant is re-read at dispatch, so a deleted user's lists
+stop running. The macro table is shared by every server: a principal may
+redefine only its own macros, while trusted local code (no RBAC scope) may
+redefine any and its macros cannot be replaced by a user. Anonymous MCP
+sessions act as an ``mcp:<session>`` operator, so this applies to them even with
+RBAC off; outside RBAC and MCP nothing changes.
+
+**Named registries are capped.** The stores behind ``AC_cas_put`` /
+``AC_cas_get``, ``AC_dedup_check``, ``AC_idempotency_begin`` / ``_complete`` /
+``_release``, ``AC_bulkhead_run``, ``AC_sequence_observe`` and
+``AC_outbox_enqueue`` / ``AC_outbox_pending`` hold at most
+``MAX_REGISTRY_NAMES`` (1,024) names each. At the cap an existing name keeps
+working and nothing is evicted; a new name, including a read of a name never
+written, raises ``RegistryFullError`` naming the registry. None has a delete or
+reset command, so names are released when the process ends.
+
+**Generated documents keep references.** ``AC_generate_sop`` (``actions``,
+``title``) and ``AC_generate_code`` (``source``) substitute known ``${var}``
+placeholders -- a ``source`` path built from variables included -- but write
+``${secrets.NAME}``, names not bound yet (a loop variable the documented steps
+set), nested placeholders and variables holding a value the run resolved as a
+secret exactly as written.
+
+**Resolved env:// values are masked.** ``AC_resolve_ref`` and
+``AC_resolve_refs`` still return ``env://`` values to the caller, but register
+them with the run's secret mask, so the log, the journal and the MCP audit show
+``***`` for the rest of the run. ``AC_resolve_ref``'s ``value`` and
+``AC_resolve_refs``'s ``resolved`` are masked in the logged result and the
+Script Builder result pane. ``file://`` values are not registered.

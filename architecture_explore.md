@@ -27,11 +27,11 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,626 |
-| 程式碼總行數 | 253,784 |
+| Python 模組總數（含周邊子專案） | 1,630 |
+| 程式碼總行數 | 254,134 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
-| 套件門面 `__all__` 公開名稱數 | 1513 |
+| 套件門面 `__all__` 公開名稱數 | 1515 |
 | GUI 分頁數（`main_widget` 註冊） | 51 |
 | MCP 工具數（`build_default_tool_registry()` 實測） | 823 |
 | `test_*.py` 測試檔／測試函式 | 846 / 8,825 |
@@ -100,7 +100,7 @@ USB/IP 協定、Prometheus 指標），以維持這條輕相依基線。
 | 模式 | 落點 | 說明 |
 | --- | --- | --- |
 | **Strategy** | `wrapper/platform_wrapper.py` | 依 `sys.platform` 只匯入當前 OS 的 `keyboard`／`mouse`／`screen`／`recorder` 實作；Linux 再細分 Wayland／X11，Wayland 後端不可用時自動退回 XWayland 並記警告。新增平台不需要改 wrapper。 |
-| **Facade** | `je_auto_control/__init__.py` | 把 1513 個公開名稱集中再匯出，使用者只 `import je_auto_control`。`api/core.py` 另提供一個小而穩定的版本化門面（7 個名稱）給新整合使用。 |
+| **Facade** | `je_auto_control/__init__.py` | 把 1515 個公開名稱集中再匯出，使用者只 `import je_auto_control`。`api/core.py` 另提供一個小而穩定的版本化門面（7 個名稱）給新整合使用。 |
 | **Command** | `utils/executor/action_executor.py` | `Executor.event_dict` 是字串 → callable 的分派表；JSON 動作檔即指令序列，因此可錄製、序列化、重播、簽章。 |
 | **Observer** | `utils/callback/`、`utils/observer/`、`utils/triggers/` | 動作完成後觸發回呼；畫面出現／消失／變化與外部事件（webhook／IMAP／檔案）驅動腳本。 |
 | **Template Method** | `utils/generate_report/` | HTML／JSON／XML 三個產生器共用「收集紀錄 → 格式化 → 寫檔」骨架，各自實作渲染。 |
@@ -168,9 +168,9 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
-| `je_auto_control/__init__.py` | 2,752 | **套件門面**。按首次存取解析 1513 個公開名稱，具體型別宣告與 `__all__` 保留原始來源及順序。 |
+| `je_auto_control/__init__.py` | 2,756 | **套件門面**。按首次存取解析 1515 個公開名稱，具體型別宣告與 `__all__` 保留原始來源及順序。 |
 | `je_auto_control/_lazy_exports.py` | 29 | 公開名稱的來源屬性／模組繫結與首次存取解析；保留並行的明確指派。 |
-| `je_auto_control/_export_bindings.py` | 1,850 | 由具體型別宣告產生的公開名稱來源查表；CI 檢查產生結果與順序。 |
+| `je_auto_control/_export_bindings.py` | 1,853 | 由具體型別宣告產生的公開名稱來源查表；CI 檢查產生結果與順序。 |
 | `je_auto_control/__main__.py` | 107 | 舊版 argparse 進入點：`-e` 執行單檔、`-d` 執行整個目錄、`--execute_str` 執行 JSON 字串、`-c` 建立專案。 |
 | `je_auto_control/cli.py` | 470 | **主 CLI**（`je_auto_control` console script）。子命令：`run`（含 `--var`／`--dry-run`／`--journal`）、`journal`（依 run 篩選與有界遮罩快照）、`validate`／`lint`、`list-commands`、`fmt`、`record`、`codegen`、`failure-bundle`、`list-jobs`、`start-server`（`--token`／`--token-file`／`--no-auth`）、`start-rest`、`version`。所有子命令延遲匯入，確保不碰 Qt。 |
 | `je_auto_control/api/__init__.py` | 100 | 版本化整合進入點。 |
@@ -296,7 +296,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 20,037 行。
+> 25 個套件、約 20,369 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -308,7 +308,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/decision_table/` | 112 | DMN 風格決策表：規則 + 命中策略，把分支外部化 |
 | `utils/deterministic/` | 116 | 決定性執行控制：固定亂數種子 + 凍結時鐘 |
 | `utils/action_journal/` | 866 | 結構化動作日誌：schema v1、寫入前遮罩、跨行程排序／尾端復原、executor 明確 scope 擷取與本機 parallel／DAG parent 傳遞；門面、AC／MCP、Script Builder 與 CLI 擷取／有界查閱；observer／路徑政策隨巢狀根與 workers 保留，Run History 查閱與手動 history 關聯共用相同來源。 |
-| `utils/executor/` | 10,963 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
+| `utils/executor/` | 11,250 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
 | `utils/flow_debugger/` | 166 | action list 的單步除錯器與追蹤器 |
 | `utils/input_macro/` | 490 | 定時輸入事件：錄製結果的整形（`timeline`／`InputRecorder`，Windows 與 macOS 共用）、重播與宣告式輸入序列 DSL |
 | `utils/json/` | 99 | action JSON 檔讀寫與正規化格式化（`fmt --check` 的後端） |
@@ -319,7 +319,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/project/` | 211 | 專案腳手架：建立目錄結構與範本 action 檔 |
 | `utils/recording_edit/` | 165 | 不重錄的前提下裁切／過濾／縮放已錄製的 action list |
 | `utils/saga/` | 115 | Saga 協調器：失敗時以 LIFO 補償動作回滾 |
-| `utils/script_vars/` | 377 | 執行期變數作用域、插值與 context-local vault guard；受管操作拒絕隱式秘密存取 |
+| `utils/script_vars/` | 422 | 執行期變數作用域、插值與 context-local vault guard；受管操作拒絕隱式秘密存取 |
 | `utils/skill_library/` | 145 | 具名可重用 action 序列（skill）的持久化倉庫 |
 | `utils/state_machine/` | 306 | 宣告式有限狀態機驅動 action JSON；預設動作跨狀態共享單次執行範圍 |
 | `utils/stubs/` | 325 | 為 `AC_*` 指令面產生型別 stub |
@@ -350,7 +350,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.3 排程、觸發與背景監看
 
-> 11 個套件、約 4,527 行。
+> 11 個套件、約 4,537 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -362,7 +362,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/scheduler/` | 512 | 間隔式與 cron 式的 action JSON 排程器 |
 | `utils/session_guard/` | 62 | 驅動輸入前先偵測工作階段是否已鎖定／非互動 |
 | `utils/triggers/` | 1,450 | 事件驅動觸發引擎：影像／視窗／像素／檔案／webhook／IMAP 郵件 |
-| `utils/voice/` | 99 | 語音指令路由：把辨識到的語句對應到 `AC_*` action list |
+| `utils/voice/` | 109 | 語音指令路由：把辨識到的語句對應到 `AC_*` action list |
 | `utils/watchdog/` | 232 | 背景彈窗／中斷看門狗；每條規則涵蓋 matcher／action 與錯誤日誌的秘密遮罩 |
 | `utils/watcher/` | 90 | 無頭輪詢原語：滑鼠位置、像素顏色、log tail |
 
@@ -669,7 +669,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.14 安全、機密與合規
 
-> 13 個套件、約 4,913 行。
+> 13 個套件、約 4,914 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -678,7 +678,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/governance/` | 263 | 治理：maker-checker 核准閘門與即時憑證租約 |
 | `utils/license_policy/` | 240 | 以 SBOM 元件評估 SPDX 授權允許／拒絕政策 |
 | `utils/provenance/` | 126 | SLSA 建置來源證明（in-toto v1） |
-| `utils/rbac/` | 2,063 | 角色型存取控制：使用者與權杖驗證、REST／MCP／executor 的能力政策，`deferred.py` 將背景工作綁定註冊者並在觸發時重新驗證來源 store；不保存 bearer token。；MCP 的 tool_classification.py 擁有明確畫面／呼叫者資料清單、標準別名與混合參數權限；未知唯讀提示要求 read_data；command_review.py 記錄 `COMMAND_CAPABILITIES` 以外每個 `AC_*` 指令的審查（只需提交入口的 drive_input），新指令未分類時 CI 失敗 |
+| `utils/rbac/` | 2,064 | 角色型存取控制：使用者與權杖驗證、REST／MCP／executor 的能力政策，`deferred.py` 將背景工作綁定註冊者並在觸發時重新驗證來源 store；不保存 bearer token。；MCP 的 tool_classification.py 擁有明確畫面／呼叫者資料清單、標準別名與混合參數權限；未知唯讀提示要求 read_data；command_review.py 記錄 `COMMAND_CAPABILITIES` 以外每個 `AC_*` 指令的審查（只需提交入口的 drive_input），新指令未分類時 CI 失敗 |
 | `utils/redaction/` | 573 | 截圖遮蔽層：規則偵測 + 政策 + 協調器（上傳 VLM 前先遮） |
 | `utils/sbom/` | 170 | SBOM（CycloneDX）產生 |
 | `utils/secret_ref/` | 242 | URI scheme 形式的值參照解析 |
@@ -755,19 +755,23 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_window.py` | 65 | Query a specified HWND's current owner and child windows without activation or input. |
 | `windows_native.py` | 113 | Typed Win32 query/read bindings and caller-sized memory information layouts. |
 
-#### `utils/executor/`（10,963 行）— 執行核心
+#### `utils/executor/`（11,250 行）— 執行核心
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
-| `action_executor.py` | 8,729 | `Executor` 類別與 `event_dict` 分派表（774 個指令），另含數百個把 utils 能力接成指令的 adapter 函式；全域單例 `executor` 與 `add_command_to_executor()` 擴充點。 |
-| `flow_control.py` | 727 | 真正的流程控制：`AC_loop`／`AC_for_each`／`AC_while_*`／`AC_if_*`／`AC_try`／`AC_retry`／`AC_parallel`／`AC_define_macro`／`AC_call_macro`／變數指令（`AC_set_var`／`AC_get_var`／`AC_inc_var`）。`LoopBreak`／`LoopContinue` 以例外實作。34 個區塊指令的分派表 `BLOCK_COMMANDS` 也在這裡，含下一列匯入的資料來源指令。 |
+| `action_executor.py` | 8,699 | `Executor` 類別與 `event_dict` 分派表（774 個指令），另含數百個把 utils 能力接成指令的 adapter 函式；全域單例 `executor` 與 `add_command_to_executor()` 擴充點。 |
+| `flow_control.py` | 730 | 真正的流程控制：`AC_loop`／`AC_for_each`／`AC_while_*`／`AC_if_*`／`AC_try`／`AC_retry`／`AC_parallel`／`AC_define_macro`／`AC_call_macro`／變數指令（`AC_set_var`／`AC_get_var`／`AC_inc_var`）。`LoopBreak`／`LoopContinue` 以例外實作。34 個區塊指令的分派表 `BLOCK_COMMANDS` 也在這裡，含下一列匯入的資料來源指令。 |
 | `flow_data_commands.py` | 275 | `AC_*_to_var` 資料來源與轉換指令：shell、時鐘、亂數、PDF、TOTP、SQL、檔案、HTTP、OCR，加上 `AC_assert_var`／`AC_assert_db`／`AC_assert_duration`／`AC_transform_var`。都不執行巢狀 action list，所以沒有迴圈／分支語意。 |
 | `action_schema.py` | 225 | action list 的結構驗證：形狀、參數型別、未知指令拒絕。單一走訪同時支援兩種消費方式：`validate_actions()` 遇到第一個問題就拋、`unknown_command_names()` 收齊全部不認得的名字（REST `/execute` 用它回 400）。 |
-| `action_redaction.py` | 227 | 記錄與紀錄鍵用的遮蔽：`AC_secret_*` 的參數（金庫通行碼、機密值）在寫進 log、當成結果紀錄的鍵之前換成 `***`，巢狀在區塊指令裡的也一樣。 |
+| `action_redaction.py` | 252 | 記錄與紀錄鍵用的遮蔽：`AC_secret_*` 的參數（金庫通行碼、機密值）在寫進 log、當成結果紀錄的鍵之前換成 `***`，巢狀在區塊指令裡的也一樣；結果中名稱敏感的欄位與 `RESULT_SECRETS` 列出的欄位（`AC_resolve_ref` 的 `value`、`AC_resolve_refs` 的 `resolved`）也遮蔽。 |
 | `adapter_args.py` | 34 | executor adapter 共用的參數檢查：JSON 字串必須解成清單、門檻必須是有限數字。 |
 | `mouse_aliases.py` | 40 | 單鍵點擊別名（`AC_click_left` 等），executor 與 callback executor 共用。 |
 | `containment.py` | 35 | Bring an error from outside the framework family into the executor's per-action containment. |
 | `flags.py` | 19 | 旗標讀取 `as_bool`：依拼法（`"true"`／`"yes"`／`"on"`／`"1"`）而非 Python 真值判斷，所以 JSON、CLI、MCP 傳來的 `"false"` 是關；所有 adapter 與流程指令共用。 |
+| `registrant_authority.py` | 97 | 存下的動作清單只在註冊者與目前呼叫端都允許時執行：`registrant_and_caller()` 以 command guard 逐步檢查語音指令與 macro 的每一步（含巢狀與 `AC_parallel` 分支）；`define_macro()` 拒絕一個身分重新定義另一個身分的 macro（受信任的本機程式碼除外）。 |
+| `named_registry.py` | 78 | `AC_cas_*`／`AC_dedup_check`／`AC_idempotency_*`／`AC_bulkhead_run`／`AC_sequence_observe`／`AC_outbox_*` 背後的全程序具名表，各自最多 `MAX_REGISTRY_NAMES`（1,024）個名稱；新名稱超過上限拋 `RegistryFullError`，既有名稱照常運作，永不淘汰。 |
+| `document_commands.py` | 52 | `AC_generate_sop`／`AC_generate_code` 的 adapter：寫出的文件保留機密參照，已知 `${var}` 照常代換，`${secrets.*}` 與尚未綁定的名稱照原樣保留。 |
+| `ref_commands.py` | 62 | `AC_resolve_ref`／`AC_resolve_refs` 的 adapter：回傳參照的值，但 `env://` 的值登記到本次執行的機密遮罩，不以明文進日誌、journal 與 MCP 稽核。 |
 
 #### `utils/mcp_server/`（22,565 行，823 個工具）— 最大子系統
 
@@ -1643,9 +1647,9 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `gui/` | 171 | 46,385 |
 | `utils/mcp_server/` | 63 | 22,565 |
 | `utils/remote_desktop/` | 77 | 17,407 |
-| `utils/executor/` | 13 | 10,963 |
+| `utils/executor/` | 17 | 11,250 |
 | `utils/usb/` | 22 | 5,558 |
-| `je_auto_control/`（頂層 3 檔） | 5 | 5,208 |
+| `je_auto_control/`（頂層 3 檔） | 5 | 5,215 |
 | `utils/accessibility/` | 17 | 3,524 |
 | `wrapper/` | 25 | 6,104 |
 | `windows/` | 24 | 2,405 |
@@ -1660,8 +1664,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,098 |
-| **總計** | **1,614** | **253,035** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,154 |
+| **總計** | **1,618** | **253,385** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

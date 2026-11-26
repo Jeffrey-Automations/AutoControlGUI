@@ -97,6 +97,8 @@ MCP 的 `tools/call` 以可停止的执行进行，列为 `mcp-…`。`notificat
 
 REST 主机数据读取与对应 MCP 权限一致：调度、远程 session、USB passthrough 状态、loopback／remote 设备列表及诊断需要 `read_data`。对应已注册的状态命令、`AC_probe_capabilities` 与 `AC_diagnose` 会在运行提供者之前检查权限。只读标记不授予 viewer 访问权；operator／admin 仍可使用。USB 枚举／事件、保留的 inspector 统计与进程 metrics 也需要 `read_data`；`AC_list_usb_devices`、`AC_usb_recent_events`、`AC_inspector_recent`、`AC_inspector_summary` 同样检查此权限。Dashboard 各面板分别显示缺少的权限并清除旧数据；session 刷新成功后也会清除先前的错误状态。未列入权限表的 executor 命令仍属于另一项审查范围。
 
+语音命令（`AC_voice_register`）与 macro（`AC_define_macro`）保留注册者的权限：触发或调用时，每个步骤必须注册者与当前调用端都有权执行才会执行，因此保存的动作列表不会借用 admin 的权限，也不会在 GUI 或 Python 触发时不经检查就执行。只有 macro 的所有者或受信任的本机代码可以重新定义它。匿名 MCP session 以受限的 operator 身份执行，所以即使 RBAC 关闭也适用；没有 RBAC 且不经 MCP 时行为不变。每个具名 executor registry（`AC_cas_put`、`AC_dedup_check`、`AC_idempotency_begin`、`AC_bulkhead_run`、`AC_sequence_observe`、`AC_outbox_enqueue` 背后的 store、window、bulkhead、tracker 与 outbox）最多保存 1,024 个名称（`MAX_REGISTRY_NAMES`）：已有名称照常运作，新名称会抛出 `RegistryFullError`，名称只在进程结束时释放。`AC_generate_sop` 与 `AC_generate_code` 会替换已知的 `${var}`，但 `${secrets.NAME}` 与尚未绑定的名称（例如循环变量）按原样写出。`AC_resolve_ref`／`AC_resolve_refs` 获取的 `env://` 值仍返回给调用端，但在该次运行剩余的期间，日志、journal 与 MCP 审计中都会遮罩，记录的结果与 Script Builder 结果窗格也会遮罩。
+
 主机只读模式对外部提供的目录及后续注册应用相同限制，接收请求及重新核对身份后的调用都检查混合用途参数。MCP 配置的失败截图需要可写入的工具及重新核对后具输入操作权限的调用者；只读调用与 viewer 不会触发截图。这不表示所有依赖包或诊断读取均无初始化副作用。
 
 内部 Windows 进程内存准备工作新增映像文件测量，通过保留的只读 handle 执行有界哈希并保留失败清理供重试。这只是观察到的文件证据，不是已加载代码或 fixture 的身份证明；原生验收尚未完成，且不提供任意地址内存工具。详见[契约](../docs/process_memory_contract.md)。

@@ -38,6 +38,9 @@ governance 憑證 broker。``resolve_refs_in`` 走訪巢狀 dict/list 並就地�
 會丟 ``SecretRefError``：祕密的值不進這些紀錄。需要值的步驟請引用 ``${secrets.NAME}``，或在 Python
 裡呼叫 ``resolve_ref``。
 
+``env://`` 的值仍會回傳，但會登記到本次執行的機密遮罩：日誌、journal 與 MCP 稽核中顯示 ``***``，
+記錄的結果與 Script Builder 結果窗格也會遮罩 ``value`` / ``resolved``。
+
 ``RefResolver`` 有兩個選用的限制，沒給就不生效：``env_allowlist``（``env://`` 只能讀的變數名稱，
 可用 ``fnmatch`` 樣式）與 ``path_policy``（``PathPolicy``，``file://`` 必須留在它的根目錄內）。
 ``RefResolver.check_all(obj)`` 只檢查一個結構、不讀取任何東西。MCP 伺服器依

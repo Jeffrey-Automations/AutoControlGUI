@@ -55,3 +55,6 @@ Command                          Effect
 The same operations are exposed as MCP tools (``ac_voice_register`` /
 ``ac_voice_dispatch`` / ``ac_voice_list`` / ``ac_voice_clear``) and as Script
 Builder commands under **Agent**.
+
+A command keeps its registrant's authority: on dispatch each step runs only if
+both the registrant and the current caller may run it.
