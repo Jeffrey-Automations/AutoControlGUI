@@ -131,8 +131,7 @@ class _ViewerFilesMixin(_ViewerPanelPart):
                                 self._uploads_done, self._transfer_failed):
             QMessageBox.information(self, "WebRTC", _t("rd_file_busy"))
             return
-        self._status_label.setText(
-            _t("rd_file_sending").replace("{name}", os.path.basename(names[0])))
+        self._status.show("rd_file_sending", name=os.path.basename(names[0]))
 
     def _transfer_failed(self, error: object) -> None:
         QMessageBox.warning(self, "WebRTC", str(error))
@@ -140,9 +139,7 @@ class _ViewerFilesMixin(_ViewerPanelPart):
     def _uploads_done(self, outcome: Tuple[int, Optional[str]]) -> None:
         sent, last_error = outcome
         if sent:
-            self._status_label.setText(
-                _t("rd_webrtc_upload_done").format(n=sent),
-            )
+            self._status.show("rd_webrtc_upload_done", n=sent)
             QTimer.singleShot(500, self, self._on_browse_refresh)
         if last_error is not None and sent == 0:
             QMessageBox.warning(self, "WebRTC", last_error)
@@ -168,9 +165,7 @@ class _ViewerFilesMixin(_ViewerPanelPart):
 
     def _on_inbox_op_result(self, name: str, ok: bool, error: object) -> None:
         if ok:
-            self._status_label.setText(
-                _t("rd_webrtc_browse_op_ok").format(name=name),
-            )
+            self._status.show("rd_webrtc_browse_op_ok", name=name)
             # Refresh listing so the table reflects the change
             try:
                 if self._viewer is not None and self._viewer.authenticated:
@@ -201,12 +196,10 @@ class _ViewerFilesMixin(_ViewerPanelPart):
                                 functools.partial(self._file_sent, path), self._transfer_failed):
             QMessageBox.information(self, "WebRTC", _t("rd_file_busy"))
             return
-        self._status_label.setText(_t("rd_file_sending").replace("{name}", os.path.basename(path)))
+        self._status.show("rd_file_sending", name=os.path.basename(path))
 
     def _file_sent(self, path: str, _outcome: object) -> None:
-        self._status_label.setText(
-            _t("rd_webrtc_file_sent").format(name=path),
-        )
+        self._status.show("rd_webrtc_file_sent", name=path)
 
     def _on_received_file(self, path: object) -> None:
         # Called from the asyncio thread, which has no Qt event loop:
@@ -215,9 +208,7 @@ class _ViewerFilesMixin(_ViewerPanelPart):
         self._signals.file_received.emit(path)
 
     def _on_file_received_ui(self, path: object) -> None:
-        self._status_label.setText(
-            _t("rd_webrtc_file_received").format(name=str(path)),
-        )
+        self._status.show("rd_webrtc_file_received", name=str(path))
 
 
 def _is_cancelled(token: CancellationToken) -> bool:

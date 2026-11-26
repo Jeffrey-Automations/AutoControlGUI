@@ -63,17 +63,17 @@ class _HostTrustMixin(_HostPanelPart):
                                 functools.partial(self._push_done, path), self._push_failed):
             QMessageBox.information(self, "WebRTC", _t("rd_file_busy"))
             return
-        self._status_label.setText(_t("rd_file_sending").replace("{name}", os.path.basename(path)))
+        self._status.show("rd_file_sending", name=os.path.basename(path))
 
     def _push_done(self, path: str, sent: object) -> None:
-        self._status_label.setText("")
+        self._status.show_plain("")
         QMessageBox.information(
             self, "WebRTC",
             _t("rd_webrtc_push_done").format(n=sent, name=path),
         )
 
     def _push_failed(self, error: object) -> None:
-        self._status_label.setText("")
+        self._status.show_plain("")
         QMessageBox.warning(self, "WebRTC", str(error))
 
     def _on_export_trust(self) -> None:

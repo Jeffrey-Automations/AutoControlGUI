@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QPushButton, QSpinBox, QTextEdit, QVBoxLayout,
 )
 
+from je_auto_control.gui._i18n_helpers import KeyedText
 from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
@@ -79,8 +80,10 @@ class _ViewerUiMixin(_ViewerPanelPart):
     def _build_session_card(self) -> Card:
         """Status, the in-session actions and the live link statistics."""
         card = Card()
-        self._status_label = QLabel(_t("rd_webrtc_status_idle"))
+        self._status_label = QLabel()
         self._status_label.setWordWrap(True)
+        self._status = KeyedText(self._status_label)
+        self._status.show("rd_webrtc_status_idle")
         set_role(self._status_label, "hint")
         card.add(self._status_label)
         self._cad_btn = self._tr(QPushButton(), "rd_webrtc_send_cad")
@@ -108,9 +111,12 @@ class _ViewerUiMixin(_ViewerPanelPart):
         self._quality_dot.setStyleSheet(
             _QUALITY_DOT_STYLE,
         )
-        self._quality_dot.setToolTip(_t("rd_webrtc_quality_unknown"))
+        self._quality_tip = KeyedText(self._quality_dot, "setToolTip")
+        self._quality_tip.show("rd_webrtc_quality_unknown")
         stats_row.addWidget(self._quality_dot)
-        self._stats_label = QLabel(_t("rd_webrtc_stats_idle"))
+        self._stats_label = QLabel()
+        self._stats_text = KeyedText(self._stats_label)
+        self._stats_text.show("rd_webrtc_stats_idle")
         self._stats_label.setStyleSheet("font-family: 'Consolas', monospace;")
         set_role(self._stats_label, "hint")
         self._stats_label.setWordWrap(True)

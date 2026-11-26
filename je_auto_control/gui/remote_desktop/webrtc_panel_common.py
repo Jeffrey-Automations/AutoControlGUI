@@ -10,7 +10,7 @@ from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QLabel, QLineEdit, QWidget
 
 from je_auto_control.gui.remote_desktop._webrtc_types import AvFrameT, WebRTCConfigT
-from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._i18n_helpers import KeyedText, TranslatableMixin
 from je_auto_control.gui._slow_op import StopQueue
 from je_auto_control.gui._weak_call import weak_slot
 from je_auto_control.gui.remote_desktop._helpers import _t
@@ -80,6 +80,7 @@ class _PanelPart(TranslatableMixin, QWidget):
     # Set by each panel's __init__: shutdowns of sessions the panel let go of.
     _stops: StopQueue
     _status_label: QLabel
+    _status: KeyedText          # what _status_label shows, kept as a key for a language switch
     _signals: _PanelSignals
     _stun_edit: QLineEdit
     _turn_edit: QLineEdit
@@ -93,12 +94,12 @@ class _PanelPart(TranslatableMixin, QWidget):
     def _show_idle(self) -> None:
         """Show "idle" -- or "stopping" while a session this panel let go of is still closing."""
         key = "gui_op_stopping" if self._stops.pending else "rd_webrtc_status_idle"
-        self._status_label.setText(_t(key))
+        self._status.show(key)
 
     def _on_stops_drained(self) -> None:
         """GUI thread: the last shutdown reported; a "stopping" still on show becomes "idle"."""
         if self._status_label.text() == _t("gui_op_stopping"):
-            self._status_label.setText(_t("rd_webrtc_status_idle"))
+            self._status.show("rd_webrtc_status_idle")
 
 
 def start_panel_task(panel: QWidget, attribute: str, work: Callable[..., object],

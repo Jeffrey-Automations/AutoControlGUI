@@ -12,8 +12,13 @@ it made the widget a reference cycle, so dropping one never freed it: it stayed
 a live window until the cycle collector ran, and the collector destroyed the
 C++ object wherever it happened to be — on Python 3.10/3.11 that can be in the
 middle of a PySide call that is still walking a list of widgets.
+
+A text that changes with the widget's state -- a status line, a quality hint --
+is shown through a :class:`KeyedText`, which keeps the catalogue key and its
+fields rather than the rendered string, so the owner's ``retranslate`` can show
+it again in the new language.
 """
-from typing import List, Optional, Tuple, TypeVar
+from typing import Callable, List, Optional, Tuple, TypeVar
 
 from PySide6.QtWidgets import (
     QAbstractButton, QGroupBox, QLabel, QLineEdit, QTabWidget, QWidget,
@@ -77,3 +82,41 @@ class TranslatableMixin:
                 tab_widget.setTabText(index, language_wrapper.translate(key, key))
             except RuntimeError:
                 continue
+
+
+class KeyedText:
+    """One text of a widget (``setText`` by default), set from a catalogue key so a language switch re-reads it."""
+
+    def __init__(self, widget: QWidget, setter: str = "setText") -> None:
+        self._apply = getattr(widget, setter)
+        self._render: Optional[Callable[[], str]] = None
+
+    def show(self, key: str, **fields: object) -> None:
+        """Show ``key`` with each ``{field}`` replaced, now and on every :meth:`retranslate`."""
+        self.show_rendered(lambda: _fill(language_wrapper.translate(key, key), fields))
+
+    def show_rendered(self, render: Callable[[], str]) -> None:
+        """Show what ``render`` returns, calling it again on every :meth:`retranslate`."""
+        self._render = render
+        self._apply(render())
+
+    def show_plain(self, text: str) -> None:
+        """Show ``text`` as it is: data, or a text a later update replaces anyway."""
+        self._render = None
+        self._apply(text)
+
+    def retranslate(self) -> None:
+        """Show the remembered key again in the active language."""
+        if self._render is None:
+            return
+        try:
+            self._apply(self._render())
+        except RuntimeError:
+            self._render = None     # the widget was destroyed
+
+
+def _fill(template: str, fields: dict[str, object]) -> str:
+    """Replace each ``{name}`` of ``template``; a translation that leaves one out is not an error."""
+    for name, value in fields.items():
+        template = template.replace("{" + name + "}", str(value))
+    return template

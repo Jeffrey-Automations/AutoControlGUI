@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._dispose import release_resources
-from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._i18n_helpers import KeyedText, TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -57,6 +57,7 @@ class FlakinessTab(TranslatableMixin, QWidget):
         self._group_by = QComboBox()
         self._group_by.addItems(["script_path", "source_id"])
         self._status = QLabel()
+        self._status_text = KeyedText(self._status)
         self._reports = TabTask(self)       # the report queries the run-history store
         self._reports.result.connect(self._show_report)
         self._reports.error.connect(self._show_error)
@@ -71,7 +72,7 @@ class FlakinessTab(TranslatableMixin, QWidget):
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
         self._apply_headers()
-        self._refresh()
+        self._status_text.retranslate()     # not a new query: one may still be running
 
     def _apply_headers(self) -> None:
         self._table.setHorizontalHeaderLabels([_t(k) for k in _COLUMN_KEYS])
@@ -98,23 +99,19 @@ class FlakinessTab(TranslatableMixin, QWidget):
     def _refresh(self) -> None:
         work = functools.partial(analyze_flakiness, limit=self._limit.value(), min_runs=self._min_runs.value(),
                                  group_by=self._group_by.currentText())
-        self._status.setText(_t("task_running" if self._reports.start(work) else "task_busy"))
+        self._status_text.show("task_running" if self._reports.start(work) else "task_busy")
 
     def _show_error(self, error: object) -> None:
-        self._status.setText(str(error))
+        self._status_text.show_plain(str(error))
 
     def _show_report(self, report: FlakinessReport) -> None:
         self._table.setRowCount(len(report.entries))
         for row, entry in enumerate(report.entries):
             self._set_row(row, entry)
         if report.total_groups:
-            self._status.setText(
-                _t("flaky_summary")
-                .replace("{flaky}", str(report.flaky_count))
-                .replace("{total}", str(report.total_groups)),
-            )
+            self._status_text.show("flaky_summary", flaky=report.flaky_count, total=report.total_groups)
         else:
-            self._status.setText(_t("flaky_summary_empty"))
+            self._status_text.show("flaky_summary_empty")
 
     def _set_row(self, row: int, entry: FlakyEntry) -> None:
         values = (

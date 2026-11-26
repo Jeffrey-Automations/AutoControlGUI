@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QPushButton, QSizePolicy, QSpinBox, QTableWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._i18n_helpers import KeyedText
 from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui.adaptive.flow_layout import flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
@@ -62,8 +63,10 @@ class _HostUiMixin(_HostPanelPart):
     def _build_sessions_card(self) -> Card:
         """Status line, the live sessions table and what can be done to a session."""
         card = Card()
-        self._status_label = QLabel(_t("rd_webrtc_status_idle"))
+        self._status_label = QLabel()
         self._status_label.setWordWrap(True)
+        self._status = KeyedText(self._status_label)
+        self._status.show("rd_webrtc_status_idle")
         set_role(self._status_label, "hint")
         card.add(self._status_label)
         sessions_row = QHBoxLayout()
@@ -72,7 +75,8 @@ class _HostUiMixin(_HostPanelPart):
         self._host_quality_dot.setStyleSheet(
             _QUALITY_DOT_STYLE,
         )
-        self._host_quality_dot.setToolTip(_t("rd_webrtc_quality_unknown"))
+        self._host_quality_tip = KeyedText(self._host_quality_dot, "setToolTip")
+        self._host_quality_tip.show("rd_webrtc_quality_unknown")
         sessions_row.addWidget(self._host_quality_dot)
         self._sessions_label = QLabel(_t("rd_webrtc_sessions_count").format(n=0))
         sessions_row.addWidget(self._sessions_label, stretch=1)

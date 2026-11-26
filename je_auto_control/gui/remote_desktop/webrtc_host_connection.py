@@ -144,7 +144,7 @@ class _HostConnectionMixin(_HostPanelPart):
         self._publish_loop.offer_published.connect(self._on_loop_offer_published)
         self._publish_loop.session_connected.connect(self._on_loop_session_connected)
         self._publish_loop.failed.connect(self._on_signaling_failed)
-        self._status_label.setText(_t("rd_webrtc_publishing_offer"))
+        self._status.show("rd_webrtc_publishing_offer")
         self._publish_loop.start()
         self._start_lan_advertise()
 
@@ -189,7 +189,7 @@ class _HostConnectionMixin(_HostPanelPart):
 
     def _on_signaling_failed(self, message: str) -> None:
         QMessageBox.warning(self, "WebRTC", as_plain(message))      # may quote the signaling server
-        self._status_label.setText(_t("rd_webrtc_status_idle"))
+        self._status.show("rd_webrtc_status_idle")
 
     def _on_generate_offer(self) -> None:
         if refused_on(self._status_label, "AC_start_webrtc_host"):
@@ -205,7 +205,7 @@ class _HostConnectionMixin(_HostPanelPart):
             self._show_error(error)
             return
         self._set_hosting(True)
-        self._status_label.setText(_t("rd_webrtc_generating_offer"))
+        self._status.show("rd_webrtc_generating_offer")
         self._offer_view.setPlainText("")
         QTimer.singleShot(0, self, self._produce_offer)
 
@@ -243,7 +243,7 @@ class _HostConnectionMixin(_HostPanelPart):
         session_id, offer = owned.session_id, owned.sdp
         self._manual_session_id = session_id
         self._offer_view.setPlainText(offer)
-        self._status_label.setText(_t("rd_webrtc_offer_ready"))
+        self._status.show("rd_webrtc_offer_ready")
 
     def _on_apply_answer(self) -> None:
         if self._multi_host is None or not self._manual_session_id:
@@ -260,13 +260,13 @@ class _HostConnectionMixin(_HostPanelPart):
                             functools.partial(_accept_answer, host, session_id, answer),
                             functools.partial(self._answer_applied, host, session_id),
                             functools.partial(self._show_offer_error, host)):
-            self._status_label.setText(_t("task_running"))
+            self._status.show("task_running")
 
     def _answer_applied(self, host: MultiViewerHostT, session_id: str, _outcome: object) -> None:
         """GUI thread: the answer was accepted -- unless the host was stopped meanwhile."""
         if self._multi_host is not host:
             return
-        self._status_label.setText(_t("rd_webrtc_answer_applied"))
+        self._status.show("rd_webrtc_answer_applied")
         if self._manual_session_id == session_id:
             self._manual_session_id = None  # consumed; next Generate creates new session
 

@@ -12,6 +12,7 @@ pytest.importorskip("aiortc")
 
 from PySide6.QtWidgets import QApplication, QComboBox, QLabel
 
+from je_auto_control.gui._i18n_helpers import KeyedText
 from je_auto_control.gui.remote_desktop import advanced_group, webrtc_host_media, webrtc_panel
 
 
@@ -58,7 +59,7 @@ def test_missing_codec_actions_report_failure(qapp, monkeypatch, codec):
     combo = QComboBox()
     combo.addItem("selected", codec)
     label = QLabel()
-    panel = SimpleNamespace(_hw_codec_combo=combo, _status_label=label)
+    panel = SimpleNamespace(_hw_codec_combo=combo, _status_label=label, _status=KeyedText(label))
     webrtc_panel._WebRTCHostPanel._on_hw_codec_changed(panel)
     expected = (webrtc_panel._t("rd_webrtc_hw_codec_failed").format(codec=codec)
                 if codec else webrtc_panel._t("rd_webrtc_unavailable"))

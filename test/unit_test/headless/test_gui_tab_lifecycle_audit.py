@@ -398,3 +398,61 @@ def test_a_language_switch_reaches_the_count_line(qapp, module, name, label):
         for tab in tabs:
             getattr(tab, "dispose", tab.close)()
             tab.deleteLater()
+
+
+def _in_language(key, **fields):
+    from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
+    text = language_wrapper.translate(key, key)
+    for name, value in fields.items():
+        text = text.replace("{" + name + "}", str(value))
+    return text
+
+
+def test_a_language_switch_reaches_state_texts_and_quality_hints(qapp, monkeypatch):
+    pytest.importorskip("av")
+    pytest.importorskip("aiortc")
+    from headless._qt_settle import pump_until
+    from je_auto_control.gui import flakiness_tab
+    from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
+    from je_auto_control.gui.rbac_users_panel import RbacUsersPanel
+    from je_auto_control.gui.remote_desktop.webrtc_panel import _WebRTCHostPanel, _WebRTCViewerPanel
+    from je_auto_control.utils.flakiness import FlakinessReport
+    from je_auto_control.utils.remote_desktop.webrtc_stats import StatsSnapshot
+    monkeypatch.setattr(flakiness_tab, "analyze_flakiness",
+                        lambda **_kwargs: FlakinessReport(generated_at=0.0, group_by="script",
+                                                          total_groups=3, flaky_count=1))
+    previous, built = language_wrapper.language, []
+    try:
+        language_wrapper.reset_language("English")
+        host, viewer, users = _WebRTCHostPanel(), _WebRTCViewerPanel(), RbacUsersPanel()
+        flaky = flakiness_tab.FlakinessTab()
+        built += [host, viewer, users, flaky]
+        host._update_host_quality_dot(StatsSnapshot(rtt_ms=300.0))
+        viewer._update_quality_dot(StatsSnapshot(rtt_ms=20.0))
+        viewer._auto_reconnect_check.setChecked(True)
+        for edit in (viewer._server_edit, viewer._host_id_edit, viewer._token_edit):
+            edit.setText("127.0.0.1")
+        viewer._maybe_schedule_auto_reconnect()
+        viewer._reconnect_timer.stop()
+        users._path_input.clear()
+        users._reload()
+        assert pump_until(lambda: not flaky._reports.running)
+        language_wrapper.reset_language("Japanese")
+        for widget in built:
+            widget.retranslate()
+        assert host._status_label.text() == _in_language("rd_webrtc_status_idle")
+        assert host._host_quality_dot.toolTip() == _in_language("rd_webrtc_quality_poor")
+        assert viewer._quality_dot.toolTip() == _in_language("rd_webrtc_quality_good")
+        assert viewer._stats_label.text() == _in_language("rd_webrtc_stats_idle")
+        maximum = viewer._reconnect_max_spin.value()
+        assert viewer._status_label.text() == _in_language("rd_webrtc_reconnecting", n=1, max=maximum)
+        assert viewer._sync_btn.text() == _in_language("rd_webrtc_sync_start")     # its section is collapsed
+        assert users._status_label.text() == _in_language("rest_users_no_store")
+        assert flaky._status.text() == _in_language("flaky_summary", flaky=1, total=3)
+        assert not flaky._reports.running, "a language switch ran the report again"
+    finally:
+        language_wrapper.reset_language(previous)
+        for widget in built:
+            getattr(widget, "dispose", widget.close)()
+            widget.deleteLater()
+        _flush_deletes(qapp)

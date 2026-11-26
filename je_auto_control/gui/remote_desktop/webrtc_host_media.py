@@ -65,7 +65,7 @@ class _HostMediaMixin(_HostPanelPart):
             key = "rd_webrtc_hw_codec_active"
         else:
             key = "rd_webrtc_hw_codec_failed"
-        self._status_label.setText(_t(key).format(codec=codec))
+        self._status.show(key, codec=codec)
 
     def _on_toggle_accept_viewer_video(self, value: bool) -> None:
         if self._multi_host is None:
@@ -233,13 +233,13 @@ class _HostMediaMixin(_HostPanelPart):
         self._host_quality_dot.setStyleSheet(
             f"background-color: {color}; border-radius: 7px;",
         )
-        self._host_quality_dot.setToolTip(_t(tip_key))
+        self._host_quality_tip.show(tip_key)
 
     def _reset_host_quality_dot(self) -> None:
         self._host_quality_dot.setStyleSheet(
             _QUALITY_DOT_STYLE,
         )
-        self._host_quality_dot.setToolTip(_t("rd_webrtc_quality_unknown"))
+        self._host_quality_tip.show("rd_webrtc_quality_unknown")
 
     def _stop_adaptive(self) -> None:
         # Stays on the GUI thread: StatsPoller.stop() cannot block (see its docstring),

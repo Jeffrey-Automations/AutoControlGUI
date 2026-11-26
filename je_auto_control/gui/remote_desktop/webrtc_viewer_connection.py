@@ -83,7 +83,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
             return
         self._user_initiated_disconnect = False
         self._stop_viewer_if_any()
-        self._status_label.setText(_t("rd_webrtc_polling_offer"))
+        self._status.show("rd_webrtc_polling_offer")
         self._offer_worker = ViewerSignalingWorker(
             server_url=self._server_edit.text().strip(),
             host_id=self._host_id_edit.text().strip(),
@@ -99,7 +99,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         except (ValueError, RuntimeError, OSError) as error:
             self._show_error(error)
             return
-        self._status_label.setText(_t("rd_webrtc_creating_answer"))
+        self._status.show("rd_webrtc_creating_answer")
         QTimer.singleShot(0, self, lambda: self._answer_and_push(offer_sdp))
 
     def _answer_and_push(self, offer_sdp: str) -> None:
@@ -146,7 +146,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
                 submit_panel_call(self, functools.partial(
                     self._known_hosts.remember_dtls_fingerprint, host_id, new_fp))
         self._answer_view.setPlainText(answer)
-        self._status_label.setText(_t("rd_webrtc_pushing_answer"))
+        self._status.show("rd_webrtc_pushing_answer")
         self._answer_worker = ViewerAnswerPushWorker(
             server_url=self._server_edit.text().strip(),
             host_id=self._host_id_edit.text().strip(),
@@ -158,11 +158,11 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         self._answer_worker.start()
 
     def _on_answer_pushed(self) -> None:
-        self._status_label.setText(_t("rd_webrtc_waiting_auth"))
+        self._status.show("rd_webrtc_waiting_auth")
 
     def _on_signaling_failed(self, message: str) -> None:
         QMessageBox.warning(self, "WebRTC", as_plain(message))      # may quote the signaling server
-        self._status_label.setText(_t("rd_webrtc_status_idle"))
+        self._status.show("rd_webrtc_status_idle")
 
     def _on_create_answer(self) -> None:
         if not self._validate_required_fields(needs_server=False):
@@ -177,7 +177,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         except (ValueError, RuntimeError, OSError) as error:
             self._show_error(error)
             return
-        self._status_label.setText(_t("rd_webrtc_creating_answer"))
+        self._status.show("rd_webrtc_creating_answer")
         QTimer.singleShot(0, self, lambda: self._produce_answer(offer))
 
     def _require_viewer(self) -> WebRTCDesktopViewerT:
@@ -192,7 +192,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
 
     def _show_manual_answer(self, answer: str) -> None:
         self._answer_view.setPlainText(answer)
-        self._status_label.setText(_t("rd_webrtc_answer_ready"))
+        self._status.show("rd_webrtc_answer_ready")
 
     def _on_stop(self) -> None:
         self._user_initiated_disconnect = True
@@ -272,7 +272,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
 
     def _on_auth(self, ok: bool) -> None:
         key = "rd_webrtc_auth_ok" if ok else "rd_webrtc_auth_fail"
-        self._status_label.setText(_t(key))
+        self._status.show(key)
         if ok:
             self._auto_reconnect_attempts = 0  # reset on successful auth
             host_id = self._host_id_edit.text().strip()
@@ -307,7 +307,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         max_attempts = int(self._reconnect_max_spin.value())
         base_delay_s = int(self._reconnect_delay_spin.value())
         if self._auto_reconnect_attempts >= max_attempts:
-            self._status_label.setText(_t("rd_webrtc_reconnect_giveup"))
+            self._status.show("rd_webrtc_reconnect_giveup")
             return
         if (not self._server_edit.text().strip()
                 or not self._host_id_edit.text().strip()
@@ -318,11 +318,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         delay_ms = min(
             60000, 1000 * base_delay_s * (2 ** (self._auto_reconnect_attempts - 1)),
         )
-        self._status_label.setText(
-            _t("rd_webrtc_reconnecting").format(
-                n=self._auto_reconnect_attempts, max=max_attempts,
-            ),
-        )
+        self._status.show("rd_webrtc_reconnecting", n=self._auto_reconnect_attempts, max=max_attempts)
         self._reconnect_timer.start(delay_ms)
 
 

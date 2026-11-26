@@ -20,9 +20,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Optional
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
-    QMessageBox, QWidget,
+    QAbstractButton, QMessageBox, QWidget,
 )
 
 from je_auto_control.gui.remote_desktop._webrtc_types import MultiViewerHostT, SessionRecorderT, WebRTCDesktopViewerT
@@ -90,6 +90,11 @@ if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
     )
 
 
+def _turned_off(button: QAbstractButton) -> bool:
+    """Whether ``button`` itself was disabled; ``isEnabled()`` is also false inside a collapsed section."""
+    return button.testAttribute(Qt.WidgetAttribute.WA_ForceDisabled)
+
+
 class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSessionsMixin,
                        _HostConnectionMixin):
     """Host: stream this machine's screen and accept viewer input."""
@@ -145,7 +150,7 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
             for widget in (self._generate_btn, self._apply_btn,
                            self._publish_btn):
                 widget.setEnabled(False)
-            self._status_label.setText(_t("rd_webrtc_unavailable"))
+            self._status.show("rd_webrtc_unavailable")
 
     def prefill(self, token: Optional[str] = None,
                 host_id: Optional[str] = None,
@@ -232,11 +237,11 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
             self._tray.set_hosting(hosting)
 
     def _on_state(self, state: str) -> None:
-        self._status_label.setText(f"{_t('rd_webrtc_state_label')} {state}")
+        self._status.show_rendered(lambda: f"{_t('rd_webrtc_state_label')} {state}")
 
     def _on_auth(self, ok: bool) -> None:
         key = "rd_webrtc_auth_ok" if ok else "rd_webrtc_auth_fail"
-        self._status_label.setText(_t(key))
+        self._status.show(key)
 
     def _show_error(self, error: Exception) -> None:
         autocontrol_logger.warning("webrtc host panel error: %r", error)
@@ -245,6 +250,8 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
         self._apply_session_headers()
+        self._status.retranslate()
+        self._host_quality_tip.retranslate()
         host = self._multi_host
         self._sessions_label.setText(
             _t("rd_webrtc_sessions_count").format(n=host.session_count() if host is not None else 0))
@@ -361,7 +368,7 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
         if not is_webrtc_available():
             for widget in (self._answer_btn, self._connect_btn):
                 widget.setEnabled(False)
-            self._status_label.setText(_t("rd_webrtc_unavailable"))
+            self._status.show("rd_webrtc_unavailable")
 
     def dispose(self) -> None:
         """Release what the panel holds beyond its widgets -- including the session it is in.
@@ -418,7 +425,7 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
             self._on_stop()
 
     def _on_state(self, state: str) -> None:
-        self._status_label.setText(f"{_t('rd_webrtc_state_label')} {state}")
+        self._status.show_rendered(lambda: f"{_t('rd_webrtc_state_label')} {state}")
         if state in ("failed", "disconnected"):
             self._maybe_schedule_auto_reconnect()
 
@@ -436,13 +443,16 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
+        for text in (self._status, self._quality_tip, self._stats_text):
+            text.retranslate()
         self._remote_files_table.retranslate()
         self._tag_filter_combo.setItemText(0, _t("rd_webrtc_tag_all"))
         # The registered texts are the buttons' idle ones.
-        if self._recorder is not None or not self._record_btn.isEnabled():
+        # A button turned off while its stop runs, not one inside a collapsed (so disabled) section.
+        if self._recorder is not None or _turned_off(self._record_btn):
             self._record_btn.setText(_t("rd_webrtc_stop_recording" if self._recorder is not None
                                         else "gui_op_stopping"))
-        if self._sync_engine is not None or not self._sync_btn.isEnabled():
+        if self._sync_engine is not None or _turned_off(self._sync_btn):
             self._sync_btn.setText(_t("rd_webrtc_sync_stop" if self._sync_engine is not None else "gui_op_stopping"))
         self._pen_btn.setText(_t("rd_webrtc_pen_on" if self._pen_btn.isChecked() else "rd_webrtc_pen_off"))
 

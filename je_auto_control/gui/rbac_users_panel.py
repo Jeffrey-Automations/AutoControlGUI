@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._authorize import RefusalLabel, refusal
 from je_auto_control.gui._dispose import release_resources
-from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._i18n_helpers import KeyedText, TranslatableMixin
 from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui._qt_typed import filled_item
@@ -72,6 +72,7 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
         self._token_value = QLineEdit()
         self._token_value.setReadOnly(True)
         self._status_label = QLabel()
+        self._status = KeyedText(self._status_label)     # a language switch re-reads what it says
         self._status_label.setWordWrap(True)
         self._status_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self._refusal = RefusalLabel()
@@ -104,6 +105,7 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
     def retranslate(self) -> None:
         """Re-apply the registered keys and the table's column titles."""
         super().retranslate()
+        self._status.retranslate()
         self._retitle_columns()
 
     def _retitle_columns(self) -> None:
@@ -147,21 +149,21 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
         path = self.users_path()
         if path is None:
             self._table.setRowCount(0)
-            self._status_label.setText(_t("rest_users_no_store"))
+            self._status.show("rest_users_no_store")
             return
         refused = refusal("AC_user_list")
         if refused is not None:
             self._table.setRowCount(0)
-            self._status_label.setText(refused)
+            self._status.show_plain(refused)
             return
         self._run(path, None)
 
     def _run(self, path: str, change: Optional[Callable[[], Any]]) -> None:
         """Make ``change`` (when given) and list the users again, off the GUI thread."""
         if not self._ops.start(functools.partial(_change_then_list, path, change)):
-            self._status_label.setText(_t("task_busy"))
+            self._status.show("task_busy")
             return
-        self._status_label.setText(_t("task_running"))
+        self._status.show("task_running")
 
     def _on_ops_done(self, outcome: Dict[str, Any]) -> None:
         users, refused = outcome["users"], outcome["refused"]
@@ -169,14 +171,17 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
         for row, user in enumerate(users):
             for column, key in enumerate(("user_id", "display_name", "role")):
                 self._table.setItem(row, column, QTableWidgetItem(str(user[key])))
-        self._status_label.setText(refused or _t("rest_users_count").format(count=len(users), path=outcome["path"]))
+        if refused:
+            self._status.show_plain(refused)
+        else:
+            self._status.show("rest_users_count", count=len(users), path=outcome["path"])
         issued = outcome["issued"]
         if isinstance(issued, dict) and "token" in issued:
             self._token_value.setText(str(issued["token"]))
-            self._status_label.setText(_t("rest_users_token_issued").format(user=issued["user_id"]))
+            self._status.show("rest_users_token_issued", user=issued["user_id"])
 
     def _on_ops_failed(self, error: object) -> None:
-        self._status_label.setText(str(error))
+        self._status.show_plain(str(error))
 
     def _on_row_selected(self) -> None:
         row = self._table.currentRow()
@@ -193,11 +198,11 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
             return None
         path = self.users_path()
         if path is None:
-            self._status_label.setText(_t("rest_users_no_store"))
+            self._status.show("rest_users_no_store")
             return None
         user_id = self._id_input.text().strip()
         if not user_id:
-            self._status_label.setText(_t("rest_users_no_user"))
+            self._status.show("rest_users_no_user")
             return None
         return path, user_id
 
