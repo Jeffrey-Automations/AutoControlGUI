@@ -3,7 +3,8 @@
 Requests run as a :class:`~je_auto_control.gui._tab_task.TabTask` started with
 ``start_until_stopped``: Stop stops scheduling (managed nodes are asked to
 pause, running nodes finish), and the tab stays busy until the run has ended
-and shows what it did. Closing the tab stops it the same way.
+and shows what it did. Closing the tab stops it the same way. Reading the
+file the Load dialog picked is a tab task of its own, one load at a time.
 """
 import json
 import threading
@@ -36,6 +37,12 @@ from je_auto_control.utils.dag.managed_tasks import managed_stop_scope
 
 
 _COLUMNS = ("id", "host", "status", "task_id", "duration_ms", "error")
+
+
+def _read_definition(path: str) -> str:
+    """Worker thread: the text of the DAG file at ``path`` (``ValueError`` when it is not UTF-8)."""
+    with open(path, "r", encoding="utf-8") as fp:
+        return fp.read()
 
 
 def _t(key: str) -> str:
@@ -115,6 +122,9 @@ class DagTab(TranslatableMixin, QWidget):
         self._run = TabTask(self)
         self._run.result.connect(self._show_outcome)
         self._run.error.connect(self._on_worker_failed)
+        self._loading = TabTask(self)       # reading the file the Load dialog picked
+        self._loading.result.connect(self._on_loaded)
+        self._loading.error.connect(self._on_worker_failed)
         self._inspection_source = ""
         self._inspection_output = QPlainTextEdit()
         self._inspection_output.setReadOnly(True)
@@ -204,11 +214,14 @@ class DagTab(TranslatableMixin, QWidget):
         )
         if not path:
             return
-        try:
-            with open(path, "r", encoding="utf-8") as fp:
-                self._editor.setPlainText(fp.read())
-        except (OSError, ValueError) as error:      # ValueError: the file is not UTF-8
-            self._status_label.setText(f"{_t('dag_error')}: {error}")
+        if not self._loading.start(partial(_read_definition, path)):
+            self._status_label.setText(_t("task_busy"))
+            return
+        self._status_label.setText(_t("task_running"))
+
+    def _on_loaded(self, text: str) -> None:
+        self._editor.setPlainText(text)
+        self._status_label.setText("")
 
     def _on_validate(self) -> None:
         definition = self._parse_editor()
