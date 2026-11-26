@@ -29,6 +29,14 @@ the backend after that finishes on its own (the backend bounds a transfer at
 ``MAX_TIMEOUT_MS``), its result is discarded, and the session closes its
 handle.
 
+Such *abandoned* threads are never killed, but they are counted across the
+process: while ``max_abandoned`` of them (from any closed session) are still
+inside the backend, a new claim (OPEN or RESUME) is refused with
+``ABANDONED_MESSAGE``, which the viewer receives as a ``UsbClientError``. A
+viewer that keeps reconnecting while its transfers hang can therefore not pile
+up more than that many threads on the host; claims it already holds keep
+working, and new ones are accepted again as the abandoned threads finish.
+
 Replies are handed to ``send_reply`` from the worker threads; the channel
 host passes one that marshals the send onto the event loop
 (``call_soon_threadsafe`` through the WebRTC bridge).
@@ -39,7 +47,7 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass
-from typing import Callable, Deque, Dict, List, Optional
+from typing import Callable, Deque, Dict, List, Optional, Set
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.usb.passthrough.protocol import Frame, Opcode
@@ -49,12 +57,17 @@ from je_auto_control.utils.usb.passthrough.session import UsbPassthroughSession
 _CLAIM_OPCODES = frozenset({
     Opcode.CTRL, Opcode.BULK, Opcode.INT, Opcode.CREDIT, Opcode.CLOSE,
 })
+#: Opcodes that ask for a new claim, refused while too many abandoned threads remain.
+_NEW_CLAIM_OPCODES = frozenset({Opcode.OPEN, Opcode.RESUME})
 _SESSION_LANE = -1
+DEFAULT_MAX_ABANDONED = 16
 DEFAULT_IDLE_S = 2.0
 DEFAULT_JOIN_TIMEOUT_S = 0.1
 QUEUE_FULL_MESSAGE = "usb request queue full"
 CLOSED_MESSAGE = "usb channel closed"
 NO_WORKER_MESSAGE = "usb worker unavailable"
+ABANDONED_MESSAGE = ("usb host busy: worker threads of closed sessions are still inside the backend; "
+                     "try again when they finish")
 
 ReplySink = Callable[[Frame], None]
 
@@ -66,11 +79,40 @@ class WorkerLimits:
     ``max_pending``: frames waiting to be served (None: the session's
     ``frame_budget``). ``idle_s``: how long an idle lane thread lingers.
     ``join_timeout_s``: how long :meth:`UsbSessionWorker.close` waits.
+    ``max_abandoned``: process-wide count of threads left inside the backend
+    by closed sessions at which new claims are refused.
     """
 
     max_pending: Optional[int] = None
     idle_s: float = DEFAULT_IDLE_S
     join_timeout_s: float = DEFAULT_JOIN_TIMEOUT_S
+    max_abandoned: int = DEFAULT_MAX_ABANDONED
+
+
+class _AbandonedThreads:
+    """Lane threads that outlived their session's close, still inside a backend call; never killed."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._threads: Set[threading.Thread] = set()
+
+    def add(self, threads: List[threading.Thread]) -> None:
+        with self._lock:
+            self._threads.update(threads)
+
+    def count(self) -> int:
+        """How many are still running (finished ones are forgotten here)."""
+        with self._lock:
+            self._threads = {thread for thread in self._threads if thread.is_alive()}
+            return len(self._threads)
+
+
+_ABANDONED = _AbandonedThreads()
+
+
+def abandoned_worker_threads() -> int:
+    """Lane threads of closed USB sessions, in this process, still inside a backend call."""
+    return _ABANDONED.count()
 
 
 class _Lane:
@@ -97,6 +139,7 @@ class UsbSessionWorker:
         self._max_pending = max(1, int(budget))
         self._idle_s = max(0.0, float(limits.idle_s))
         self._join_timeout_s = max(0.0, float(limits.join_timeout_s))
+        self._max_abandoned = max(1, int(limits.max_abandoned))
         self._lock = threading.Lock()
         self._lanes: Dict[int, _Lane] = {}
         self._pending = 0
@@ -117,6 +160,8 @@ class UsbSessionWorker:
     def submit(self, frame: Frame) -> Optional[str]:
         """Queue ``frame`` without blocking; None if accepted, else why not."""
         key = self._lane_key(frame)
+        if frame.op in _NEW_CLAIM_OPCODES and _ABANDONED.count() >= self._max_abandoned:
+            return ABANDONED_MESSAGE
         with self._lock:
             if self._closed:
                 return CLOSED_MESSAGE
@@ -216,12 +261,13 @@ class UsbSessionWorker:
         for thread in threads:
             if thread is not current:
                 thread.join(max(0.0, deadline - time.monotonic()))
-        stuck = sum(1 for thread in threads if thread.is_alive())
+        stuck = [thread for thread in threads if thread is not current and thread.is_alive()]
         if stuck:
+            _ABANDONED.add(stuck)
             autocontrol_logger.warning(
                 "usb passthrough: %d worker(s) still inside the backend after close; "
-                "their results will be discarded and their handles closed", stuck,
+                "their results will be discarded and their handles closed", len(stuck),
             )
 
 
-__all__ = ["UsbSessionWorker", "WorkerLimits"]
+__all__ = ["UsbSessionWorker", "WorkerLimits", "abandoned_worker_threads"]

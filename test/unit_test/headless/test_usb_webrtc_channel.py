@@ -395,3 +395,33 @@ def test_frames_after_close_are_refused_not_served():
     refused = [b for b in channel.bodies(Opcode.ERROR) if b.get("request_id") == "late"]
     assert refused and "closed" in refused[0]["error"]
     assert session.active_claim_count == 0
+
+
+def _open_refusals(channel):
+    return [b["error"] for b in channel.bodies(Opcode.ERROR) if "busy" in b.get("error", "")]
+
+
+def test_new_claims_wait_while_closed_sessions_leave_too_many_threads_in_the_backend():
+    from je_auto_control.utils.usb.passthrough.session_worker import abandoned_worker_threads
+    assert _eventually(lambda: abandoned_worker_threads() == 0)     # none left by an earlier test
+    limits = _limits(join_timeout_s=0.05, max_abandoned=1)
+    backend, other = _GatedBackend(), _GatedBackend()
+    gone, gone_channel, _ = _host(backend, limits=limits)
+    host, channel, _ = _host(other, limits=limits)
+    try:
+        held = _open_claim(channel)                      # a claim held before the cap is reached
+        _block(gone_channel, backend, _open_claim(gone_channel))
+        gone.close()                                     # its lane thread stays inside the backend
+        assert abandoned_worker_threads() == 1
+        channel.deliver(Frame(op=Opcode.OPEN, payload=json.dumps(
+            {"vendor_id": "1050", "product_id": "0407"}).encode("utf-8")))
+        assert channel.wait_for(lambda _frames: bool(_open_refusals(channel)))
+        channel.deliver(_bulk(held, "held"))
+        assert _answered(channel, "held")                # what is already claimed keeps working
+        backend.gate.set()
+        assert _eventually(lambda: abandoned_worker_threads() == 0)
+        assert _open_claim(channel) != held              # accepted again once the thread finished
+    finally:
+        backend.gate.set()
+        gone.close()
+        host.close()
