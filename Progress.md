@@ -119,33 +119,7 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 
 - **Windows UIA 後端的執行緒模型**已對真的 COM 驗過（U-20261113-01；U-20261121-17 再驗：讀取在呼叫者執行緒與 walker 上都可用、stop 能叫醒等待中的 `AC_wait_for_focus_change`、`system_volume` 的 Core Audio 改經同一條 apartment 路徑，主執行緒與 worker 執行緒皆可讀）。`comtypes` 已宣告為 `accessibility` extra，`windows-uia.yml` 已在 Windows runner 以真 COM 跑過（3 項通過）。
 - **GUI 審查留下的（U-20261126-12）**：
-  - `TODO`：切換語言後，探測找到的狀態列與品質提示已改用 `KeyedText` 重繪（U-20261126-29）；其餘約 230 處 `setText(_t(...))`（63 個檔案）
-    未轉換，操作後才設的狀態文字可能仍是舊語言。
-- **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）。
-  結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
-  對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
-  `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
-- **stop 還叫不醒的**：已經進到後端的單一指令只剩其他未接合的原生呼叫（擷取輸出的 shell 指令已可停止，U-20261115-23；共用 HTTP client 的請求連 TCP 交握都可中斷，正在進行的 DNS 查詢也不必等（查詢在背景跑完、之後不會送出請求），U-20261116-08／-10／-15；套件內每個 `cv2.matchTemplate` 與 OCR 引擎的單次原生運算都改由 `stoppable_call` 不再等待，但運算本身在背景跑完，U-20261116-11／-14）；單一手勢內的節奏 sleep 已可停止（U-20261121-04）；VLM 定位請求同樣改由 `stoppable_call` 不再等待（U-20261121-10）；唯讀無障礙讀取（列出／焦點／值／狀態／表格）改在單一常駐執行緒上跑，stop 不再等待（U-20261121-15，本機以真 UIA 驗過）；寫入（設值／invoke／toggle）仍在呼叫者執行緒，不可中斷；
-  非腳本分頁已傳遞協作取消；尚未檢查 token 的後端呼叫仍只能丟棄晚到結果，須逐一接合。
-  ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在指令 handler 裡呼叫 `stop()`／`wait_idle()` 會立刻回 `False`、不再等到逾時（U-20261116-15）。沒對真的 Slack workspace 跑過。
-  新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。
-- **WebRTC**：LAN 廣播的註冊與取消已移出 GUI 執行緒，但真的 zeroconf 的時間與名稱衝突行為只對假物件測過。
-- **切換主題後那幾個事件迴圈回合內**，以被暫存的頁面為 parent 的 `QMessageBox` 會相對於隱藏的暫存 widget 定位（只影響位置）。
-  系統匣路徑在 offscreen 下沒有 tray，`_on_tray_open` 是直接呼叫測的。基準（`benchmarks/gui_*.py`）CI 仍不設門檻。
-- **把 Python 建的 widget 放進分頁列在結束時崩潰**：已查明觸發條件——分頁列按鈕上接了 Python callable、又有排隊中的 `deleteLater()`、而行程經 `os._exit` 離開；
-  先把 deferred delete 沖掉就不會。機制（Qt 在行程結束時釋放那個 slot）是推論，沒有 C 堆疊可看。`_tab_close_icon.py` 沒有改回自訂按鈕。
-- 遠端桌面的輸入改成佇列送出後，`AC_remote_send_input` 回的 `{"sent": True}` 意思是「已排入」；`SO_SNDTIMEO` 的 POSIX 包法與經 TLS socket 的行為沒在這台機器上驗過。
-- 沒在 macOS／Linux 上看過新的關閉鈕、捲動與重設樣式；沒在真的多螢幕桌面試過視窗位置還原；PyBreeze 沒有對這一版跑過；各語系新增的字串（日文、簡體中文）沒有母語者看過。
-
----
-
-## 這一輪修正留下的後續
-
-`TODO` — 下列整合、安全與平台驗證仍未完成。
-
-- **Intel Mac 安裝要編譯 `cryptography`**：下限拉到 50 之後 `macosx_10_9_x86_64` 沒有 wheel（探測：最新只到 48.0.1），
-  `pip install je_auto_control` 在 Intel Mac 需要 Rust 工具鏈。沒有在 Intel Mac 上實際編過。
-- **伺服器與 executor 審查留下的（U-20261126-13）**：
+  - `TODO`：切換語言後，表格儲存格（Run History 以外）仍是舊語言；少數字串寫死英文、不在語言檔（如「Error: …」「Exported … code」）（U-20261126-32）。
   - `DECIDE`：`cv2.error`／`sqlite3.Error`／外掛自訂例外仍會中止整份動作清單；HTTP 上交握式 `resources/subscribe` 回 `{}` 但從不通知；macro 是全程序共用。
   - `DECIDE`（U-20261126-28 補審）：socket server 沒有驗證也不看 RBAC，本機任何程序都能以受信身分執行任何指令（含 admin 限定的與 `quit_server`）；
     加 token 或使用者檢查會打破現有 socket 客戶端與文件化的協定，不加則 RBAC 在本機可被繞過。

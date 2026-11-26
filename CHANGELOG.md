@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- GUI: status lines, results, hints, window titles and the tray menu follow a language switch;
+  Presence, Variables, Run History and WebRunner no longer re-run their query on a switch.
+
 - Executor flags spelled `"false"` are honoured by `AC_usb_passthrough_enable`, `AC_usb_acl_add`,
   `AC_usb_acl_import`, `AC_assert_visual`, `AC_soft_assert`, the fuzzy commands and `AC_execute_action`
   (`dry_run`). List arguments given as a JSON string must decode to a list. `AC_wait_color`,
