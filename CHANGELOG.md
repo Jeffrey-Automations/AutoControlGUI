@@ -57,6 +57,17 @@
 - `env://` values returned by `AC_resolve_ref` / `AC_resolve_refs` are masked for the rest of the run
   in logs, the journal and the MCP audit, and `value` / `resolved` are masked in the logged result and
   the Script Builder result pane; the executor record and the MCP result still carry the value.
+- Remote desktop: a TCP / WebSocket connection still authenticating no longer takes a `max_clients`
+  slot. At most `max_pending_handshakes` (default 8) may be authenticating at once (more are closed
+  at accept), and each has `auth_timeout` (default 10 s, at most 60; it was 60 s per read) for TLS,
+  the WebSocket upgrade and the challenge-response together, so a silent connection is dropped after
+  10 s. A viewer whose host filled up while it authenticated receives `AUTH_FAIL "host full"`. Both
+  settings are accepted by `RemoteDesktopHost`, `registry.start_host` / `start_ws_host`,
+  `AC_start_remote_host`, `AC_start_ws_host`, `ac_remote_host_start` and the host tab; a boolean,
+  string, fractional cap or deadline outside (0, 60] raises `ValueError`. Over H.264 a viewer that
+  falls behind skips ahead to a fresh keyframe instead of decoding broken P-frames, and a new viewer
+  starts at a keyframe; the host forces one at most once a second (`CodecProvider.request_keyframe`,
+  honoured by `H264CodecProvider`). JPEG streams are unchanged.
 
 - GUI: translated table and list cells follow a language switch, and 58 message-box titles,
   validation messages and result lines that were hard-coded English are translated.

@@ -81,6 +81,8 @@ Wayland NORMAL 輸入透過受管理的子程序執行 libei 與 portal 呼叫�
 
 關閉 Remote Desktop 會釋放頁面；重新開啟會建立新控制項，不自動接回共用連線。Registry 的 TCP／WebSocket 連線仍可供腳本使用；頁面擁有的 WebRTC 連線與音訊在背景停止。待處理核准會拒絕，延遲回呼會丟棄。已在傳送中的檔案傳輸會在頁面關閉、連線被放掉或上傳取消時於下一個區塊停止，主機會丟棄未完成的檔案（TCP、WebSocket 與 WebRTC 皆同）。
 
+遠端桌面主機（TCP 與 WebSocket）不再讓還在驗證的連線占用 `max_clients` 的 viewer 名額。`max_pending_handshakes`（預設 8）限制同時驗證中的連線數，超過的在 accept 時就拒絕。`auth_timeout`（預設 10 秒，最多 60）涵蓋 TLS、WebSocket 升級與 challenge-response，所以不說話的連線 10 秒後就被斷開，不再占著名額最多 60 秒。連線要等身分驗證通過才占用 viewer 名額；若在驗證途中名額被占滿，該 viewer 會收到 `AUTH_FAIL "host full"`。兩個設定都可用於 `RemoteDesktopHost`、registry 的 `start_host`／`start_ws_host`、`AC_start_remote_host`、`AC_start_ws_host`、`ac_remote_host_start` 與主機分頁的進階區。落後的 H.264 viewer 現在會跳到新的關鍵影格，不再解碼參考影格已遺失的 P-frame；主機會向編碼器要求該關鍵影格，整個主機每秒最多一次。JPEG 串流不變。
+
 WebRTC host/viewer 的 `stop()` 最多等待三秒完成軟體清理。`PeerStopPending` 保留同一個尚未完成的操作；明確重試只會繼續等待。`PeerStopFailed` 保留清理失敗的資源供明確重試，成功前禁止重新啟動。Multi-viewer host 保留失敗的 session 與共用來源。`FolderSyncEngine.stop_confirmed()` 在原工作執行緒仍存活時回傳 `False`。這些結果不代表原生裝置已釋放；頁面銷毀後的復原仍需持久資源保管與重試整合。
 
 主機檔案請求會保留原傳送工作，直到工作執行緒退出，重複停止也不會提前釋放所有權。停止會通知取消並等候原工作；無法中斷的後端操作仍可能讓停止維持待完成。
