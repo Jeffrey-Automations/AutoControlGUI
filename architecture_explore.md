@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,620 |
-| 程式碼總行數 | 250,941 |
+| 程式碼總行數 | 251,166 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -538,14 +538,14 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.10 遠端桌面與 USB
 
-> 6 個套件、約 33,052 行。
+> 6 個套件、約 33,277 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/admin/` | 483 | 多主機管理主控台：平行輪詢 N 個 AutoControl REST 端點 |
-| `utils/config_sync/` | 8,577 | 持久化設定與條件交易：`contract.py` 管理有限 JSON 與協定例外；`store.py` 以 SQLite 原子比較版本／記錄重送收據；`routes.py` 提供第二版 HTTP 與明確盲寫相容；`commands.py` 共用 AC／MCP／Builder；`client.py` 條件提交，另有因果模型、peer ledger 與本機 SQLite outbox；第三版 /causal 交易已接上確認／退休／回收與刪除憑證；client／outbox 已接上原請求重送、有界 CAS 重合併及原子快照確認；持久化控制、原子本機 full-resync／舊待送退役與歷史收據已接上。本機資產工具另提供 manifest、整版雜湊驗證與不可變目錄發布；七種來源 adapters 保存可攜因果 profiles；workspace INI 與 GUI 共用偏好正規化。來源／outbox 與原子 full-resync 基準已由 SyncWorkspace 協調；引用資產以不可變分塊／完整 hash 收據、具驗證 HTTP 與完整 profile 串流發布接上；Sync UI 仍屬 C3。 |
+| `utils/config_sync/` | 8,614 | 持久化設定與條件交易：`contract.py` 管理有限 JSON 與協定例外；`store.py` 以 SQLite 原子比較版本／記錄重送收據；`routes.py` 提供第二版 HTTP 與明確盲寫相容；`commands.py` 共用 AC／MCP／Builder；`client.py` 條件提交，另有因果模型、peer ledger 與本機 SQLite outbox；第三版 /causal 交易已接上確認／退休／回收與刪除憑證；client／outbox 已接上原請求重送、有界 CAS 重合併及原子快照確認；持久化控制、原子本機 full-resync／舊待送退役與歷史收據已接上。本機資產工具另提供 manifest、整版雜湊驗證與不可變目錄發布；七種來源 adapters 保存可攜因果 profiles；workspace INI 與 GUI 共用偏好正規化。來源／outbox 與原子 full-resync 基準已由 SyncWorkspace 協調；引用資產以不可變分塊／完整 hash 收據、具驗證 HTTP 與完整 profile 串流發布接上；Sync UI 仍屬 C3。 |
 | `utils/device_matrix/` | 236 | 行動裝置矩陣：同一 action list 於多台裝置平行執行 |
-| `utils/remote_desktop/` | 17,233 | **遠端桌面子系統**：TCP／WebSocket／WebRTC 三條傳輸路徑、主機與檢視端、訊令伺服器、TURN／中繼、多檢視者、錄影、信任清單、TOTP、稽核鏈；私有選用功能模組保留整組匯入結果。 |
+| `utils/remote_desktop/` | 17,421 | **遠端桌面子系統**：TCP／WebSocket／WebRTC 三條傳輸路徑、主機與檢視端、訊令伺服器、TURN／中繼、多檢視者、錄影、信任清單、TOTP、稽核鏈；私有選用功能模組保留整組匯入結果。 |
 | `utils/usb/` | 5,507 | 跨平台 USB 列舉／熱插拔／裝置直通（WinUSB、IOKit、libusb 後端 + ACL + WebRTC DataChannel 通道） |
 | `utils/usbip/` | 1,016 | USB/IP 線路協定主機端（協定封包、TCP 伺服器、libusb URB 後端） |
 
@@ -825,7 +825,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `rate_limit.py` | 48 | 工具呼叫的 token bucket 限流。 |
 | `__main__.py` | 126 | `je_auto_control_mcp` console script 進入點。 |
 
-#### `utils/remote_desktop/`（17,233 行／77 檔）
+#### `utils/remote_desktop/`（17,421 行／77 檔）
 
 三條傳輸路徑並存：**TCP**（JPEG 影格）、**WebSocket**（同協定換傳輸）、**WebRTC**（aiortc 視訊 + DataChannel）。
 `_export_bindings.py` 保存產生的來源對照；`_optional/` 分別管理 WebRTC、錄影、多檢視者、
@@ -839,21 +839,21 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `webrtc_retirement.py` | 191 | 序列化 peer 世代、保留未完成的停止 future，區分待完成與失敗清理。 |
 | `webrtc_media_owners.py` | 249 | 保留 peer 媒體建構失敗及未完成子資源，提供快取的 slot 清理結果。 |
 | `webrtc_peer_cleanup.py` | 168 | 逐項清理 host／viewer 的原始資源，保留失敗項目並等候影格任務結束。 |
-| `host.py` | 713 | TCP 主機：接受迴圈、TLS 包裝、連線／認證握手、音訊與剪貼簿廣播、檔案推送、單次 token。 |
+| `host.py` | 707 | TCP 主機：接受迴圈、TLS 包裝、連線／認證握手、音訊與剪貼簿廣播、檔案推送、單次 token。 |
 | `viewer.py` | 749 | TCP 檢視端。 |
-| `host_service.py` | 579 | 無頭 WebRTC 主機執行器 + 多平台服務安裝器。 |
-| `host_client.py` | 497 | TCP 主機的每連線處理器：一個檢視端一個實例,擁有它的認證交換、sender／audio／receiver 三條執行緒,以及入站訊息的路由表。 |
+| `host_service.py` | 628 | 無頭 WebRTC 主機執行器 + 多平台服務安裝器。 |
+| `host_client.py` | 554 | TCP 主機的每連線處理器：一個檢視端一個實例,擁有它的認證交換、sender／audio／receiver 三條執行緒,以及入站訊息的路由表。 |
 | `registry.py` | 581 | `AC_remote_*` 指令使用的行程級單例。 |
 | `webrtc_transport.py` | 453 | 共用 WebRTC 管線：asyncio 橋接執行緒、螢幕視訊軌、設定。 |
-| `multi_viewer.py` | 523 | 每個連入檢視端各跑一個 `WebRTCDesktopHost` 的協調器。 |
+| `multi_viewer.py` | 569 | 每個連入檢視端各跑一個 `WebRTCDesktopHost` 的協調器。 |
 | `signaling_server.py` | 393 | WebRTC SDP rendezvous、持久化設定及具驗證的資產 chunk／blob 路由；CLI 提供 config／asset store 路徑與明確舊版寫入相容。 |
 | `audit_log.py` | 417 | SQLite 雜湊鏈稽核記錄。 |
 | `host_capture.py` | 318 | TCP 主機的影格與游標產生：螢幕列舉、監視器索引轉擷取區域、預設 JPEG／游標 provider,以及 `FrameProductionMixin`（游標輪詢、擷取迴圈、上線編碼）。 |
 | `ws_protocol.py` | 332 | 最小 RFC 6455 WebSocket 框架與握手。 |
 | `file_transfer.py` | 506 | 分塊檔案傳輸。 |
-| `relay.py` | 357 | NAT 穿透失敗時的 TCP 中繼。 |
+| `relay.py` | 378 | NAT 穿透失敗時的 TCP 中繼。 |
 | `fingerprint.py` | 269 | TOFU 主機指紋驗證。 |
-| `turn_config.py` | 249 | coturn 設定產生器。 |
+| `turn_config.py` | 270 | coturn 設定產生器。 |
 | `presence.py` | 240 | 多檢視者的執行緒安全在場註冊表。 |
 | `jpeg_recorder_encrypted.py` | 239 | AES-GCM 加密版 session 錄影。 |
 | `address_book.py` | 229 | 檢視端的主機通訊錄。 |
@@ -945,7 +945,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cv2_utils/template_detection.py` | 198 | Locate a template image on screen, in the coordinates the mouse takes. |
 | `utils/cv2_utils/video_recording.py` | 76 | Internal image/capture utilities. |
 
-#### `utils/config_sync/`（8,577 行）— 持久化、因果模型與本機重送
+#### `utils/config_sync/`（8,614 行）— 持久化、因果模型與本機重送
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -960,7 +960,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/config_sync/peers.py` | 132 | 可序列化 peer 確認／退休／full-resync epoch 與刪除回收資格判斷。 |
 | `utils/config_sync/outbox_models.py` | 193 | 操作身分／來源封存、端點正規化、重試預算與投遞報告。 |
 | `utils/config_sync/outbox_schema.py` | 98 | 辨識自有 outbox SQLite application/schema，驗證並原子遷移版本 1／2→3，拒絕修改外來資料庫。 |
-| `utils/config_sync/outbox.py` | 373 | 本機持久化佇列、固定準備請求、有界退避／取消與 lease；成功收據與完整伺服器快照原子確認。 |
+| `utils/config_sync/outbox.py` | 410 | 本機持久化佇列、固定準備請求、有界退避／取消與 lease；成功收據與完整伺服器快照原子確認。 |
 | `utils/config_sync/causal_commands.py` | 79 | 純資料合併／peer 轉換與私有佇列 enqueue／status；不連線或套用設定。 |
 | `utils/config_sync/causal_models.py` | 145 | 明確 actor、完整衝突 alternatives 與不保留舊 payload 的永久刪除憑證。 |
 | `utils/config_sync/causal_merge.py` | 68 | 確定性多值 frontier、因果支配、操作分叉拒絕與刪除憑證合併。 |
@@ -1622,7 +1622,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | --- | ---: | ---: |
 | `gui/` | 169 | 44,975 |
 | `utils/mcp_server/` | 63 | 22,424 |
-| `utils/remote_desktop/` | 77 | 17,233 |
+| `utils/remote_desktop/` | 77 | 17,421 |
 | `utils/executor/` | 11 | 10,855 |
 | `utils/usb/` | 22 | 5,507 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,178 |
@@ -1640,8 +1640,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,076 | 114,209 |
-| **總計** | **1,608** | **250,196** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,076 | 114,246 |
+| **總計** | **1,608** | **250,421** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

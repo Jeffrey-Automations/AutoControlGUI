@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Remote desktop: chat, clipboard and file sends queue per viewer (a stalled viewer's overflow
+  is dropped); `RelayServer(max_handshakes=64)` caps handshakes; `generate-systemd` /
+  `generate-launchd` escape paths and refuse unrepresentable ones (`ServiceUnitError`, exit 2);
+  the TURN bundle is written owner-only; `SyncOutbox` skips conflict rows and prunes receipts.
+
 - Agent runtime: `stop_all` returns without waiting for a busy DAG batch (it is fenced in the
   background and listed in `batch_fence_pending`); a pinned image directly under a default
   drive root is refused; a recovery successor may only add resume conditions.

@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-25 | 2026-11-26 | Close the remote desktop review follow-ups | #done #fix #remote-desktop | [2026-11-c](2026-11-c.md) |
 | U-20261126-24 | 2026-11-26 | Close the agent runtime review follow-ups | #done #fix #agent #stop #security | [2026-11-c](2026-11-c.md) |
 | U-20261126-23 | 2026-11-26 | Close the utils L-Z review follow-ups | #done #fix #stop | [2026-11-c](2026-11-c.md) |
 | U-20261126-22 | 2026-11-26 | Authorize, mask and move older GUI work off the GUI thread | #done #decision #gui #rbac | [2026-11-c](2026-11-c.md) |
