@@ -23,6 +23,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["AUTOCONTROL_GUI_SETTINGS"] = "off"
 from PySide6.QtWidgets import QApplication
 app = QApplication.instance() or QApplication([])
+# As start_autocontrol_gui() does: the tabs' workers run Python, and a cyclic collection a worker
+# triggered could reach a dropped tab's Qt objects (an access violation on Windows 3.11 CI).
+from je_auto_control.gui._gui_thread_gc import GuiThreadCollector
+collector = GuiThreadCollector(app)
 from je_auto_control.gui.tab_registry import TAB_SPECS
 
 def build(spec, delete):
