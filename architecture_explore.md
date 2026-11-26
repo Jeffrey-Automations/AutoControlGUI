@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,620 |
-| 程式碼總行數 | 252,117 |
+| Python 模組總數（含周邊子專案） | 1,621 |
+| 程式碼總行數 | 252,535 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -168,7 +168,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `je_auto_control/__init__.py` | 2,743 | **套件門面**。按首次存取解析 1508 個公開名稱，具體型別宣告與 `__all__` 保留原始來源及順序。 |
 | `je_auto_control/_lazy_exports.py` | 29 | 公開名稱的來源屬性／模組繫結與首次存取解析；保留並行的明確指派。 |
 | `je_auto_control/_export_bindings.py` | 1,844 | 由具體型別宣告產生的公開名稱來源查表；CI 檢查產生結果與順序。 |
-| `je_auto_control/__main__.py` | 106 | 舊版 argparse 進入點：`-e` 執行單檔、`-d` 執行整個目錄、`--execute_str` 執行 JSON 字串、`-c` 建立專案。 |
+| `je_auto_control/__main__.py` | 107 | 舊版 argparse 進入點：`-e` 執行單檔、`-d` 執行整個目錄、`--execute_str` 執行 JSON 字串、`-c` 建立專案。 |
 | `je_auto_control/cli.py` | 456 | **主 CLI**（`je_auto_control` console script）。子命令：`run`（含 `--var`／`--dry-run`／`--journal`）、`journal`（依 run 篩選與有界遮罩快照）、`validate`／`lint`、`list-commands`、`fmt`、`record`、`codegen`、`failure-bundle`、`list-jobs`、`start-server`、`start-rest`、`version`。所有子命令延遲匯入，確保不碰 Qt。 |
 | `je_auto_control/api/__init__.py` | 100 | 版本化整合進入點。 |
 | `je_auto_control/api/core.py` | 73 | **穩定無頭 API 門面**：暴露 `execute_action`、`execute_action_with_vars`、`generate_code`、`run_diagnostics`、`create_failure_bundle`、`failure_bundle_on_error`、`FailureBundleOptions`，另提供 `BackendContext`／`CapabilityStatus`／`CapabilitySnapshot`／`probe_capabilities`，以及 `CancellationToken`／`TaskProgress`／`cancellation_scope`。mypy 型別契約以此為起點，現已擴到整包（見「設定基線」）。 |
@@ -558,7 +558,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 > **2026-10-09 第四輪新增的模組**：`utils/thread_bound.py`（只在設定它的執行緒上有效的 context 變數，RBAC 身分、裝置綁定、自愈標記與 stop token 共用）、
 > `utils/accessibility/backends/windows_automation.py`（每個執行緒的 COM apartment 與 UIAutomation 物件）、
 > `gui/_weak_call.py`（弱參照持有的工作回呼）、`gui/_qt_typed.py`（對真實 Qt 型別檢查用的小工具）。
-> 之後新增：`gui/script_builder/one_time_dialog.py`（Script Builder 的一次性值對話框，值只留在記憶體）、`gui/_authorize.py`（分頁呼叫特權功能前先問 RBAC，拒絕顯示在分頁中而不是從 slot 拋出）、`gui/_secret_field.py`（預設遮蔽、可切換顯示與複製的 token／密碼欄）。
+> 之後新增：`gui/script_builder/one_time_dialog.py`（Script Builder 的一次性值對話框，值只留在記憶體）、`gui/_authorize.py`（分頁呼叫特權功能前先問 RBAC，拒絕顯示在分頁中而不是從 slot 拋出）、`gui/_secret_field.py`（預設遮蔽、可切換顯示與複製的 token／密碼欄）、`gui/_latest_decoder.py`（在各檢視自己的執行緒解碼最新影像，較新的來源取代尚未解碼的）。
 > `utils/executor/result_hook.py`（每次執行、每個執行緒的指令結果掛鉤，巢狀指令也回報）。
 
 ### 5.4.11 伺服器、網路協定與外部整合
@@ -1393,7 +1393,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `config_sync_tab.py` | 432 | Lazy Actions-menu workspace synchronization, causal review and explicit live preference application. |
 | `_auto_click_tab.py` | 321 | 獨立自動點擊分頁；快照工作參數，以 TabTask 執行與取消。 |
 | `_screenshot_tab.py` | 180 | 獨立延遲建立的截圖／像素分頁；背景讀取、輸入快照與關閉後結果丟棄。 |
-| `_image_detect_tab.py` | 158 | 獨立影像偵測分頁，擁有輸入、背景工作與關閉生命週期。 |
+| `_image_detect_tab.py` | 172 | 獨立影像偵測分頁，擁有輸入、背景工作與關閉生命週期。 |
 | `_script_tab.py` | 183 | 獨立腳本執行分頁；背景載入與執行，關閉取消並釋放控制項。 |
 | `_record_tab.py` | 173 | 獨立錄製／回放檢視；背景工作與共享錄製器狀態，關閉檢視不停止錄製器。 |
 | `_report_tab.py` | 106 | 報表分頁 mixin。 |
@@ -1404,7 +1404,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `_worker_thread.py` | 273 | `start_worker()`：在 daemon `threading.Thread` 上執行 `QObject` worker 的 `run()`（沒有 `QThread` 可被銷毀），並經由分頁擁有的中繼物件回報結果（回呼一律在 GUI 執行緒；worker 沒處理的例外也送到 `on_fail`）；worker 留在模組登錄表直到 GUI 執行緒看到它結束，啟動失敗回復登記並保留原失敗；回傳 `WorkerHandle`（`isRunning()`）；程式結束時先呼叫 worker 的 `request_stop()`，最多等 10 秒，仍在跑的隨行程結束。 |
 | `_gui_thread_gc.py` | 66 | `GuiThreadCollector`：GUI 開著時關掉自動循環回收，改由 GUI 執行緒上的 `QTimer` 依直譯器門檻回收（第 0 代、每 threshold[1] 次第 1 代、每 threshold[1]×threshold[2] 次完整回收），結束時恢復；讓 worker 執行緒不會收走 PySide6 6.12 會延後刪除的 Qt 物件。 |
 | `task_controller.py` | 270 | 共用 owner-bound task／typed outcome-progress；獨立 token、弱回呼、dispatch 身分更新與銷毀後結果隔離。工作綁定獨立 cancellation scope；其餘面板遷移另列進度。 |
-| `template_candidate_panel.py` | 247 | 預覽原始／候選縮圖、檢視驗證並明確接受／回復。 |
+| `template_candidate_panel.py` | 277 | 預覽原始／候選縮圖、檢視驗證並明確接受／回復。 |
 | `template_candidate_worker.py` | 125 | 背景檔案操作、延後權限檢查與提交前取消；完成寫入不重標為取消。 |
 | `journal_candidate_worker.py` | 150 | 背景產碼、差異呈現、審閱匯出／匯入驗證、權限與取消。 |
 | `journal_candidate_panel.py` | 231 | 程式、差異、來源與排除項目的審閱；Actions 明確匯入與匯出。 |
@@ -1412,8 +1412,8 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `journal_browser.py` | 260 | Run History 與 Self-Healing 共用的唯讀日誌檢視：來源連結／路徑／run／step 篩選、有界快照表與明細，舊結果以 request ID 隔離。 |
 | `journal_browser_worker.py` | 88 | 背景查閱與逐筆取消；帶入 context 並在開檔前重查 deferred 擁有者，以 queued counts 回報進度。 |
 | `manual_run_controls.py` | 72 | 手動執行的 history 勾選與獨立 journal 路徑；以共用無頭 scope 包住既有 GUI 執行，不改結果與變數。 |
-| `language_wrapper/` | 8,619 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
-| `selector/` | 216 | 拖曳選取螢幕區域的半透明全螢幕覆蓋層與樣板裁切工具（互動式，但都有對應的程式化 API）。 |
+| `language_wrapper/` | 8,623 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
+| `selector/` | 225 | 拖曳選取螢幕區域的半透明全螢幕覆蓋層與樣板裁切工具（互動式，但都有對應的程式化 API）。 |
 
 > **分頁指令一律走 Actions 選單**：分頁本身只放輸入、表格與結果檢視，指令由視窗層選單暴露。
 > 核心與功能分頁實作 `menu_actions()`（目前 57 個檔案有此 hook）；Remote Desktop 由 `main_widget.py` 的 `_own_tab_builders` 保留選用相依套件後備檢視。
@@ -1425,7 +1425,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | --- | ---: | --- |
 | auto_click | `_auto_click_tab.py` | 321 | 自動點擊：座標、間隔、熱鍵、`write`、捲動。 |
 | screenshot | `_screenshot_tab.py` | 180 | 截圖、選區、螢幕尺寸、取像素色。 |
-| image_detect | `_image_detect_tab.py` | 158 | 樣板裁切、定位、定位全部、定位並點擊。 |
+| image_detect | `_image_detect_tab.py` | 172 | 樣板裁切、定位、定位全部、定位並點擊。 |
 | record | `_record_tab.py` | 173 | 錄製／停止／回放／存檔／載入。 |
 | script_builder | `script_builder/` | 7,005 | **視覺化腳本編輯器**：`command_schema.py`（5,556 行 `AC_*` 參數綱要）、`step_model.py`（步驟模型與 AC JSON 序列化）、`step_list_view.py`（含巢狀 body 的樹狀檢視）、`step_form_view.py`（綱要驅動表單）、`builder_tab.py`（含日誌候選預覽與明確匯入，保留來源）。 |
 | flow_editor | `flow_editor/` | 521 | 節點式流程圖檢視：`layout.py`（純 Python 佈局演算法，可單測）、`scene.py`（Qt 場景繪製）、`tab.py`。 |
@@ -1434,13 +1434,13 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | variables | `variables_tab.py` | 172 | 檢視、灌入、清除 executor 執行期作用域。 |
 | secrets | `secrets_tab.py` | 241 | 解鎖保險庫並管理 `${secrets.NAME}`。 |
 | vlm | `vlm_tab.py` | 152 | 用文字描述 UI 元素，交由模型定位。 |
-| self_healing | `self_healing_tab.py`、`healing_evaluation_panel.py`、`healing_evaluation_worker.py`、`template_candidate_panel.py`、`template_candidate_worker.py` | 1,004 | 執行時定位／記錄、固定影像版本比較、原始步驟與候選樣板生命週期；背景工作可取消並丟棄過期結果。 |
+| self_healing | `self_healing_tab.py`、`healing_evaluation_panel.py`、`healing_evaluation_worker.py`、`template_candidate_panel.py`、`template_candidate_worker.py` | 1,034 | 執行時定位／記錄、固定影像版本比較、原始步驟與候選樣板生命週期；背景工作可取消並丟棄過期結果。 |
 | ocr_reader | `ocr_tab.py` | 193 | 傾印區域文字或以 regex 搜尋。 |
 | accessibility | `accessibility_tab.py` | 193 | 瀏覽 OS UI 樹並依 role/name 點擊。 |
 | live_hud | `live_hud_tab.py` | 156 | 即時 HUD：滑鼠位置、游標下像素色、log tail。 |
 | llm_planner | `llm_planner_tab.py` | 196 | 自然語言描述 → 預覽 → 執行。 |
 | computer_use | `computer_use_tab.py` | 164 | 從 GUI 啟動 Anthropic 閉環 agent。 |
-| agent_tasks | `agent_tasks_tab.py` | 629 | 受管任務輸入、狀態與 Actions menu；服務獨立於視圖生命週期。 |
+| agent_tasks | `agent_tasks_tab.py` | 633 | 受管任務輸入、狀態與 Actions menu；服務獨立於視圖生命週期。 |
 | scheduler | `scheduler_tab.py` | 177 | 註冊間隔式 action JSON 執行。 |
 | hotkeys | `hotkeys_tab.py` | 169 | 將全域熱鍵綁到 action 檔。 |
 | triggers | `triggers_tab.py` | 407 | 影像／視窗／像素／檔案事件監看。 |
@@ -1462,7 +1462,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | dag_runner | `dag_tab.py` | 380 | 編輯、驗證、執行跨主機 DAG。 |
 | chatops | `chatops_tab.py` | 141 | 在接上 Slack 前先本機測試 slash 指令。 |
 | trace_replay | `trace_replay_tab.py` | 251 | 拖曳捲動時光回溯錄製內容。 |
-| remote_desktop | `remote_desktop/`（40 檔） | 8,819 | 見下。 |
+| remote_desktop | `remote_desktop/`（40 檔） | 8,973 | 見下。 |
 | presence | `presence_tab.py` | 176 | 多檢視者在場名單。 |
 | rest_api | `rest_api_tab.py` | 319 | 啟停 HTTP 前端並顯示 URL、實際驗證模式與可用 token。 |
 | admin_console | `admin_console_tab.py` | 384 | 管理多個遠端 AutoControl REST 端點。 |
@@ -1480,7 +1480,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `gui/diagnostics_capabilities.py` | 60 | 只呈現既有不可變能力快照與四語狀態；不探測、不連線，不持有原生物件。 |
 
-#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／8,819 行）
+#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／8,973 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1491,19 +1491,19 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `folder_sync_controls.py` | 72 | Translate the existing folder toggle into owned start, reconnect handoff and explicit baseline reset. |
 | `folder_sync_io.py` | 130 | Bind confirmed folder sends, cancellation and frozen receipts to one captured GUI owner. |
 | `webrtc_panel_state.py` | 171 | 主機／檢視端 mixin 的具體 Qt 狀態與 slot 型別契約；不新增執行時預設值。 |
-| `webrtc_panel.py` | 460 | WebRTC 子分頁主體。 |
-| `webrtc_dialogs.py` | 539 | WebRTC GUI 用的自訂對話框與清單元件（待審檢視者、信任清單、通訊錄、遠端檔案表、稽核記錄、LAN 瀏覽）。 |
+| `webrtc_panel.py` | 497 | WebRTC 子分頁主體。 |
+| `webrtc_dialogs.py` | 577 | WebRTC GUI 用的自訂對話框與清單元件（待審檢視者、信任清單、通訊錄、遠端檔案表、稽核記錄、LAN 瀏覽）。 |
 | `advanced_group.py` | 99 | 兩個 WebRTC 面板共用的 Advanced STUN／TURN（含選用硬體編碼器）群組，含分離的 STUN／TURN 與選用主機硬體編碼器 Protocol。 |
 | `trusted_group.py` | 75 | WebRTC host 面板的信任 viewer 清單群組（移除／清空／匯入／匯出），含它寫回面板的 Protocol。 |
-| `connection_screen.py` | 735 | Quick Connect —— AnyDesk 風格單畫面入口。 |
-| `viewer_panel.py` | 619 | 「控制另一台機器」子分頁。 |
+| `connection_screen.py` | 740 | Quick Connect —— AnyDesk 風格單畫面入口。 |
+| `viewer_panel.py` | 626 | 「控制另一台機器」子分頁。 |
 | `webrtc_known_hosts.py` | 377 | TOFU 釘選庫瀏覽器：`KnownHostsDialog` 與帶外釘選用的小表單。由 `webrtc_dialogs` 再匯出。 |
-| `host_panel.py` | 409 | 「分享這台機器」子分頁。 |
-| `_host_ops.py` | 39 | Start and stop the machine's remote-desktop host on a worker thread. Host 面板與 Quick Connect 共用的 `replace_host`／`stop_host`／`release_host`。 |
+| `host_panel.py` | 422 | 「分享這台機器」子分頁。 |
+| `_host_ops.py` | 68 | Start and stop the machine's remote-desktop host on a worker thread. Host 面板與 Quick Connect 共用的 `replace_host`／`stop_host`／`release_host`。 |
 | `frame_display.py` | 252 | 繪製 JPEG 影格並發出遠端輸入事件的元件。 |
 | `webrtc_workers.py` | 253 | 訊令流程的背景 worker（`DaemonThread`，長輪詢比面板或程式活得久也不會中止行程）。 |
 | `tab.py` | 180 | 外層容器分頁。 |
-| `_helpers.py` | 341 | 面板共用輔助：翻譯、Qt→AC 鍵滑鼠對應、TLS context、狀態徽章、指紋與時間格式化。 |
+| `_helpers.py` | 358 | 面板共用輔助：翻譯、Qt→AC 鍵滑鼠對應、TLS context、狀態徽章、指紋與時間格式化。 |
 | `remote_screen_window.py` | 140 | 檢視端的彈出視窗。 |
 | `tray_icon.py` | 106 | WebRTC 主機的系統匣圖示。 |
 | `annotation_overlay.py` | 174 | 主機端標註的透明最上層覆蓋。 |
@@ -1620,12 +1620,12 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 169 | 45,487 |
+| `gui/` | 170 | 45,904 |
 | `utils/mcp_server/` | 63 | 22,489 |
 | `utils/remote_desktop/` | 77 | 17,421 |
 | `utils/executor/` | 11 | 10,899 |
 | `utils/usb/` | 22 | 5,553 |
-| `je_auto_control/`（頂層 3 檔） | 5 | 5,178 |
+| `je_auto_control/`（頂層 3 檔） | 5 | 5,179 |
 | `utils/accessibility/` | 17 | 3,524 |
 | `wrapper/` | 25 | 6,101 |
 | `windows/` | 24 | 2,405 |
@@ -1641,7 +1641,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,076 | 114,505 |
-| **總計** | **1,608** | **251,372** |
+| **總計** | **1,609** | **251,790** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

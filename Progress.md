@@ -119,9 +119,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 
 - **Windows UIA 後端的執行緒模型**已對真的 COM 驗過（U-20261113-01；U-20261121-17 再驗：讀取在呼叫者執行緒與 walker 上都可用、stop 能叫醒等待中的 `AC_wait_for_focus_change`、`system_volume` 的 Core Audio 改經同一條 apartment 路徑，主執行緒與 worker 執行緒皆可讀）。`comtypes` 已宣告為 `accessibility` extra，`windows-uia.yml` 已在 Windows runner 以真 COM 跑過（3 項通過）。
 - **GUI 審查留下的（U-20261126-12）**：
-  - `TODO`（維護者 2026-11-26：UI 的背景作業都不得卡主執行緒）：仍在 GUI 執行緒——`connection_screen`／`viewer_panel`／`host_panel` 預覽的每格 JPEG 解碼；
-    連線或啟動時的 `load_default_certs`／`load_cert_chain`；`webrtc_panel._on_pending_viewer` 的 `trust_pending_viewer`（核准與寫信任清單同一呼叫）；
-    `AuditLogDialog` 的 sqlite 查詢；`_image_detect_tab._crop_template`；`agent_observation_view`、`template_candidate_panel` 結果 slot 的解碼。
   - `TODO`：切換語言後，探測找到的狀態列與品質提示已改用 `KeyedText` 重繪（U-20261126-29）；其餘約 230 處 `setText(_t(...))`（63 個檔案）
     未轉換，操作後才設的狀態文字可能仍是舊語言。
 - **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）。

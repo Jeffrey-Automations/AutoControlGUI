@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- GUI: remote-desktop frames and result images decode off the GUI thread; a CA-store load failure
+  is reported as the connect error; audit-log query errors and template-crop errors show in place.
+
 - The config-sync outbox database moves to schema v4 (migrated in place); peer-control receipts are
   pruned by the outbox bounds but kept at least a day. USB passthrough refuses new claims with
   "usb host busy" while `WorkerLimits.max_abandoned` (16) closed-session threads are still in the
