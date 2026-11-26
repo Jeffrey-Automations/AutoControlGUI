@@ -1,7 +1,6 @@
 """Shared managed-task lifecycle with fenced dispatch and evidence-based completion."""
 from __future__ import annotations
 
-import json
 import threading
 import time
 import uuid
@@ -27,7 +26,7 @@ from je_auto_control.utils.agent_runtime.policy import (
 )
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.agent_runtime.runtime_lock import (
-    RuntimeLock, cancel_tokens, close_runtime_ownership, retire_runtime_inputs,
+    RuntimeLock, close_runtime_ownership, retire_runtime_inputs,
 )
 from je_auto_control.utils.agent_runtime.presence_host import RuntimePresence
 from je_auto_control.utils.agent_runtime.retained_browser import RetainedBrowsers
@@ -41,6 +40,7 @@ from je_auto_control.utils.agent_runtime.task_recovery import AgentRecovery, rec
 from je_auto_control.utils.agent_runtime.origin_policy import bind_origin, validate_origins, origin_ceilings
 from je_auto_control.utils.agent_runtime.store import AgentTaskStore, request_spec_digest
 from je_auto_control.utils.agent_runtime.dag_batches import DagBatches
+from je_auto_control.utils.agent_runtime.runtime_stop import stop_all_tasks
 from je_auto_control.utils.agent_runtime.transfer_host import TransferHost
 from je_auto_control.utils.agent_runtime.transfer_protocol import AgentTransfers
 from je_auto_control.utils.agent_runtime.transfer_transport import TransferPeer
@@ -532,64 +532,8 @@ class AgentRuntime:
         return self._request_stop(task_id, "cancelling", "cancelled")
 
     def stop_all(self) -> dict[str, Any]:
-        """Cancel every visible task; operators cannot stop another principal's work."""
-        # Input stops first: fencing a batch waits for that batch's running operation, which can be a slow host.
-        cancel_tokens(self._stop_final, self._token, self._visible_live_ids())
-        errors = self.batches.stop_all()
-        identifiers = cancel_tokens(self._stop_final, self._token, self._visible_live_ids())
-        with self.store.connection(write=True) as connection:
-            connection.executemany("UPDATE agent_tasks SET state='cancelling',updated=? WHERE id=? "
-                "AND state NOT IN ('succeeded','failed','cancelled','timed_out')",
-                [(time.time(), identifier) for identifier in identifiers])
-        queued = self._cancel_without_input(identifiers)
-        snapshots = self._stop_snapshots([task_id for task_id in identifiers[:1000] if task_id in queued])
-        results: List[dict[str, Any]] = []
-        for task_id in identifiers:
-            if task_id in queued:
-                if task_id in snapshots:
-                    results.append(snapshots[task_id])
-                continue
-            try:
-                result = self.cancel(task_id)
-                if len(results) < 1000:
-                    results.append(result.to_dict())
-            except _ERRORS as error:
-                errors.append({"task_id": task_id, "error": type(error).__name__})
-        return {"tasks": results, "requested": len(identifiers), "cleanup_errors": errors[:1000]}
-
-    def _stop_snapshots(self, identifiers: List[str]) -> dict[str, dict[str, Any]]:
-        if not identifiers:
-            return {}
-        with self.store.connection() as connection:
-            connection.execute("CREATE TEMP TABLE agent_stop_page (id TEXT PRIMARY KEY)")
-            connection.executemany("INSERT INTO agent_stop_page VALUES (?)", [(item,) for item in identifiers])
-            rows = connection.execute("SELECT t.*,p.task_id AS report_pending FROM agent_tasks t "
-                "JOIN agent_stop_page s ON s.id=t.id LEFT JOIN agent_evidence_pending p ON p.task_id=t.id").fetchall()
-        return {row["id"]: AgentTaskResult(row["id"], row["state"], json.loads(row["spec"])["goal"], row["reason"],
-                row["steps"], tuple(freeze(json.loads(row["verification"]))),
-                freeze({"details_deferred": True, "report_pending": row["report_pending"] is not None})).to_dict()
-                for row in rows}
-
-    def _cancel_without_input(self, identifiers: List[str]) -> set[str]:
-        with self._mutex:
-            queued = {task_id for task_id in identifiers if task_id not in self._leases
-                      and task_id not in self._executing}
-        with self.store.connection(write=True) as connection:
-            connection.executemany("UPDATE agent_tasks SET state='cancelled',updated=? "
-                                   "WHERE id=? AND state='cancelling'", [(time.time(), item) for item in queued])
-        if self.background is not None:
-            self.evidence.defer(list(queued))
-        else:
-            for task_id in queued:
-                self.evidence.publish(task_id)
-        return queued
-
-    def _visible_live_ids(self) -> List[str]:
-        identity = current_authorization()
-        with self.store.connection() as connection:
-            rows = connection.execute("SELECT id,owner FROM agent_tasks "
-                "WHERE state NOT IN ('succeeded','failed','cancelled','timed_out')").fetchall()
-        return [row["id"] for row in rows if owns_task(json.loads(row["owner"]), identity)]
+        """Cancel every visible task; operators cannot stop another principal's work (see :mod:`.runtime_stop`)."""
+        return stop_all_tasks(self)
 
     def _request_stop(self, task_id: str, pending: str, settled: str) -> AgentTaskResult:
         row = self._row(task_id)
