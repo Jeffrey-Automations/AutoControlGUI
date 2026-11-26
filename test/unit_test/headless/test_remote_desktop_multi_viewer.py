@@ -537,7 +537,8 @@ def test_a_session_whose_connection_ended_is_pruned(state):
     _FakeHost.instances[0].kwargs["on_state_change"](state)
     assert _wait_for(lambda: host.session_count() == 0)
     assert _FakeHost.instances[0].stopped
-    assert track.stopped, "the last viewer left, so the capture must stop"
+    # The source is released right after the session leaves the registry, on the same prune thread.
+    assert _wait_for(lambda: track.stopped), "the last viewer left, so the capture must stop"
 
 
 def test_a_disconnected_session_is_kept_because_ice_can_recover():
