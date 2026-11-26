@@ -70,12 +70,28 @@ def test_any_directory_another_account_can_change_refuses_the_image(security, le
         require_trusted_image(IMAGE, 7, source)
 
 
-def test_grants_that_cannot_redirect_the_path_are_accepted():
-    # A drive root lets Authenticated Users create folders (append data only), and the
+def _default_root():
+    # A drive root lets Authenticated Users create folders (FILE_ADD_SUBDIRECTORY), and the
     # Modify grant they get on new subfolders is inherit-only. A deny or audit ACE grants nothing.
-    root = _safe(AccessEntry(0, 0, APPEND_ONLY, OTHER), AccessEntry(0, 0x08 | 0x03, 0x1301BF, OTHER),
+    return _safe(AccessEntry(0, 0, APPEND_ONLY, OTHER), AccessEntry(0, 0x08 | 0x03, 0x1301BF, OTHER),
                  AccessEntry(1, 0, FULL, OTHER), AccessEntry(2, 0, FULL, OTHER))
-    require_trusted_image(IMAGE, 7, Source(**{"C:\\": root}))
+
+
+def test_grants_that_cannot_redirect_the_path_are_accepted():
+    # Accepted only above the image's own directory: a folder created there is not beside the image.
+    require_trusted_image(IMAGE, 7, Source(**{"C:\\": _default_root()}))
+
+
+@pytest.mark.parametrize("image, level, security", [
+    ("C:\\fixture.exe", "C:\\", _default_root()),  # the default drive-root ACL, image directly under it
+    (IMAGE, "C:\\Fixtures\\app", _safe(AccessEntry(0, 0, APPEND_ONLY, OTHER))),
+], ids=["drive-root", "image-directory"])
+def test_creating_a_folder_beside_the_image_refuses_it(image, level, security):
+    # FILE_ADD_SUBDIRECTORY on the image's own directory lets another account plant
+    # ``fixture.exe.local``, which redirects the image's DLL loading (DotLocal redirection).
+    source = Source(final="\\\\?\\" + image, **{level: security})
+    with pytest.raises(MemoryObservationError, match="unsupported"):
+        require_trusted_image(image, 7, source)
 
 
 def test_the_running_user_may_own_and_write_the_deployment():

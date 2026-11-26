@@ -8,6 +8,11 @@ So a lease is only enough when the path itself cannot change underneath it:
   not a junction or symbolic link, and grants no account outside SYSTEM,
   Administrators, TrustedInstaller and the running user the right to rename,
   delete, re-link, rewrite the ACL of, or add files to it;
+* the image's own directory also grants no such account the right to create a
+  subdirectory, so nobody can plant ``<image>.local`` beside it, which redirects
+  the image's DLL loading. Higher up that right stays allowed (a drive root
+  grants it to Authenticated Users): a folder created there is not beside the
+  image. So an image directly under a default drive root is refused;
 * the leased handle's final path is the requested path, so no reparse point,
   short name, ``subst`` drive or network redirection sits anywhere in it.
 
@@ -31,6 +36,8 @@ _INHERIT_ONLY = 0x08
 # Rights that let a holder add a file (a planted DLL), rename, delete or re-link an entry,
 # turn the directory into a junction, or take over its ACL or owner.
 _UNSAFE_RIGHTS = (0x2 | 0x40 | 0x100 | 0x10000 | 0x40000 | 0x80000 | 0x10000000 | 0x40000000)
+# FILE_ADD_SUBDIRECTORY: in the image's own directory, it plants an ``<image>.local`` redirection folder.
+_IMAGE_DIRECTORY_RIGHTS = _UNSAFE_RIGHTS | 0x4
 _ALLOW_TYPES = frozenset({0x0, 0x9})
 # Deny, audit, alarm, mandatory-label and attribute ACEs grant nothing.
 _NON_GRANTING_TYPES = frozenset({0x1, 0x2, 0x3, 0x6, 0x7, 0x8, 0xA, 0xC, 0xD, 0xE, 0xF,
@@ -99,20 +106,20 @@ def _directories(path: str) -> list[str]:
     return chain
 
 
-def _unsafe(entry: AccessEntry, trusted: frozenset[str]) -> bool:
+def _unsafe(entry: AccessEntry, trusted: frozenset[str], rights: int) -> bool:
     if entry.flags & _INHERIT_ONLY or entry.kind in _NON_GRANTING_TYPES:
         return False
     if entry.kind not in _ALLOW_TYPES or entry.sid is None:
         return True  # an allow ACE this check cannot read is not assumed harmless
-    return bool(entry.mask & _UNSAFE_RIGHTS) and entry.sid not in trusted
+    return bool(entry.mask & rights) and entry.sid not in trusted
 
 
-def _protected(security: DirectorySecurity, trusted: frozenset[str]) -> bool:
+def _protected(security: DirectorySecurity, trusted: frozenset[str], rights: int) -> bool:
     if not security.attributes & _DIRECTORY or security.attributes & _REPARSE_POINT:
         return False
     if security.owner not in trusted or security.entries is None:
         return False
-    return not any(_unsafe(entry, trusted) for entry in security.entries)
+    return not any(_unsafe(entry, trusted, rights) for entry in security.entries)
 
 
 def _dos_path(final: str) -> str:
@@ -125,8 +132,10 @@ def require_trusted_image(path: str, handle: int, source: SecuritySource) -> Non
     """Refuse unless ``path`` cannot be redirected and the leased ``handle`` is the file it names."""
     local = local_drive_path(path)
     trusted = _WELL_KNOWN_TRUSTED | {source.user_sid()}
-    for directory in _directories(local):
-        if not _protected(source.directory(directory), trusted):
+    chain = _directories(local)
+    for index, directory in enumerate(chain):
+        rights = _IMAGE_DIRECTORY_RIGHTS if index == len(chain) - 1 else _UNSAFE_RIGHTS
+        if not _protected(source.directory(directory), trusted, rights):
             _fail(FailureReason.UNSUPPORTED)
     if ntpath.normcase(_dos_path(source.final_path(handle))) != ntpath.normcase(local):
         _fail(FailureReason.TARGET_CHANGED)
