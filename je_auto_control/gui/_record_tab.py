@@ -123,7 +123,7 @@ class RecordTab(TranslatableMixin, QWidget):
 
     def _playback_record(self) -> None:
         if not self._record_data:
-            QMessageBox.warning(self, "Warning", "No recorded data")
+            QMessageBox.warning(self, _t("gui_warning_title"), _t("record_no_data"))
             return
         # The worker gets its own copy: loading or recording again while the
         # playback runs must not change the list under it.
@@ -139,7 +139,7 @@ class RecordTab(TranslatableMixin, QWidget):
 
     def _on_playback_error(self, error: object) -> None:
         if not was_stopped(error):
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
 
     def _on_playback_finished(self) -> None:
         self.sync_with_engine()
@@ -147,13 +147,13 @@ class RecordTab(TranslatableMixin, QWidget):
     def _save_record(self) -> None:
         try:
             if not self._record_data:
-                QMessageBox.warning(self, "Warning", "No recorded data")
+                QMessageBox.warning(self, _t("gui_warning_title"), _t("record_no_data"))
                 return
             path, _ = QFileDialog.getSaveFileName(self, _t("save_record"), "", _JSON_FILE_FILTER)
             if path:
                 self._start_work(functools.partial(write_action_json, path, copy.deepcopy(self._record_data)))
         except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
 
     def _load_record(self) -> None:
         try:
@@ -161,7 +161,7 @@ class RecordTab(TranslatableMixin, QWidget):
             if path:
                 self._start_work(functools.partial(read_action_json, path), tag="data")
         except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
 
     def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         return [("start_record", self._start_record), ("stop_record", self._stop_record),

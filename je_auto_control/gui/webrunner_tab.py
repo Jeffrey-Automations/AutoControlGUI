@@ -170,7 +170,7 @@ class WebRunnerTab(TranslatableMixin, QWidget):
             try:
                 params = json.loads(params_text)
             except ValueError as error:
-                self._output.append(f"params JSON error: {error}")
+                self._output.append(f"{_t('web_params_error')}: {error}")
                 return
         self._run_safe(
             functools.partial(run_webrunner_action, {"action": action, "params": params}),

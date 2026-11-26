@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from functools import partial
 import math
-from typing import Callable, Literal
+from typing import Callable, Literal, Tuple
 
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QLabel, QLineEdit, QMessageBox,
@@ -34,20 +34,24 @@ class _Detection:
     button: str
 
 
-def _detect(request: _Detection) -> str:
+#: What a worker hands back: the catalogue key of the line the tab shows, and its fields.
+_Outcome = Tuple[str, dict[str, object]]
+
+
+def _detect(request: _Detection) -> _Outcome:
     if request.operation == "center":
-        return f"Center: {locate_image_center(request.path, request.threshold, request.draw)}"
+        return "img_center", {"point": locate_image_center(request.path, request.threshold, request.draw)}
     if request.operation == "all":
         matches = locate_all_image(request.path, request.threshold, request.draw)
-        return f"Found {len(matches)} matches:\n{matches}"
+        return "img_found", {"count": len(matches), "matches": matches}
     point = locate_and_click(request.path, request.button, request.threshold, request.draw)
-    return f"Clicked at: {point}"
+    return "img_clicked", {"point": point}
 
 
-def _save_template(save_path: str, region: tuple[int, int, int, int]) -> str:
+def _save_template(save_path: str, region: tuple[int, int, int, int]) -> _Outcome:
     """Worker thread: grab ``region`` and write it to ``save_path``; the line the tab shows."""
     saved = save_region_template(save_path, region)
-    return f"Template saved: {save_path} region={saved}"
+    return "img_template_saved", {"path": save_path, "region": saved}
 
 
 class ImageDetectionTab(TranslatableMixin, QWidget):
@@ -74,6 +78,7 @@ class ImageDetectionTab(TranslatableMixin, QWidget):
         result_card = Card().add(set_role(self._tr(QLabel(), "detection_result"), "sectionTitle"))
         self.detect_result_text = QTextEdit()
         self.detect_result_text.setReadOnly(True)
+        self._result_text = self._keyed(self.detect_result_text)
         layout.addWidget(result_card.add(self.detect_result_text, stretch=1), stretch=1)
         self._status_key = ""
         self._task = TabTask(self)
@@ -103,31 +108,31 @@ class ImageDetectionTab(TranslatableMixin, QWidget):
         try:
             region = open_region_selector(self)     # the operator drags here, on the GUI thread
         except (AutoControlException, OSError, ValueError, RuntimeError) as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
             return
         # The screen grab and the PNG write run off the GUI thread; the path is set once it is written.
         if region is not None and self._task.start(partial(_save_template, save_path, region), tag=save_path):
-            self._status_key = "task_running"
-            self.detect_result_text.setText(_t(self._status_key))
+            self._show_status("task_running")
 
     def _start(self, operation: Literal["center", "all", "click"]) -> None:
         if self._task.running:
             return
+        path = self.img_path_input.text()
+        if not path:
+            self._show_problem("img_path_empty")
+            return
         try:
-            path = self.img_path_input.text()
-            if not path:
-                raise ValueError("Template image path is empty")
             threshold = float(self.threshold_input.text() or "0.8")
-            if not math.isfinite(threshold) or not 0 <= threshold <= 1:
-                raise ValueError("Threshold must be between 0 and 1")
-            request = _Detection(operation, path, threshold, self.draw_check.isChecked(),
-                                 self.mouse_button_combo.currentText())
-        except (ValueError, TypeError) as error:
+        except ValueError as error:
             self._on_error(error)
             return
+        if not math.isfinite(threshold) or not 0 <= threshold <= 1:
+            self._show_problem("img_threshold_range")
+            return
+        request = _Detection(operation, path, threshold, self.draw_check.isChecked(),
+                             self.mouse_button_combo.currentText())
         if self._task.start(partial(_detect, request)):
-            self._status_key = "task_running"
-            self.detect_result_text.setText(_t(self._status_key))
+            self._show_status("task_running")
 
     def _locate_image(self) -> None:
         self._start("center")
@@ -140,32 +145,32 @@ class ImageDetectionTab(TranslatableMixin, QWidget):
 
     def _stop(self) -> None:
         if self._task.running:
-            self._status_key = "task_stopping"
-            self.detect_result_text.setText(_t(self._status_key))
+            self._show_status("task_stopping")
             self._task.stop()
 
-    def _on_task_result(self, result: str) -> None:
+    def _show_status(self, key: str) -> None:
+        self._status_key = key
+        self._result_text.show(key)
+
+    def _on_task_result(self, result: _Outcome) -> None:
         if self._task.tag:                  # a crop: its tag is the template it wrote
             self.img_path_input.setText(self._task.tag)
-        self._on_result(result)
-
-    def _on_result(self, result: str) -> None:
+        key, fields = result
         self._status_key = ""
-        self.detect_result_text.setText(result)
+        self._result_text.show(key, **fields)
+
+    def _show_problem(self, key: str) -> None:
+        """Show ``key`` as an error of the inputs; both parts follow a language switch."""
+        self._status_key = ""
+        self._result_text.show_rendered(lambda: _t("gui_error_title") + ": " + _t(key))
 
     def _on_error(self, error: object) -> None:
-        self._on_result(f"Error: {error}")
+        self._status_key = ""
+        self._result_text.show_joined("gui_error_title", error)
 
     def _on_finished(self) -> None:
         if self._status_key in {"task_running", "task_stopping"}:
-            self._status_key = "task_stopped"
-            self.detect_result_text.setText(_t(self._status_key))
-
-    def retranslate(self) -> None:
-        """Refresh labels and transient status without discarding the last result."""
-        super().retranslate()
-        if self._status_key:
-            self.detect_result_text.setText(_t(self._status_key))
+            self._show_status("task_stopped")
 
     def dispose(self) -> None:
         """Cancel pending work and drop late outcomes; entered native calls may finish."""

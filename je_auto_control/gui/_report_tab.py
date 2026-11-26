@@ -30,7 +30,8 @@ class ReportTab(TranslatableMixin, QWidget):
         # Actions menu; the tab keeps only status, name input, and result.
         tr_group = self._tr(QGroupBox(), "test_record_status")
         tr_h = QHBoxLayout()
-        self.tr_status_label = QLabel("OFF")
+        self.tr_status_label = QLabel()
+        self._record_state = self._keyed(self.tr_status_label)
         tr_h.addWidget(self.tr_status_label)
         tr_group.setLayout(tr_h)
         layout.addWidget(tr_group)
@@ -60,7 +61,7 @@ class ReportTab(TranslatableMixin, QWidget):
         ]
 
     def sync_with_engine(self) -> None:
-        self.tr_status_label.setText("ON" if test_record_instance.init_record else "OFF")
+        self._record_state.show("report_record_on" if test_record_instance.init_record else "report_record_off")
 
     def showEvent(self, event: QShowEvent) -> None:  # noqa: N802  # reason: Qt virtual method
         self.sync_with_engine()
@@ -90,17 +91,19 @@ class ReportTab(TranslatableMixin, QWidget):
     def _gen_xml(self) -> None:
         self._start_report(generate_xml_report, "XML")
 
-    def _on_report_result(self, result: str) -> None:
-        self._result_text.show_plain(result)
+    def _on_report_result(self, result: tuple[str, str]) -> None:
+        format_name, name = result
+        self._result_text.show("report_generated", format=format_name, name=name)
 
     def _on_report_error(self, error: object) -> None:
-        self._result_text.show_plain(f"Error: {error}")
+        self._result_text.show_joined("gui_error_title", error)
 
     def dispose(self) -> None:
         """Drop late results; an already-running report write may still finish."""
         self._task.stop()
 
 
-def _write_report(generator: Callable[[str], None], name: str, format_name: str) -> str:
+def _write_report(generator: Callable[[str], None], name: str, format_name: str) -> tuple[str, str]:
+    """Worker thread: write the report; the format and name the tab reports back."""
     generator(name)
-    return f"{format_name} report generated: {name}"
+    return format_name, name

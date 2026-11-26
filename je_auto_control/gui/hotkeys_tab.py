@@ -121,12 +121,12 @@ class HotkeysTab(TranslatableMixin, QWidget):
         combo = self._combo_input.text().strip()
         script = self._script_input.text().strip()
         if not combo or not script:
-            QMessageBox.warning(self, "Error", "Combo and script path are required")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("hk_combo_script_required"))
             return
         try:
             default_hotkey_daemon.bind(combo, script)
         except ValueError as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
             return
         self._refresh()
 
@@ -144,7 +144,7 @@ class HotkeysTab(TranslatableMixin, QWidget):
         try:
             default_hotkey_daemon.start()
         except NotImplementedError as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
             return
         self.sync_with_engine()
 

@@ -71,7 +71,7 @@ class StepFormView(QWidget):
             return
         spec = COMMAND_SPECS.get(step.command)
         if spec is None:
-            self._title.setText(f"Unknown command: {step.command}")
+            self._title.setText(_t("sb_unknown_command").replace("{command}", step.command))
             return
         self._title.setText(f"{spec.label}  ({spec.command})")
         if step.args is not None:
@@ -167,7 +167,7 @@ class StepFormView(QWidget):
         return editor
 
     def _browse_file(self, target: QLineEdit) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Select file")
+        path, _ = QFileDialog.getOpenFileName(self, _t("sb_dialog_select_file"))
         if path:
             target.setText(path)
 

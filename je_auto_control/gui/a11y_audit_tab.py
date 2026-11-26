@@ -131,5 +131,7 @@ class A11yAuditTab(TranslatableMixin, QWidget):
         except (ValueError, IndexError) as error:
             self._summary_text.show_plain(str(error))
             return
-        verdict = "PASS" if ratio >= 4.5 else "FAIL"
-        self._summary_text.show_plain(f"contrast {ratio:.2f}:1 — AA {verdict}")
+        verdict = "audit_contrast_pass" if ratio >= 4.5 else "audit_contrast_fail"
+        shown = f"{ratio:.2f}"
+        self._summary_text.show_rendered(
+            lambda: _t("audit_contrast_result").replace("{ratio}", shown).replace("{verdict}", _t(verdict)))

@@ -124,18 +124,16 @@ class ChatOpsTab(TranslatableMixin, QWidget):
         if was_stopped(error):
             self._output.append(_t("task_stopped"))
             return
-        self._output.append(as_plain(f"router error: {error}"))
+        self._output.append(as_plain(f"{_t('chatops_router_error')}: {error}"))
 
     def _show_result(self, result: Any) -> None:
         if result is None:
-            self._output.append(
-                f"(no match for: {self._pending_message!r} — did you miss the / prefix?)",
-            )
+            self._output.append(_t("chatops_no_match").replace("{message}", repr(self._pending_message)))
             return
         prefix = "✓" if result.succeeded else "✗"
         self._output.append(as_plain(f"{prefix} {result.text}"))
         if result.artifact_path:
-            self._output.append(f"  artifact: {result.artifact_path}")
+            self._output.append(f"  {_t('chatops_artifact')}: {result.artifact_path}")
 
 
 __all__ = ["ChatOpsTab"]

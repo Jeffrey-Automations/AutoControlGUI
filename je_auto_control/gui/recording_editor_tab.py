@@ -8,7 +8,7 @@ import copy
 import functools
 import json
 import math
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
@@ -59,7 +59,8 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         self._preview.setReadOnly(True)
         self._status = QLabel("")
         self._status_text = self._keyed(self._status)
-        self._done_text = ""                # what the running save or export shows when it returns
+        # The key and fields of what the running save or export shows when it returns.
+        self._done: Tuple[str, Dict[str, object]] = ("", {})
         self._trim_start = QLineEdit("0")
         self._trim_end = QLineEdit("")
         self._delay_factor = QLineEdit("1.0")
@@ -147,7 +148,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         try:
             show_journal_candidate(self, self._actions)
         except (AutoControlException, ValueError, TypeError) as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
 
     # pylint: disable-next=invalid-name  # reason: Qt override
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802  # reason: Qt override
@@ -183,7 +184,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         )
         if path:
             self._start_file(functools.partial(write_action_json, path, copy.deepcopy(self._actions)),
-                             "save", f"Saved to {path}")
+                             "save", ("re_saved", {"path": path}))
 
     _TARGET_FILTERS = {
         "pytest": "Python (*.py)",
@@ -196,7 +197,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         if not self._actions:
             return
         target, ok = QInputDialog.getItem(
-            self, _t("re_export_target"), "target",
+            self, _t("re_export_target"), _t("re_export_target_prompt"),
             list(self._TARGET_FILTERS), 0, False,
         )
         if not ok:
@@ -206,18 +207,20 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         )
         if path:
             work = functools.partial(generate_code_file, copy.deepcopy(self._actions), path, target=target)
-            self._start_file(work, "export", f"Exported {target} code to {path}")
+            self._start_file(work, "export", ("re_exported", {"target": target, "path": path}))
 
-    def _start_file(self, work: Callable[[], Any], tag: str, done_text: str = "") -> None:
+    def _start_file(self, work: Callable[[], Any], tag: str,
+                    done: Optional[Tuple[str, Dict[str, object]]] = None) -> None:
         if not self._files.start(work, tag=tag):
             self._status_text.show("task_busy")
             return
-        self._done_text = done_text
+        self._done = done or ("", {})
         self._status_text.show("task_running")
 
     def _on_file_done(self, result: Any) -> None:
         if self._files.tag != "load":
-            self._status_text.show_plain(self._done_text)
+            key, fields = self._done
+            self._status_text.show(key, **fields)
             return
         self._actions = result
         self._undo_stack.clear()  # a freshly loaded recording starts clean
@@ -225,14 +228,14 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
 
     def _on_file_failed(self, error: object) -> None:
         self._status_text.clear()
-        QMessageBox.warning(self, "Error", str(error))
+        QMessageBox.warning(self, _t("gui_error_title"), str(error))
 
     def _refresh(self) -> None:
         self._list.clear()
         for idx, action in enumerate(self._actions):
             self._list.addItem(f"{idx}: {action[0]}")
         self._preview.setPlainText(json.dumps(self._actions, indent=2, ensure_ascii=False))
-        self._status_text.show_plain(f"{len(self._actions)} actions")
+        self._status_text.show("re_action_count", count=len(self._actions))
 
     def _apply_trim(self) -> None:
         try:
@@ -240,7 +243,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
             end_text = self._trim_end.text().strip()
             end = int(end_text) if end_text else None
         except ValueError:
-            QMessageBox.warning(self, "Error", "Trim indices must be integers")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("re_trim_not_int"))
             return
         self._mutate(trim_actions(self._actions, start, end))
 
@@ -251,7 +254,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         try:
             new_actions = remove_action(self._actions, row)
         except IndexError as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
             return
         self._mutate(new_actions)
 
@@ -262,7 +265,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
             if not math.isfinite(factor):
                 raise ValueError("the delay factor must be finite")
         except ValueError:
-            QMessageBox.warning(self, "Error", "Factor/clamp must be numeric")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("re_delay_not_number"))
             return
         self._mutate(adjust_delays(self._actions, factor=factor, clamp_ms=clamp))
 
@@ -273,7 +276,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
             if not (math.isfinite(fx) and math.isfinite(fy)):     # float() reads "inf" and "nan"
                 raise ValueError("the scale factors must be finite")
         except ValueError:
-            QMessageBox.warning(self, "Error", "Scale factors must be numeric")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("re_scale_not_number"))
             return
         self._mutate(scale_coordinates(self._actions, fx, fy))
 

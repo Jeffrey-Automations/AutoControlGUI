@@ -251,8 +251,8 @@ class _ViewerUiMixin(_ViewerPanelPart):
         self._token_edit = self._tr(QLineEdit(), "rd_token_placeholder")
         form.addRow(self._tr(QLabel(), "rd_token_label"), SecretField(self._token_edit, self._tr))
         self._bandwidth_combo = QComboBox()
-        for key, info in BANDWIDTH_PRESETS.items():
-            self._bandwidth_combo.addItem(info["label"], key)
+        for key in BANDWIDTH_PRESETS:
+            self._bandwidth_combo.addItem(_t(f"rd_webrtc_bandwidth_{key}"), key)
         form.addRow(self._tr(QLabel(), "rd_webrtc_bandwidth_label"), self._bandwidth_combo)
         layout.addLayout(form)
         self._share_my_screen_check = self._tr(

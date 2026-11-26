@@ -152,7 +152,7 @@ class AgentObservationView(QWidget):
         if isinstance(error, AgentTaskError):
             self._notice.setText(str(error))
         else:
-            self._notice.setText(f"observation preview image could not be decoded: {error}")
+            self._notice.setText(f"{language_wrapper.translate('agent_observation_image_failed')}: {error}")
 
     def _pick_element(self, row: int, _column: int) -> None:
         if self.observation_id and 0 <= row < len(self._indices):

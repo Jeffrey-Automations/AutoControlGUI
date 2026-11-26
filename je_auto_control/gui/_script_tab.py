@@ -109,7 +109,7 @@ class ScriptTab(TranslatableMixin, QWidget):
         if was_stopped(error):
             self._result_text.show("task_stopped")
             return
-        self._result_text.show_plain(f"Error: {error}")
+        self._result_text.show_joined("gui_error_title", error)
 
     def _stop_script(self) -> None:
         """Ask the running script to stop; it ends at its next checkpoint."""
@@ -132,7 +132,7 @@ class ScriptTab(TranslatableMixin, QWidget):
         self.script_editor.setText(json.dumps(data, indent=2, ensure_ascii=False))
 
     def _load_error(self, error: object) -> None:
-        self._result_text.show_plain(f"Error loading: {error}")
+        self._result_text.show_joined("script_load_error", error)
 
     def _execute_script(self) -> None:
         path = self.script_path_input.text()

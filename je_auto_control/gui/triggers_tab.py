@@ -272,12 +272,12 @@ class TriggersTab(TranslatableMixin, QWidget):
     def _on_add(self) -> None:
         script = self._script_input.text().strip()
         if not script:
-            QMessageBox.warning(self, "Error", "Script path is required")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("tr_script_required"))
             return
         try:
             trigger = self._build_trigger(script)
         except ValueError as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
             return
         default_trigger_engine.add(trigger)
         self._refresh()
@@ -344,11 +344,11 @@ class TriggersTab(TranslatableMixin, QWidget):
     def _on_combine(self, mode: str) -> None:
         ids = self._selected_ids()
         if len(ids) < 2:
-            QMessageBox.warning(self, "Error", _t("tr_combine_need_two"))
+            QMessageBox.warning(self, _t("gui_error_title"), _t("tr_combine_need_two"))
             return
         script = self._script_input.text().strip()
         if not script:
-            QMessageBox.warning(self, "Error", "Script path is required")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("tr_script_required"))
             return
         children = children_to_combine(
             ids, default_trigger_engine.list_triggers())

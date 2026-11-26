@@ -483,6 +483,8 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
             text.retranslate()
         self._remote_files_table.retranslate()
         self._tag_filter_combo.setItemText(0, _t("rd_webrtc_tag_all"))
+        for index in range(self._bandwidth_combo.count()):
+            self._bandwidth_combo.setItemText(index, _t(f"rd_webrtc_bandwidth_{self._bandwidth_combo.itemData(index)}"))
         # The registered texts are the buttons' idle ones.
         # A button turned off while its stop runs, not one inside a collapsed (so disabled) section.
         if self._recorder is not None or _turned_off(self._record_btn):

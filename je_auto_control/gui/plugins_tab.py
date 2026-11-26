@@ -50,9 +50,9 @@ class PluginsTab(TranslatableMixin, QWidget):
         self._tr_init()
         self._dir_input = QLineEdit()
         self._list = QListWidget()
-        self._status_text = _t("pl_no_loaded")
-        self._status = QLabel(self._status_text)
-        self._status_is_translatable = True
+        self._status = QLabel()
+        self._status_text = self._keyed(self._status)
+        self._status_text.show("pl_no_loaded")
         self._refusal = RefusalLabel()
         self._loading = TabTask(self)       # reading and importing the plugin files
         self._loading.result.connect(self._on_loaded)
@@ -86,41 +86,32 @@ class PluginsTab(TranslatableMixin, QWidget):
             ("pl_load", self._on_load),
         ]
 
-    def retranslate(self) -> None:
-        TranslatableMixin.retranslate(self)
-        if self._status_is_translatable:
-            self._status.setText(_t("pl_no_loaded"))
-
     def _browse(self) -> None:
         path = QFileDialog.getExistingDirectory(self, _t("pl_dialog_plugin_dir"))
         if path:
             self._dir_input.setText(path)
-
-    def _set_status(self, text: str) -> None:
-        self._status.setText(text)
-        self._status_is_translatable = False
 
     def _on_load(self) -> None:
         path = self._dir_input.text().strip()
         if not path or not self._refusal.allows(_COMMAND):
             return
         if not self._loading.start(functools.partial(_load_work, path)):
-            self._set_status(_t("task_busy"))
+            self._status_text.show("task_busy")
             return
         self._loading_path = path
-        self._set_status(_t("task_running"))
+        self._status_text.show("task_running")
 
     def _on_load_failed(self, error: object) -> None:
-        self._set_status(str(error))
-        QMessageBox.warning(self, "Error", str(error))
+        self._status_text.show_plain(str(error))
+        QMessageBox.warning(self, _t("gui_error_title"), str(error))
 
     def _on_loaded(self, commands: Dict[str, Callable[..., Any]]) -> None:
         path = self._loading_path
         if not commands:
-            self._set_status(f"No AC_* callables found in {path}")
+            self._status_text.show("pl_none_found", path=path)
             return
         registered = register_plugin_commands(commands)
         self._list.clear()
         for name in registered:
             self._list.addItem(name)
-        self._set_status(f"Registered {len(registered)} commands from {path}")
+        self._status_text.show("pl_registered", count=len(registered), path=path)

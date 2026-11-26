@@ -441,7 +441,7 @@ class AutoControlGUIUI(QMainWindow):
         try:
             default_hotkey_daemon.start()
         except NotImplementedError as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
         self.auto_control_gui_widget.sync_engine_tabs()
 
     def _start_scheduler(self) -> None:

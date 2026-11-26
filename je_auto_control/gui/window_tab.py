@@ -139,9 +139,9 @@ class WindowManagerTab(TranslatableMixin, QWidget):
             return
         try:
             if not get_backend().bring_to_front(window_id):
-                QMessageBox.warning(self, "Error", "The window could not be brought to the front.")
+                QMessageBox.warning(self, _t("gui_error_title"), _t("win_focus_failed"))
         except (AutoControlException, RuntimeError, OSError) as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
 
     def _on_close(self) -> None:
         window_id = self._selected_window()
@@ -151,4 +151,4 @@ class WindowManagerTab(TranslatableMixin, QWidget):
             get_backend().close(window_id)
             self.refresh()
         except (AutoControlException, RuntimeError, OSError) as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))

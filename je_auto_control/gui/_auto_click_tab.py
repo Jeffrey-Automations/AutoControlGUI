@@ -61,6 +61,12 @@ def _click(request: _Click) -> None:
             type_keyboard(request.key)
 
 
+def _warn(parent: QWidget, key: str) -> None:
+    """Show ``key`` in a warning box titled in the active language."""
+    QMessageBox.warning(parent, language_wrapper.translate("gui_warning_title", "gui_warning_title"),
+                        language_wrapper.translate(key, key))
+
+
 class AutoClickTab(TranslatableMixin, QWidget):
     """Own the timer, input snapshots and worker for this auto-click page."""
 
@@ -211,12 +217,12 @@ class AutoClickTab(TranslatableMixin, QWidget):
         try:
             interval = int(self.interval_input.text())
         except ValueError:
-            QMessageBox.warning(self, "Warning", "Interval must be a number")
+            _warn(self, "auto_click_interval_not_number")
             return
         # The validator's bottom of 1 is a hint only: "0" set a 0 ms timer,
         # which clicked on every event-loop pass (18,579 clicks in 0.5 s).
         if interval < 1:
-            QMessageBox.warning(self, "Warning", "Interval must be at least 1 ms")
+            _warn(self, "auto_click_interval_too_small")
             return
         self.repeat_count = 0
         try:
@@ -262,7 +268,7 @@ class AutoClickTab(TranslatableMixin, QWidget):
     def _on_error(self, error: object) -> None:
         self.timer.stop()
         self._refresh_status()
-        QMessageBox.warning(self, "Error", str(error))
+        QMessageBox.warning(self, self._translate("gui_error_title"), str(error))
 
     def _get_mouse_pos(self) -> None:
         self._start_work(get_mouse_position, tag="position")

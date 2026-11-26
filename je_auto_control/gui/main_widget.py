@@ -5,6 +5,7 @@ from PySide6.QtCore import Signal, QObject
 from PySide6.QtGui import QKeyEvent, Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 
+from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import stop_all_script_runs
 from je_auto_control.gui.tab_registry import TAB_SPECS, TabEntry, TabRegistry, lazy_factory
 from je_auto_control.gui.workspace import WorkspaceShell
@@ -15,6 +16,20 @@ _TabEntry = TabEntry
 class _WorkerSignals(QObject):
     finished = Signal(str)
     error = Signal(str)
+
+
+class _RemoteDesktopUnavailable(TranslatableMixin, QWidget):
+    """The tab shown in place of Remote Desktop when the optional ``webrtc`` extra is not installed."""
+
+    def __init__(self, import_error: ImportError) -> None:
+        super().__init__()
+        message = QLabel()
+        message.setWordWrap(True)
+        message.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self._keyed(message).show("rd_unavailable_detail", error=repr(import_error))
+        layout = QVBoxLayout(self)
+        layout.addWidget(message)
+        layout.addStretch()
 
 
 class AutoControlGUIWidget(WorkspaceShell):
@@ -49,19 +64,7 @@ class AutoControlGUIWidget(WorkspaceShell):
             import_error: ImportError = error
         else:
             return RemoteDesktopTab()
-        placeholder = QWidget()
-        layout = QVBoxLayout(placeholder)
-        message = QLabel(
-            "Remote Desktop is unavailable: the optional 'webrtc' extra "
-            "(aiortc + PyAV) is not installed.\n\n"
-            "Install with:\n    pip install je_auto_control[webrtc]\n\n"
-            f"Underlying error: {import_error!r}",
-        )
-        message.setWordWrap(True)
-        message.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        layout.addWidget(message)
-        layout.addStretch()
-        return placeholder
+        return _RemoteDesktopUnavailable(import_error)
 
     def open_script_file(self, path: str) -> None:
         """Load a JSON script into the Script Executor tab and focus it."""

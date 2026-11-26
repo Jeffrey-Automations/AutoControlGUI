@@ -125,12 +125,12 @@ class SchedulerTab(TranslatableMixin, QWidget):
     def _on_add(self) -> None:
         path = self._path_input.text().strip()
         if not path:
-            QMessageBox.warning(self, "Error", "Script path is required")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("sch_script_required"))
             return
         try:
             interval = float(self._interval_input.text() or "60")
         except ValueError:
-            QMessageBox.warning(self, "Error", "Interval must be a number")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("sch_interval_not_number"))
             return
         default_scheduler.add_job(
             script_path=path,

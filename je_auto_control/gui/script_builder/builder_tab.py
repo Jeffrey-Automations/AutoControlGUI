@@ -133,6 +133,7 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
         self._capture.retranslate()
+        self._tree.retranslate()
         if self._add_btn is not None:
             self._add_btn.setText(_t("sb_add_step"))
         if hasattr(self._form, "retranslate"):
@@ -240,7 +241,7 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
                                       on_import=self._import_journal_candidate,
                                       current_actions=lambda: steps_to_actions(self._tree.root_steps()))
         except (AutoControlException, ValueError, TypeError) as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
 
     def _import_journal_candidate(self, candidate: CandidateScript) -> None:
         """Replace editor data explicitly with independent reviewed actions and source metadata."""
@@ -281,18 +282,18 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
     def _on_file_done(self, result: Any) -> None:
         if self._files.tag == "save":
             self._source_path = result
-            self._result.setPlainText(f"Saved: {result}")
+            self._result.setPlainText(_t("sb_saved").replace("{path}", str(result)))
             return
         path, steps, extras = result
         self._file_extras = extras
         self._source_path = path
         self._tree.load_steps(steps)
         self._form.load_step(None)
-        self._result.setPlainText(f"Loaded: {path}")
+        self._result.setPlainText(_t("sb_loaded").replace("{path}", str(path)))
 
     def _on_file_failed(self, error: object) -> None:
         self._result.setPlainText("")
-        QMessageBox.warning(self, "Error", str(error))
+        QMessageBox.warning(self, _t("gui_error_title"), str(error))
 
     def import_sync_script(self, actions: list[object], source_path: str) -> None:
         """Explicitly replace editor data with one validated loaded native snapshot, without dispatching it."""
@@ -316,10 +317,10 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
             actions = steps_to_actions(self._tree.root_steps())
         except (AutoControlException, OSError, ValueError, TypeError,
                 RuntimeError) as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
             return
         if not actions:
-            QMessageBox.information(self, "Info", "No steps to run")
+            QMessageBox.information(self, _t("gui_info_title"), _t("sb_no_steps"))
             return
         collector = OneTimeCollector()
         capture = _requested_manual_run(getattr(self, "_capture", None), source_id="gui.builder",
@@ -399,4 +400,4 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
             self._show_with_one_time([_t("task_stopped")])
             return
         self._show_with_one_time([])
-        QMessageBox.warning(self, "Error", str(error))
+        QMessageBox.warning(self, _t("gui_error_title"), str(error))
