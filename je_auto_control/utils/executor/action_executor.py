@@ -32,6 +32,7 @@ from je_auto_control.utils.executor.action_schema import (
     unknown_command_names, validate_actions,
 )
 from je_auto_control.utils.executor.flags import as_bool as _as_bool
+from je_auto_control.utils.executor.adapter_args import finite_float as _finite, json_list as _json_list
 from je_auto_control.utils.executor.dispatch import dispatch_checkpoint
 from je_auto_control.utils.agent_runtime.commands import COMMANDS as AGENT_TASK_COMMANDS
 from je_auto_control.utils.executor.flow_control import (
@@ -549,7 +550,7 @@ def _wait_color(target_rgb: Any, region: Any = None,
         region = json.loads(region) if region.strip() else None
     return wait_until_color(
         region=region, target_rgb=target_rgb, tolerance=int(tolerance),
-        min_fraction=float(min_fraction), present=_as_bool(present),
+        min_fraction=_finite(min_fraction, "min_fraction"), present=_as_bool(present),
         timeout_s=float(timeout_s), poll_interval_s=float(poll_interval_s),
     ).to_dict()
 
@@ -1163,7 +1164,7 @@ def _assert_audio(duration_s: float = 1.0,
     """Executor adapter: assert audio activity / silence."""
     from je_auto_control.utils.media_assert import assert_audio_activity
     return assert_audio_activity(
-        duration_s=float(duration_s), threshold=float(threshold),
+        duration_s=float(duration_s), threshold=_finite(threshold, "threshold"),
         expect_sound=_as_bool(expect_sound), samplerate=int(samplerate),
         channels=int(channels), raise_on_fail=_as_bool(raise_on_fail),
     ).to_dict()
@@ -1181,7 +1182,7 @@ def _assert_video_changes(video_path: str,
     return assert_video_changes(
         video_path, start_s=float(start_s),
         end_s=None if end_s is None else float(end_s),
-        threshold=float(threshold), expect_motion=_as_bool(expect_motion),
+        threshold=_finite(threshold, "threshold"), expect_motion=_as_bool(expect_motion),
         region=region, raise_on_fail=_as_bool(raise_on_fail),
     ).to_dict()
 
@@ -2457,24 +2458,19 @@ def _snap_window(title: str, position: str = "left") -> Dict[str, Any]:
 def _arrange_grid(titles: Any, rows: Any = None, cols: Any = None,
                   gap: Any = 0) -> Dict[str, Any]:
     """Executor adapter: tile a list of window titles into a grid."""
-    import json
     from je_auto_control.utils.window_capture import arrange_grid
-    if isinstance(titles, str):
-        titles = json.loads(titles)
-    moved = arrange_grid(list(titles),
+    titles = _json_list(titles, "titles")
+    moved = arrange_grid(titles,
                          rows=int(rows) if rows is not None else None,
                          cols=int(cols) if cols is not None else None,
                          gap=int(gap))
-    return {"moved": moved, "count": len(list(titles))}
+    return {"moved": moved, "count": len(titles)}
 
 
 def _arrange_cascade(titles: Any, offset: Any = 30) -> Dict[str, Any]:
     """Executor adapter: cascade a list of window titles diagonally."""
-    import json
     from je_auto_control.utils.window_capture import arrange_cascade
-    if isinstance(titles, str):
-        titles = json.loads(titles)
-    titles = list(titles)
+    titles = _json_list(titles, "titles")
     return {"moved": arrange_cascade(titles, offset=int(offset)),
             "count": len(titles)}
 
@@ -4024,11 +4020,8 @@ def _outbox_pending(name: str) -> Dict[str, Any]:
 def _collation_sort(items: Any, strength: str = "tertiary",
                     tailoring: Any = None, reverse: Any = False) -> Dict[str, Any]:
     """Adapter: locale-aware sort of a list of strings."""
-    import json
     from je_auto_control.utils.locale_collation import sort_strings
-    if isinstance(items, str):
-        items = json.loads(items)
-    ordered = sort_strings(list(items), strength=strength,
+    ordered = sort_strings(_json_list(items, "items"), strength=strength,
                            tailoring=tailoring or None, reverse=_as_bool(reverse))
     return {"sorted": ordered}
 
@@ -4079,11 +4072,8 @@ def _bidi_strip(text: str) -> Dict[str, Any]:
 def _format_list(items: Any, style: str = "and",
                  locale: str = "en") -> Dict[str, Any]:
     """Adapter: join items into a localised list string."""
-    import json
     from je_auto_control.utils.list_format import format_list
-    if isinstance(items, str):
-        items = json.loads(items)
-    return {"text": format_list(list(items), style=style, locale=locale)}
+    return {"text": format_list(_json_list(items, "items"), style=style, locale=locale)}
 
 
 def _format_message(pattern: str, args: Any = None,
@@ -5430,9 +5420,10 @@ def _perceptual_diff(actual: str, expected: str, threshold: Any = 0.1,
                      max_diff_ratio: Any = None) -> Dict[str, Any]:
     """Adapter: perceptual (YIQ) image diff with anti-alias suppression."""
     from je_auto_control.utils.perceptual_diff import perceptual_diff
+    limit = None if max_diff_ratio is None else _finite(max_diff_ratio, "max_diff_ratio")
     result = perceptual_diff(actual, expected, threshold=float(threshold),
                              include_aa=_as_bool(include_aa))
-    if max_diff_ratio is not None and result.diff_ratio > float(max_diff_ratio):
+    if limit is not None and result.diff_ratio > limit:
         raise AutoControlActionException(
             f"perceptual diff {result.diff_ratio} exceeds {max_diff_ratio}")
     return {"diff_pixels": result.diff_pixels, "total_pixels": result.total_pixels,
@@ -6814,8 +6805,7 @@ def _write_step_video(steps: Any, output: str, fps: int = 10,
 
 
 def _coerce_list(value: Any) -> List[Any]:
-    import json
-    return json.loads(value) if isinstance(value, str) else list(value)
+    return _json_list(value)
 
 
 def _fuzzy_ratio(left: Any, right: Any,
