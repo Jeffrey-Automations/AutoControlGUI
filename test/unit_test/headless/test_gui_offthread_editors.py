@@ -260,3 +260,22 @@ def test_the_quarantine_is_changed_and_read_off_the_gui_thread(boxes, monkeypatc
     assert cleared.off_gui_thread()
     tab.dispose()
     tab.deleteLater()
+
+
+def test_releasing_a_case_removes_it_by_its_name_not_its_label(boxes, monkeypatch):
+    from je_auto_control.gui import test_suite_tab as module
+    name = "login  (slow network)"                   # the separator the label uses, inside the name
+    entries = [type("Entry", (), {"name": name, "reason": "flips"})()]
+    removed = []
+    store = type("Store", (), {"list": staticmethod(lambda: list(entries)),
+                               "remove": staticmethod(removed.append)})()
+    monkeypatch.setattr(module, "default_quarantine_store", lambda: store)
+    tab = module.TestSuiteTab()
+    assert pump_until(lambda: tab._quarantine.count() == 1)
+    assert tab._quarantine.item(0).text() == f"{name}  (flips)"
+    tab._quarantine.setCurrentRow(0)
+    tab._on_release_selected()
+    assert pump_until(lambda: not tab._store.running)
+    assert removed == [name]
+    tab.dispose()
+    tab.deleteLater()

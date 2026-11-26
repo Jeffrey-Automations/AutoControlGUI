@@ -12,7 +12,7 @@ from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QFileDialog, QLabel, QListWidget,
+    QAbstractItemView, QFileDialog, QLabel, QListWidget, QListWidgetItem,
     QPlainTextEdit, QTableWidget, QTableWidgetItem, QVBoxLayout,
     QWidget,
 )
@@ -230,7 +230,9 @@ class TestSuiteTab(TranslatableMixin, QWidget):
             label = entry.name
             if entry.reason:
                 label += f"  ({entry.reason})"
-            self._quarantine.addItem(label)
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, entry.name)     # the label is not parsed back
+            self._quarantine.addItem(item)
 
     def _on_auto_quarantine(self) -> None:
         self._refresh_quarantine(auto_quarantine_from_flakiness)
@@ -238,7 +240,7 @@ class TestSuiteTab(TranslatableMixin, QWidget):
     def _on_release_selected(self) -> None:
         item = self._quarantine.currentItem()
         if item is not None:
-            self._refresh_quarantine(functools.partial(_release, item.text().split("  (")[0]))
+            self._refresh_quarantine(functools.partial(_release, str(item.data(Qt.ItemDataRole.UserRole))))
 
     def _on_clear_quarantine(self) -> None:
         self._refresh_quarantine(_clear_quarantine)
