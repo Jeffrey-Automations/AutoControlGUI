@@ -1148,6 +1148,65 @@ def test_audit_logger_redacts_sensitive_keys(tmp_path):
                                      "user": "jeff"}
 
 
+def _refusal_server(tmp_path, **kwargs):
+    """A server with one audited tool that takes a secret, and the audit lines it writes."""
+    from je_auto_control.utils.mcp_server.audit import AuditLogger
+    audit = AuditLogger(path=str(tmp_path / "audit.jsonl"))
+    tool = MCPTool(
+        name="guarded", description="guarded",
+        input_schema={"type": "object",
+                       "properties": {"x": {"type": "integer"}, "password": {"type": "string"}},
+                       "required": ["x"]},
+        handler=lambda x, password="": x,
+    )
+    server = MCPServer(tools=[tool], audit_logger=audit, **kwargs)
+
+    def lines():
+        return [json.loads(line) for line in
+                (tmp_path / "audit.jsonl").read_text(encoding="utf-8").splitlines()]
+    return server, lines
+
+
+_FIXTURE_SECRET = "fixture-only-value"  # NOSONAR S2068 reason: masking test fixture, not a credential
+
+
+def test_a_call_refused_for_its_arguments_is_audited_with_the_secret_masked(tmp_path):
+    server, lines = _refusal_server(tmp_path)
+    response = _decode(server.handle_line(_request("tools/call", params={
+        "name": "guarded", "arguments": {"x": "not a number", "password": _FIXTURE_SECRET}})))
+    assert response["result"]["isError"] is True
+    [record] = lines()
+    assert record["status"] == "invalid_arguments"
+    assert record["arguments"]["password"] == "<redacted>"
+    assert _FIXTURE_SECRET not in json.dumps(record)
+    assert "Invalid arguments" in record["error"]
+
+
+def test_a_rate_limited_call_is_audited(tmp_path):
+    from je_auto_control.utils.mcp_server.rate_limit import RateLimiter
+    server, lines = _refusal_server(tmp_path, rate_limiter=RateLimiter(rate_per_sec=0.0001, capacity=1))
+    for msg_id in (1, 2):
+        server.handle_line(_request("tools/call", msg_id=msg_id, params={
+            "name": "guarded", "arguments": {"x": 1, "password": _FIXTURE_SECRET}}))
+    assert [record["status"] for record in lines()] == ["ok", "rate_limited"]
+    assert _FIXTURE_SECRET not in json.dumps(lines())
+
+
+def test_a_call_whose_confirmation_is_declined_or_unavailable_is_audited(tmp_path, monkeypatch):
+    monkeypatch.setenv("JE_AUTOCONTROL_MCP_CONFIRM_DESTRUCTIVE", "1")
+    server, lines = _refusal_server(tmp_path)
+    server._client_capabilities = {"elicitation": {}}
+    server.handle_line(_request("tools/call", msg_id=1, params={   # no stream to ask on
+        "name": "guarded", "arguments": {"x": 1}}))
+    server.set_writer(lambda line: None)
+    monkeypatch.setattr(server, "request_elicitation", lambda **kwargs: {"action": "decline"})
+    server.handle_line(_request("tools/call", msg_id=2, params={
+        "name": "guarded", "arguments": {"x": 1}}))
+    records = lines()
+    assert [record["status"] for record in records] == ["unconfirmed", "unconfirmed"]
+    assert "unavailable" in records[0]["error"] and "declined" in records[1]["error"]
+
+
 def test_audit_logger_disabled_when_no_path():
     from je_auto_control.utils.mcp_server.audit import AuditLogger
     audit = AuditLogger(path=None)

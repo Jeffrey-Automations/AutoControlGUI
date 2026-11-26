@@ -1,8 +1,10 @@
 """Audit log for MCP tool calls.
 
-With a sink configured, every ``tools/call`` produces one JSONL line with
-timestamp, tool name, sanitised arguments, status (``ok`` / ``error`` /
-``cancelled`` / ``denied``), and duration.
+With a sink configured, every ``tools/call`` of a known tool produces one
+JSONL line with timestamp, tool name, sanitised arguments, status (``ok`` /
+``error`` / ``cancelled`` / ``denied``, or for a call refused at admission
+``refused`` / ``invalid_arguments`` / ``rate_limited`` / ``unconfirmed``),
+and duration.
 
 **The log is off by default.** The sink is the ``path`` given to
 :class:`AuditLogger`, else the file ``JE_AUTOCONTROL_MCP_AUDIT`` names; with

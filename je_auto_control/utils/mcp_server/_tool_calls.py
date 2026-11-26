@@ -29,6 +29,12 @@ from je_auto_control.utils.mcp_server.tools._validation import (
 )
 
 
+def _result_text(result: Dict[str, Any]) -> str:
+    """The text blocks of a tool result, joined."""
+    return " ".join(str(block.get("text", "")) for block in result.get("content", [])
+                    if isinstance(block, dict))
+
+
 def _error_screenshot(name: str) -> Optional[str]:
     """``server._capture_error_screenshot``, resolved when a tool fails."""
     from je_auto_control.utils.mcp_server import server
@@ -80,19 +86,52 @@ class ToolCallMixin:
             raise _MCPError(-32602, f"Unknown tool: {name}")
         tool = self._tool_for_invocation(tool)
         authorize_tool_call(tool, arguments, self._audit)  # RBAC; a no-op without a user
-        self._require_disclosed_tool(name, tool_view, tool)
+        return name, tool, self._admit_tool_call(name, tool, arguments, tool_view)
+
+    def _admit_tool_call(self, name: str, tool: Any, arguments: Dict[str, Any],
+                         tool_view: Any) -> Dict[str, Any]:
+        """The checks after RBAC; a refusal is audited under the stage that refused it.
+
+        Only the RBAC refusal (``denied``) used to reach the audit log, which
+        documents every call: ``refused`` (not disclosed), ``invalid_arguments``,
+        ``rate_limited`` and ``unconfirmed`` (the confirmation was declined or
+        could not be asked for). A confirmation prompt still awaiting its
+        answer is not a refusal and is not recorded.
+        """
+        stage = "refused"
+        try:
+            self._require_disclosed_tool(name, tool_view, tool)
+            stage = "invalid_arguments"
+            admitted = self._checked_arguments(name, tool, arguments)
+            stage = "rate_limited"
+            if self._rate_limiter is not None and not self._rate_limiter.try_acquire():
+                raise _MCPError(-32000, f"Rate limit exceeded for tool {name!r}")
+            stage = "unconfirmed"
+            self._maybe_confirm_destructive(name, tool, admitted)
+        except (_MCPError, _InvalidToolArguments) as error:
+            self._audit_refusal(name, arguments, stage, str(error))
+            raise
+        except AnsweredByGate as answered:
+            if answered.result.get("isError"):
+                self._audit_refusal(name, arguments, stage, _result_text(answered.result))
+            raise
+        return admitted
+
+    def _checked_arguments(self, name: str, tool: Any, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """``arguments`` checked against the schema, then canonicalised by the argument policy."""
         violation = (validate_arguments(tool.input_schema, arguments)
                      or undeclared_arguments(tool.input_schema, arguments))
         if violation is not None:
             raise _InvalidToolArguments(f"Invalid arguments for {name}: {violation}")
         try:
-            arguments = self._active_argument_policy.apply(name, tool.input_schema, arguments)
+            return self._active_argument_policy.apply(name, tool.input_schema, arguments)
         except AutoControlException as error:
             raise _InvalidToolArguments(f"Invalid arguments for {name}: {error}") from error
-        if self._rate_limiter is not None and not self._rate_limiter.try_acquire():
-            raise _MCPError(-32000, f"Rate limit exceeded for tool {name!r}")
-        self._maybe_confirm_destructive(name, tool, arguments)
-        return name, tool, arguments
+
+    def _audit_refusal(self, name: str, arguments: Dict[str, Any], status: str, text: str) -> None:
+        """Record a call refused at admission; the logger masks secret arguments."""
+        self._audit.record(tool=name, arguments=arguments, status=status,
+                           duration_seconds=0.0, error_text=text)
 
     @secret_log_scope()
     def _handle_tools_call(self, msg_id: Any,
