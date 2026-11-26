@@ -56,6 +56,20 @@ from je_auto_control.utils.remote_desktop.host_client import (
 )
 
 InputDispatcher = Callable[[Mapping[str, Any]], Any]
+
+
+def _send_message(msg_type: MessageType, payload: bytes, channel: MessageChannel) -> None:
+    """Send one message; the viewer's sender thread handles a broken channel."""
+    channel.send_typed(msg_type, payload)
+
+
+def _send_file_logged(address: Tuple[Any, ...], source_path: str, dest_path: str,
+                      on_progress: Optional[ProgressCallback], channel: MessageChannel) -> None:
+    """Stream one file to one viewer; a failure is logged and keeps the viewer connected."""
+    try:
+        send_file(channel, source_path, dest_path, on_progress=on_progress)
+    except (OSError, FileTransferError) as error:
+        autocontrol_logger.info("remote_desktop file send to %s failed: %r", address, error)
 # accept() 的輪詢間隔，用來定期檢查 _shutdown 旗標。
 # How long accept() blocks before re-checking the _shutdown flag.
 _ACCEPT_POLL_TIMEOUT_S = 0.5
@@ -399,26 +413,23 @@ class RemoteDesktopHost(FrameProductionMixin):
         return self._broadcast_clipboard_payload(
             encode_image(png_bytes), "image", bytes(png_bytes), automatic)
 
+    def _live_clients(self) -> List[_ClientHandler]:
+        """Snapshot the authenticated viewers that are still connected."""
+        with self._clients_lock:
+            return [c for c in self._clients
+                    if c.authenticated and not c._shutdown.is_set()]
+
     def _broadcast_clipboard_payload(self, payload: bytes, kind: str, data: Any,
                                      automatic: bool) -> int:
-        with self._clients_lock:
-            clients = [c for c in self._clients
-                       if c.authenticated and not c._shutdown.is_set()]
+        """Queue a CLIPBOARD on each viewer's own sender; returns how many took it."""
         sent = 0
-        for client in clients:
+        for client in self._live_clients():
             # One guard per viewer: what viewer A sent still goes to viewer B.
             if automatic and not client.clipboard_guard.should_send(kind, data):
                 continue
-            try:
-                client._channel.send_typed(MessageType.CLIPBOARD, payload)
+            if client.push_outgoing("clipboard", partial(_send_message, MessageType.CLIPBOARD, payload)):
                 client.clipboard_guard.note_sent(kind, data)
                 sent += 1
-            except OSError as error:
-                autocontrol_logger.info(
-                    "remote_desktop clipboard send to %s failed: %r",
-                    client.address, error,
-                )
-                client.stop()
         return sent
 
     def set_file_receiver(self, receiver: FileReceiver) -> None:
@@ -437,23 +448,17 @@ class RemoteDesktopHost(FrameProductionMixin):
         ``dest_path`` is relative to each viewer's download directory: a
         viewer refuses an absolute path or one that leaves that directory.
 
-        Returns the number of viewers the transfer was attempted on.
-        Each viewer gets its own ``transfer_id`` so progress callbacks
-        can be demultiplexed in the GUI.
+        Returns the number of viewers the transfer was queued for. Each
+        viewer's copy runs on that viewer's own sender thread, so one that
+        stopped reading holds only itself, and ``on_progress`` is called
+        from those threads. Each viewer gets its own ``transfer_id`` so
+        progress callbacks can be demultiplexed in the GUI.
         """
-        with self._clients_lock:
-            clients = [c for c in self._clients
-                       if c.authenticated and not c._shutdown.is_set()]
-        for client in clients:
-            try:
-                send_file(client._channel, source_path, dest_path,
-                          on_progress=on_progress)
-            except (OSError, FileTransferError) as error:
-                autocontrol_logger.info(
-                    "remote_desktop file send to %s failed: %r",
-                    client.address, error,
-                )
-        return len(clients)
+        queued = 0
+        for client in self._live_clients():
+            job = partial(_send_file_logged, client.address, source_path, dest_path, on_progress)
+            queued += client.push_outgoing("file", job)
+        return queued
 
     def _try_consume_resume(self, nonce: bytes,
                             payload: bytes) -> Optional[str]:
@@ -529,28 +534,17 @@ class RemoteDesktopHost(FrameProductionMixin):
     def broadcast_chat(self, text: str, sender: str = "host") -> int:
         """Phase 5.2: send a chat message to every connected viewer.
 
-        Returns the number of viewers the message was *attempted* on.
-        Per-client errors are logged but do not abort the broadcast.
+        Returns the number of viewers the message was queued for, each on
+        that viewer's own sender thread: a viewer that stopped reading, or
+        whose bounded queue is full, does not hold the others.
         """
         if not isinstance(text, str) or not text:
             return 0
         payload = json.dumps(
             {"sender": sender, "text": text, "ts": time.time()},
         ).encode("utf-8")
-        with self._clients_lock:
-            clients = [c for c in self._clients
-                       if c.authenticated and not c._shutdown.is_set()]
-        sent = 0
-        for client in clients:
-            try:
-                client._channel.send_typed(MessageType.CHAT, payload)
-                sent += 1
-            except OSError as error:
-                autocontrol_logger.info(
-                    "remote_desktop chat send to %s failed: %r",
-                    client.address, error,
-                )
-        return sent
+        job = partial(_send_message, MessageType.CHAT, payload)
+        return sum(client.push_outgoing("chat", job) for client in self._live_clients())
 
     def _ip_allowed(self, address: Tuple[Any, ...]) -> bool:
         """Apply the Phase 4.3 allowlist; log + reject silently otherwise."""

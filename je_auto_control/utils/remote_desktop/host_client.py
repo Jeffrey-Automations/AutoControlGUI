@@ -9,8 +9,9 @@ module does not import it.
 """
 import collections
 import json
+import queue
 import threading
-from typing import TYPE_CHECKING, Deque, List, NoReturn, Optional, Any, Set, Tuple
+from typing import TYPE_CHECKING, Callable, Deque, List, NoReturn, Optional, Any, Set, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
@@ -45,12 +46,16 @@ _FILE_MSG_TYPES = frozenset({
 #: Messages a view-only viewer may not send, besides INPUT.
 _CONTROL_MSG_TYPES = frozenset({MessageType.CLIPBOARD, *_FILE_MSG_TYPES})
 
+#: A host-initiated send (chat, clipboard, file) run on the viewer's own thread.
+OutgoingJob = Callable[[MessageChannel], None]
+
 
 class _ClientHandler:
     """Per-connection auth + input-receive + frame-send state."""
 
     _AUDIO_QUEUE_MAXLEN = 50  # ~2.5 s of buffered chunks at 50 ms each
     _CURSOR_QUEUE_MAXLEN = 64  # ~2 s of updates at 30 Hz
+    _OUTGOING_QUEUE_MAXSIZE = 64  # host-initiated sends waiting on one viewer
 
     def __init__(self, host: "RemoteDesktopHost",
                  channel: MessageChannel, address: Tuple[Any, ...]) -> None:
@@ -70,6 +75,14 @@ class _ClientHandler:
         self._cursor_queue: Deque[bytes] = collections.deque(
             maxlen=self._CURSOR_QUEUE_MAXLEN,
         )
+        # Chat, clipboard and file sends the host initiated, run on this
+        # viewer's own rd-outgoing thread so a viewer that stopped reading
+        # blocks only itself; full means the viewer is that far behind.
+        self._outgoing: "queue.Queue[Tuple[str, OutgoingJob]]" = queue.Queue(
+            maxsize=self._OUTGOING_QUEUE_MAXSIZE,
+        )
+        self._outgoing_lock = threading.Lock()
+        self._outgoing_thread: Optional[threading.Thread] = None
         self.authenticated = False
         #: What this viewer and the host have exchanged over the clipboard,
         #: so a forwarded change is not sent back to where it came from.
@@ -161,6 +174,50 @@ class _ClientHandler:
         with self._host._frame_cond:
             self._cursor_queue.append(payload)
             self._host._frame_cond.notify_all()
+
+    def push_outgoing(self, what: str, job: OutgoingJob) -> bool:
+        """Queue a host-initiated send for this viewer's own sender thread.
+
+        ``False`` when the viewer is gone or so far behind that its bounded
+        queue is full: the send is dropped for this viewer only.
+        """
+        if self._shutdown.is_set():
+            return False
+        try:
+            self._outgoing.put_nowait((what, job))
+        except queue.Full:
+            autocontrol_logger.warning(
+                "remote_desktop %s to %s dropped: the viewer is not reading", what, self._address,
+            )
+            return False
+        with self._outgoing_lock:
+            if self._outgoing_thread is None:
+                self._outgoing_thread = threading.Thread(
+                    target=self._outgoing_loop, name="rd-outgoing", daemon=True,
+                )
+                self._outgoing_thread.start()
+        return True
+
+    def _outgoing_loop(self) -> None:
+        while not self._shutdown.is_set():
+            try:
+                what, job = self._outgoing.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            if self._shutdown.is_set():
+                return
+            try:
+                job(self._channel)
+            except OSError as error:
+                autocontrol_logger.info(
+                    "remote_desktop %s send to %s failed: %r", what, self._address, error,
+                )
+                self.stop()
+                return
+            except ProtocolError as error:
+                autocontrol_logger.warning(
+                    "remote_desktop %s to %s not sent: %r", what, self._address, error,
+                )
 
     def stop(self) -> None:
         """Signal threads, abandon this viewer's unfinished uploads, close the socket."""
