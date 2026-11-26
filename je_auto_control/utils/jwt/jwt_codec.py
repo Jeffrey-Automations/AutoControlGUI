@@ -62,6 +62,13 @@ class ClaimsPolicy:
     verify_exp: bool = True
     verify_nbf: bool = True
 
+    def __post_init__(self) -> None:
+        leeway = self.leeway
+        # NaN or infinity would make every exp/nbf comparison pass, so an expired token stays valid forever.
+        if isinstance(leeway, bool) or not isinstance(leeway, (int, float)) \
+                or not math.isfinite(leeway) or leeway < 0:
+            raise JwtError(f"leeway must be a finite, non-negative number of seconds, not {leeway!r}")
+
 
 def _b64url_encode(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")

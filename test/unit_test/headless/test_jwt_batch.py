@@ -167,3 +167,18 @@ def test_the_mcp_schema_declares_the_leeway_bounds():
     [decode] = [tool for tool in jwt_tools() if tool.name == "ac_jwt_decode"]
     assert decode.input_schema["properties"]["leeway"] == {
         "type": "number", "minimum": 0, "maximum": 3600}
+
+
+@pytest.mark.parametrize("leeway", [float("nan"), float("inf"), -1.0, True, "5"])
+def test_the_library_policy_refuses_a_leeway_that_would_disable_expiry(leeway):
+    from je_auto_control.utils.jwt.jwt_codec import ClaimsPolicy, JwtError
+    with pytest.raises(JwtError):
+        ClaimsPolicy(leeway=leeway)
+
+
+def test_ac_jwt_decode_refuses_a_nan_leeway():
+    from je_auto_control.utils.executor.action_executor import executor
+    from je_auto_control.utils.jwt.jwt_codec import JwtError, encode_jwt
+    token = encode_jwt({"exp": 1}, "k" * 32)
+    with pytest.raises(JwtError):
+        executor.event_dict["AC_jwt_decode"](token, "k" * 32, leeway=float("nan"))
