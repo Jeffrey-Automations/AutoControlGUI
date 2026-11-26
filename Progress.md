@@ -143,13 +143,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - **socket server 驅動程式執行檔過舊**（U-20261126-35）：`autocontrol_driver/AutoControlDriverWindows.exe`（2023-05-18）與 `generate_autocontrol_driver_linux` 仍是沒有驗證的舊伺服器；倉庫裡只有指向作者舊機器絕對路徑的 `auto_py_to_exe.json`，沒有可在這裡執行的建置腳本，需要重建或移除。
 - **Intel Mac 安裝要編譯 `cryptography`**：下限拉到 50 之後 `macosx_10_9_x86_64` 沒有 wheel（探測：最新只到 48.0.1），
   `pip install je_auto_control` 在 Intel Mac 需要 Rust 工具鏈。沒有在 Intel Mac 上實際編過。
-- **伺服器與 executor 審查留下的（U-20261126-13）**：
-  - `DECIDE`：macro 是全程序共用。
-  - `DECIDE`（U-20261126-28 補審）：`AC_voice_register` 註冊的動作清單以呼叫 `AC_voice_dispatch` 者的權限執行（同 macro 那一類）；改成記下註冊者（`DeferredAuthorization`）會改變 admin dispatch 能做的事。
-    具名的記憶體內 executor registry（`_VERSIONED_STORES`、`_DEDUP_WINDOWS`、`_IDEMPOTENCY_STORES`、`_BULKHEADS`、`_SEQUENCE_TRACKERS`）沒有上限，已驗證的呼叫者可一直新建名稱；加 LRU 上限會丟掉仍在用的狀態。
-  - `DECIDE`（U-20261126-31 逐行審查）：`AC_generate_sop`（`actions`）與 `AC_generate_code`（`source`）執行時就展開，
-    `${secrets.X}` 會以明文寫進產出的檔案與結果、迴圈變數則報 Unknown variable；加進 `_DEFERRED_COMMAND_KEYS` 可解，但 `${var}` 就不再代換，而 `source` 有時是靠代換的路徑。
-    `AC_resolve_ref` 拒絕 `secret://`，卻把可能是祕密的 `env://` 值放進記錄的結果。
 - **遠端與 USB 審查留下的（U-20261126-17）**：`DECIDE`：未驗證的連線最多占一個 `max_clients` 名額 60 秒；H.264 over TCP 只留最新封包，慢的觀看者會掉 P-frame。
   USB 直通斷線後，仍在後端裡的傳輸執行緒會跑到後端逾時（最長 60 秒）才結束；全程序同時最多 `WorkerLimits.max_abandoned`（預設 16）條，超過時新的 OPEN／RESUME 被拒（U-20261126-29）。
 - **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；

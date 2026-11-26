@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-37 | 2026-11-26 | Run stored action lists under both authorities, cap named registries and keep secrets out of generated output | #done #security #decide #rbac | [2026-11-c](2026-11-c.md) |
 | U-20261126-36 | 2026-11-26 | Fail image absence checks on unusable input, contain foreign errors and deliver HTTP resource updates | #done #fix #decide #mcp | [2026-11-c](2026-11-c.md) |
 | U-20261126-35 | 2026-11-26 | Require authentication on the TCP socket server | #done #security #decide #socket | [2026-11-c](2026-11-c.md) |
 | U-20261126-34 | 2026-11-26 | Let the read-only worker verify desktop tasks | #done #agent #decide | [2026-11-c](2026-11-c.md) |
