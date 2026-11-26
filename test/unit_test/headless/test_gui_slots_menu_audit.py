@@ -256,7 +256,10 @@ def test_a_vault_that_cannot_be_opened_or_written_is_reported(monkeypatch, comma
     tab = module.SecretsTab()
     tab._passphrase.setText("correct horse")
     getattr(tab, command)()
+    from headless._qt_settle import pump_until
+    assert pump_until(lambda: not tab._runs.running)     # the key derivation runs off the GUI thread
     assert warned == [str(failure)]
+    tab.dispose()
     tab.deleteLater()
 
 
