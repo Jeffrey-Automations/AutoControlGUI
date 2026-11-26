@@ -208,3 +208,55 @@ def test_the_flakiness_report_is_computed_off_the_gui_thread(boxes, monkeypatch)
     assert gate.off_gui_thread() and tab._status.text() == _t("flaky_summary_empty")
     tab.dispose()
     tab.deleteLater()
+
+
+# --- the test suite tab -----------------------------------------------------------------------------------
+
+def test_the_suite_tab_loads_and_exports_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui import test_suite_tab as module
+    spec = tmp_path / "suite.json"
+    spec.write_text('{"cases": []}', encoding="utf-8")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(spec), ""))
+    load = _Gate(module._read_spec)
+    monkeypatch.setattr(module, "_read_spec", load)
+    tab = module.TestSuiteTab()
+    _returns_at_once(tab._on_load_file)
+    assert load.entered.wait(_WAIT)
+    assert tab._summary.text() == _t("task_running")
+    tab._on_load_file()                             # one file at a time
+    assert tab._summary.text() == _t("task_busy")
+    load.release.set()
+    assert pump_until(lambda: not tab._files.running)
+    assert load.off_gui_thread() and tab._spec.toPlainText() == '{"cases": []}'
+    write = _Gate(lambda *args: None)
+    monkeypatch.setattr(module.ac, "write_junit_xml", write)
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(tmp_path / "j.xml"), ""))
+    tab._last_result = module.TestSuiteResult(name="s", cases=[])
+    _returns_at_once(tab._on_junit)
+    assert write.entered.wait(_WAIT)
+    write.release.set()
+    assert pump_until(lambda: not tab._files.running)
+    assert write.off_gui_thread()
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_the_quarantine_is_changed_and_read_off_the_gui_thread(boxes, monkeypatch):
+    from je_auto_control.gui import test_suite_tab as module
+    entries = [type("Entry", (), {"name": "flaky_case", "reason": "flips"})()]
+    cleared = _Gate(entries.clear)
+    store = type("Store", (), {"list": staticmethod(lambda: list(entries)), "clear": staticmethod(cleared),
+                               "remove": staticmethod(lambda name: None)})()
+    monkeypatch.setattr(module, "default_quarantine_store", lambda: store)
+    started = time.monotonic()
+    tab = module.TestSuiteTab()
+    assert time.monotonic() - started < 5.0, "building the tab waited for the quarantine"
+    assert pump_until(lambda: tab._quarantine.count() == 1)
+    _returns_at_once(tab._on_clear_quarantine)
+    assert cleared.entered.wait(_WAIT)
+    assert tab._quarantine.count() == 1
+    cleared.release.set()
+    assert pump_until(lambda: tab._quarantine.count() == 0)
+    assert cleared.off_gui_thread()
+    tab.dispose()
+    tab.deleteLater()

@@ -14,7 +14,6 @@ execute a script run it off the GUI thread now; those three use a real (small)
 widget and wait for the outcome to be delivered.
 """
 import os
-import types
 
 import pytest
 
@@ -157,12 +156,12 @@ def test_suite_load_file_handles_non_utf8(monkeypatch, tmp_path):
     bad.write_bytes(b"\xff\xfe\x00 not valid utf-8 \xff")
     monkeypatch.setattr(ts.QFileDialog, "getOpenFileName",
                         lambda *a, **k: (str(bad), ""))
-    captured = {}
-    stub = types.SimpleNamespace(
-        _spec=types.SimpleNamespace(setPlainText=lambda _s: captured.__setitem__("spec", True)),
-        _summary=types.SimpleNamespace(setText=lambda s: captured.__setitem__("summary", s)),
-    )
-
-    ts.TestSuiteTab._on_load_file(stub)  # must not raise UnicodeDecodeError
-    assert "summary" in captured  # error surfaced on the summary label
-    assert "spec" not in captured  # the unreadable content was not shown
+    _app()
+    tab = ts.TestSuiteTab()                         # the file is read off the GUI thread
+    tab._spec.setPlainText("kept")
+    tab._on_load_file()                             # must not raise UnicodeDecodeError
+    assert settle(tab._files, "task")
+    assert "utf-8" in tab._summary.text()           # error surfaced on the summary label
+    assert tab._spec.toPlainText() == "kept"        # the unreadable content was not shown
+    tab.dispose()
+    tab.deleteLater()

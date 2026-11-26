@@ -282,7 +282,9 @@ def test_a_suite_report_that_cannot_be_written_is_reported(monkeypatch, command,
     tab = module.TestSuiteTab()
     tab._last_result = object()
     getattr(tab, command)()
+    assert settle(tab._files, "task")               # written off the GUI thread
     assert "disk full" in tab._summary.text()
+    tab.dispose()
     tab.deleteLater()
 
 
