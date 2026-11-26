@@ -6,6 +6,7 @@ a flag spelled ``"false"``, a JSON string that decodes to a string, a ``NaN``
 threshold, an unknown operator, or a result that reported a setting it did
 not apply. No ``PySide6``, no real mouse, keyboard, screen or USB device.
 """
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -169,3 +170,66 @@ def test_perceptual_diff_refuses_a_nan_max_diff_ratio(monkeypatch):
     monkeypatch.setattr(perceptual_diff, "perceptual_diff", lambda *a, **k: result)
     with pytest.raises(AutoControlActionException):
         ae._perceptual_diff("a.png", "b.png", max_diff_ratio=NAN)
+
+
+# --- an unknown operator --------------------------------------------------------
+
+def test_expect_poll_refuses_an_unknown_op(monkeypatch):
+    monkeypatch.setitem(ae.executor.event_dict, "AC_review_three", lambda: 3)
+    with pytest.raises(AutoControlActionException):
+        ae._expect_poll(["AC_review_three"], op="eq", expected=5,
+                        timeout_s=0.05, interval_s=0.01)
+
+
+def test_expect_poll_known_and_default_ops_still_work(monkeypatch):
+    monkeypatch.setitem(ae.executor.event_dict, "AC_review_three", lambda: 3)
+    assert ae._expect_poll(["AC_review_three"], op="equals", expected=3)["ok"] is True
+    assert ae._expect_poll(["AC_review_three"])["ok"] is True
+
+
+# --- a result that reported a setting it did not apply ----------------------
+
+def test_usb_watch_start_reports_the_interval_in_use(monkeypatch):
+    from je_auto_control.utils.usb import usb_watcher
+    fake = SimpleNamespace(start=lambda: None, is_running=True, poll_interval_s=2.0)
+    monkeypatch.setattr(usb_watcher, "default_usb_watcher", lambda: fake)
+    assert ae._usb_watch_start(poll_interval_s=0.5)["interval_s"] == 2.0
+
+
+def test_usb_watcher_exposes_its_poll_interval():
+    from je_auto_control.utils.usb.usb_watcher import UsbHotplugWatcher
+    assert UsbHotplugWatcher(poll_interval_s=5.0, enumerator=list).poll_interval_s == 5.0
+
+
+# --- a shared singleton started twice ------------------------------------------
+
+def test_a11y_record_start_from_two_threads_starts_one_recorder(monkeypatch):
+    from je_auto_control.utils import accessibility
+    both_inside = threading.Barrier(2)
+    started = []
+
+    class FakeRecorder:
+        def __init__(self, **_kwargs):
+            try:
+                both_inside.wait(timeout=0.5)  # both callers past the None check
+            except threading.BrokenBarrierError:
+                pass
+            self.is_running = False
+
+        def start(self):
+            started.append(self)
+            self.is_running = True
+
+        def stop(self):
+            self.is_running = False
+            return []
+
+    monkeypatch.setattr(accessibility, "AccessibilityRecorder", FakeRecorder)
+    monkeypatch.setattr(ae, "_AX_RECORDER_SINGLETON", None)
+    threads = [threading.Thread(target=ae._a11y_record_start) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+    ae._a11y_record_stop()
+    assert len(started) == 1

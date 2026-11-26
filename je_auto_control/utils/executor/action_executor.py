@@ -266,6 +266,7 @@ def _run_dag(definition: Dict[str, Any],
 
 
 _AX_RECORDER_SINGLETON = None
+_AX_RECORDER_LOCK = threading.Lock()  # two concurrent starts each built and started one
 _DEFAULT_APPROVALS_DIR = ".approvals"
 
 
@@ -330,25 +331,24 @@ def _a11y_record_start(app_name: Optional[str] = None,
     """Executor adapter: start the singleton accessibility recorder."""
     from je_auto_control.utils.accessibility import AccessibilityRecorder
     global _AX_RECORDER_SINGLETON
-    if (_AX_RECORDER_SINGLETON is not None
-            and _AX_RECORDER_SINGLETON.is_running):
-        return {"running": True, "already": True}
-    _AX_RECORDER_SINGLETON = AccessibilityRecorder(
-        app_name=app_name,
-        poll_interval_s=float(poll_interval_s),
-        min_movement_px=int(min_movement_px),
-    )
-    _AX_RECORDER_SINGLETON.start()
+    with _AX_RECORDER_LOCK:
+        if _AX_RECORDER_SINGLETON is not None and _AX_RECORDER_SINGLETON.is_running:
+            return {"running": True, "already": True}
+        _AX_RECORDER_SINGLETON = AccessibilityRecorder(
+            app_name=app_name, poll_interval_s=float(poll_interval_s),
+            min_movement_px=int(min_movement_px))
+        _AX_RECORDER_SINGLETON.start()
     return {"running": True, "already": False}
 
 
 def _a11y_record_stop() -> List[Dict[str, Any]]:
     """Executor adapter: stop the recorder and return the captured events."""
     global _AX_RECORDER_SINGLETON
-    if _AX_RECORDER_SINGLETON is None:
-        return []
-    events = _AX_RECORDER_SINGLETON.stop()
-    _AX_RECORDER_SINGLETON = None
+    with _AX_RECORDER_LOCK:
+        if _AX_RECORDER_SINGLETON is None:
+            return []
+        events = _AX_RECORDER_SINGLETON.stop()
+        _AX_RECORDER_SINGLETON = None
     return [event.to_dict() for event in events]
 
 
@@ -1583,10 +1583,10 @@ def _usb_watch_start(poll_interval_s: float = 2.0) -> Dict[str, Any]:
     """Executor adapter: start the singleton USB hotplug watcher."""
     from je_auto_control.utils.usb.usb_watcher import default_usb_watcher
     watcher = default_usb_watcher()
-    # poll_interval_s is consumed at watcher construction time only;
-    # honor it on a fresh singleton, otherwise just (re-)start.
+    # The singleton is built with the default interval and poll_interval_s
+    # cannot change it, so report the one in use, not the one asked for.
     watcher.start()
-    return {"running": watcher.is_running, "interval_s": poll_interval_s}
+    return {"running": watcher.is_running, "interval_s": watcher.poll_interval_s}
 
 
 def _usb_watch_stop() -> Dict[str, Any]:
@@ -4968,7 +4968,10 @@ def _expect_poll(action: Any, key: Any = None, op: str = "truthy",
                 "gt": lambda: to_be_greater_than(expected),
                 "regex": lambda: to_match_regex(str(expected)),
                 "truthy": to_be_truthy}
-    inner = builders.get(str(op), to_be_truthy)()
+    name = "truthy" if op in (None, "") else str(op)
+    if name not in builders:  # "eq" fell back to truthy and matched any non-empty value
+        raise AutoControlActionException(f"unknown expect_poll op {op!r}; expected one of {sorted(builders)}")
+    inner = builders[name]()
     failed = object()  # a failed attempt: distinct from a result of None, so it never matches
 
     def matcher(value: Any) -> bool:

@@ -103,6 +103,11 @@ class UsbHotplugWatcher:
         self._next_seq: int = 1
 
     @property
+    def poll_interval_s(self) -> float:
+        """Seconds between two enumerations, after the 0.25 s floor."""
+        return self._interval
+
+    @property
     def is_running(self) -> bool:
         """Whether a poller thread is alive for the current run."""
         with self._lifecycle_lock:
