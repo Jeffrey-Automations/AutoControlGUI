@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- The config-sync outbox database moves to schema v4 (migrated in place); peer-control receipts are
+  pruned by the outbox bounds but kept at least a day. USB passthrough refuses new claims with
+  "usb host busy" while `WorkerLimits.max_abandoned` (16) closed-session threads are still in the
+  backend. One WebRTC drop uses one auto-reconnect attempt.
+
 - Secrets passed as positional arguments are masked in logs, record keys, the MCP audit file and
   the action journal, so record keys change for those actions. The Prometheus exporter and the
   ACME HTTP-01 server drop a silent client after 30 s. `AC_expect_poll` no longer matches

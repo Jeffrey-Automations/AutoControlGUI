@@ -122,9 +122,8 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   - `TODO`（維護者 2026-11-26：UI 的背景作業都不得卡主執行緒）：仍在 GUI 執行緒——`connection_screen`／`viewer_panel`／`host_panel` 預覽的每格 JPEG 解碼；
     連線或啟動時的 `load_default_certs`／`load_cert_chain`；`webrtc_panel._on_pending_viewer` 的 `trust_pending_viewer`（核准與寫信任清單同一呼叫）；
     `AuditLogDialog` 的 sqlite 查詢；`_image_detect_tab._crop_template`；`agent_observation_view`、`template_candidate_panel` 結果 slot 的解碼。
-  - `TODO`：WebRTC 一次斷線的「disconnected」「failed」會用掉兩次重連；
-    `test_suite_tab` 以兩個空白加「(」拆標籤解除隔離，案例名含該字串會拆錯；
-    切換語言後部分暫態文字與品質提示仍是舊語言。
+  - `TODO`：切換語言後，探測找到的狀態列與品質提示已改用 `KeyedText` 重繪（U-20261126-29）；其餘約 230 處 `setText(_t(...))`（63 個檔案）
+    未轉換，操作後才設的狀態文字可能仍是舊語言。
 - **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）。
   結果裡內嵌的動作清單以「參數」規則遮蔽，那些欄位不提供一次性顯示。
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
@@ -159,8 +158,7 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - **`DECIDE`（agent_runtime 審查）**：`ReadOnlyWorker` 無法設定任何桌面任務（基底 worker 要求在場綁定，而主機刻意不傳），桌面唯讀完成驗證目前完全不能用；
   修法是一處覆寫，但等於移除一個拒絕條件。
 - **遠端與 USB 審查留下的（U-20261126-17）**：`DECIDE`：未驗證的連線最多占一個 `max_clients` 名額 60 秒；H.264 over TCP 只留最新封包，慢的觀看者會掉 P-frame。
-  `TODO`：config sync 的 `sync_control_receipts` 沒有修剪（該表沒有時間欄，加上期限要改 schema）。
-  USB 直通斷線後，仍在後端裡的傳輸執行緒會跑到後端逾時（最長 60 秒）才結束；一直重連的觀看者每個斷掉的工作階段最多可占 max_claims + 1 條這種執行緒。
+  USB 直通斷線後，仍在後端裡的傳輸執行緒會跑到後端逾時（最長 60 秒）才結束；全程序同時最多 `WorkerLimits.max_abandoned`（預設 16）條，超過時新的 OPEN／RESUME 被拒（U-20261126-29）。
 - **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；
   私鑰支援選用通行碼加密，未設定時仍是明文 PEM（0600，Windows 上沒驗權限位元）；遷移模式開著時 HMAC 簽章會被接受。
 - **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：

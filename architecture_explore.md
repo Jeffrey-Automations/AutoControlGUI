@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,620 |
-| 程式碼總行數 | 251,939 |
+| 程式碼總行數 | 252,117 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -538,15 +538,15 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.10 遠端桌面與 USB
 
-> 6 個套件、約 33,277 行。
+> 6 個套件、約 33,378 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/admin/` | 483 | 多主機管理主控台：平行輪詢 N 個 AutoControl REST 端點 |
-| `utils/config_sync/` | 8,614 | 持久化設定與條件交易：`contract.py` 管理有限 JSON 與協定例外；`store.py` 以 SQLite 原子比較版本／記錄重送收據；`routes.py` 提供第二版 HTTP 與明確盲寫相容；`commands.py` 共用 AC／MCP／Builder；`client.py` 條件提交，另有因果模型、peer ledger 與本機 SQLite outbox；第三版 /causal 交易已接上確認／退休／回收與刪除憑證；client／outbox 已接上原請求重送、有界 CAS 重合併及原子快照確認；持久化控制、原子本機 full-resync／舊待送退役與歷史收據已接上。本機資產工具另提供 manifest、整版雜湊驗證與不可變目錄發布；七種來源 adapters 保存可攜因果 profiles；workspace INI 與 GUI 共用偏好正規化。來源／outbox 與原子 full-resync 基準已由 SyncWorkspace 協調；引用資產以不可變分塊／完整 hash 收據、具驗證 HTTP 與完整 profile 串流發布接上；Sync UI 仍屬 C3。 |
+| `utils/config_sync/` | 8,669 | 持久化設定與條件交易：`contract.py` 管理有限 JSON 與協定例外；`store.py` 以 SQLite 原子比較版本／記錄重送收據；`routes.py` 提供第二版 HTTP 與明確盲寫相容；`commands.py` 共用 AC／MCP／Builder；`client.py` 條件提交，另有因果模型、peer ledger 與本機 SQLite outbox；第三版 /causal 交易已接上確認／退休／回收與刪除憑證；client／outbox 已接上原請求重送、有界 CAS 重合併及原子快照確認；持久化控制、原子本機 full-resync／舊待送退役與歷史收據已接上。本機資產工具另提供 manifest、整版雜湊驗證與不可變目錄發布；七種來源 adapters 保存可攜因果 profiles；workspace INI 與 GUI 共用偏好正規化。來源／outbox 與原子 full-resync 基準已由 SyncWorkspace 協調；引用資產以不可變分塊／完整 hash 收據、具驗證 HTTP 與完整 profile 串流發布接上；Sync UI 仍屬 C3。 |
 | `utils/device_matrix/` | 236 | 行動裝置矩陣：同一 action list 於多台裝置平行執行 |
 | `utils/remote_desktop/` | 17,421 | **遠端桌面子系統**：TCP／WebSocket／WebRTC 三條傳輸路徑、主機與檢視端、訊令伺服器、TURN／中繼、多檢視者、錄影、信任清單、TOTP、稽核鏈；私有選用功能模組保留整組匯入結果。 |
-| `utils/usb/` | 5,507 | 跨平台 USB 列舉／熱插拔／裝置直通（WinUSB、IOKit、libusb 後端 + ACL + WebRTC DataChannel 通道） |
+| `utils/usb/` | 5,553 | 跨平台 USB 列舉／熱插拔／裝置直通（WinUSB、IOKit、libusb 後端 + ACL + WebRTC DataChannel 通道） |
 | `utils/usbip/` | 1,016 | USB/IP 線路協定主機端（協定封包、TCP 伺服器、libusb URB 後端） |
 
 > **2026-10-09 第三輪新增的模組**（各自的子套件列在 §5.4 的原表格裡，這裡只列檔名與職責）：
@@ -891,13 +891,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `permissions.py` / `clipboard_sync.py` / `wake_on_lan.py` / `session_actions.py` / `auth.py` | 64 / 139 / 56 / 40 / 28 | 逐 session 權限、剪貼簿同步、WOL、SAS 注入與螢幕遮蔽、HMAC 挑戰回應。 |
 | `ws_host.py` / `ws_viewer.py` / `jpeg_recorder.py` | 41 / 30 / 146 | WebSocket 傳輸變體與 TCP 路徑錄影。 |
 
-#### `utils/usb/`（5,507 行）與 `utils/usbip/`（1,016 行）
+#### `utils/usb/`（5,553 行）與 `utils/usbip/`（1,016 行）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
 | `usb/passthrough/session.py` | 655 | 逐 peer 的 USB 直通 session。 |
 | `usb/passthrough/session_frames.py` | 185 | 直通協定的純分派器與訊框輔助函式。 |
-| `usb/passthrough/session_worker.py` | 227 | 逐 session 的工作執行緒，讓阻塞的 USB 工作離開 WebRTC 事件迴圈；每個 claim 一條 FIFO。 |
+| `usb/passthrough/session_worker.py` | 273 | 逐 session 的工作執行緒，讓阻塞的 USB 工作離開 WebRTC 事件迴圈；每個 claim 一條 FIFO。 |
 | `usb/passthrough/viewer_client.py` | 552 | 檢視端的直通協定用戶端。 |
 | `usb/passthrough/backend.py` | 488 | 後端 ABC + libusb 實作。 |
 | `usb/passthrough/winusb_backend.py` | 488 | Windows WinUSB 後端（ctypes）。 |
@@ -945,7 +945,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cv2_utils/template_detection.py` | 198 | Locate a template image on screen, in the coordinates the mouse takes. |
 | `utils/cv2_utils/video_recording.py` | 76 | Internal image/capture utilities. |
 
-#### `utils/config_sync/`（8,614 行）— 持久化、因果模型與本機重送
+#### `utils/config_sync/`（8,669 行）— 持久化、因果模型與本機重送
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -959,8 +959,8 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/config_sync/versions.py` | 155 | 因果版本向量、雙方衝突保存、封存 JSON 與明確觀察後的解決。 |
 | `utils/config_sync/peers.py` | 132 | 可序列化 peer 確認／退休／full-resync epoch 與刪除回收資格判斷。 |
 | `utils/config_sync/outbox_models.py` | 193 | 操作身分／來源封存、端點正規化、重試預算與投遞報告。 |
-| `utils/config_sync/outbox_schema.py` | 98 | 辨識自有 outbox SQLite application/schema，驗證並原子遷移版本 1／2→3，拒絕修改外來資料庫。 |
-| `utils/config_sync/outbox.py` | 410 | 本機持久化佇列、固定準備請求、有界退避／取消與 lease；成功收據與完整伺服器快照原子確認。 |
+| `utils/config_sync/outbox_schema.py` | 119 | 辨識自有 outbox SQLite application/schema，驗證並原子遷移版本 1／2→3，拒絕修改外來資料庫。 |
+| `utils/config_sync/outbox.py` | 417 | 本機持久化佇列、固定準備請求、有界退避／取消與 lease；成功收據與完整伺服器快照原子確認。 |
 | `utils/config_sync/causal_commands.py` | 79 | 純資料合併／peer 轉換與私有佇列 enqueue／status；不連線或套用設定。 |
 | `utils/config_sync/causal_models.py` | 145 | 明確 actor、完整衝突 alternatives 與不保留舊 payload 的永久刪除憑證。 |
 | `utils/config_sync/causal_merge.py` | 68 | 確定性多值 frontier、因果支配、操作分叉拒絕與刪除憑證合併。 |
@@ -1009,7 +1009,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/config_sync/adapter_factory.py` | 202 | Build private local adapter profiles from explicit JSON source descriptors with live path/cancellation authority. |
 | `utils/config_sync/adapter_commands.py` | 59 | Private JSON command adapters capture, merge, resolve and materialize inert causal definition profiles. |
 | `utils/config_sync/control_models.py` | 127 | 固定控制意圖、穩定 RPC 操作 ID 與控制結果。 |
-| `utils/config_sync/control_store.py` | 267 | 持久化控制 lease、固定請求與精簡歷史收據。 |
+| `utils/config_sync/control_store.py` | 294 | 持久化控制 lease、固定請求與精簡歷史收據。 |
 | `utils/config_sync/control_adoption.py` | 85 | 收據確認時原子採用本機世代、快照並封存待送舊編輯。 |
 | `utils/config_sync/control_delivery.py` | 156 | 明確 peer 控制投遞、有界過期重合併與原請求重送。 |
 | `utils/config_sync/outbox_lease.py` | 15 | 共用持久化 due／lease 到期判定。 |
@@ -1397,7 +1397,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `_script_tab.py` | 183 | 獨立腳本執行分頁；背景載入與執行，關閉取消並釋放控制項。 |
 | `_record_tab.py` | 173 | 獨立錄製／回放檢視；背景工作與共享錄製器狀態，關閉檢視不停止錄製器。 |
 | `_report_tab.py` | 106 | 報表分頁 mixin。 |
-| `_i18n_helpers.py` | 79 | 需要即時語言切換的分頁共用的翻譯註冊 mixin。 |
+| `_i18n_helpers.py` | 122 | 需要即時語言切換的分頁共用的翻譯註冊 mixin。 |
 | `_validators.py` | 29 | `int_validator()`／`double_validator()`：以 C locale 驗證的數字輸入框 validator，接受的正是 `int()`／`float()` 讀得懂的寫法（預設 locale 在法文、德文下只收小數逗號）。所有數字 `QLineEdit` 都用它。 |
 | `_screen_geometry.py` | 55 | Qt 邏輯座標與截圖用的原生像素互轉：`native_region()`、`screen_at_native()`、`logical_point()`（每個螢幕的左上角在兩者相同，螢幕內依 device pixel ratio 縮放）。區域選取與主機端標註覆蓋層都用它。 |
 | `_daemon_thread.py` | 79 | `DaemonThread`：`QThread` 的替代品，保留遠端桌面 worker 用到的介面（`start`／`run`／`isRunning`／`wait`／`requestInterruption`／`started`／`finished`），但 `run()` 跑在 daemon `threading.Thread` 上，刪除物件或程式結束都不會銷毀執行中的執行緒。 |
@@ -1446,10 +1446,10 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | triggers | `triggers_tab.py` | 407 | 影像／視窗／像素／檔案事件監看。 |
 | webhooks | `webhooks_tab.py` | 244 | 將 HTTP 請求綁到 action 腳本。 |
 | email_triggers | `email_triggers_tab.py` | 259 | 將 IMAP 信箱綁到 action 腳本。 |
-| test_suite | `test_suite_tab.py` | 244 | 執行 QA 套件規格並管理易碎隔離區。 |
+| test_suite | `test_suite_tab.py` | 246 | 執行 QA 套件規格並管理易碎隔離區。 |
 | assertions | `assertions_tab.py` | 154 | 執行單一畫面狀態斷言並顯示通過／失敗。 |
 | data_source | `data_source_tab.py` | 152 | 預覽無頭資料層載入的資料列。 |
-| flakiness | `flakiness_tab.py` | 129 | 依執行歷史排序間歇失敗的腳本。 |
+| flakiness | `flakiness_tab.py` | 126 | 依執行歷史排序間歇失敗的腳本。 |
 | a11y_audit | `a11y_audit_tab.py` | 138 | 從即時樹找出無障礙／i18n 缺陷。 |
 | device_matrix | `device_matrix_tab.py` | 139 | 一份 action list 跨多裝置平行執行。 |
 | mobile | `mobile_tab.py` | 222 | Android／iOS 裝置工作階段：設定報告、擷取、手勢、輸入與能力矩陣。 |
@@ -1462,7 +1462,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | dag_runner | `dag_tab.py` | 380 | 編輯、驗證、執行跨主機 DAG。 |
 | chatops | `chatops_tab.py` | 141 | 在接上 Slack 前先本機測試 slash 指令。 |
 | trace_replay | `trace_replay_tab.py` | 251 | 拖曳捲動時光回溯錄製內容。 |
-| remote_desktop | `remote_desktop/`（40 檔） | 8,789 | 見下。 |
+| remote_desktop | `remote_desktop/`（40 檔） | 8,819 | 見下。 |
 | presence | `presence_tab.py` | 176 | 多檢視者在場名單。 |
 | rest_api | `rest_api_tab.py` | 319 | 啟停 HTTP 前端並顯示 URL、實際驗證模式與可用 token。 |
 | admin_console | `admin_console_tab.py` | 384 | 管理多個遠端 AutoControl REST 端點。 |
@@ -1480,7 +1480,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `gui/diagnostics_capabilities.py` | 60 | 只呈現既有不可變能力快照與四語狀態；不探測、不連線，不持有原生物件。 |
 
-#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／8,789 行）
+#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／8,819 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1490,8 +1490,8 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `view_upload.py` | 42 | Value-only legacy viewer uploads owned by the shared GUI task controller. |
 | `folder_sync_controls.py` | 72 | Translate the existing folder toggle into owned start, reconnect handoff and explicit baseline reset. |
 | `folder_sync_io.py` | 130 | Bind confirmed folder sends, cancellation and frozen receipts to one captured GUI owner. |
-| `webrtc_panel_state.py` | 166 | 主機／檢視端 mixin 的具體 Qt 狀態與 slot 型別契約；不新增執行時預設值。 |
-| `webrtc_panel.py` | 448 | WebRTC 子分頁主體。 |
+| `webrtc_panel_state.py` | 171 | 主機／檢視端 mixin 的具體 Qt 狀態與 slot 型別契約；不新增執行時預設值。 |
+| `webrtc_panel.py` | 460 | WebRTC 子分頁主體。 |
 | `webrtc_dialogs.py` | 539 | WebRTC GUI 用的自訂對話框與清單元件（待審檢視者、信任清單、通訊錄、遠端檔案表、稽核記錄、LAN 瀏覽）。 |
 | `advanced_group.py` | 99 | 兩個 WebRTC 面板共用的 Advanced STUN／TURN（含選用硬體編碼器）群組，含分離的 STUN／TURN 與選用主機硬體編碼器 Protocol。 |
 | `trusted_group.py` | 75 | WebRTC host 面板的信任 viewer 清單群組（移除／清空／匯入／匯出），含它寫回面板的 Protocol。 |
@@ -1620,11 +1620,11 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 169 | 45,410 |
+| `gui/` | 169 | 45,487 |
 | `utils/mcp_server/` | 63 | 22,489 |
 | `utils/remote_desktop/` | 77 | 17,421 |
 | `utils/executor/` | 11 | 10,899 |
-| `utils/usb/` | 22 | 5,507 |
+| `utils/usb/` | 22 | 5,553 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,178 |
 | `utils/accessibility/` | 17 | 3,524 |
 | `wrapper/` | 25 | 6,101 |
@@ -1640,8 +1640,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,076 | 114,450 |
-| **總計** | **1,608** | **251,194** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,076 | 114,505 |
+| **總計** | **1,608** | **251,372** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
