@@ -252,3 +252,33 @@ def test_a_damaged_pending_report_does_not_stop_the_others(runtime):
     instance.maintain()
     assert instance.evidence.metadata(damaged)["report_pending"] is True
     assert instance.evidence.metadata(healthy)["report_pending"] is False
+
+
+def test_damaged_pending_reports_back_off_instead_of_filling_every_batch(runtime):
+    instance, _target = runtime
+    tasks = sorted(instance.submit(spec()).task_id for _index in range(16))
+    damaged, healthy = tasks[:8], tasks[8:]  # a full batch of damaged reports ahead of the healthy ones
+    instance.evidence.defer(tasks)
+    for task_id in damaged:
+        (instance.evidence.directory(task_id) / "journal.jsonl").unlink()
+    attempts, publish = [], instance.evidence.publish
+
+    def counted(task_id):
+        attempts.append(task_id)
+        publish(task_id)
+    instance.evidence.publish = counted
+    now = time.monotonic()
+    instance.evidence._clock = lambda: now
+    instance.evidence.flush()
+    assert not any(instance.evidence.metadata(task_id)["report_pending"] for task_id in healthy)
+    assert all(instance.evidence.metadata(task_id)["report_pending"] for task_id in damaged)
+    late = instance.submit(spec()).task_id
+    instance.evidence.defer([late])
+    attempts.clear()
+    instance.evidence.flush()
+    assert attempts == [late]  # the damaged ones wait out their back-off
+    now += 3601
+    attempts.clear()
+    instance.evidence.flush()
+    assert sorted(attempts) == damaged  # retried later, and never dropped
+    assert all(instance.evidence.metadata(task_id)["report_pending"] for task_id in damaged)
