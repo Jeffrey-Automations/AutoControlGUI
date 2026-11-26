@@ -37,6 +37,7 @@ from je_auto_control.utils.remote_desktop.transport import MessageChannel
 
 if TYPE_CHECKING:  # avoids a runtime cycle: host imports this module
     from je_auto_control.utils.remote_desktop.host import RemoteDesktopHost
+    from je_auto_control.utils.remote_desktop.host_admission import PendingAdmission
 
 _FILE_MSG_TYPES = frozenset({
     MessageType.FILE_BEGIN, MessageType.FILE_CHUNK, MessageType.FILE_END,
@@ -58,8 +59,12 @@ class _ClientHandler:
     _OUTGOING_QUEUE_MAXSIZE = 64  # host-initiated sends waiting on one viewer
 
     def __init__(self, host: "RemoteDesktopHost",
-                 channel: MessageChannel, address: Tuple[Any, ...]) -> None:
+                 channel: MessageChannel, address: Tuple[Any, ...],
+                 admission: Optional["PendingAdmission"] = None) -> None:
         self._host = host
+        #: The pending slot and auth deadline this connection holds until
+        #: its credentials verify; ``None`` outside the host's accept path.
+        self.admission = admission
         self._channel = channel
         self._address = address
         self._shutdown = threading.Event()
@@ -259,9 +264,15 @@ class _ClientHandler:
             )
             return PERMISSION_DENIED
 
+    def _pending_read_timeout(self) -> float:
+        """Socket timeout while unauthenticated: the pending deadline's time left, if any."""
+        if self.admission is None:
+            return _AUTH_TIMEOUT_S
+        return self.admission.read_timeout()
+
     def _authenticate(self) -> None:
         nonce = make_nonce()
-        self._channel.settimeout(_AUTH_TIMEOUT_S)
+        self._channel.settimeout(self._pending_read_timeout())
         self._channel.send_typed(MessageType.AUTH_CHALLENGE, nonce)
         msg_type, payload = self._channel.read_typed()
         if msg_type is not MessageType.AUTH_RESPONSE:
@@ -270,11 +281,16 @@ class _ClientHandler:
         # signs with that token directly — host short-circuits the
         # approval popup and reuses the saved permission.
         resumed = self._host._try_consume_resume(nonce, payload)
+        if resumed is None and not self._host._verify_token(nonce, payload):
+            self._reject_auth(b"bad token", "bad token")
+        # Only now, credentials proven, does the connection take a viewer
+        # slot: an unauthenticated one used to hold it for up to 60 s.
+        self._channel.settimeout(_AUTH_TIMEOUT_S)
+        if not self._host._admit_client(self):
+            self._reject_auth(b"host full", "no viewer slot")
         if resumed is not None:
             self.permission = resumed
         else:
-            if not self._host._verify_token(nonce, payload):
-                self._reject_auth(b"bad token", "bad token")
             # Host operator gates the session *before* AUTH_OK so the
             # viewer surfaces the rejection as an AuthenticationError
             # instead of connecting and then mysteriously disconnecting.
@@ -298,6 +314,8 @@ class _ClientHandler:
     def _reject_auth(self, payload: bytes, message: str) -> NoReturn:
         """Release admission capacity before the terminal reply lets the viewer immediately reconnect."""
         self._shutdown.set()
+        if self.admission is not None:
+            self.admission.settle()
         self._channel.send_typed(MessageType.AUTH_FAIL, payload)
         raise AuthenticationError(message)
 

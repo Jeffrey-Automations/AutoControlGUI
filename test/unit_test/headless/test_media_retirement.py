@@ -310,6 +310,7 @@ def test_host_audio_failure_does_not_skip_socket_or_client_cleanup():
     host._frame_cond = threading.Condition()
     host._clients_lock = threading.Lock()
     host._clients = [SimpleNamespace(stop=lambda: calls.append("client"))]
+    host._pending = {}
     host._file_receiver = None
     host._accept_thread = host._capture_thread = host._cursor_thread = None
     with pytest.raises(OSError):
