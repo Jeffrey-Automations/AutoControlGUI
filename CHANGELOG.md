@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- **Breaking:** the TCP socket server (`start-server`, `start_autocontrol_socket_server`) requires
+  authentication. A client that sends a command (or `quit_server`) without it gets
+  `authentication required` and the command does not run. To migrate, send `AUTH <token>` as the
+  first line of each connection and read the `AUTH_OK` line before the reply, or use
+  `send_socket_command()`. The token is read from `~/.je_auto_control/socket_server_<port>.token`
+  (owner-only, deleted on close), set with `--token` / `JE_AUTOCONTROL_SOCKET_TOKEN`, or under RBAC
+  is a user's token (the server token is then refused; actions need `drive_input`, `quit_server`
+  needs `manage_hosts`). To keep the old protocol, start the server with `--no-auth`
+  (`require_auth=False`), which logs a warning at start. `TCPServer.close_flag` was already gone;
+  wait on `server.socket.fileno() == -1` instead.
 - Agent runtime: a desktop task can be verified by a permanent read-only completion reader; the
   read-only helper takes no presence binding and refuses one.
 

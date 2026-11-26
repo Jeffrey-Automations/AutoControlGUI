@@ -37,6 +37,8 @@ While the window is open, the app collects Python's cyclic garbage on the GUI th
 - Connect AI clients through MCP, or integrate through REST and Python.
 - Use recording, scheduling and remote-desktop tools through the optional GUI.
 
+The TCP socket server (`je_auto_control start-server`, port 9938) now requires authentication. Each connection opens with `AUTH <token>` and is answered `AUTH_OK` before its command runs. The token is `--token`, else `JE_AUTOCONTROL_SOCKET_TOKEN`, else a random one written owner-only to `~/.je_auto_control/socket_server_<port>.token` (`--token-file` changes it) and deleted when the server stops. Under RBAC only users' tokens are accepted: running actions needs `drive_input` and `quit_server` needs `manage_hosts`. A connection gets 10 seconds and 3 tries, and failures are rate-limited per address. `ac.send_socket_command([["AC_screen_size"]])` reads the token and authenticates for you. An existing client must send the `AUTH` line first, or the server must be started with `--no-auth`, which logs a warning that any local process can then run any command. See [integrations](docs/guides/en/integrations.md#servers-and-integrations).
+
 The Image Detection page runs matching in the background and owns its mouse-button selection.
 Its Actions menu can stop a pending search; closing the page discards late results and reopening resets its inputs.
 Cancellation prevents later move/click steps, but cannot interrupt a native call already in progress.

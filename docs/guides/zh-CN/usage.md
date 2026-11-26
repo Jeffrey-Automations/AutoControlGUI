@@ -192,7 +192,7 @@ je_auto_control record out.json [--duration 5]
 je_auto_control codegen script.json --target pytest -o test_flow.py
 je_auto_control failure-bundle failure.zip --error "login timed out"
 je_auto_control list-jobs
-je_auto_control start-server --port 9938      # TCP socket 服务器
+je_auto_control start-server --port 9938      # TCP socket 服务器（AUTH token；--token、--token-file、--no-auth）
 je_auto_control start-rest   --port 9939      # REST API
 je_auto_control version
 ```

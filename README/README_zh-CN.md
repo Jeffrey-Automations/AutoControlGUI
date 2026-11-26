@@ -37,6 +37,8 @@ python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 - 通过 MCP 连接 AI 客户端，或通过 REST 与 Python 整合。
 - 在可选 GUI 中使用录制、调度与远程桌面工具。
 
+TCP socket 服务器（`je_auto_control start-server`，端口 9938）现在需要验证。每条连接先发送 `AUTH <token>`，收到 `AUTH_OK` 后指令才会执行。token 依次取 `--token`、`JE_AUTOCONTROL_SOCKET_TOKEN`，都没有则随机生成，并以仅所有者可读的方式写入 `~/.je_auto_control/socket_server_<port>.token`（`--token-file` 可改），服务器停止时删除。RBAC 下只接受用户的 token：执行动作需要 `drive_input`，`quit_server` 需要 `manage_hosts`。每条连接有 10 秒与 3 次机会，失败按地址限流。`ac.send_socket_command([["AC_screen_size"]])` 会替你读取 token 并完成验证。现有客户端必须先发送 `AUTH` 那一行，或以 `--no-auth` 启动服务器；后者会记录警告：此时任何本机进程都能执行任何指令。详见[整合说明](../docs/guides/zh-CN/integrations.md)。
+
 图像检测分页在后台执行匹配，并有自己的鼠标按键选择。
 Actions 菜单可停止待完成的搜索；关闭分页会丢弃延迟结果，重新打开会重置输入字段。
 取消可阻止后续移动与点击步骤，但无法中断已进入的原生调用。

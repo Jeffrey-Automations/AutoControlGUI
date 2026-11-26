@@ -68,12 +68,30 @@ For OpenAI agent integrations, expose a focused allow-list with `export_openai_t
 |---|---|---|
 | **MCP server** | `je_auto_control_mcp` (stdio) or `AC_start_mcp_http_server` | 823 tools for Claude Desktop / Claude Code / custom tool loops: the full `ac_*` surface plus short model-friendly aliases for common GUI actions. Speaks the stateless MCP 2026-07-28 beside the `initialize`-based revisions. Bearer auth, TLS, audit log, rate limit, plugin hot-reload, CI fake backend. |
 | **REST API** | `je_auto_control start-rest` | Bearer token, per-IP rate limit + lockout, SQLite audit hook, `/metrics`, `/openapi.json`, `/docs` Swagger UI, `/dashboard`. |
-| **TCP socket server** | `je_auto_control start-server` | Newline-framed JSON action lists. Binds `127.0.0.1` by default. |
+| **TCP socket server** | `je_auto_control start-server` | Newline-framed JSON action lists after an `AUTH <token>` handshake (see below). Binds `127.0.0.1` by default. |
 | **pytest plugin** | installed automatically | Fixtures plus a Gherkin step library for pytest-bdd / behave. |
 | **Language server** | `python -m autocontrol_lsp.server` | Completion and diagnostics for `AC_*` action JSON, generated from the live command table. |
 | **Remote desktop** | `RemoteDesktopHost` / GUI | TCP, WebSocket, or WebRTC; TOTP, trust list, TURN config, file/clipboard/audio sync. |
 
 All servers bind to `127.0.0.1` unless you opt in explicitly.
+
+**TCP socket server authentication.** The first line of every connection must be `AUTH <token>`; the server answers `AUTH_OK` and then reads one command as before. A command sent without it, `quit_server` included, is refused with `authentication required` and does not run.
+
+- **Server token** (RBAC off): `start_autocontrol_socket_server(token=...)` / `--token`, else `JE_AUTOCONTROL_SOCKET_TOKEN`, else a random `secrets.token_urlsafe(32)`. It is written atomically to `~/.je_auto_control/socket_server_<port>.token` (`--token-file` / `token_path` overrides it), readable by its owner only (0600 on POSIX, a current-user-only access list on Windows), and deleted when the server closes. The CLI prints the path, never the token.
+- **RBAC on** (`JE_AUTOCONTROL_RBAC_USERS`): only users' tokens authenticate; the server token is refused and no file is written. Each command runs under that user's role: an action list needs `drive_input` and is checked whole before it runs, nested action files are checked by the executor, and `quit_server` needs `manage_hosts`.
+- **Limits:** 10 seconds to authenticate, 3 wrong tokens per connection before it is closed, and failed attempts rate-limited per client address (after 8 failures a minute wrong tokens get `too many failed attempts`; a valid token is never locked out).
+- **Opt-out:** `--no-auth` / `require_auth=False` keeps the unauthenticated protocol and logs a warning that any process able to reach the server can run any command.
+
+The client helper reads the token for you:
+
+```python
+import je_auto_control as ac
+
+print(ac.send_socket_command([["AC_screen_size"]], port=9938))  # token file, or JE_AUTOCONTROL_SOCKET_TOKEN
+ac.send_socket_command("quit_server", port=9938, token="<an admin's token under RBAC>")
+```
+
+`read_socket_token(port)` and `authenticate_connection(connection, stream, token)` cover clients that open their own socket. An existing client must send `AUTH <token>` and read the `AUTH_OK` line before its reply, or the server must be started with `--no-auth`.
 
 The MCP window-state tools `ac_window_minimize`, `ac_window_maximize` and `ac_window_restore` return the window handle on accepted requests and `isError: true` on backend refusal (including a stale handle or rejected activation). Raw Win32 `ShowWindow` previous visibility is normalized by the backend.
 

@@ -66,12 +66,30 @@ OpenAI agent 请使用 `export_openai_tools(only=[...])` 提供聚焦工具集�
 |---|---|---|
 | **MCP 服务器** | `je_auto_control_mcp`（stdio）或 `AC_start_mcp_http_server` | 823 个工具，供 Claude Desktop／Claude Code／自定义 tool loop 使用：完整的 `ac_*` 工具接口，以及常用 GUI 操作的短名称 alias。除了以 `initialize` 握手的各版协议，也支持无状态的 MCP 2026-07-28。Bearer 认证、TLS、审计日志、限流、插件热重载、CI 假后端。 |
 | **REST API** | `je_auto_control start-rest` | Bearer token、按 IP 限流与锁定、SQLite 审计 hook、`/metrics`、`/openapi.json`、`/docs` Swagger UI、`/dashboard`。 |
-| **TCP socket 服务器** | `je_auto_control start-server` | 以换行分隔的 JSON 动作列表。默认绑定 `127.0.0.1`。 |
+| **TCP socket 服务器** | `je_auto_control start-server` | 先以 `AUTH <token>` 握手（见下文），再发送以换行分隔的 JSON 动作列表。默认绑定 `127.0.0.1`。 |
 | **pytest 插件** | 安装后自动生效 | 提供 fixture 与供 pytest-bdd／behave 使用的 Gherkin step library。 |
 | **语言服务器** | `python -m autocontrol_lsp.server` | 为 `AC_*` 动作 JSON 提供补全与诊断，命令清单直接取自运行期的命令表。 |
 | **远程桌面** | `RemoteDesktopHost` 或 GUI | TCP、WebSocket 或 WebRTC；TOTP、信任列表、TURN 配置、文件／剪贴板／音频同步。 |
 
 除非明确指定，所有服务器都绑定在 `127.0.0.1`。
+
+**TCP socket 服务器验证。** 每条连接的第一行必须是 `AUTH <token>`；服务器回 `AUTH_OK`，之后照旧读取一条指令。没有先验证就发送的指令（包括 `quit_server`）会以 `authentication required` 拒绝，不会执行。
+
+- **服务器 token**（RBAC 关闭）：`start_autocontrol_socket_server(token=...)`／`--token`，否则 `JE_AUTOCONTROL_SOCKET_TOKEN`，再否则随机生成 `secrets.token_urlsafe(32)`。它以原子方式写入 `~/.je_auto_control/socket_server_<port>.token`（可用 `--token-file`／`token_path` 改路径），只有所有者能读（POSIX 为 0600，Windows 为只列当前用户的访问控制列表），服务器关闭时删除。CLI 只打印路径，不打印 token。
+- **RBAC 开启**（`JE_AUTOCONTROL_RBAC_USERS`）：只接受用户的 token；服务器 token 会被拒，也不写文件。每个指令以该用户的角色执行：动作列表需要 `drive_input`，执行前整份检查；嵌套的动作文件由执行器检查；`quit_server` 需要 `manage_hosts`。
+- **限制：** 10 秒内必须完成验证；每条连接错 3 次 token 即关闭；失败尝试按客户端地址限流（一分钟内失败 8 次后，错误 token 会收到 `too many failed attempts`；正确 token 永远不会被锁住）。
+- **关闭验证：** `--no-auth`／`require_auth=False` 保留不验证的协议，并记录警告：任何连得到服务器的进程都能执行任何指令。
+
+客户端辅助函数会替你读取 token：
+
+```python
+import je_auto_control as ac
+
+print(ac.send_socket_command([["AC_screen_size"]], port=9938))  # token 文件，或 JE_AUTOCONTROL_SOCKET_TOKEN
+ac.send_socket_command("quit_server", port=9938, token="<RBAC 下某位 admin 的 token>")
+```
+
+自行打开 socket 的客户端可用 `read_socket_token(port)` 与 `authenticate_connection(connection, stream, token)`。现有客户端必须先发送 `AUTH <token>` 并在读取回复前读掉 `AUTH_OK` 那一行，或改以 `--no-auth` 启动服务器。
 
 MCP 窗口状态工具 `ac_window_minimize`、`ac_window_maximize` 与 `ac_window_restore` 在后端接受请求时返回窗口 handle，被拒绝时回复 `isError: true`（包括 handle 失效或激活请求被拒）。Win32 原始 `ShowWindow` 的先前可见性由后端规范化处理。
 
