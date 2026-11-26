@@ -17,6 +17,10 @@ class AccessibilityBackend:
 
     name: str = "abstract"
     available: bool = False
+    #: Whether every write calls ``walker.begin_act()`` after finding its control and before acting,
+    #: so a stop that arrives during the find prevents the act. Without it a stopped run waits for
+    #: the whole write once it has started.
+    gates_writes: bool = False
 
     def list_elements(self, app_name: Optional[str] = None,
                       max_results: int = 200,

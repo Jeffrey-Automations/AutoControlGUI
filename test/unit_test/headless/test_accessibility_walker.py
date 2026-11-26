@@ -1,4 +1,4 @@
-"""Read-only accessibility walks run on one long-lived thread so a stop ends the wait. No Qt, no COM."""
+"""Accessibility walks run on one long-lived thread so a stop ends the wait. No Qt, no COM."""
 import threading
 import time
 
@@ -71,10 +71,11 @@ def test_inside_a_run_every_read_runs_on_the_one_walker_thread(backend):
     assert backend.threads[0] is _WALKER.thread and backend.threads[0] is not threading.current_thread()
 
 
-def test_writes_never_move_to_the_walker(backend):
+def test_inside_a_run_a_write_runs_on_the_walker_too(backend):
+    # As one job that finds, then checks the stop, then acts: see test_accessibility_walker_writes.
     with stoppable_run():
         assert accessibility_api.control_invoke(name="OK") is True
-    assert backend.threads == [threading.current_thread()]
+    assert backend.threads == [_WALKER.thread] and backend.threads[0] is not threading.current_thread()
 
 
 def test_a_stop_ends_the_wait_for_a_slow_walk(backend):
