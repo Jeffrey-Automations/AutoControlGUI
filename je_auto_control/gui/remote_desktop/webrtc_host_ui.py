@@ -82,6 +82,7 @@ class _HostUiMixin(_HostPanelPart):
         sessions_row.addWidget(self._sessions_label, stretch=1)
         card.add(sessions_row)
         self._sessions_table = QTableWidget(0, 5)
+        self._tr_cells(self._sessions_table)
         self._apply_session_headers()
         self._sessions_table.setColumnWidth(0, 18)
         self._sessions_table.horizontalHeader().setSectionResizeMode(

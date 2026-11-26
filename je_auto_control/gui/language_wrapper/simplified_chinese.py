@@ -2099,3 +2099,14 @@ simplified_chinese_word_dict.update({
     'flaky_summary': '{total} 组中有 {flaky} 组不稳定',
     'flaky_summary_empty': '暂无运行记录',
 })
+
+# Table and list cells that follow a language switch.
+simplified_chinese_word_dict.update({
+    "dm_result_ok": "成功",
+    "dm_result_fail": "失败",
+    "audit_filter_all": "（全部）",
+    "rd_webrtc_unnamed": "（未命名）",
+    "rd_webrtc_unlabeled": "（无标签）",
+    "rd_webrtc_stat_loss": "丢包 {pct}%",
+    "rd_webrtc_stat_jitter": "抖动 {ms} ms",
+})

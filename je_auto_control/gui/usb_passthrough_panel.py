@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._authorize import RefusalLabel, authorized
@@ -137,6 +138,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         self._hotplug_timer.timeout.connect(self._poll_hotplug)
         self._last_seen_seq = 0
         self._local_table = _make_table(5)
+        self._tr_cells(self._local_table)
         self._shared_table = _make_table(4)
         self._remote_url = QLineEdit("http://127.0.0.1:9939")
         self._remote_token = QLineEdit()
@@ -348,10 +350,10 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
             cells = [
                 device.vendor_id or "-", device.product_id or "-",
                 device.product or "", device.serial or "",
-                _t(f"usb_share_policy_{policy}"),
             ]
             for col, text in enumerate(cells):
                 self._local_table.setItem(row, col, QTableWidgetItem(text))
+            self._local_table.setItem(row, len(cells), keyed_cell(f"usb_share_policy_{policy}"))
 
     def _on_auto_toggled(self, on: bool) -> None:
         if on:

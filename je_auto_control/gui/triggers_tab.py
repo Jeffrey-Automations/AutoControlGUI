@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._slow_op import SlowOp
@@ -81,6 +82,7 @@ class TriggersTab(TranslatableMixin, QWidget):
         self._apply_status()
         self._table = QTableWidget(0, 5)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tr_cells(self._table)
         self._table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(
@@ -144,7 +146,6 @@ class TriggersTab(TranslatableMixin, QWidget):
         self._apply_type_combo()
         self._apply_table_headers()
         self._apply_status()
-        self._refresh()
 
     def _build_layout(self) -> None:
         # Browse/add/remove/combine/start/stop commands run from the Actions
@@ -384,15 +385,13 @@ class TriggersTab(TranslatableMixin, QWidget):
 
     def _fill_table(self, triggers: Sequence[_TriggerBase]) -> None:
         self._table.setRowCount(len(triggers))
-        yes = _t("tr_yes")
-        no = _t("tr_no")
         for row, trigger in enumerate(triggers):
             detail = _describe(trigger)
             for col, value in enumerate((
-                trigger.trigger_id, type(trigger).__name__, detail,
-                str(trigger.fired), yes if trigger.enabled else no,
+                trigger.trigger_id, type(trigger).__name__, detail, str(trigger.fired),
             )):
                 self._table.setItem(row, col, QTableWidgetItem(value))
+            self._table.setItem(row, 4, keyed_cell("tr_yes" if trigger.enabled else "tr_no"))
 
 
 def _describe(trigger: _TriggerBase) -> str:

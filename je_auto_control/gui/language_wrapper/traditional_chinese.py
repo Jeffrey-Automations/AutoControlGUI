@@ -2107,3 +2107,14 @@ traditional_chinese_word_dict.update({
     'flaky_summary': '{total} 組中有 {flaky} 組不穩定',
     'flaky_summary_empty': '尚無執行紀錄',
 })
+
+# Table and list cells that follow a language switch.
+traditional_chinese_word_dict.update({
+    "dm_result_ok": "成功",
+    "dm_result_fail": "失敗",
+    "audit_filter_all": "（全部）",
+    "rd_webrtc_unnamed": "（未命名）",
+    "rd_webrtc_unlabeled": "（無標籤）",
+    "rd_webrtc_stat_loss": "封包遺失 {pct}%",
+    "rd_webrtc_stat_jitter": "抖動 {ms} ms",
+})

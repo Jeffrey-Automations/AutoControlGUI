@@ -29,6 +29,7 @@ from je_auto_control.utils.rbac.policy import authorize_command
 from je_auto_control.utils.remote_desktop.audit_log import default_audit_log
 
 
+#: The value of the dropdown's first entry, which reads ``audit_filter_all`` in the active language.
 _ALL_SENTINEL = "(all)"
 # Pinned at the top of the dropdown so operators can jump straight to
 # them even on a fresh DB where they haven't been recorded yet.
@@ -139,6 +140,8 @@ class AuditLogTab(TranslatableMixin, QWidget):
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
         self._apply_table_headers()
+        if self._type_filter.count() and self._type_filter.itemData(0) == _ALL_SENTINEL:
+            self._type_filter.setItemText(0, _t("audit_filter_all"))
 
     def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
@@ -198,21 +201,19 @@ class AuditLogTab(TranslatableMixin, QWidget):
                 )
 
     def _sync_event_type_dropdown(self, choices: List[str]) -> None:
-        current = self._type_filter.currentText()
+        current = self._current_event_type_filter()
         self._type_filter.blockSignals(True)
         self._type_filter.clear()
-        self._type_filter.addItems(choices)
+        for choice in choices:
+            self._type_filter.addItem(_t("audit_filter_all") if choice == _ALL_SENTINEL else choice, choice)
         # Restore previous selection if still valid; otherwise default
         # to the all-sentinel.
-        if current and current in choices:
-            self._type_filter.setCurrentText(current)
-        else:
-            self._type_filter.setCurrentIndex(0)
+        self._type_filter.setCurrentIndex(max(0, self._type_filter.findData(current) if current else 0))
         self._type_filter.blockSignals(False)
 
     def _current_event_type_filter(self) -> Optional[str]:
         text = self._type_filter.currentText().strip()
-        if not text or text == _ALL_SENTINEL:
+        if not text or text in (_ALL_SENTINEL, _t("audit_filter_all")):
             return None
         return text
 

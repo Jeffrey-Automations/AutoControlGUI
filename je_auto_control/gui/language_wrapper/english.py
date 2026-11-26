@@ -2166,3 +2166,14 @@ english_word_dict.update({
  'tab_diagnostics_subtitle': 'Check what this machine can automate and why a feature is unavailable.',
  'tab_config_sync_subtitle': 'Synchronise workspace settings and scripts with other machines.',
  'tab_report_subtitle': 'Turn recorded test results into HTML, JSON or XML reports.'})
+
+# Table and list cells that follow a language switch.
+english_word_dict.update({
+    "dm_result_ok": "OK",
+    "dm_result_fail": "FAIL",
+    "audit_filter_all": "(all)",
+    "rd_webrtc_unnamed": "(unnamed)",
+    "rd_webrtc_unlabeled": "(unlabeled)",
+    "rd_webrtc_stat_loss": "loss {pct}%",
+    "rd_webrtc_stat_jitter": "jitter {ms} ms",
+})

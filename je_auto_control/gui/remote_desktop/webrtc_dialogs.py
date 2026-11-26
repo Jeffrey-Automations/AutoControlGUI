@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from je_auto_control.gui._i18n_cells import set_rendered
 from je_auto_control.gui._slow_op import app_stop_queue
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
@@ -105,13 +106,9 @@ class TrustedViewersList(QListWidget):
     def populate(self, entries: list[dict[str, Any]]) -> None:
         self.clear()
         for entry in entries:
-            viewer_id = entry.get("viewer_id", "")
-            label = entry.get("label", "") or "(unlabeled)"
-            last_used = _format_short_time(entry.get("last_used"))
-            suffix = f"  ({last_used})" if last_used else ""
-            display = f"{label} - {str(viewer_id)[:8]}...{suffix}"
-            item = QListWidgetItem(display)
-            item.setData(Qt.ItemDataRole.UserRole, viewer_id)
+            item = QListWidgetItem()
+            set_rendered(item, functools.partial(_trusted_entry_text, entry))     # re-read on a language switch
+            item.setData(Qt.ItemDataRole.UserRole, entry.get("viewer_id", ""))
             self.addItem(item)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 Qt override
@@ -131,6 +128,14 @@ def _format_size(value: Any) -> str:
         return f"{int(value):,}"
     except (TypeError, ValueError, OverflowError):
         return str(value)
+
+
+def _trusted_entry_text(entry: dict[str, Any]) -> str:
+    """The one-line label of a trusted viewer, in the active language."""
+    label = entry.get("label", "") or _t("rd_webrtc_unlabeled")
+    last_used = _format_short_time(entry.get("last_used"))
+    suffix = f"  ({last_used})" if last_used else ""
+    return f"{label} - {str(entry.get('viewer_id', ''))[:8]}...{suffix}"
 
 
 class AddressBookList(QListWidget):
@@ -187,14 +192,15 @@ class AddressBookList(QListWidget):
         )
         self.clear()
         for entry in sorted_entries:
-            item = QListWidgetItem(self._format_entry(entry))
+            item = QListWidgetItem()
+            set_rendered(item, functools.partial(self._format_entry, entry))      # re-read on a language switch
             item.setData(Qt.ItemDataRole.UserRole, entry)
             self.addItem(item)
 
     @staticmethod
     def _format_entry(entry: dict[str, Any]) -> str:
         """Build the one-line display label for an address-book entry."""
-        label = entry.get("label", "") or "(unnamed)"
+        label = entry.get("label", "") or _t("rd_webrtc_unnamed")
         host_id = entry.get("host_id", "")
         star = "★ " if entry.get("favorite") else ""
         last_used = _format_short_time(entry.get("last_used"))

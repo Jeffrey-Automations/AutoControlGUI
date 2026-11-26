@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from je_auto_control.gui.remote_desktop.webrtc_panel_state import _ViewerPanelPart
 
+import functools
 from typing import Optional
 
 
@@ -127,20 +128,9 @@ class _ViewerMediaMixin(_ViewerPanelPart):
             path=str(recorder.output_path), error=error))
 
     def _on_stats(self, snapshot: StatsSnapshot) -> None:
-        parts = []
-        if snapshot.fps is not None:
-            parts.append(f"FPS {snapshot.fps:.1f}")
-        if snapshot.bitrate_kbps is not None:
-            parts.append(f"{snapshot.bitrate_kbps:.0f} kbps")
-        if snapshot.rtt_ms is not None:
-            parts.append(f"RTT {snapshot.rtt_ms:.0f} ms")
-        if snapshot.packet_loss_pct is not None:
-            parts.append(f"loss {snapshot.packet_loss_pct:.1f}%")
-        if snapshot.jitter_ms is not None:
-            parts.append(f"jitter {snapshot.jitter_ms:.1f}ms")
-        if not parts:
+        if not _stats_line(snapshot):
             return
-        self._stats_text.show_plain(" | ".join(parts))     # the next poll writes it anew
+        self._stats_text.show_rendered(functools.partial(_stats_line, snapshot))
         self._update_quality_dot(snapshot)
         if hasattr(self, "_rtt_spark"):
             self._rtt_spark.push(snapshot.rtt_ms)
@@ -259,6 +249,22 @@ class _ViewerMediaMixin(_ViewerPanelPart):
         if hasattr(self, "_rtt_spark"):
             self._rtt_spark.clear()
             self._bitrate_spark.clear()
+
+
+def _stats_line(snapshot: StatsSnapshot) -> str:
+    """The viewer's statistics line for ``snapshot`` in the active language; empty when it has nothing."""
+    parts = []
+    if snapshot.fps is not None:
+        parts.append(f"FPS {snapshot.fps:.1f}")
+    if snapshot.bitrate_kbps is not None:
+        parts.append(f"{snapshot.bitrate_kbps:.0f} kbps")
+    if snapshot.rtt_ms is not None:
+        parts.append(f"RTT {snapshot.rtt_ms:.0f} ms")
+    if snapshot.packet_loss_pct is not None:
+        parts.append(_t("rd_webrtc_stat_loss").replace("{pct}", f"{snapshot.packet_loss_pct:.1f}"))
+    if snapshot.jitter_ms is not None:
+        parts.append(_t("rd_webrtc_stat_jitter").replace("{ms}", f"{snapshot.jitter_ms:.1f}"))
+    return " | ".join(parts)
 
 
 __all__ = ["_ViewerMediaMixin"]

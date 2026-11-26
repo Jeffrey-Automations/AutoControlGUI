@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._authorize import RefusalLabel
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._slow_op import SlowOp
@@ -63,6 +64,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
         self._method_checks["POST"].setChecked(True)
         self._table = QTableWidget(0, 6)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._tr_cells(self._table)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.verticalHeader().setVisible(False)
         self._table.horizontalHeader().setSectionResizeMode(
@@ -87,7 +89,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
         self._apply_table_headers()
-        self._refresh()
+        self._apply_status()
 
     def _apply_table_headers(self) -> None:
         self._table.setHorizontalHeaderLabels([
@@ -212,6 +214,11 @@ class WebhooksTab(TranslatableMixin, QWidget):
         self._refresh()
 
     def _refresh(self) -> None:
+        self._apply_status()
+        with kept_selection(self._table):
+            self._fill_table()
+
+    def _apply_status(self) -> None:
         bound = default_webhook_server.bound_address
         if self._server_op.busy:
             self._status_label.setText(_t("gui_op_stopping"))
@@ -223,8 +230,6 @@ class WebhooksTab(TranslatableMixin, QWidget):
             )
         else:
             self._status_label.setText(_t("wh_stopped"))
-        with kept_selection(self._table):
-            self._fill_table()
 
     def _fill_table(self) -> None:
         rows = default_webhook_server.list_webhooks()
@@ -236,9 +241,9 @@ class WebhooksTab(TranslatableMixin, QWidget):
                 ",".join(trigger.methods),
                 trigger.script_path,
                 str(trigger.fired),
-                _t("wh_yes") if trigger.token else _t("wh_no"),
             )
-            for col, text in enumerate(values):
-                item = QTableWidgetItem(text)
+            items = [QTableWidgetItem(text) for text in values]
+            items.append(keyed_cell("wh_yes" if trigger.token else "wh_no"))
+            for col, item in enumerate(items):
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(row, col, item)

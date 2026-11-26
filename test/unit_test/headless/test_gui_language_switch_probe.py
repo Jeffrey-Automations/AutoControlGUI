@@ -4,8 +4,9 @@ The probe builds each tab of ``TAB_SPECS`` in English, switches to Japanese
 and re-translates it the way the workspace does (shared surfaces, then the
 tab's own ``retranslate``), then builds the same tab again in Japanese and
 compares every text a user reads: labels, buttons, group titles, tooltips,
-placeholders, table and tree headers, combo entries and tab titles. A text
-set once at construction and never registered shows up as a difference.
+placeholders, table and tree headers, the text and tooltip of every table,
+tree and list cell, combo entries and tab titles. A text set once at
+construction and never registered shows up as a difference.
 
 The texts a tab sets later, from its state, are covered case by case in
 ``test_gui_state_texts_language.py`` and ``test_gui_remote_texts_language.py``.
@@ -29,8 +30,8 @@ import json, os, sys
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QComboBox, QGroupBox, QLabel, QLineEdit,
-                               QMessageBox, QPlainTextEdit, QTableWidget, QTabWidget, QTextEdit, QTreeWidget,
-                               QWidget)
+                               QListWidget, QMessageBox, QPlainTextEdit, QTableWidget, QTabWidget, QTextEdit,
+                               QTreeWidget, QTreeWidgetItemIterator, QWidget)
 app = QApplication.instance() or QApplication([])
 for box in ("warning", "information", "critical", "question"):
     setattr(QMessageBox, box, staticmethod(lambda *a, **k: QMessageBox.StandardButton.No))
@@ -47,6 +48,20 @@ def headers(widget):
     return [item.text(c) for c in range(item.columnCount())]
 
 
+def cells(widget):
+    if isinstance(widget, QTableWidget):
+        items = [widget.item(r, c) for r in range(widget.rowCount()) for c in range(widget.columnCount())]
+        return [[i.text(), i.toolTip()] if i is not None else None for i in items]
+    if isinstance(widget, QListWidget):
+        return [[widget.item(r).text(), widget.item(r).toolTip()] for r in range(widget.count())]
+    found, walk = [], QTreeWidgetItemIterator(widget)
+    while walk.value() is not None:
+        item = walk.value()
+        found += [[item.text(c), item.toolTip(c)] for c in range(item.columnCount())]
+        walk += 1
+    return found
+
+
 def texts(root):
     found = []
     for widget in (root, *root.findChildren(QWidget)):
@@ -59,6 +74,8 @@ def texts(root):
             found.append(("placeholder", widget.placeholderText()))
         if isinstance(widget, (QTableWidget, QTreeWidget)):
             found.append(("headers", headers(widget)))
+        if isinstance(widget, (QTableWidget, QTreeWidget, QListWidget)):
+            found.append(("cells", cells(widget)))
         if isinstance(widget, QComboBox):
             found.append(("items", [widget.itemText(i) for i in range(widget.count())]))
         if isinstance(widget, QTabWidget):

@@ -203,6 +203,7 @@ class _ViewerUiMixin(_ViewerPanelPart):
         tag_form.addRow(self._tr(QLabel(), "rd_webrtc_tag_filter"), self._tag_filter_combo)
         layout.addLayout(tag_form)
         self._address_list = AddressBookList()
+        self._tr_cells(self._address_list)
         self._address_list.chosen.connect(self._on_address_chosen)
         self._address_list.deleted.connect(self._on_address_removed)
         self._address_list.favorite_toggled.connect(self._on_address_favorite)

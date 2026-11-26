@@ -2160,3 +2160,14 @@ japanese_word_dict.update({
     'flaky_summary': '{total} グループ中 {flaky} 件が不安定',
     'flaky_summary_empty': '実行履歴はまだありません',
 })
+
+# Table and list cells that follow a language switch.
+japanese_word_dict.update({
+    "dm_result_ok": "成功",
+    "dm_result_fail": "失敗",
+    "audit_filter_all": "（すべて）",
+    "rd_webrtc_unnamed": "（名前なし）",
+    "rd_webrtc_unlabeled": "（ラベルなし）",
+    "rd_webrtc_stat_loss": "損失 {pct}%",
+    "rd_webrtc_stat_jitter": "ジッター {ms} ms",
+})

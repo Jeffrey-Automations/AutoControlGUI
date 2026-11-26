@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._authorize import RefusalLabel, authorized, refusal
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import decoded_image
 from je_auto_control.gui._tab_task import TabTask
@@ -76,6 +77,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._token_input.setEchoMode(QLineEdit.EchoMode.Password)
         self._table = QTableWidget(0, 5)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tr_cells(self._table)
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents,
         )
@@ -363,15 +365,13 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
             self._table.setItem(row, 1, QTableWidgetItem(host.base_url))
             status = status_by_label.get(host.label)
             if status is None:
-                health_text = "?"
-            elif status.healthy:
-                health_text = _t("admin_health_ok")
+                health = QTableWidgetItem("?")
             else:
-                health_text = _t("admin_health_down")
+                health = keyed_cell("admin_health_ok" if status.healthy else "admin_health_down")
             latency_text = "-" if status is None else f"{status.latency_ms:.0f} ms"
             jobs_text = "-" if status is None or status.job_count is None \
                 else str(status.job_count)
-            self._table.setItem(row, 2, QTableWidgetItem(health_text))
+            self._table.setItem(row, 2, health)
             self._table.setItem(row, 3, QTableWidgetItem(latency_text))
             self._table.setItem(row, 4, QTableWidgetItem(jobs_text))
 

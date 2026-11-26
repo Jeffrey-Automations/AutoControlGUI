@@ -20,6 +20,10 @@ it again in the new language. ``self._keyed(widget)`` makes one that
 :meth:`TranslatableMixin.retranslate` re-renders itself; one made for the owner
 (``self._keyed(self, "setWindowTitle")``) holds it weakly, for the same reason
 as above.
+
+A table or list cell whose text is a translated word keeps its key on the item
+(:mod:`je_auto_control.gui._i18n_cells`); ``self._tr_cells(view)`` registers the
+view so :meth:`TranslatableMixin.retranslate` renders those cells again.
 """
 import weakref
 from typing import Callable, List, Optional, Tuple, TypeVar
@@ -28,6 +32,7 @@ from PySide6.QtWidgets import (
     QAbstractButton, QGroupBox, QLabel, QLineEdit, QTabWidget, QWidget,
 )
 
+from je_auto_control.gui._i18n_cells import CellView, retranslate_cells
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
@@ -80,10 +85,21 @@ class TranslatableMixin:
         self._tr_keyed.append(text)
         return text
 
+    def _tr_cells(self, view: CellView) -> None:
+        """Register ``view`` so :meth:`retranslate` renders its keyed cells again."""
+        if not hasattr(self, "_tr_views"):
+            self._tr_views: List[CellView] = []
+        self._tr_views.append(view)
+
     def retranslate(self) -> None:
-        """Re-apply every registered translation key and re-render every keyed text."""
+        """Re-apply every registered translation key and re-render every keyed text and cell."""
         for text in getattr(self, "_tr_keyed", []):
             text.retranslate()
+        for view in getattr(self, "_tr_views", []):
+            try:
+                retranslate_cells(view)
+            except RuntimeError:
+                continue    # the view was destroyed
         for widget, key, setter in getattr(self, "_tr_registry", []):
             target = self if widget is None else widget
             try:

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
@@ -55,6 +56,7 @@ class DeviceMatrixTab(TranslatableMixin, QWidget):
         self._table = QTableWidget(0, len(_COLS))
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setStretchLastSection(True)
+        self._tr_cells(self._table)
         self._summary = QLabel()
         self._summary_text = self._keyed(self._summary)
         self._task: Optional[TaskHandle] = None     # one run at a time
@@ -125,11 +127,10 @@ class DeviceMatrixTab(TranslatableMixin, QWidget):
         results = report["results"]
         self._table.setRowCount(len(results))
         for row, res in enumerate(results):
-            values = (res["device_id"], res["platform"],
-                      "OK" if res["success"] else "FAIL",
-                      f"{res['duration_s']:.2f}s", res.get("error") or "")
-            for col, text in enumerate(values):
-                item = QTableWidgetItem(str(text))
+            items = [QTableWidgetItem(str(res["device_id"])), QTableWidgetItem(str(res["platform"])),
+                     keyed_cell("dm_result_ok" if res["success"] else "dm_result_fail"),
+                     QTableWidgetItem(f"{res['duration_s']:.2f}s"), QTableWidgetItem(str(res.get("error") or ""))]
+            for col, item in enumerate(items):
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(row, col, item)
         self._summary_text.show("dm_summary", passed=report["passed"], failed=report["failed"], total=report["total"])

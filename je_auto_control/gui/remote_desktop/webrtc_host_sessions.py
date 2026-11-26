@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from je_auto_control.gui._i18n_cells import set_rendered
 from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._slow_op import hold_failed_stop
 from je_auto_control.gui.remote_desktop._webrtc_types import MultiViewerHostT
@@ -120,7 +121,7 @@ class _HostSessionsMixin(_HostPanelPart):
         if snapshot.rtt_ms is not None:
             parts.append(f"RTT {snapshot.rtt_ms:.0f}ms")
         if snapshot.packet_loss_pct is not None:
-            parts.append(f"loss {snapshot.packet_loss_pct:.1f}%")
+            parts.append(_t("rd_webrtc_stat_loss").replace("{pct}", f"{snapshot.packet_loss_pct:.1f}"))
         if snapshot.fps is not None:
             parts.append(f"FPS {snapshot.fps:.1f}")
         if snapshot.bitrate_kbps is not None:
@@ -166,9 +167,10 @@ class _HostSessionsMixin(_HostPanelPart):
             dot_item = QTableWidgetItem("●")
             dot_item.setForeground(QColor(color))
             dot_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            dot_item.setToolTip(self._format_quality_tooltip(
-                self._session_cache.get_snapshot(sid),
-            ))
+            # Rendered, not set: a language switch reads the tooltip again.
+            set_rendered(dot_item, functools.partial(self._format_quality_tooltip,
+                                                     self._session_cache.get_snapshot(sid)),
+                         Qt.ItemDataRole.ToolTipRole)
             self._sessions_table.setItem(row, 0, dot_item)
             id_item = QTableWidgetItem(sid[:8] if sid else "")
             id_item.setData(Qt.ItemDataRole.UserRole, sid)

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.responsive import fit_columns
@@ -38,6 +39,8 @@ from je_auto_control.utils.self_healing import (
 
 _COLUMNS = ("timestamp", "method", "coordinates",
             "operation", "operation_status", "verified", "duration_ms", "template_path", "description")
+#: Stands for a verification that did not run: the cell reads "Unknown" in the active language.
+_UNKNOWN = object()
 
 
 def _t(key: str) -> str:
@@ -91,6 +94,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         self._status_text = self._keyed(self._status)
         self._status.setTextFormat(Qt.TextFormat.PlainText)
         self._table = QTableWidget(0, len(_COLUMNS))
+        self._tr_cells(self._table)
         self._details = QPlainTextEdit()
         self._details.setReadOnly(True)
         self._group_box = QGroupBox()
@@ -288,12 +292,12 @@ class SelfHealingTab(TranslatableMixin, QWidget):
                 event.timestamp, event.method,
                 _format_coordinates(event.coordinates),
                 event.operation, event.operation_status,
-                _t("self_heal_unknown") if event.verified is None else str(event.verified),
+                _UNKNOWN if event.verified is None else str(event.verified),
                 f"{event.duration_ms:.1f}",
                 event.template_path or "", event.description or "",
             )
             for col, text in enumerate(values):
-                item = QTableWidgetItem(str(text))
+                item = keyed_cell("self_heal_unknown") if text is _UNKNOWN else QTableWidgetItem(str(text))
                 item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                 self._table.setItem(row, col, item)
         fit_columns(self._table, capped=(_COLUMNS.index("template_path"), _COLUMNS.index("description")))

@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any, Protocol, TypeVar
 
 from PySide6.QtWidgets import (
-    QGroupBox, QPushButton, QVBoxLayout, QWidget,
+    QGroupBox, QListWidget, QPushButton, QTableWidget, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui.adaptive.flow_layout import flow_of
@@ -33,6 +33,9 @@ class TrustedGroupHost(Protocol):
 
     def _tr(self, widget: _W, key: str, setter: str = "") -> _W:
         """Register ``widget`` for live re-translation and return it."""
+
+    def _tr_cells(self, view: QTableWidget | QListWidget) -> None:
+        """Register ``view`` so a language switch renders its keyed cells again."""
 
     def _on_remove_trust(self, viewer_id: str) -> None:
         """Forget the viewer the list emitted."""
@@ -55,6 +58,7 @@ def build_trusted_group(panel: TrustedGroupHost) -> QGroupBox:
     group = panel._tr(QGroupBox(), "rd_webrtc_trusted_group")
     layout = QVBoxLayout()
     panel._trusted_list = TrustedViewersList()
+    panel._tr_cells(panel._trusted_list)
     panel._trusted_list.removed.connect(panel._on_remove_trust)
     layout.addWidget(panel._trusted_list)
     buttons = []
