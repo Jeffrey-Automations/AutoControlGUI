@@ -19,6 +19,10 @@ def _directory(path: Path) -> None:
         raise AgentTaskError('task artifact directory escapes its owner cache')
 
 
+# The journal, its lock file and the never-deleted guard beside it (json_store's file lock), the report.
+_NAMES = frozenset({'journal.jsonl', 'journal.jsonl.lock', 'journal.jsonl.lock.guard', 'report.json'})
+
+
 class EvidenceCache:
     """Bind cache identity to a persistent database nonce and its complete canonical path."""
 
@@ -59,8 +63,7 @@ class EvidenceCache:
 
     def file(self, task_id: str, name: str) -> Path:
         """Reject redirected, nonregular or multiply linked current artifact files."""
-        if name not in {'journal.jsonl', 'journal.jsonl.lock', 'journal.jsonl.lock.guard', 'report.json'} and re.fullmatch(
-                '[0-9a-f]{32}\\.jpg', name) is None:
+        if name not in _NAMES and re.fullmatch('[0-9a-f]{32}\\.jpg', name) is None:
             raise AgentTaskError('invalid task artifact filename')
         path = self.directory(task_id) / name
         if path.is_symlink() or resolved(path) != path:
