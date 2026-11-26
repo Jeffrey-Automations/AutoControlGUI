@@ -29,7 +29,6 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
-from xml.sax.saxutils import escape as xml_escape
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -206,8 +205,8 @@ def _checked(value: object, what: str, pattern: re.Pattern[str]) -> str:
 
 def _plist_text(value: object, what: str) -> str:
     """Escape ``value`` for a plist ``<string>``; a carriage return is kept as a reference."""
-    escaped = xml_escape(_checked(value, what, _NEVER_REPRESENTABLE))
-    return escaped.replace("\r", "&#13;")
+    text = _checked(value, what, _NEVER_REPRESENTABLE)
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\r", "&#13;")
 
 
 def _systemd_word(value: object, what: str) -> str:
