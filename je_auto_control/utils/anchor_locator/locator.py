@@ -18,7 +18,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from je_auto_control.utils.accessibility.element import AccessibilityNotAvailableError
-from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.exception.exceptions import AutoControlException, ImageSearchInputException
 from je_auto_control.utils.ocr.backends.base import OCRBackendNotAvailableError
 from je_auto_control.utils.vision.backends.base import VLMNotAvailableError
 
@@ -30,9 +30,10 @@ from je_auto_control.utils.vision.backends.base import VLMNotAvailableError
 # whole anchor locate instead of returning found=False.
 _LOCATE_ERRORS = (OSError, RuntimeError, ValueError, AutoControlException)
 # ...except a backend that is not set up, which is a configuration error: no
-# OCR engine came back as {"found": False, "error": "anchor not found"}.
+# OCR engine came back as {"found": False, "error": "anchor not found"}. A
+# template the search cannot use (a typo in the path) is one too, not a miss.
 _UNAVAILABLE = (AccessibilityNotAvailableError, OCRBackendNotAvailableError,
-                VLMNotAvailableError)
+                VLMNotAvailableError, ImageSearchInputException)
 
 
 # Spatial relations the wrapper understands.

@@ -216,12 +216,14 @@ def _image_found_ok(transition: Mapping[str, Any], _context: Mapping[str, Any],
     image = spec.get("image") if isinstance(spec, Mapping) else spec
     # 1.0 is locate_image_center's own default (an exact match).
     threshold = float(spec.get("detect_threshold", 1.0)) if isinstance(spec, Mapping) else 1.0
-    from je_auto_control.utils.exception.exceptions import AutoControlException
+    from je_auto_control.utils.exception.exceptions import (
+        AutoControlException, ImageSearchInputException,
+    )
     from je_auto_control.wrapper.auto_control_image import locate_image_center
     try:
         locate_image_center(image, detect_threshold=threshold)
-    except ExecutionStopped:
-        raise  # in the family, but not a guard that does not fire
+    except (ExecutionStopped, ImageSearchInputException):
+        raise  # in the family, but not a guard that does not fire: a stop, or a typo
     except (AutoControlException, OSError, ValueError):
         return False  # not on screen (or unreadable): the guard does not fire
     return True

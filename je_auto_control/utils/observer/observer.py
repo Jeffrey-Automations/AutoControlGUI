@@ -23,7 +23,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
-from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.exception.exceptions import AutoControlException, ImageSearchInputException
 from je_auto_control.utils.executor.run_control import ExecutionStopped
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.logging.secret_scope import secret_log_scope
@@ -219,12 +219,18 @@ def _raise_if_stopped(error: BaseException) -> None:
 
 
 def image_predicate(image: str, threshold: float = 0.8) -> Callable[[], Any]:
-    """Predicate: the located image centre, or ``None`` when absent."""
+    """Predicate: the located image centre, or ``None`` when absent.
+
+    A template the search cannot use raises: read as "absent", a typo in the
+    path fired the rule's vanish transition. The observer logs the error.
+    """
     def predicate() -> Any:
         from je_auto_control.wrapper.auto_control_image import (
             locate_image_center)
         try:
             return locate_image_center(image, detect_threshold=float(threshold))
+        except ImageSearchInputException:
+            raise
         except _RULE_ERRORS as error:
             _raise_if_stopped(error)
             return None

@@ -168,9 +168,11 @@ def assert_image(template_path: str,
 
     A screen that could not be searched fails the assertion either way: it
     used to count as "not found", so ``present=False`` passed without looking.
+    So does a template the search cannot use (missing, unreadable, single
+    colour) or a threshold outside 0-1: ``present=False`` passed on a typo.
     """
     from je_auto_control.utils.exception.exceptions import (
-        ImageNotFoundException,
+        ImageNotFoundException, ImageSearchInputException,
     )
     from je_auto_control.wrapper.auto_control_image import locate_image_center
     coords: Optional[Any] = None
@@ -180,6 +182,8 @@ def assert_image(template_path: str,
         found = True
     except ImageNotFoundException:
         found = False
+    except ImageSearchInputException as error:
+        found, unsearched = False, f"; the template could not be used: {error}"
     except (OSError, RuntimeError, ValueError, TypeError) as error:
         raise_if_run_interrupted(error)
         found, unsearched = False, f"; the screen was not searched: {error!r}"

@@ -137,18 +137,18 @@ def _flat_search(monkeypatch, value):
 
 def test_a_single_colour_template_is_never_found_on_screen(monkeypatch):
     """Zero variance scores 1.0 everywhere: ``locate_and_click`` clicked the corner of the screen."""
-    from je_auto_control.utils.exception.exceptions import ImageNotFoundException
+    from je_auto_control.utils.exception.exceptions import ImageSearchInputException
     detection, flat = _flat_search(monkeypatch, 77)
     for find in (detection.find_image, detection.find_image_multi):
-        with pytest.raises(ImageNotFoundException, match="single colour"):
+        with pytest.raises(ImageSearchInputException, match="single colour"):
             find(flat, 0.9)
 
 
 def test_a_single_colour_template_is_never_found_on_a_device():
     from PIL import Image
-    from je_auto_control.utils.exception.exceptions import ImageNotFoundException
+    from je_auto_control.utils.exception.exceptions import ImageSearchInputException
     from je_auto_control.wrapper.device_frame import DeviceFrame
     screen = Image.fromarray(RNG.integers(0, 255, (120, 160, 3), dtype=np.uint8))
     frame = DeviceFrame(image=screen, point_size=screen.size)
-    with pytest.raises(ImageNotFoundException, match="single colour"):
+    with pytest.raises(ImageSearchInputException, match="single colour"):
         frame.locate_image(np.full((12, 12), 77, np.uint8))

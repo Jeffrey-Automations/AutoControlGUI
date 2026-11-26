@@ -20,7 +20,7 @@ pytest.importorskip("je_open_cv")
 
 from je_auto_control.utils.cv2_utils import template_detection  # noqa: E402
 from je_auto_control.utils.cv2_utils.image_file import write_image  # noqa: E402
-from je_auto_control.utils.exception.exceptions import ImageNotFoundException  # noqa: E402
+from je_auto_control.utils.exception.exceptions import ImageSearchInputException  # noqa: E402
 from je_auto_control.utils.ocr import text_span  # noqa: E402
 from je_auto_control.wrapper import auto_control_image  # noqa: E402
 
@@ -76,15 +76,15 @@ def test_a_colour_template_still_matches(screen):
     np.zeros((5, 5), dtype=np.float64),         # a pixel type matchTemplate refuses
     np.zeros((2, 2, 2, 2), dtype=np.uint8),
 ])
-def test_a_template_opencv_cannot_use_is_the_typed_miss(screen, template):
-    with pytest.raises(ImageNotFoundException):
+def test_a_template_opencv_cannot_use_is_the_typed_input_error(screen, template):
+    with pytest.raises(ImageSearchInputException):
         auto_control_image.locate_image_center(template)
 
 
-def test_an_undecodable_file_is_the_typed_miss(screen, tmp_path):
+def test_an_undecodable_file_is_the_typed_input_error(screen, tmp_path):
     path = tmp_path / "broken.png"
     path.write_bytes(b"not an image")
-    with pytest.raises(ImageNotFoundException, match="broken.png"):
+    with pytest.raises(ImageSearchInputException, match="broken.png"):
         auto_control_image.locate_image_center(str(path))
 
 

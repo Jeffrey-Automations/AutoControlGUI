@@ -188,7 +188,7 @@ def _heal_on_frame(frame: Any, template_path: Optional[str], description: Option
     session cannot hand it a frame; this is the same order against the frame.
     """
     from je_auto_control.utils.exception.exceptions import (
-        AutoControlException, ImageNotFoundException,
+        AutoControlException, ImageNotFoundException, ImageSearchInputException,
     )
     from je_auto_control.utils.self_healing.locator import (
         METHOD_IMAGE, METHOD_MISS, METHOD_VLM, HealOutcome,
@@ -200,7 +200,9 @@ def _heal_on_frame(frame: Any, template_path: Optional[str], description: Option
     if template_path:
         try:
             x, y = frame.locate_image(template_path, float(detect_threshold))
-        except ImageNotFoundException as error:
+        except (ImageNotFoundException, ImageSearchInputException) as error:
+            # Either way the template gave no point: fall back to the VLM, as
+            # the desktop self-heal does, and report why in the outcome.
             image_error = str(error)
         else:
             return HealOutcome(found=True, coordinates=(int(x), int(y)), method=METHOD_IMAGE,
