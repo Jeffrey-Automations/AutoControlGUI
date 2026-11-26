@@ -235,6 +235,11 @@ and the admin console's poll and broadcast (hosts not reached yet are skipped). 
 session caught mid-call is closed, as on a timeout. A native call that cannot be interrupted keeps
 running in the background and its result is discarded.
 
-Still not interruptible: accessibility writes (set value / invoke / toggle), the join of
-``AC_parallel`` (held keys are released only once every branch has ended) and the finalisation of
-a screen recording.
+Accessibility writes (set value / invoke / toggle) run inside a run as one job on the accessibility
+walker thread: a stop that arrives before the write acts prevents it, and one that arrives while it
+acts waits up to 5 seconds, then returns the result or raises ``AccessibilityWriteOutcomeUnknown``.
+On Windows the check sits between finding the element and acting; other backends count the whole
+call as the act. Outside a run nothing changes.
+
+Still not interruptible: the join of ``AC_parallel`` (held keys are released only once every
+branch has ended) and the finalisation of a screen recording.

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Inside a run, accessibility set-value / invoke / toggle run on the accessibility walker thread: a
+  stop before the write acts prevents it, and one during the act waits up to 5 s, then returns the
+  result or raises `AccessibilityWriteOutcomeUnknown` (exported from the facade). Outside a run
+  nothing changes. Backends gain a `gates_writes` attribute; only Windows is gated today.
+
 - `SlackBot` polls every `run_poll_interval_s` (new, 1 s by default; finite, > 0 and at most
   `poll_interval_s`) while a `/run` is going, so a `/stop` lands within about a second; idle it keeps
   `poll_interval_s` (5 s). A Slack `429` with `Retry-After` now holds every poll back until it passes.

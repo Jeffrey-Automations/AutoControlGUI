@@ -2,7 +2,7 @@
 from je_auto_control._lazy_exports import AttributeBinding, ExportBinding, ModuleBinding
 
 
-PUBLIC_ORDER_SHA256 = '5e2ccb205283db542475d96aded0a1b4a7072c747245f333efa515f4565d102c'
+PUBLIC_ORDER_SHA256 = 'a30d779009f1d0e1c496942ec466541732b4dc3dbfc7e6cf0736219e5e0f0120'
 
 _IOS_SIMCTL = 'je_auto_control.ios.simctl'
 _LINUX_WAYLAND_GLOBAL_SHORTCUTS = 'je_auto_control.linux_wayland.global_shortcuts'
@@ -487,6 +487,8 @@ EXPORTS: dict[str, ExportBinding] = {
     'AutoControlActionNullException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlActionNullException'),
     'AutoControlActionException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlActionException'),
     'AutoControlForeignException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlForeignException'),
+    'AccessibilityWriteOutcomeUnknown':
+        AttributeBinding('je_auto_control.utils.accessibility.walker', 'AccessibilityWriteOutcomeUnknown'),
     'record': AttributeBinding(_WRAPPER_AUTO_CONTROL_RECORD, 'record'),
     'stop_record': AttributeBinding(_WRAPPER_AUTO_CONTROL_RECORD, 'stop_record'),
     'stop_record_timeline': AttributeBinding(_WRAPPER_AUTO_CONTROL_RECORD, 'stop_record_timeline'),

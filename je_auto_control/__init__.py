@@ -93,6 +93,7 @@ if _TYPE_CHECKING:
     )
     from je_auto_control.utils.exception.exceptions import ImageNotFoundException
     from je_auto_control.utils.exception.exceptions import ImageSearchInputException
+    from je_auto_control.utils.accessibility.walker import AccessibilityWriteOutcomeUnknown
     from je_auto_control.utils.executor.action_executor import add_command_to_executor
     from je_auto_control.utils.executor.action_executor import execute_action
     from je_auto_control.utils.executor.action_executor import execute_action_with_vars
@@ -2030,7 +2031,7 @@ __all__ = [
     "AutoControlScreenException", "AutoControlFlatTemplateException",
     "ImageNotFoundException", "ImageSearchInputException", "AutoControlJsonActionException",
     "AutoControlRecordException", "AutoControlActionNullException", "AutoControlActionException",
-    "AutoControlForeignException", "record",
+    "AutoControlForeignException", "AccessibilityWriteOutcomeUnknown", "record",
     "stop_record", "stop_record_timeline",
     "read_action_json", "read_executable_action_json", "write_action_json", "format_action_json",
     "execute_action", "execute_files", "executor",

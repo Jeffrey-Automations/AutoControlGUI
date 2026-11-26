@@ -205,5 +205,6 @@ registry 的 ``RegistryFullError``。這些 registry 都沒有刪除或重設指
 ``AC_computer_use`` 的每次模型呼叫、``AC_assert_audio`` ／ ``AC_assert_video``，以及管理主控台的輪詢與廣播（尚未連到的主機會略過）。
 呼叫進行到一半被停止的行動裝置工作階段會關閉，與逾時相同。無法中斷的原生呼叫會在背景跑完，結果不會被使用。
 
-仍不可中斷：無障礙寫入（設值／invoke／toggle）、 ``AC_parallel`` 等待分支結束（所有分支結束才放開按住的鍵），
-以及螢幕錄影的收尾。
+無障礙寫入（設值／invoke／toggle）在執行中整個交給無障礙 walker 執行緒：寫入動作前收到停止就不會寫入；動作進行中收到停止則最多等 5 秒，之後回傳結果或拋出 ``AccessibilityWriteOutcomeUnknown``。Windows 上的檢查點在找到元素與動作之間，其他後端把整個呼叫視為動作。未在執行中時行為不變。
+
+仍不可中斷： ``AC_parallel`` 等待分支結束（所有分支結束才放開按住的鍵），以及螢幕錄影的收尾。
