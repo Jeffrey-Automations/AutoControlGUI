@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,634 |
-| 程式碼總行數 | 254,870 |
+| 程式碼總行數 | 254,988 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1515 |
@@ -281,11 +281,11 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
-| `android/adb_client.py` | 338 | `adb` CLI 的薄封裝。 |
+| `android/adb_client.py` | 352 | `adb` CLI 的薄封裝。 |
 | `android/client.py` | 129 | `uiautomator2.Device` 的延遲封裝。 |
-| `android/find.py` | 108 | uiautomator2 widget 樹的元素查詢。 |
+| `android/find.py` | 111 | uiautomator2 widget 樹的元素查詢。 |
 | `ios/client.py` | 126 | `facebook-wda`（WebDriverAgent）封裝。 |
-| `ios/find.py` | 94 | XCUITest 無障礙查詢。 |
+| `ios/find.py` | 97 | XCUITest 無障礙查詢。 |
 | `ios/input.py` | 94 | iOS 觸控與按鍵原語。 |
 | `ios/screen.py` | 85 | iOS 裝置螢幕擷取與尺寸。 |
 
@@ -328,7 +328,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.2 框架基礎設施
 
-> 15 個套件、約 6,274 行。
+> 15 個套件、約 6,287 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -345,7 +345,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/path_guard/` | 267 | 命令列及伺服器的路徑邊界、客戶端根目錄隔離與受管任務來源政策紀錄 |
 | `utils/platform_id/` | 62 | 作業系統家族的單一判定點。`sys.platform` 原本在一百多處跟字面清單比對，而那些清單都沒有 BSD；`is_x11_unix()` 問的是「這是不是 X11 unix」，這才是守衛一直想問的問題 |
 | `utils/process_memory/` | 2,349 | 內部受審 probe 的有界語意觀察、typed Windows provider、獨立映像檔觀測、自有啟動加釘選雜湊的 attestor 與失敗 handle 回收；檔案證據不等於載入程式碼身分，原生驗收及 runtime 整合待完成 |
-| `utils/shell_process/` | 343 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
+| `utils/shell_process/` | 356 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
 | `utils/start_exe/` | 36 | 啟動另一個執行檔行程 |
 
 ### 5.4.3 排程、觸發與背景監看
@@ -397,7 +397,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.5 影像辨識與畫面分析
 
-> 37 個套件、約 6,661 行。
+> 37 個套件、約 6,664 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -410,7 +410,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cv2_utils/` | 1,122 | OpenCV 基礎層：擷取後端選擇（`screen_grabber`，Pillow／mss 或平台後端）、截圖、`[left, top, right, bottom]` 區域擷取（`region_capture`，Windows 經 `grab_logical` 涵蓋所有螢幕）、樣板比對（走 `grab_logical`，涵蓋所有螢幕）、螢幕錄影、影片錄製（兩者都經 `frame_clock` 依 fps 配速）、連通元件、影像堆疊的取用口（`optional`，Windows arm64 沒有 wheel 時語意報錯）、非 ASCII 路徑也讀寫得到的影像檔存取（`image_file`） |
 | `utils/edge_lines/` | 131 | 以 Hough 轉換偵測線條／格線／分隔線 |
 | `utils/edge_match/` | 118 | 邊緣形狀（Chamfer／距離轉換）樣板比對 |
-| `utils/feature_match/` | 146 | ORB 特徵比對：在旋轉／縮放／主題變更下定位樣板 |
+| `utils/feature_match/` | 149 | ORB 特徵比對：在旋轉／縮放／主題變更下定位樣板 |
 | `utils/hsv_segment/` | 103 | HSV 色彩空間分割（抗光照的顏色遮罩 + blob 框） |
 | `utils/icon_classify/` | 151 | 從像素形狀判斷一個框是哪一類元件 |
 | `utils/image_dedup/` | 100 | 感知雜湊影像去重（Pillow aHash/dHash） |
@@ -490,7 +490,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.8 元素定位、自我修復與智慧等待
 
-> 23 個套件、約 6,368 行。
+> 23 個套件、約 6,370 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -516,16 +516,16 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/` | 2,240 | 執行時自癒定位與固定 PNG 版本比較、明確母體／延遲／來源報告 |
 | `utils/semantic_recording/` | 513 | 為錄製內容加上語義錨點，支援換機重播與自癒重播 |
 | `utils/settle_detector/` | 79 | 以純函式介面判定 UI 是否已靜止 |
-| `utils/smart_waits/` | 665 | 智慧等待：以影格差異取代 `time.sleep` |
+| `utils/smart_waits/` | 667 | 智慧等待：以影格差異取代 `time.sleep` |
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 61,188 行。
+> 14 個套件、約 61,190 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
-| `utils/agent/` | 2,268 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
+| `utils/agent/` | 2,270 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
 | `utils/agent_runtime/` | 33,779 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 178 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
@@ -541,11 +541,11 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.10 遠端桌面與 USB
 
-> 6 個套件、約 33,908 行。
+> 6 個套件、約 33,930 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
-| `utils/admin/` | 483 | 多主機管理主控台：平行輪詢 N 個 AutoControl REST 端點 |
+| `utils/admin/` | 505 | 多主機管理主控台：平行輪詢 N 個 AutoControl REST 端點 |
 | `utils/config_sync/` | 8,669 | 持久化設定與條件交易：`contract.py` 管理有限 JSON 與協定例外；`store.py` 以 SQLite 原子比較版本／記錄重送收據；`routes.py` 提供第二版 HTTP 與明確盲寫相容；`commands.py` 共用 AC／MCP／Builder；`client.py` 條件提交，另有因果模型、peer ledger 與本機 SQLite outbox；第三版 /causal 交易已接上確認／退休／回收與刪除憑證；client／outbox 已接上原請求重送、有界 CAS 重合併及原子快照確認；持久化控制、原子本機 full-resync／舊待送退役與歷史收據已接上。本機資產工具另提供 manifest、整版雜湊驗證與不可變目錄發布；七種來源 adapters 保存可攜因果 profiles；workspace INI 與 GUI 共用偏好正規化。來源／outbox 與原子 full-resync 基準已由 SyncWorkspace 協調；引用資產以不可變分塊／完整 hash 收據、具驗證 HTTP 與完整 profile 串流發布接上；Sync UI 仍屬 C3。 |
 | `utils/device_matrix/` | 236 | 行動裝置矩陣：同一 action list 於多台裝置平行執行 |
 | `utils/remote_desktop/` | 17,946 | **遠端桌面子系統**：TCP／WebSocket／WebRTC 三條傳輸路徑、主機與檢視端、訊令伺服器、TURN／中繼、多檢視者、錄影、信任清單、TOTP、稽核鏈；私有選用功能模組保留整組匯入結果。 |
@@ -566,14 +566,14 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.11 伺服器、網路協定與外部整合
 
-> 24 個套件、約 8,639 行。
+> 24 個套件、約 8,645 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/acme_v2/` | 632 | 完整 ACME v2 用戶端（RFC 8555），不依賴 certbot |
 | `utils/chatops/` | 1,055 | Chat-ops bot：接收 Slack／Discord／webhook 的 slash 指令並路由到動作 |
 | `utils/cookie_jar/` | 203 | RFC 6265 cookie jar |
-| `utils/email_send/` | 118 | SMTP 寄信（email 觸發器的發送端搭檔） |
+| `utils/email_send/` | 124 | SMTP 寄信（email 觸發器的發送端搭檔） |
 | `utils/events/` | 106 | 對外 CloudEvents 發送（執行生命週期事件） |
 | `utils/http_cassette/` | 246 | 錄製／重播 HTTP 互動，做離線決定性 API 測試 |
 | `utils/http_client/` | 471 | 零依賴 HTTP(S) 用戶端，供 action 步驟呼叫 API |
@@ -597,7 +597,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.12 報表、可觀測性與測試治理
 
-> 34 個套件、約 8,056 行。
+> 34 個套件、約 8,074 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -613,7 +613,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/flake_cluster/` | 112 | 以共同失敗 Jaccard 相似度為易碎測試分群 |
 | `utils/flakiness/` | 151 | 以執行歷史分析不穩定測試 |
 | `utils/generate_report/` | 342 | HTML／JSON／XML 三種報表產生器（Template Method） |
-| `utils/media_assert/` | 273 | 媒體斷言：音訊活動與影片動態檢查 |
+| `utils/media_assert/` | 291 | 媒體斷言：音訊活動與影片動態檢查 |
 | `utils/observability/` | 715 | Prometheus 格式指標 + OpenTelemetry 相容 trace + `/metrics` 匯出伺服器 |
 | `utils/otlp_export/` | 114 | OTLP/JSON span 匯出 |
 | `utils/percentiles/` | 119 | 可合併的串流延遲摘要與精確百分位數 |
@@ -1558,7 +1558,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `je_auto_control/utils/exception/cancellation.py` | 103 | Qt-free token／progress 與 context-local scope；None 僅暫停取消，不改權限。 |
 | `je_auto_control/utils/dbus_client/cancellable_io.py` | 84 | 保留總時限的 socket 輪詢、部分寫入 offset 與連線取消。 |
-| `je_auto_control/utils/cancellable_process.py` | 102 | 自有 capture helper／process group 的取消、回收與 pipe 清理；保留原控制，不訊號已回收 PID。 |
+| `je_auto_control/utils/cancellable_process.py` | 112 | 自有 capture helper／process group 的取消、回收與 pipe 清理；保留原控制，不訊號已回收 PID。 |
 
 ## 6. 擴充點
 
@@ -1653,10 +1653,10 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `utils/usb/` | 22 | 5,558 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,215 |
 | `utils/accessibility/` | 17 | 3,524 |
-| `wrapper/` | 25 | 6,104 |
+| `wrapper/` | 25 | 6,126 |
 | `windows/` | 24 | 2,405 |
 | `utils/rest_api/` | 8 | 2,276 |
-| `utils/agent/` | 13 | 2,268 |
+| `utils/agent/` | 13 | 2,270 |
 | `linux_with_x11/` | 19 | 1,382 |
 | `linux_wayland/` | 25 | 4,503 |
 | `utils/triggers/` | 4 | 1,450 |
@@ -1666,8 +1666,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,154 |
-| **總計** | **1,620** | **254,005** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,248 |
+| **總計** | **1,620** | **254,123** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

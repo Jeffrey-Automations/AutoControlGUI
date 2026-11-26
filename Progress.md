@@ -122,7 +122,8 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
   `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
 - **stop 還叫不醒的**：已經進到後端的單一指令只剩其他未接合的原生呼叫（擷取輸出的 shell 指令已可停止，U-20261115-23；共用 HTTP client 的請求連 TCP 交握都可中斷，正在進行的 DNS 查詢也不必等（查詢在背景跑完、之後不會送出請求），U-20261116-08／-10／-15；套件內每個 `cv2.matchTemplate` 與 OCR 引擎的單次原生運算都改由 `stoppable_call` 不再等待，但運算本身在背景跑完，U-20261116-11／-14）；單一手勢內的節奏 sleep 已可停止（U-20261121-04）；VLM 定位請求同樣改由 `stoppable_call` 不再等待（U-20261121-10）；唯讀無障礙讀取（列出／焦點／值／狀態／表格）改在單一常駐執行緒上跑，stop 不再等待（U-20261121-15，本機以真 UIA 驗過）；寫入（設值／invoke／toggle）仍在呼叫者執行緒，不可中斷；
-  非腳本分頁已傳遞協作取消；尚未檢查 token 的後端呼叫仍只能丟棄晚到結果，須逐一接合。
+  非腳本分頁已傳遞協作取消。adb、USB／Wayland 擷取工具、行動裝置呼叫與 find-element 等待、`AC_wait_for_port` 探測、`AC_send_email`、`AC_feature_match`、agent 每次的模型呼叫、聲音／影片斷言與管理主控台的輪詢／廣播也已接上 stop（U-20261126-41）。
+  仍不可中斷，各有原因：無障礙寫入是「先走樹找元素再動作」的單一呼叫，放棄等待後寫入仍會晚到，拆開又得跨執行緒傳 COM 物件，需先原生驗證；`AC_parallel` 等分支結束才放開按住的鍵；錄影的 `stop_recording` 收尾（中斷會毀掉 MP4）；已在 `stoppable_call` 後面的原生運算仍在背景跑完。
   ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，`/stop` 的反應受輪詢間隔限制（預設 5 秒）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在指令 handler 裡呼叫 `stop()`／`wait_idle()` 會立刻回 `False`、不再等到逾時（U-20261116-15）。沒對真的 Slack workspace 跑過。
   新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。
 - **WebRTC**：LAN 廣播的註冊與取消已移出 GUI 執行緒，但真的 zeroconf 的時間與名稱衝突行為只對假物件測過。

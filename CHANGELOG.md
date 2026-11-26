@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- A stop now also ends adb commands, the USB and Wayland capture tools, mobile device calls and
+  find-element waits, `AC_wait_for_port`, `AC_send_email`, `AC_feature_match`, each agent model call,
+  `AC_assert_audio` / `AC_assert_video` and admin poll / broadcast. A device session stopped mid-call is
+  closed; a stopped email may or may not have been delivered. `run_captured(kill_tree=False)` is new.
+
 - GUI: Script Builder offers the secret arguments of an action list returned in a result as one-time
   values; Quick Connect says when its session or host was taken over instead of just closing.
 

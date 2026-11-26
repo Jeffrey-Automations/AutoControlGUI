@@ -195,3 +195,15 @@ registry 的 ``RegistryFullError``。這些 registry 都沒有刪除或重設指
 但會登記到本次執行的機密遮罩，所以該次執行剩下的期間日誌、journal 與 MCP 稽核都顯示 ``***``。
 ``AC_resolve_ref`` 的 ``value`` 與 ``AC_resolve_refs`` 的 ``resolved`` 在記錄的結果與 Script Builder
 結果窗格中也會遮罩。``file://`` 的值不會登記。
+
+停止執行
+--------
+
+停止（或取消）會以 ``ExecutionStopped`` 結束進行中指令的等待：等待與暫停、擷取輸出的 shell 指令、共用 HTTP client、
+範本比對、OCR、VLM 與 LLM 請求、唯讀無障礙讀取、adb 指令、USB 與 Wayland 擷取工具、行動裝置呼叫與 find-element 等待、
+``AC_wait_for_port`` 探測、``AC_send_email`` （郵件可能已送出也可能沒有）、``AC_feature_match``、``AC_agent_run`` ／
+``AC_computer_use`` 的每次模型呼叫、``AC_assert_audio`` ／ ``AC_assert_video``，以及管理主控台的輪詢與廣播（尚未連到的主機會略過）。
+呼叫進行到一半被停止的行動裝置工作階段會關閉，與逾時相同。無法中斷的原生呼叫會在背景跑完，結果不會被使用。
+
+仍不可中斷：無障礙寫入（設值／invoke／toggle）、 ``AC_parallel`` 等待分支結束（所有分支結束才放開按住的鍵），
+以及螢幕錄影的收尾。

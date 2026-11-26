@@ -221,3 +221,20 @@ them with the run's secret mask, so the log, the journal and the MCP audit show
 ``***`` for the rest of the run. ``AC_resolve_ref``'s ``value`` and
 ``AC_resolve_refs``'s ``resolved`` are masked in the logged result and the
 Script Builder result pane. ``file://`` values are not registered.
+
+Stopping a run
+--------------
+
+A stop (or a cancellation) ends the wait of the command in progress with ``ExecutionStopped``:
+waits and pauses, shell commands that capture output, the shared HTTP client, template matching,
+OCR, VLM and LLM requests, read-only accessibility reads, adb commands, the USB and Wayland
+capture tools, mobile device calls and find-element waits, ``AC_wait_for_port`` probes,
+``AC_send_email`` (the message may or may not have been delivered), ``AC_feature_match``, each
+model call of ``AC_agent_run`` / ``AC_computer_use``, ``AC_assert_audio`` / ``AC_assert_video``
+and the admin console's poll and broadcast (hosts not reached yet are skipped). A mobile device
+session caught mid-call is closed, as on a timeout. A native call that cannot be interrupted keeps
+running in the background and its result is discarded.
+
+Still not interruptible: accessibility writes (set value / invoke / toggle), the join of
+``AC_parallel`` (held keys are released only once every branch has ended) and the finalisation of
+a screen recording.
