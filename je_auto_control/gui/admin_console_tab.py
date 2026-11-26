@@ -9,6 +9,9 @@ The health poll and the thumbnail fetch are tasks too, with a deadline and
 **Stop polling** in the Actions menu: stopping either, or closing the tab,
 skips the hosts not reached yet and drops the answer.
 
+Adding and removing hosts rewrites the host file, so both are a tab task too,
+one at a time.
+
 Every command first asks RBAC for its ``AC_admin_*`` command, in the slot
 (the refusal is shown in the tab) and, for the background ones, again on the
 worker; the host list is not shown to a role that may not read it.
@@ -92,6 +95,9 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._broadcasts.result.connect(self._show_broadcast)
         self._broadcasts.error.connect(self._show_broadcast_error)
         self._broadcast_stop: Optional[threading.Event] = None
+        self._edits = TabTask(self)            # add or remove hosts: the host file is rewritten
+        self._edits.result.connect(self._on_hosts_edited)
+        self._edits.error.connect(self._on_hosts_edit_failed)
         # Phase 6.5: live-thumbnail grid + auto-poll timer.
         self._thumbnails = QListWidget()
         self._thumbnails.setViewMode(QListWidget.ViewMode.IconMode)
@@ -184,25 +190,36 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
     def _on_add(self) -> None:
         if not self._refusal.allows("AC_admin_add_host"):
             return
-        label = self._label_input.text().strip()
-        url = self._url_input.text().strip()
-        token = self._token_input.text().strip()
-        try:
-            self._client.add_host(label=label, base_url=url, token=token)
-        except ValueError as error:
-            QMessageBox.warning(self, _t("admin_add"), str(error))
-            return
-        self._label_input.clear()
-        self._url_input.clear()
-        self._token_input.clear()
-        self._refresh_table()
+        work = functools.partial(authorized, "AC_admin_add_host", self._client.add_host,
+                                 label=self._label_input.text().strip(), base_url=self._url_input.text().strip(),
+                                 token=self._token_input.text().strip())
+        self._start_edit(work, "add")
 
     def _on_remove(self) -> None:
         labels = self._selected_labels()
         if not labels or not self._refusal.allows("AC_admin_remove_host"):
             return
-        for label in labels:
-            self._client.remove_host(label)
+        self._start_edit(functools.partial(authorized, "AC_admin_remove_host", _remove_hosts, self._client, labels),
+                         "remove")
+
+    def _start_edit(self, work: Callable[[], Any], tag: str) -> None:
+        if not self._edits.start(work, tag=tag):
+            self._broadcast_status.setText(_t("task_busy"))
+            return
+        self._broadcast_status.setText(_t("task_running"))
+
+    def _on_hosts_edited(self, _outcome: object) -> None:
+        self._broadcast_status.setText("")
+        if self._edits.tag == "add":
+            self._label_input.clear()
+            self._url_input.clear()
+            self._token_input.clear()
+        self._refresh_table()
+
+    def _on_hosts_edit_failed(self, error: object) -> None:
+        self._broadcast_status.setText("")
+        title = _t("admin_add") if self._edits.tag == "add" else _t("admin_remove")
+        QMessageBox.warning(self, title, str(error))
         self._refresh_table()
 
     def _on_refresh(self) -> None:
@@ -357,6 +374,11 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
             self._table.setItem(row, 2, QTableWidgetItem(health_text))
             self._table.setItem(row, 3, QTableWidgetItem(latency_text))
             self._table.setItem(row, 4, QTableWidgetItem(jobs_text))
+
+
+def _remove_hosts(client: Any, labels: List[str]) -> int:
+    """Worker thread: remove each host (each removal rewrites the host file); return how many were removed."""
+    return sum(1 for label in labels if client.remove_host(label))
 
 
 __all__ = ["AdminConsoleTab"]

@@ -558,3 +558,78 @@ def test_disposing_the_usb_panel_drops_an_acl_import_still_out(boxes, monkeypatc
     pump_until(lambda: False, timeout=0.5)
     assert panel._viewer_status.text() == _t("task_running")
     panel.deleteLater()
+
+
+# --- admin console: add and remove hosts --------------------------------------------------------------------
+
+def _admin_tab(monkeypatch, tmp_path):
+    from je_auto_control.gui import admin_console_tab as module
+    from je_auto_control.utils.admin.admin_client import AdminConsoleClient
+    client = AdminConsoleClient(persist_path=tmp_path / "hosts.json")
+    monkeypatch.setattr(module, "default_admin_console", lambda: client)
+    tab = module.AdminConsoleTab()
+    tab._thumb_interval.setValue(0)                 # no thumbnail polling
+    return tab, client
+
+
+def test_adding_an_admin_host_writes_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    tab, client = _admin_tab(monkeypatch, tmp_path)
+    gate = _Gate(then=client.add_host)
+    monkeypatch.setattr(client, "add_host", gate)
+    tab._label_input.setText("alpha")
+    tab._url_input.setText("http://a.invalid:9939")         # NOSONAR never contacted
+    tab._token_input.setText("tok")
+    _returns_at_once(tab._on_add)
+    assert gate.entered.wait(_WAIT)
+    assert tab._broadcast_status.text() == _t("task_running")
+    tab._on_add()                                   # one host edit at a time
+    assert tab._broadcast_status.text() == _t("task_busy")
+    gate.release.set()
+    assert pump_until(lambda: not tab._edits.running)
+    assert gate.off_gui_thread() and len(gate.calls) == 1
+    assert tab._table.rowCount() == 1 and tab._label_input.text() == ""
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_a_rejected_admin_host_is_reported_and_its_fields_kept(boxes, monkeypatch, tmp_path):
+    tab, _client = _admin_tab(monkeypatch, tmp_path)
+    tab._label_input.setText("alpha")
+    tab._on_add()                                   # no URL
+    assert pump_until(lambda: not tab._edits.running)
+    assert len(boxes) == 1 and tab._label_input.text() == "alpha" and tab._table.rowCount() == 0
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_removing_admin_hosts_writes_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    tab, client = _admin_tab(monkeypatch, tmp_path)
+    client.add_host("alpha", "http://a.invalid:9939", "tok")    # NOSONAR never contacted
+    tab._refresh_table()
+    tab._table.selectRow(0)
+    gate = _Gate(then=client.remove_host)
+    monkeypatch.setattr(client, "remove_host", gate)
+    _returns_at_once(tab._on_remove)
+    assert gate.entered.wait(_WAIT)
+    assert tab._table.rowCount() == 1
+    gate.release.set()
+    assert pump_until(lambda: not tab._edits.running)
+    assert gate.off_gui_thread() and tab._table.rowCount() == 0
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_disposing_the_admin_console_drops_a_host_edit_still_out(boxes, monkeypatch, tmp_path):
+    tab, client = _admin_tab(monkeypatch, tmp_path)
+    gate = _Gate(then=client.add_host)
+    monkeypatch.setattr(client, "add_host", gate)
+    tab._label_input.setText("alpha")
+    tab._url_input.setText("http://a.invalid:9939")         # NOSONAR never contacted
+    tab._token_input.setText("tok")
+    tab._on_add()
+    assert gate.entered.wait(_WAIT)
+    tab.dispose()
+    gate.release.set()
+    pump_until(lambda: False, timeout=0.5)
+    assert tab._table.rowCount() == 0 and tab._label_input.text() == "alpha"
+    tab.deleteLater()
