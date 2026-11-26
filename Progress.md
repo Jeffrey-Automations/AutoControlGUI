@@ -149,8 +149,7 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - **Intel Mac 安裝要編譯 `cryptography`**：下限拉到 50 之後 `macosx_10_9_x86_64` 沒有 wheel（探測：最新只到 48.0.1），
   `pip install je_auto_control` 在 Intel Mac 需要 Rust 工具鏈。沒有在 Intel Mac 上實際編過。
 - **伺服器與 executor 審查留下的（U-20261126-13）**：
-  - `DECIDE`：`SlackBot` 在 `last_seen_ts=None` 時讀最多約 1,000 則舊訊息並執行其中指令，每次重啟都會重播 `/run`（既有測試依賴）；
-    `cv2.error`／`sqlite3.Error`／外掛自訂例外仍會中止整份動作清單；HTTP 上交握式 `resources/subscribe` 回 `{}` 但從不通知；macro 是全程序共用。
+  - `DECIDE`：`cv2.error`／`sqlite3.Error`／外掛自訂例外仍會中止整份動作清單；HTTP 上交握式 `resources/subscribe` 回 `{}` 但從不通知；macro 是全程序共用。
   - `TODO`：使用者檔只在單一程序內序列化（CLI 與伺服器同時改仍互蓋）；`RestAuthGate._buckets` 依來源 IP 無上限成長；
     MCP 在准入前拒絕的呼叫沒有稽核（`AuditLogger` 說每次都有）；`ac_jwt_decode` 沒有 `leeway`；
     尚未追查 `AC_agent_task_*`／`AC_agent_dag` 的參數會不會在 runtime 再展開一次；上述未讀檔案待審。
