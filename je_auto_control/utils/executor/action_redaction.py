@@ -31,10 +31,12 @@ hands to the checker. The exemption is honoured only where a person is
 reading their own run (``show_identifiers=True``, the builder's result pane);
 the log masks an identifier like any other ``token``.
 """
+import functools
+import inspect
 import re
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, FrozenSet, List, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, FrozenSet, List, Mapping, Optional, Tuple, Union
 
 _VAULT_COMMAND_PREFIX = "AC_secret_"
 #: Commands outside the vault whose every argument is a secret.
@@ -180,7 +182,36 @@ def _redact_argument(command: str, argument: Any) -> Any:
     if isinstance(argument, dict):
         return {name: _MASK if is_sensitive_argument(command, name) else redact_actions(item)
                 for name, item in argument.items()}
+    if isinstance(argument, list):
+        # A positional list: the same rule, by the name of each position.
+        names = _positional_names(command)
+        return [_MASK if index < len(names) and is_sensitive_argument(command, names[index])
+                else redact_actions(item) for index, item in enumerate(argument)]
     return redact_actions(argument)
+
+
+def _positional_names(command: str) -> Tuple[str, ...]:
+    """The parameter names of ``command``, in order; empty for one the executor does not know."""
+    try:
+        # pylint: disable-next=import-outside-toplevel  # reason: the executor imports this module
+        from je_auto_control.utils.executor.action_executor import executor
+    except ImportError:  # the executor is still loading, so it has run nothing
+        return ()
+    target = executor.event_dict.get(command)
+    try:
+        return _parameter_names(target)
+    except TypeError:  # an unhashable callable: not cached
+        return _parameter_names.__wrapped__(target)
+
+
+@functools.lru_cache(maxsize=4096)
+def _parameter_names(target: Optional[Callable[..., Any]]) -> Tuple[str, ...]:
+    if target is None:
+        return ()
+    try:
+        return tuple(inspect.signature(target).parameters)
+    except (TypeError, ValueError):  # no signature to read
+        return ()
 
 
 def describe_action(action: Any) -> str:
