@@ -301,6 +301,9 @@ def test_a_session_that_fails_to_stop_is_retained_until_retry():
     assert not track.stopped
     with pytest.raises(PeerStopPending):
         host.create_session_offer()
+    # The refused offer restarts the retirement on its own thread; let that attempt (which still
+    # fails) finish, or it races this stop for the screen source and one of them is told to wait.
+    assert _wait_for(lambda: not host._retry_running)  # pylint: disable=protected-access
     child.raise_on.clear()
     host.stop_session(session_id)
     assert host.session_count() == 0
