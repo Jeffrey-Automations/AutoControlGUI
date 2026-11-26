@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- The prebuilt `autocontrol_driver/AutoControlDriverWindows.exe` and `generate_autocontrol_driver_linux`
+  are removed: they shipped the old unauthenticated socket server. The `Driver` workflow builds the
+  driver with Nuitka (a windowless `AutoControlDriver.exe`, a Linux `AutoControlDriver`), smoke-tests
+  its authentication, and attaches both to each GitHub release; `autocontrol_driver/build_driver.py`
+  builds it locally.
+
 - **Breaking:** the TCP socket server (`start-server`, `start_autocontrol_socket_server`) requires
   authentication. A client that sends a command (or `quit_server`) without it gets
   `authentication required` and the command does not run. To migrate, send `AUTH <token>` as the

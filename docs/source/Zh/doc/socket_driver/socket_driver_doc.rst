@@ -153,3 +153,24 @@ Socket 伺服器允許其他程式語言（或遠端機器）透過 TCP 傳送 J
      - 9938
    * - Token 檔
      - ``~/.je_auto_control/socket_server_<port>.token``，僅擁有者可讀，關閉時刪除
+
+Driver 執行檔
+=============
+
+``autocontrol_driver/generate_autocontrol_driver.py`` 會啟動需要驗證的 socket 伺服器，並持續執行到客戶端送出
+``quit_server``。它的執行檔不放在 repo 裡，而是由 ``Driver`` workflow（``.github/workflows/driver.yml``）
+在 Windows 與 Ubuntu runner 上用 Nuitka 建置：
+
+* Windows：一個沒有主控台視窗的 ``AutoControlDriver.exe`` （``--windows-console-mode=disable``）。
+* Linux：一個 ``AutoControlDriver`` 二進位檔。
+
+每個建置都會啟動一次，必須拒絕沒有 token 的指令、回應帶 token 的指令，並在收到 ``quit_server`` 後結束
+（``autocontrol_driver/smoke_driver.py``）。建置結果會上傳為 workflow artifact，並附在每個發布的 GitHub release。
+在本機建置：
+
+.. code-block:: bash
+
+    python -m pip install nuitka==4.3.5 zstandard==0.25.0
+    python autocontrol_driver/build_driver.py --output-dir dist
+
+Driver 沒有視窗：token 請從上面的 token 檔讀取，停止它請送 ``quit_server``。

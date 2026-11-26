@@ -167,3 +167,26 @@ Protocol Details
      - 9938
    * - Token file
      - ``~/.je_auto_control/socket_server_<port>.token``, owner-only, deleted on close
+
+Driver Executable
+=================
+
+``autocontrol_driver/generate_autocontrol_driver.py`` starts the authenticated socket server and
+stays up until a client sends ``quit_server``. Its executables are not kept in the repository; the
+``Driver`` workflow (``.github/workflows/driver.yml``) builds them with Nuitka on Windows and Ubuntu
+runners:
+
+* Windows: one windowless ``AutoControlDriver.exe`` (``--windows-console-mode=disable``).
+* Linux: one ``AutoControlDriver`` binary.
+
+Each build is started once and must refuse a command sent without the token, answer one sent with
+it, and exit on ``quit_server`` (``autocontrol_driver/smoke_driver.py``). The builds are uploaded as
+workflow artifacts and attached to each published GitHub release. To build one locally:
+
+.. code-block:: bash
+
+    python -m pip install nuitka==4.3.5 zstandard==0.25.0
+    python autocontrol_driver/build_driver.py --output-dir dist
+
+The driver has no window: read the token from the token file above, and stop it with
+``quit_server``.

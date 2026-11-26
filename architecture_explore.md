@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,632 |
-| 程式碼總行數 | 254,724 |
+| Python 模組總數（含周邊子專案） | 1,634 |
+| 程式碼總行數 | 254,840 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1515 |
@@ -1535,7 +1535,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | 目錄 | 內容 | 職責 |
 | --- | --- | --- |
 | `autocontrol-lsp/` | 8 檔／752 行 | **AC_* action JSON 的語言伺服器**：`server.py`（JSON-RPC over stdio）、`handlers.py`（純函式 LSP 處理器，易單測）、`diagnostics.py`（診斷清單）、`documents.py`（記憶體文件庫）、`commands.py`（從 executor 取得所有指令，自動同步）。 |
-| `autocontrol_driver/` | 1 檔 | 產生 AutoControl driver 的小工具。 |
+| `autocontrol_driver/` | 3 檔 | socket 伺服器 driver：`generate_autocontrol_driver.py` 是入口，`build_driver.py` 以 Nuitka 建成單一無主控台執行檔，`smoke_driver.py` 驗證建好的 driver 需要驗證並能以 `quit_server` 結束；執行檔由 `Driver` workflow 建置並附在 release，不放進 repo。 |
 | `AutoControl/executor/` | 3 檔 | 由 `create_project_dir` 產生的專案範本示範（單檔／整個目錄／錯誤檔案三種執行方式）。 |
 | `exe/start_autocontrol_gui.py` | 4 行 | 打包成執行檔用的 GUI 啟動器。 |
 | `benchmarks/core_latency.py` | 32 行 | 對穩定無頭進入點的可重複煙霧基準測試。 |

@@ -37,7 +37,7 @@ python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 - 透過 MCP 連接 AI 用戶端，或透過 REST 與 Python 整合。
 - 在選配 GUI 中使用錄製、排程與遠端桌面工具。
 
-TCP socket 伺服器（`je_auto_control start-server`，連接埠 9938）現在需要驗證。每條連線先送 `AUTH <token>`，收到 `AUTH_OK` 後指令才會執行。token 依序取 `--token`、`JE_AUTOCONTROL_SOCKET_TOKEN`，都沒有則隨機產生，並以僅擁有者可讀的方式寫入 `~/.je_auto_control/socket_server_<port>.token`（`--token-file` 可改），伺服器停止時刪除。RBAC 下只接受使用者的 token：執行動作需要 `drive_input`，`quit_server` 需要 `manage_hosts`。每條連線有 10 秒與 3 次機會，失敗依位址限流。`ac.send_socket_command([["AC_screen_size"]])` 會替你讀 token 並完成驗證。既有客戶端必須先送 `AUTH` 那一行，或以 `--no-auth` 啟動伺服器；後者會記錄警告：此時任何本機程序都能執行任何指令。詳見[整合說明](../docs/guides/zh-TW/integrations.md)。
+TCP socket 伺服器（`je_auto_control start-server`，連接埠 9938）現在需要驗證。每條連線先送 `AUTH <token>`，收到 `AUTH_OK` 後指令才會執行。token 依序取 `--token`、`JE_AUTOCONTROL_SOCKET_TOKEN`，都沒有則隨機產生，並以僅擁有者可讀的方式寫入 `~/.je_auto_control/socket_server_<port>.token`（`--token-file` 可改），伺服器停止時刪除。RBAC 下只接受使用者的 token：執行動作需要 `drive_input`，`quit_server` 需要 `manage_hosts`。每條連線有 10 秒與 3 次機會，失敗依位址限流。`ac.send_socket_command([["AC_screen_size"]])` 會替你讀 token 並完成驗證。既有客戶端必須先送 `AUTH` 那一行，或以 `--no-auth` 啟動伺服器；後者會記錄警告：此時任何本機程序都能執行任何指令。詳見[整合說明](../docs/guides/zh-TW/integrations.md)。獨立的 driver（`autocontrol_driver/`）不再以預先編好的二進位檔放在 repo 裡：Driver workflow 用 Nuitka 建置（Windows 上是一個沒有主控台視窗的 `AutoControlDriver.exe`，Linux 上是一個 `AutoControlDriver` 二進位檔），確認它會拒絕沒有 token 的指令，並附在每個 GitHub release；本機可用 `python autocontrol_driver/build_driver.py` 建置。
 
 影像偵測分頁在背景執行比對，並有自己的滑鼠按鍵選擇。
 Actions 選單可停止待完成的搜尋；關閉分頁會丟棄晚到結果，重新開啟會重設輸入欄位。

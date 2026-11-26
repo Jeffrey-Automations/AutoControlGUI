@@ -677,7 +677,7 @@ safe source strings/references and masks resolved input strings/dynamic keys.
 | `docs/` | Sphinx docs, `API_LIFECYCLE.md`, `CAPABILITY_MATRIX.md`. |
 | `examples/`, `benchmarks/` | Runnable example scripts; latency smoke benchmark. |
 | `docker/`, `k8s/helm/`, `ci_templates/` | Container images and backend verification harnesses, Helm chart, GitLab CI template. |
-| `browser-extension/`, `AutoControl/`, `exe/`, `autocontrol_driver/` | Manifest v3 companion extension, project-template sample, packaged GUI launcher, driver build script. |
+| `browser-extension/`, `AutoControl/`, `exe/`, `autocontrol_driver/` | Manifest v3 companion extension, project-template sample, packaged GUI launcher, socket driver (built with Nuitka by the `Driver` workflow, never committed as a binary). |
 | `scripts/` | Release tooling, not shipped: `dev_release.py` numbers and gates the dev-channel package, `stable_release.py` picks the version a push to `main` releases (§3). |
 
 ## 3. Entry points and public interfaces
