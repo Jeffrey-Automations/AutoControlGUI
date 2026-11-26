@@ -52,6 +52,40 @@ def test_mark_click_uses_supplied_marks(monkeypatch):
     assert mark_click(99, marks) is False    # unknown id -> no click
 
 
+def test_each_caller_clicks_its_own_marks(monkeypatch):
+    import threading
+    import je_auto_control.utils.accessibility.accessibility_api as a11y
+    import je_auto_control.wrapper.auto_control_mouse as mouse
+    from je_auto_control.utils.set_of_marks import last_marks, mark_screen
+    elements = {"A": [{"bbox": [0, 0, 20, 20]}], "B": [{"bbox": [500, 500, 20, 20]}]}
+    monkeypatch.setattr(a11y, "list_accessibility_elements", lambda app_name=None: elements[app_name])
+    monkeypatch.setattr(mouse, "set_mouse_position", lambda x, y: None)
+    clicks = []
+    monkeypatch.setattr(mouse, "click_mouse", lambda btn, x, y: clicks.append((threading.current_thread().name, x, y)))
+    marked, b_done = threading.Event(), threading.Event()
+
+    def caller_a():
+        mark_screen("A")
+        marked.set()
+        b_done.wait(5)
+        mark_click(1)
+
+    def caller_b():
+        marked.wait(5)
+        mark_screen("B")
+        mark_click(1)
+        b_done.set()
+
+    threads = [threading.Thread(target=caller_a, name="A"), threading.Thread(target=caller_b, name="B")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10)
+    assert sorted(clicks) == [("A", 10, 10), ("B", 510, 510)]
+    # A caller that marked nothing still gets the newest marks, as before.
+    assert last_marks()[0]["center"] == [510, 510]
+
+
 # --- wiring ---------------------------------------------------------------
 
 def test_wiring():

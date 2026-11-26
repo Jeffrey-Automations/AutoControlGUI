@@ -11,15 +11,29 @@ click.
 The legend computation (:func:`mark_elements` / :func:`resolve_mark`) is
 pure Python and unit-testable with synthetic elements; rendering uses
 Pillow (already a dependency). Imports no ``PySide6``.
+
+The marks a :func:`mark_click` falls back to belong to the caller: each
+context (thread, asyncio task) that ran :func:`mark_screen` keeps its own, so
+two callers marking at once no longer click each other's elements. A context
+that has not marked anything -- such as a server handling each request on a
+fresh thread -- falls back to the most recent marks of any caller, which is
+how a lone caller has always worked.
 """
 import io
+import threading
+from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from je_auto_control.utils.accessibility.element import element_box
 
 _OUTLINE = (255, 0, 0)
+_Marks = Tuple[Dict[str, Any], ...]
+# The marks of the calling context; None until it has run mark_screen.
+_caller_marks: "ContextVar[Optional[_Marks]]" = ContextVar("je_auto_control_set_of_marks", default=None)
+# The newest marks of any caller, for a context that has none of its own.
 _last_marks: List[Dict[str, Any]] = []
+_last_marks_lock = threading.Lock()
 
 
 def _bbox_of(element: Any) -> List[int]:
@@ -107,16 +121,35 @@ def render_marks(image_bytes: bytes,
     return out.getvalue()
 
 
+def _current_marks() -> List[Dict[str, Any]]:
+    """The calling context's marks, else the newest marks of any caller."""
+    own = _caller_marks.get()
+    if own is not None:
+        return list(own)
+    with _last_marks_lock:
+        return list(_last_marks)
+
+
+def _store_marks(marks: List[Dict[str, Any]]) -> None:
+    stored = tuple(dict(mark) for mark in marks)
+    _caller_marks.set(stored)
+    with _last_marks_lock:
+        _last_marks[:] = stored
+
+
 def last_marks() -> List[Dict[str, Any]]:
-    """Return a copy of the marks from the most recent :func:`mark_screen`."""
-    return [dict(mark) for mark in _last_marks]
+    """Return a copy of the marks from this caller's most recent :func:`mark_screen`.
+
+    A caller that has not marked anything gets the newest marks of any caller.
+    """
+    return [dict(mark) for mark in _current_marks()]
 
 
 def mark_screen(app_name: Optional[str] = None,
                 render_path: Optional[str] = None) -> Dict[str, Any]:
     """Number the live accessibility elements; optionally render an overlay.
 
-    Stores the marks for a later :func:`mark_click`. When ``render_path`` is
+    Stores the marks for a later :func:`mark_click` by the same caller. When ``render_path`` is
     given, every monitor is captured, annotated, and saved there; the result
     then carries ``image_origin``, the screen coordinate of the image's
     top-left pixel (``mark bbox - image_origin`` is where a mark is drawn).
@@ -125,8 +158,7 @@ def mark_screen(app_name: Optional[str] = None,
     from je_auto_control.utils.accessibility.accessibility_api import (
         list_accessibility_elements)
     marks = mark_elements(list_accessibility_elements(app_name=app_name))
-    _last_marks.clear()
-    _last_marks.extend(marks)
+    _store_marks(marks)
     result: Dict[str, Any] = {"marks": marks}
     if render_path:
         # The whole desktop, not pil_screenshot(): that is the primary monitor
@@ -145,10 +177,10 @@ def mark_click(mark_id: int,
                marks: Optional[List[Dict[str, Any]]] = None) -> bool:
     """Click the centre of the marked element; return whether it matched.
 
-    Uses ``marks`` if supplied, else the marks from the last
-    :func:`mark_screen`.
+    Uses ``marks`` if supplied, else the marks from this caller's last
+    :func:`mark_screen` (or the newest of any caller when it has none).
     """
-    mark = resolve_mark(marks if marks is not None else _last_marks, mark_id)
+    mark = resolve_mark(marks if marks is not None else _current_marks(), mark_id)
     if mark is None:
         return False
     center_x, center_y = mark["center"]
