@@ -11,6 +11,16 @@ from je_auto_control.utils.agent_runtime.parent_watch import start_parent_watch
 from je_auto_control.utils.executor.dispatch import command_guard
 from je_auto_control.wrapper._input_observer import input_observer
 
+# Every route by which a NativeWorker reaches native input, a tool or focus: the operation
+# whitelist, configure readiness, the command guard, the input observer and owned cleanup.
+_NO_INPUT_PATHS = ("_dispatch", "_operation", "_scoped_operation", "_guard", "_input", "_release_owned")
+_PRESENCE_FIELDS = frozenset({"presence", "presence_endpoint"})
+
+
+def _input_paths_refused(worker: type) -> bool:
+    """Whether ``worker`` still uses ReadOnlyWorker's own refusal on every input path."""
+    return all(getattr(worker, name) is getattr(ReadOnlyWorker, name) for name in _NO_INPUT_PATHS)
+
 
 # pylint: disable-next=too-few-public-methods  # reason: one inherited RPC loop with permanently restricted dispatch
 class ReadOnlyWorker(NativeWorker):
@@ -37,6 +47,21 @@ class ReadOnlyWorker(NativeWorker):
             return
         super()._configure_scope(payload)
         self._configuration = configuration
+
+    def _configure_presence(self, payload: dict[str, Any]) -> None:
+        """Configure a desktop scope without a presence lease, and never accept one.
+
+        The presence binding exists to stop automation when a person touches the desktop. This
+        helper has nothing to stop: ``perform`` is outside its operation whitelist, every executor
+        command meets ``_guard``, every native input event meets ``_input`` and cleanup accepts only
+        empty releases, all of which raise. The exemption holds only while a subclass keeps those
+        refusals; one that overrides any of them falls back to the standard presence requirement.
+        ``_ready_activity`` is not exempted: nothing here calls it, and it still refuses if reached.
+        """
+        if _PRESENCE_FIELDS & set(payload):
+            raise AgentTaskError("read-only helper cannot take a presence lease")
+        if not _input_paths_refused(type(self)):
+            super()._configure_presence(payload)
 
     def _operation(self, operation: str, payload: dict[str, Any]) -> Any:
         if operation == "configure":
