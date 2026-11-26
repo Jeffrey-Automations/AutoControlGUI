@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-28 | 2026-11-26 | Review the server files the last pass had not read | #done #fix #security #review | [2026-11-c](2026-11-c.md) |
 | U-20261126-27 | 2026-11-26 | Move the remaining GUI file and store work off the GUI thread | #done #gui #fix | [2026-11-c](2026-11-c.md) |
 | U-20261126-26 | 2026-11-26 | Close the server and utils A-L review follow-ups | #done #fix #security #agent #rbac | [2026-11-c](2026-11-c.md) |
 | U-20261126-25 | 2026-11-26 | Close the remote desktop review follow-ups | #done #fix #remote-desktop | [2026-11-c](2026-11-c.md) |

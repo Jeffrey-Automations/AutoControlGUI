@@ -151,7 +151,11 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   `pip install je_auto_control` 在 Intel Mac 需要 Rust 工具鏈。沒有在 Intel Mac 上實際編過。
 - **伺服器與 executor 審查留下的（U-20261126-13）**：
   - `DECIDE`：`cv2.error`／`sqlite3.Error`／外掛自訂例外仍會中止整份動作清單；HTTP 上交握式 `resources/subscribe` 回 `{}` 但從不通知；macro 是全程序共用。
-  - `TODO`：這輪伺服器審查沒有讀到的檔案還待審。
+  - `DECIDE`（U-20261126-28 補審）：socket server 沒有驗證也不看 RBAC，本機任何程序都能以受信身分執行任何指令（含 admin 限定的與 `quit_server`）；
+    加 token 或使用者檢查會打破現有 socket 客戶端與文件化的協定，不加則 RBAC 在本機可被繞過。
+    `AC_voice_register` 註冊的動作清單以呼叫 `AC_voice_dispatch` 者的權限執行（同 macro 那一類）；改成記下註冊者（`DeferredAuthorization`）會改變 admin dispatch 能做的事。
+    具名的記憶體內 executor registry（`_VERSIONED_STORES`、`_DEDUP_WINDOWS`、`_IDEMPOTENCY_STORES`、`_BULKHEADS`、`_SEQUENCE_TRACKERS`）沒有上限，已驗證的呼叫者可一直新建名稱；加 LRU 上限會丟掉仍在用的狀態。
+  - `TODO`：`action_executor.py` 的轉接函式只依樣式掃過，沒有逐行讀完。
 - **`DECIDE`（agent_runtime 審查）**：`ReadOnlyWorker` 無法設定任何桌面任務（基底 worker 要求在場綁定，而主機刻意不傳），桌面唯讀完成驗證目前完全不能用；
   修法是一處覆寫，但等於移除一個拒絕條件。
 - **遠端與 USB 審查留下的（U-20261126-17）**：`DECIDE`：未驗證的連線最多占一個 `max_clients` 名額 60 秒；H.264 over TCP 只留最新封包，慢的觀看者會掉 P-frame。

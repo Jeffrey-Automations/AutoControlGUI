@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Secrets passed as positional arguments are masked in logs, record keys, the MCP audit file and
+  the action journal, so record keys change for those actions. The Prometheus exporter and the
+  ACME HTTP-01 server drop a silent client after 30 s. `AC_expect_poll` no longer matches
+  `expected: null` on a failing attempt.
+
 - GUI: file and store operations of the editors, Run History, Test Suites, Self-Healing, REST users,
   USB ACL, the admin console and the remote-desktop trust list, address book and known hosts run
   off the GUI thread; the REST one-time token field is masked; Diagnostics' capability probe is
