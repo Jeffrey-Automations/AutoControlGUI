@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-42 | 2026-11-26 | Poll Slack faster while a run is going and honour Retry-After | #done #chatops #stop #decide | [2026-11-c](2026-11-c.md) |
 | U-20261126-41 | 2026-11-26 | Let a stop end adb, device, capture, email and model calls | #done #stop #fix | [2026-11-c](2026-11-c.md) |
 | U-20261126-40 | 2026-11-26 | Reveal embedded action-list secrets once and explain a replaced Quick Connect | #done #gui #fix | [2026-11-c](2026-11-c.md) |
 | U-20261126-39 | 2026-11-26 | Build the socket driver with Nuitka in CI instead of committing binaries | #done #socket #build #ci | [2026-11-c](2026-11-c.md) |
