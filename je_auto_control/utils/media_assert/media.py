@@ -20,9 +20,11 @@ import os
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.exception.exceptions import (
     AutoControlAssertionException,
 )
+from je_auto_control.utils.executor.run_control import checkpoint, stoppable_call
 
 
 @dataclass(frozen=True)
@@ -53,7 +55,11 @@ def measure_audio_rms(duration_s: float = 1.0,
                       samplerate: int = 44100,
                       channels: int = 1,
                       device: Optional[int] = None) -> float:
-    """Record from an input device and return the RMS level of the buffer."""
+    """Record from an input device and return the RMS level of the buffer.
+
+    Inside a stoppable run or a cancellation scope a stop ends the recording
+    window early: the stream is stopped and the stop propagates.
+    """
     try:
         import numpy as np
         import sounddevice as sd
@@ -66,12 +72,21 @@ def measure_audio_rms(duration_s: float = 1.0,
     try:
         recording = sd.rec(frames, samplerate=int(samplerate),
                            channels=int(channels), device=device)
-        sd.wait()
+        _wait_recording(sd)
     except sd.PortAudioError as error:
         # No input device: PortAudioError is a bare Exception, outside every
         # caller's except clause.
         raise RuntimeError(f"audio capture failed: {error}") from error
     return float(np.sqrt(np.mean(np.square(recording))))
+
+
+def _wait_recording(sd: Any) -> None:
+    """``sd.wait()``, which a stop ends; the stream is stopped before the stop propagates."""
+    try:
+        stoppable_call(sd.wait)
+    except BaseException:
+        sd.stop()
+        raise
 
 
 def assert_audio_activity(duration_s: float = 1.0,
@@ -169,6 +184,9 @@ def _sum_frame_diffs(capture: Any, cv2: Any, start_frame: int, end_frame: Option
     count, total, previous, bounds = 0, 0.0, None, None
     index = start_frame
     while end_frame is None or index < end_frame:
+        # A long video decodes for minutes: look at a stop once per frame.
+        cancellation_checkpoint()
+        checkpoint()
         ok, frame = capture.read()
         if not ok:
             break
