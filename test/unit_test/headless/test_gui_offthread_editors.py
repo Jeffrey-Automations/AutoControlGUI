@@ -1,7 +1,9 @@
-"""The script editors read and write their files off the GUI thread.
+"""The script editors, the heal log and the flakiness report read and write off the GUI thread.
 
 The Flow Editor, the Script Builder and the Recording Editor opened, saved and
-exported inside the slot; a recording can be several megabytes. Offscreen Qt
+exported inside the slot; a recording can be several megabytes. The
+Self-Healing tab read and cleared its JSONL audit log, and the Flaky Tests tab
+queried the run history, the same way. Offscreen Qt
 against gated fakes: the slot returns first, the tab says it is running or
 busy, the outcome arrives later on the GUI thread, and disposing the tab drops
 one still out. Every file dialog is faked.
@@ -155,4 +157,54 @@ def test_disposing_the_recording_editor_drops_a_load_still_out(boxes, monkeypatc
     load.release.set()
     pump_until(lambda: False, timeout=0.5)
     assert tab._list.count() == 0
+    tab.deleteLater()
+
+
+# --- the self-healing audit log and the flakiness report ----------------------------------------------------
+
+def test_the_heal_log_is_read_and_cleared_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui import self_healing_tab as module
+    from je_auto_control.utils.self_healing import HealEvent, HealEventLog
+    log = HealEventLog(tmp_path / "events.jsonl")
+    log.append(HealEvent("now", "image", [1, 2], 1.0))
+    read = _Gate(log.list_events)
+    monkeypatch.setattr(log, "list_events", read)
+    monkeypatch.setattr(module, "default_heal_log", log)
+    started = time.monotonic()
+    tab = module.SelfHealingTab()
+    assert time.monotonic() - started < 5.0, "building the tab waited for the log"
+    assert read.entered.wait(_WAIT)
+    tab.refresh_log()                               # asked again while one is out: runs once it reports
+    read.release.set()
+    assert pump_until(lambda: not tab._log.running and tab._table.rowCount() == 1)
+    assert read.off_gui_thread()
+    clear = _Gate(log.clear)
+    monkeypatch.setattr(log, "clear", clear)
+    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
+    _returns_at_once(tab._on_clear_log)
+    assert clear.entered.wait(_WAIT)
+    clear.release.set()
+    assert pump_until(lambda: not tab._log.running and tab._table.rowCount() == 0)
+    assert clear.off_gui_thread()
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_the_flakiness_report_is_computed_off_the_gui_thread(boxes, monkeypatch):
+    from je_auto_control.gui import flakiness_tab as module
+    from je_auto_control.utils.flakiness import FlakinessReport
+    empty = FlakinessReport(generated_at=0.0, group_by="script_path", total_groups=0, flaky_count=0)
+    gate = _Gate(lambda **kwargs: empty)
+    monkeypatch.setattr(module, "analyze_flakiness", gate)
+    started = time.monotonic()
+    tab = module.FlakinessTab()
+    assert time.monotonic() - started < 5.0, "building the tab waited for the report"
+    assert gate.entered.wait(_WAIT)
+    assert tab._status.text() == _t("task_running")
+    tab._refresh()
+    assert tab._status.text() == _t("task_busy")
+    gate.release.set()
+    assert pump_until(lambda: not tab._reports.running)
+    assert gate.off_gui_thread() and tab._status.text() == _t("flaky_summary_empty")
+    tab.dispose()
     tab.deleteLater()

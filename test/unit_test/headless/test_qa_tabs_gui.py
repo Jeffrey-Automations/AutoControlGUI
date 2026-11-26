@@ -28,8 +28,11 @@ def app():
 
 def test_flakiness_tab_refreshes(app):
     tab = FlakinessTab()
+    assert settle(tab._reports, "task")     # the first report, computed off the GUI thread
     tab._refresh()
-    assert tab._status.text() != ""
+    assert settle(tab._reports, "task")
+    assert tab._status.text() not in ("", _t_running())
+    tab.dispose()
 
 
 def test_data_source_tab_loads_inline(app):

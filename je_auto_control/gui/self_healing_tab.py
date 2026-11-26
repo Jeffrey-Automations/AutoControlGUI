@@ -4,6 +4,8 @@ Fire a template-first / VLM-fallback locate from the GUI and browse the
 audit log, or compare explicit versions on provided PNG samples without device effects.
 A locate or click -- a screen search, then a model request -- runs off the GUI
 thread (:class:`~je_auto_control.gui._tab_task.TabTask`), one at a time.
+Reading and clearing the audit log (a JSONL file) is a tab task of its own; a
+refresh asked for while a read is out runs once it reports.
 """
 import functools
 import json
@@ -58,6 +60,13 @@ def _dispatch(inputs: tuple[Optional[str], Optional[str], float, Optional[list[i
 
 
 # pylint: disable-next=too-many-instance-attributes  # reason: the tab owns separate runtime and comparison controls
+def _read_log(*, clear: bool) -> list[HealEvent]:
+    """Worker thread: the newest 200 events of the audit log, after clearing it when asked."""
+    if clear:
+        default_heal_log.clear()
+    return default_heal_log.list_events(limit=200)
+
+
 class SelfHealingTab(TranslatableMixin, QWidget):
     """Trigger self-heal attempts and browse the audit log."""
 
@@ -83,6 +92,11 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         self._task = TabTask(self)          # one locate or click at a time, off the GUI thread
         self._task.result.connect(self._on_run_done)
         self._task.error.connect(self._on_run_failed)
+        self._log = TabTask(self, details=False)    # reading (or clearing) the audit log file
+        self._log.result.connect(self._show_log)
+        self._log.error.connect(self._on_log_failed)
+        self._log.finished.connect(self._log_settled)
+        self._reread_log = False
         # pylint: disable-next=no-member  # reason: PySide binds this Qt signal at runtime
         self._table.itemSelectionChanged.connect(self._show_event)
         self._build_layout()
@@ -248,12 +262,22 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-        default_heal_log.clear()
-        self.refresh_log()
+        if not self._log.start(functools.partial(_read_log, clear=True)):
+            self._status.setText(_t("task_busy"))
 
     def refresh_log(self) -> None:
-        """Reload the table from the on-disk audit log."""
-        events = default_heal_log.list_events(limit=200)
+        """Reload the table from the on-disk audit log, read off the GUI thread."""
+        self._reread_log = not self._log.start(functools.partial(_read_log, clear=False))
+
+    def _log_settled(self) -> None:
+        if self._reread_log:
+            self._reread_log = False
+            self.refresh_log()
+
+    def _on_log_failed(self, error: object) -> None:
+        self._status.setText(f"{_t('self_heal_error')}: {error}")
+
+    def _show_log(self, events: list[HealEvent]) -> None:
         self._events = events
         self._table.setRowCount(len(events))
         for row, event in enumerate(events):
