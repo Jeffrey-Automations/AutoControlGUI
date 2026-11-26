@@ -53,10 +53,19 @@ class RelayError(AutoControlException, RuntimeError):
     """Raised for handshake or pairing errors."""
 
 
-def _read_exact(sock: socket.socket, length: int) -> bytes:
-    """Block-read exactly ``length`` bytes or raise ``ConnectionError``."""
+def _read_exact(sock: socket.socket, length: int, deadline: Optional[float] = None) -> bytes:
+    """Read exactly ``length`` bytes by ``deadline`` (monotonic) or raise ``OSError``.
+
+    The deadline bounds the read as a whole: a socket timeout bounds each
+    ``recv``, and a peer sending one byte at a time never reached it.
+    """
     buf = bytearray()
     while len(buf) < length:
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise socket.timeout("relay handshake timed out")
+            sock.settimeout(remaining)
         chunk = sock.recv(length - len(buf))
         if not chunk:
             raise ConnectionError("relay peer closed during handshake")
@@ -165,10 +174,14 @@ class RelayServer:
     """In-process TCP relay paired by 32-byte session ID."""
 
     def __init__(self, bind: str = "127.0.0.1", port: int = 0,
-                 max_pending_sessions: int = 32) -> None:
+                 max_pending_sessions: int = 32, max_handshakes: int = 64) -> None:
+        """``max_handshakes`` caps connections still sending their handshake; more are refused."""
         self._bind = bind
         self._requested_port = int(port)
         self._max_pending = int(max_pending_sessions)
+        if int(max_handshakes) < 1:
+            raise RelayError("max_handshakes must be at least 1")
+        self._handshake_slots = threading.BoundedSemaphore(int(max_handshakes))
         self._listen_sock: Optional[socket.socket] = None
         self._accept_thread: Optional[threading.Thread] = None
         self._shutdown = threading.Event()
@@ -251,15 +264,20 @@ class RelayServer:
                 autocontrol_logger.info("relay accept failed: %r", error)
                 stop.wait(_ACCEPT_RETRY_S)
                 continue
+            if not self._handshake_slots.acquire(blocking=False):
+                autocontrol_logger.info("relay refusing connection: too many handshakes in progress")
+                client_sock.close()
+                continue
             threading.Thread(
-                target=self._handle_client, args=(client_sock,),
+                target=self._handle_client, args=(client_sock, True),
                 name="relay-client", daemon=True,
             ).start()
 
-    def _handle_client(self, client_sock: socket.socket) -> None:
+    def _handle_client(self, client_sock: socket.socket, holds_slot: bool = False) -> None:
+        """Read one handshake by a single deadline, then park or pair the peer."""
         try:
-            client_sock.settimeout(_HANDSHAKE_TIMEOUT_S)
-            handshake = _read_exact(client_sock, _HANDSHAKE_BYTES)
+            handshake = _read_exact(client_sock, _HANDSHAKE_BYTES,
+                                    time.monotonic() + _HANDSHAKE_TIMEOUT_S)
             client_sock.settimeout(None)
         except OSError as error:
             # ConnectionError already inherits from OSError.
@@ -269,6 +287,9 @@ class RelayServer:
             except OSError:
                 pass
             return
+        finally:
+            if holds_slot:
+                self._handshake_slots.release()
         role = handshake[0]
         session_id = handshake[1:]
         if role not in (_ROLE_HOST, _ROLE_VIEWER):

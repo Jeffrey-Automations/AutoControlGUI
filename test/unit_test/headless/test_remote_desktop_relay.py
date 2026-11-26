@@ -213,3 +213,58 @@ def test_an_aborted_connection_does_not_end_the_relays_accept_loop(monkeypatch):
     server._accept_loop(stop)
     server._listen_sock = None
     assert _Flaky.calls == 2
+
+
+def test_one_deadline_bounds_the_whole_handshake_of_a_trickling_peer(monkeypatch):
+    from je_auto_control.utils.remote_desktop import relay as relay_module
+    monkeypatch.setattr(relay_module, "_HANDSHAKE_TIMEOUT_S", 0.5)
+    server = RelayServer(bind="127.0.0.1", port=0)
+    near, far = socket.socketpair()
+    handshake = encode_handshake("host", b"S" * 32)
+
+    def trickle():
+        try:
+            for byte in handshake:       # each read beats the timeout; the whole does not
+                far.sendall(bytes([byte]))
+                time.sleep(0.1)
+        except OSError:
+            pass
+
+    feeder = threading.Thread(target=trickle, daemon=True)
+    feeder.start()
+    try:
+        started = time.monotonic()
+        server._handle_client(near)
+        assert time.monotonic() - started < 2.0
+        assert not server._pending
+        assert near.fileno() == -1
+    finally:
+        near.close()
+        far.close()
+        feeder.join(timeout=5.0)
+
+
+def _closed_by_peer(sock: socket.socket, timeout: float) -> bool:
+    sock.settimeout(timeout)
+    try:
+        return sock.recv(1) == b""
+    except socket.timeout:
+        return False
+    except OSError:
+        return True
+
+
+def test_handshakes_beyond_the_cap_are_refused():
+    server = RelayServer(bind="127.0.0.1", port=0, max_handshakes=2)
+    server.start()
+    silent = [_connect(server.port), _connect(server.port)]
+    try:
+        time.sleep(0.2)                  # let the relay take the first two in
+        extra = _connect(server.port)
+        silent.append(extra)
+        assert _closed_by_peer(extra, 2.0)
+        assert not _closed_by_peer(silent[0], 0.2)
+    finally:
+        for sock in silent:
+            sock.close()
+        server.stop(timeout=1.0)
