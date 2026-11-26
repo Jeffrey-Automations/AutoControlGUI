@@ -39,6 +39,9 @@ from je_auto_control.utils.remote_desktop.resume_tokens import (
 from je_auto_control.utils.remote_desktop.video_codec import (
     CodecProvider, JpegPassthrough,
 )
+from je_auto_control.utils.remote_desktop.delta_frames import (
+    DeltaFrameHistory, KeyframeRequests, history_for_codec,
+)
 from je_auto_control.utils.remote_desktop.transport import (
     MessageChannel, TcpMessageChannel,
 )
@@ -197,6 +200,12 @@ class RemoteDesktopHost(ConnectionAdmissionMixin, FrameProductionMixin):
         self._codec_provider: CodecProvider = (
             codec_provider if codec_provider is not None else JpegPassthrough()
         )
+        # A delta codec's P-frames need the frames before them: such a stream
+        # keeps a short backlog, and a viewer that falls further behind waits
+        # for a keyframe (asked for, rate-limited) instead of decoding garbage.
+        self._delta_history: Optional[DeltaFrameHistory] = history_for_codec(
+            self._codec_provider.name)
+        self._keyframe_requests = KeyframeRequests()
         self._listen_sock: Optional[socket.socket] = None
         self._accept_thread: Optional[threading.Thread] = None
         self._capture_thread: Optional[threading.Thread] = None

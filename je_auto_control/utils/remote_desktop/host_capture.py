@@ -17,9 +17,12 @@ from typing import (
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.remote_desktop.delta_frames import (
+    DeltaFrameHistory, EncodedFrame, KeyframeRequests,
+)
 from je_auto_control.utils.remote_desktop.protocol import MessageType
 from je_auto_control.utils.remote_desktop.video_codec import (
-    CODEC_JPEG, CodecProvider, codec_tag,
+    CODEC_JPEG, CodecProvider, codec_tag, is_keyframe_packet,
 )
 
 if TYPE_CHECKING:  # avoids a runtime cycle: host_client is a sibling
@@ -174,8 +177,9 @@ class FrameProductionMixin:
     that go on the wire. Each loop is handed its run's stop event rather
     than reading the host's, so a restart cannot revive it. Requires the
     host to provide ``_clients``/``_clients_lock``, ``_frame_provider``,
-    ``_cursor_provider``, ``_codec``, ``_fps``, ``_latest_frame`` and
-    ``_frame_lock``.
+    ``_cursor_provider``, ``_codec``, ``_fps``, ``_latest_frame``,
+    ``_frame_lock``, and for delta codecs ``_delta_history`` (the backlog
+    viewers are fed from in order) and ``_keyframe_requests``.
     """
 
     if TYPE_CHECKING:
@@ -193,6 +197,8 @@ class FrameProductionMixin:
         _codec_provider: CodecProvider
         _latest_seq: int
         _period: float
+        _delta_history: Optional[DeltaFrameHistory]
+        _keyframe_requests: KeyframeRequests
 
     def _cursor_loop(self, stop: threading.Event) -> None:
         """Poll cursor position at ~30 Hz and push it to viewers as JSON."""
@@ -284,15 +290,11 @@ class FrameProductionMixin:
             # workloads and saves a full FPS-worth of TCP / encoder
             # bandwidth at idle.
             frame_hash = hash(frame)
-            if frame_hash != last_frame_hash:
-                # Phase 6.8: hand the JPEG to the configured codec.
-                # JpegPassthrough yields the bytes unchanged so the
-                # wire format stays identical for stock clients.
-                for encoded in self._encode_for_wire(frame):
-                    with self._frame_cond:
-                        self._latest_frame = encoded
-                        self._latest_seq += 1
-                        self._frame_cond.notify_all()
+            # A keyframe a resynchronising viewer asked for is encoded even
+            # from an unchanged screen: nothing else would ever produce it.
+            forced = self._keyframe_requests.take() and self._ask_encoder_for_keyframe()
+            if frame_hash != last_frame_hash or forced:
+                self._publish_frame(frame)
                 last_frame_hash = frame_hash
             next_tick += self._period
             sleep_for = max(0.0, next_tick - time.monotonic())
@@ -300,11 +302,46 @@ class FrameProductionMixin:
                 next_tick = time.monotonic()
             stop.wait(sleep_for)
 
-    def _encode_for_wire(self, jpeg_bytes: bytes) -> Iterator[bytes]:
-        """Wrap codec output with a 1-byte tag (skipped for JPEG)."""
+    def _publish_frame(self, frame: bytes) -> None:
+        """Encode one captured JPEG and make each packet the newest frame.
+
+        Phase 6.8: JpegPassthrough yields the bytes unchanged so the wire
+        format stays identical for stock clients. A delta codec's packets
+        also go into the backlog its viewers are fed from in order.
+        """
+        for encoded, keyframe in self._encode_for_wire(frame):
+            with self._frame_cond:
+                self._latest_frame = encoded
+                self._latest_seq += 1
+                if self._delta_history is not None:
+                    self._delta_history.append(EncodedFrame(self._latest_seq, encoded, keyframe))
+                self._frame_cond.notify_all()
+
+    def _request_keyframe(self) -> None:
+        """A viewer of a delta-coded stream has to resynchronise: ask for a keyframe.
+
+        Rate-limited host-wide by :class:`KeyframeRequests`; a JPEG stream
+        has nothing to resynchronise, so there it does nothing.
+        """
+        if self._delta_history is not None:
+            self._keyframe_requests.request()
+
+    def _ask_encoder_for_keyframe(self) -> bool:
+        """Have the codec make its next packet a keyframe; ``False`` when it cannot."""
+        request = getattr(self._codec_provider, "request_keyframe", None)
+        if request is None:
+            return False
+        try:
+            return bool(request())
+        except Exception as error:  # noqa: BLE001  # reason: the provider is pluggable (PyAV errors derive from Exception alone); the viewer then waits for a natural keyframe
+            autocontrol_logger.warning("remote_desktop keyframe request failed: %r", error)
+            return False
+
+    def _encode_for_wire(self, jpeg_bytes: bytes) -> Iterator[Tuple[bytes, bool]]:
+        """Wrap codec output with a 1-byte tag (skipped for JPEG); each with whether it is a keyframe."""
         provider = self._codec_provider
         if provider.name == CODEC_JPEG:
-            yield jpeg_bytes  # legacy wire format: no tag, raw JPEG
+            yield jpeg_bytes, True  # legacy wire format: no tag, raw JPEG
             return
         tag = bytes([codec_tag(provider.name)])
         try:
@@ -314,5 +351,8 @@ class FrameProductionMixin:
                 "remote_desktop codec %s failed: %r", provider.name, error,
             )
             return
+        check = getattr(provider, "is_keyframe", None)
         for packet in packets:
-            yield tag + bytes(packet)
+            body = bytes(packet)
+            keyframe = check(body) if check is not None else is_keyframe_packet(provider.name, body)
+            yield tag + body, bool(keyframe)

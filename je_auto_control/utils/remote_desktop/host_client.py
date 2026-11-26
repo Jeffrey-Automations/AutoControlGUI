@@ -20,6 +20,7 @@ from je_auto_control.utils.remote_desktop.auth import make_nonce
 from je_auto_control.utils.remote_desktop.clipboard_sync import (
     ClipboardEchoGuard, ClipboardSyncError, decode as decode_clipboard,
 )
+from je_auto_control.utils.remote_desktop.delta_frames import DeltaFrameGate
 from je_auto_control.utils.remote_desktop.file_transfer import (
     FileTransferError, decode_begin,
 )
@@ -326,32 +327,68 @@ class _ClientHandler:
         # blank until the host moves). Doing it here rather than in start()
         # keeps a slow-reading viewer from stalling the accept thread.
         self._host._send_initial_cursor(self)
-        self._send_initial_frame()
+        # JPEG frames stand alone and only the newest is sent; a delta-coded
+        # stream goes through a gate that keeps it decodable (delta_frames).
+        gate = None if self._host._delta_history is None else DeltaFrameGate()
+        if gate is None:
+            self._send_initial_frame()
         last_sent = 0
         while True:
-            outgoing, last_sent = self._next_streamed(last_sent)
+            outgoing, delta_frames, last_sent = self._next_streamed(last_sent, gate)
             if self._shutdown.is_set():
                 return
             for msg_type, payload in outgoing:
                 if not self._send_streamed(msg_type, payload):
                     return
+            if gate is not None and not self._send_delta_frames(delta_frames, gate):
+                return
 
-    def _next_streamed(self, last_sent: int) -> Tuple[List[Tuple[MessageType, bytes]], int]:
-        """Wait for cursor updates or a frame newer than ``last_sent``; return them and the new mark."""
-        with self._host._frame_cond:
+    def _next_streamed(self, last_sent: int, gate: Optional[DeltaFrameGate],
+                       ) -> Tuple[List[Tuple[MessageType, bytes]], List[bytes], int]:
+        """Wait for cursor updates or a frame newer than ``last_sent``.
+
+        Returns the cursor updates (plus, for JPEG, the newest frame), the
+        delta-coded frames the gate lets through, and the new mark.
+        """
+        host = self._host
+        with host._frame_cond:
             while (not self._shutdown.is_set() and not self._cursor_queue
-                   and self._host._latest_seq <= last_sent):
-                self._host._frame_cond.wait(timeout=0.5)
+                   and host._latest_seq <= last_sent):
+                host._frame_cond.wait(timeout=0.5)
             outgoing = [(MessageType.CURSOR, cursor) for cursor in self._cursor_queue]
             self._cursor_queue.clear()
-            frame = self._host._latest_frame
-            seq = self._host._latest_seq
-        if frame is not None and seq > last_sent:
+            frame = host._latest_frame
+            seq = host._latest_seq
+            history = host._delta_history
+            delta_frames = [] if gate is None or history is None else gate.take(history)
+        if gate is None and frame is not None and seq > last_sent:
             outgoing.append((MessageType.FRAME, frame))
-        return outgoing, seq
+        return outgoing, delta_frames, seq
+
+    def _send_delta_frames(self, frames: List[bytes], gate: DeltaFrameGate) -> bool:
+        """Send delta-coded frames in order; ``False`` once the connection is gone.
+
+        A frame that cannot be sent takes the rest of the batch with it --
+        they reference it -- and, like a viewer that fell behind, leaves the
+        gate waiting for a keyframe, which is then asked for.
+        """
+        for payload in frames:
+            sent = self._try_send(MessageType.FRAME, payload)
+            if sent is None:
+                return False
+            if not sent:
+                gate.lose()
+                break
+        if gate.needs_keyframe:
+            self._host._request_keyframe()
+        return True
 
     def _send_streamed(self, msg_type: MessageType, payload: bytes) -> bool:
         """Send one streamed message; ``False`` once the connection is gone."""
+        return self._try_send(msg_type, payload) is not None
+
+    def _try_send(self, msg_type: MessageType, payload: bytes) -> Optional[bool]:
+        """Send one streamed message: ``True`` sent, ``False`` skipped, ``None`` connection gone."""
         try:
             self._channel.send_typed(msg_type, payload)
         except OSError as error:
@@ -360,14 +397,15 @@ class _ClientHandler:
                 self._address, error,
             )
             self.stop()
-            return False
+            return None
         except ProtocolError as error:
-            # Over the payload cap: that one frame is skipped. Raising ended
+            # Over the payload cap: that one message is skipped. Raising ended
             # this thread while the viewer stayed connected and in control.
             autocontrol_logger.warning(
                 "remote_desktop %s to %s not sent: %r",
                 msg_type.name, self._address, error,
             )
+            return False
         return True
 
     def _audio_send_loop(self) -> None:
