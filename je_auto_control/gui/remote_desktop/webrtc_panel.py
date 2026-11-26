@@ -284,6 +284,10 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         self._apply_session_headers()
         self._status.retranslate()
         self._host_quality_tip.retranslate()
+        if self._tray is not None:
+            self._tray.retranslate()
+        if self._viewer_screen_window is not None:
+            self._viewer_screen_window.retranslate()
         host = self._multi_host
         self._sessions_label.setText(
             _t("rd_webrtc_sessions_count").format(n=host.session_count() if host is not None else 0))

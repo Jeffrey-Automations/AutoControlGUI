@@ -97,6 +97,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             self._enable_audio.setEnabled(False)
         self._badge = _StatusBadge()
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         set_role(self._status, "hint")
         # _screen_window is created lazily on connect — the AnyDesk-style
         # popout. While disconnected we hold ``None`` and the panel
@@ -123,6 +124,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         self._progress_bar = QProgressBar()
         self._progress_bar.setVisible(False)
         self._progress_label = QLabel()
+        self._progress_text = self._keyed(self._progress_label)
         self._progress_label.setVisible(False)
         self._active_progress_id: Optional[str] = None
         self._build_layout()
@@ -364,7 +366,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             player = AudioPlayer()
             player.start()
         except (OSError, RuntimeError) as error:
-            self._status.setText(f"{_t('rd_viewer_audio_play')}: {error}")
+            self._status_text.show_joined('rd_viewer_audio_play', error)
             return
         self._audio_player = player
 
@@ -391,7 +393,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         if self._own_viewer() is not None:
             return  # reconnected since; the notice is about the old session
         self._disconnect()
-        self._status.setText(_t("rd_viewer_displaced"))
+        self._status_text.show("rd_viewer_displaced")
 
     def _disconnect(self) -> None:
         self._session += 1                  # whatever the closed session still sends is dropped
@@ -405,7 +407,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         self._early_frame = None
         self._close_screen_window()
         self._progress_bar.setVisible(False)
-        self._progress_label.setText("")
+        self._progress_text.clear()
         self._active_progress_id = None
         self._refresh_status()
 
@@ -504,9 +506,9 @@ class _ViewerPanel(TranslatableMixin, QWidget):
                 return
         except (OSError, RuntimeError, AutoControlException) as error:
             raise_caused_run_interruption(error)
-            self._status.setText(f"{_t('rd_viewer_error')}: {error}")
+            self._status_text.show_joined('rd_viewer_error', error)
             return
-        self._status.setText(_t("rd_viewer_clipboard_received"))
+        self._status_text.show("rd_viewer_clipboard_received")
 
     def _clipboard_peer_active(self, peer: object) -> bool:
         """Queued clipboard metadata never adopts another panel's or a replacement viewer's connection."""
@@ -525,11 +527,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             self._progress_bar.setValue(min(bytes_done, total))
         else:
             self._progress_bar.setRange(0, 0)
-        self._progress_label.setText(
-            _t("rd_progress_label")
-            .replace("{done}", str(bytes_done))
-            .replace("{total}", str(total))
-        )
+        self._progress_text.show("rd_progress_label", done=bytes_done, total=total)
 
     def _received_file_complete(self, transfer_id: str, success: bool, error: str | None, dest: str) -> None:
         self._on_file_complete_main(transfer_id, bool(success), error or "", dest)
@@ -541,13 +539,9 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         self._progress_bar.setVisible(False)
         self._progress_label.setVisible(True)
         if success:
-            self._progress_label.setText(
-                _t("rd_progress_done").replace("{path}", dest_path)
-            )
+            self._progress_text.show("rd_progress_done", path=dest_path)
         else:
-            self._progress_label.setText(
-                _t("rd_progress_failed").replace("{error}", error)
-            )
+            self._progress_text.show("rd_progress_failed", error=error)
 
     # --- input forwarding ---------------------------------------------
 
@@ -575,7 +569,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
                     return
                 text = QGuiApplication.clipboard().text()
             if not text:
-                self._status.setText(_t("rd_clipboard_empty"))
+                self._status_text.show("rd_clipboard_empty")
                 return
             delivery = ClipboardDelivery(viewer, 'text', text, authority)
             sent = delivery.dispatch(self._clipboard_peer_active,
@@ -587,7 +581,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             QMessageBox.warning(self, _t("rd_viewer_push_clipboard"),
                                 str(error))
             return
-        self._status.setText(_t("rd_clipboard_sent"))
+        self._status_text.show("rd_clipboard_sent")
 
     def _on_send_file_clicked(self) -> None:
         viewer = self._own_viewer()
