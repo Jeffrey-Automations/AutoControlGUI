@@ -14,6 +14,26 @@
   wait on `server.socket.fileno() == -1` instead.
 - Agent runtime: a desktop task can be verified by a permanent read-only completion reader; the
   read-only helper takes no presence binding and refuses one.
+- Image search: unusable input now raises `ImageSearchInputException` (exported from the facade) instead of
+  `ImageNotFoundException`: a missing or unreadable template, a single-colour template, a threshold outside
+  0-1, NaN or not a number, or an image OpenCV cannot match; `DeviceFrame.locate_image` follows. The two are
+  siblings under `AutoControlException`, so code that caught `ImageNotFoundException` for a typo in the
+  template path must also catch `ImageSearchInputException`. `AC_assert_image` with `present: false`,
+  `AC_wait_image_gone`, `ac_wait_for_image` and the `else` branch of `AC_if_image_found` now fail on such
+  input instead of passing; image triggers with it are disabled, and observer rules, state-machine
+  `if_image_found` guards and anchor locators raise.
+
+- Executor: an error from outside the framework family (`cv2.error`, `sqlite3.Error`, a plugin's own
+  exception) no longer aborts the action list; it is recorded as that action's failure, wrapped in
+  `AutoControlForeignException` (exported; `original` and `__cause__` hold the original). With
+  `raise_on_error=True` the wrapper is raised, so code that caught `cv2.error` or `sqlite3.Error` from
+  `execute_action` should catch `AutoControlForeignException` and read `original`. `AC_try` now catches
+  these errors and `AC_retry` retries them. Assertion failures (including a plugin's `AssertionError`),
+  loop signals, stops, cancellation, `KeyboardInterrupt` and `SystemExit` are still never contained.
+
+- MCP HTTP: `resources/subscribe` belongs to the session that sent it and `notifications/resources/updated`
+  is delivered on that session's `GET` stream (dropped while none is open); ending the session releases its
+  subscriptions. A request without a session is refused with `-32600` instead of answered `{}`.
 
 - GUI: translated table and list cells follow a language switch, and 58 message-box titles,
   validation messages and result lines that were hard-coded English are translated.

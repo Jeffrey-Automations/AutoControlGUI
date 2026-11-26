@@ -160,6 +160,18 @@ Resources
   - ``autocontrol://screen/live`` — base64 PNG screenshots, with
     ``resources/subscribe`` push notifications when content changes.
 
+Resource subscriptions
+  Over stdio, ``notifications/resources/updated`` goes to the peer. Over
+  HTTP a ``resources/subscribe`` belongs to the session that sent it: send
+  the ``Mcp-Session-Id`` that ``initialize`` returned and open that
+  session's standing ``GET`` stream (``Accept: text/event-stream``); the
+  updates are delivered there. Each session holds its own subscriptions, an
+  update that arrives while the session has no stream open is dropped, and
+  ending the session (``DELETE``, idle sweep or eviction) releases them. A
+  request without a session has no stream to deliver on and is refused with
+  JSON-RPC error ``-32600``. Stateless 2026-07-28 clients use
+  ``subscriptions/listen`` instead.
+
 Prompts
   Five built-in templates: ``automate_ui_task``,
   ``record_and_generalize``, ``compare_screenshots``,

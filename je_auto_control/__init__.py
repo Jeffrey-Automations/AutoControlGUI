@@ -73,6 +73,7 @@ if _TYPE_CHECKING:
     from je_auto_control.utils.cv2_utils.screenshot import pil_screenshot
     from je_auto_control.utils.cv2_utils.video_recording import RecordingThread
     from je_auto_control.utils.exception.exceptions import AutoControlActionException
+    from je_auto_control.utils.exception.exceptions import AutoControlForeignException
     from je_auto_control.utils.exception.exceptions import (
         AutoControlActionNullException,
     )
@@ -91,6 +92,7 @@ if _TYPE_CHECKING:
         AutoControlFlatTemplateException,
     )
     from je_auto_control.utils.exception.exceptions import ImageNotFoundException
+    from je_auto_control.utils.exception.exceptions import ImageSearchInputException
     from je_auto_control.utils.executor.action_executor import add_command_to_executor
     from je_auto_control.utils.executor.action_executor import execute_action
     from je_auto_control.utils.executor.action_executor import execute_action_with_vars
@@ -2023,8 +2025,9 @@ __all__ = [
     "CriticalExit", "AutoControlException", "AutoControlKeyboardException",
     "AutoControlMouseException", "AutoControlCantFindKeyException",
     "AutoControlScreenException", "AutoControlFlatTemplateException",
-    "ImageNotFoundException", "AutoControlJsonActionException",
-    "AutoControlRecordException", "AutoControlActionNullException", "AutoControlActionException", "record",
+    "ImageNotFoundException", "ImageSearchInputException", "AutoControlJsonActionException",
+    "AutoControlRecordException", "AutoControlActionNullException", "AutoControlActionException",
+    "AutoControlForeignException", "record",
     "stop_record", "stop_record_timeline",
     "read_action_json", "read_executable_action_json", "write_action_json", "format_action_json",
     "execute_action", "execute_files", "executor",

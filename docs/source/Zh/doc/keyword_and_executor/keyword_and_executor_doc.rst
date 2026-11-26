@@ -68,6 +68,25 @@ JSON 陣列（關鍵字），由執行者解析並執行。
 
    execute_action(read_action_json("actions.json"))
 
+錯誤與 ``raise_on_error``
+=========================
+
+``execute_action`` 會把失敗的動作記成它的 ``repr`` 並執行下一個；``raise_on_error=True``
+則在第一個失敗就拋出。以這種方式收納的是 ``AutoControlException`` 家族，以及內建的
+``OSError``、``RuntimeError``、``ArithmeticError``、``AttributeError``、``TypeError``、
+``ValueError``、``LookupError`` 與 ``ImportError``。
+
+指令拋出其他錯誤（``cv2.error``、``sqlite3.Error``、外掛自訂的例外類別）時，會在該動作
+被包成 ``AutoControlForeignException``，它的 ``original`` 屬性與 ``__cause__`` 是原本的
+錯誤。之後它跟其他失敗一樣被記錄，``AC_try`` 會攔到、``AC_retry`` 會重試、``AC_loop``
+逐輪記錄、``AC_parallel`` 記在它的分支裡。``raise_on_error=True`` 時拋出的是這個包裝，
+所以原本在 ``execute_action`` 外攔 ``cv2.error`` 或 ``sqlite3.Error`` 的程式碼，應改攔
+``AutoControlForeignException`` 並讀取 ``original``。
+
+不論 ``raise_on_error`` 怎麼設都從不收納的有：斷言失敗（``AutoControlAssertionException``
+與外掛自己的 ``AssertionError``）、``AC_break``／``AC_continue``、停止請求
+（``ExecutionStopped``）、取消、``KeyboardInterrupt`` 與 ``SystemExit``。
+
 執行資料夾內所有 JSON 檔案
 ===========================
 

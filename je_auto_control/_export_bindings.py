@@ -2,7 +2,7 @@
 from je_auto_control._lazy_exports import AttributeBinding, ExportBinding, ModuleBinding
 
 
-PUBLIC_ORDER_SHA256 = '51909c0bac824012d0aaf47b87809847214b2bdc8be6c2cf0ebc279ecce2e19b'
+PUBLIC_ORDER_SHA256 = '469ecde22e476bdec00c0e250cb7793905caa51e0ea0ad6c62bde9a7740499ef'
 
 _IOS_SIMCTL = 'je_auto_control.ios.simctl'
 _LINUX_WAYLAND_GLOBAL_SHORTCUTS = 'je_auto_control.linux_wayland.global_shortcuts'
@@ -480,10 +480,12 @@ EXPORTS: dict[str, ExportBinding] = {
     'AutoControlFlatTemplateException':
         AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlFlatTemplateException'),
     'ImageNotFoundException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'ImageNotFoundException'),
+    'ImageSearchInputException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'ImageSearchInputException'),
     'AutoControlJsonActionException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlJsonActionException'),
     'AutoControlRecordException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlRecordException'),
     'AutoControlActionNullException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlActionNullException'),
     'AutoControlActionException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlActionException'),
+    'AutoControlForeignException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlForeignException'),
     'record': AttributeBinding(_WRAPPER_AUTO_CONTROL_RECORD, 'record'),
     'stop_record': AttributeBinding(_WRAPPER_AUTO_CONTROL_RECORD, 'stop_record'),
     'stop_record_timeline': AttributeBinding(_WRAPPER_AUTO_CONTROL_RECORD, 'stop_record_timeline'),

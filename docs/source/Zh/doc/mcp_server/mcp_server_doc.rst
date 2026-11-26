@@ -142,6 +142,15 @@ Resources
   - ``autocontrol://screen/live`` — base64 PNG 直播,
     ``resources/subscribe`` 後當畫面有變化會推送通知。
 
+Resource 訂閱
+  stdio 上 ``notifications/resources/updated`` 送給對端。HTTP 上
+  ``resources/subscribe`` 屬於送出它的 session：請帶上 ``initialize`` 回傳的
+  ``Mcp-Session-Id``，並開啟該 session 常駐的 ``GET`` 串流
+  （``Accept: text/event-stream``），更新就送到那裡。每個 session 各自持有訂閱；
+  session 沒有開著串流時到達的更新會被丟棄；結束 session（``DELETE``、閒置清除或
+  被擠出）會釋放它們。沒有 session 的請求沒有可送達的串流，會以 JSON-RPC 錯誤
+  ``-32600`` 拒絕。無狀態 2026-07-28 的用戶端改用 ``subscriptions/listen``。
+
 Prompts
   五個內建範本:``automate_ui_task``、``record_and_generalize``、
   ``compare_screenshots``、``find_widget``、``explain_action_file``。

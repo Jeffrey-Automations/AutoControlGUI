@@ -822,6 +822,24 @@ repository has driven a real phone, not because the code is unfinished.
   (`DeviceError` is a `RuntimeError`, `DeviceTimeoutError` a `TimeoutError`,
   `JournalFormatError` and `JournalImportError` a `ValueError`,
   `AuthorizationError` a `PermissionError`).
+- An image search that cannot run on its input (a missing or unreadable
+  template, a single-colour template, a threshold outside 0-1, NaN or not a
+  number, an image OpenCV cannot match) raises `ImageSearchInputException`,
+  not `ImageNotFoundException`, which now means only "searched, not on
+  screen". The two are siblings under `AutoControlException`, so code that
+  caught `ImageNotFoundException` to handle a bad path must also catch
+  `ImageSearchInputException`; `AC_assert_image(present=False)`,
+  `AC_wait_image_gone` and `AC_if_image_found` fail on such input.
+- `execute_action` records an error from outside the framework family
+  (`cv2.error`, `sqlite3.Error`, a plugin's own class) as that action's
+  failure, wrapped in `AutoControlForeignException` (`original` and
+  `__cause__` hold the original); with `raise_on_error=True` the wrapper is
+  raised instead of the original. Assertion failures (including a plugin's
+  `AssertionError`), loop signals, stops, cancellation, `KeyboardInterrupt`
+  and `SystemExit` are never contained.
+- MCP HTTP `resources/subscribe` belongs to the session that sent it and is
+  delivered on that session's `GET` stream; without a session it is refused
+  with `-32600` instead of answering `{}`.
 - `python -m mypy` holds every module written since v0.0.225 to
   `disallow_untyped_defs` and `disallow_any_generics`; see
   `test/verify/typing_strict_baseline.txt` for the modules that predate that.

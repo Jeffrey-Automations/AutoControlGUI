@@ -128,6 +128,10 @@ python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 | 系统诊断 | `run_diagnostics` | `AC_diagnose` | Diagnostics |
 | 测试代码生成 | `generate_code` | — | — |
 
+**图像搜索：不在画面上与输入不能用。** `ImageNotFoundException` 表示搜索跑过、模板不在画面上。搜索无法使用的输入改抛 `ImageSearchInputException`：模板文件不存在或读不出、单一颜色的模板（到处都会匹配成功）、`detect_threshold`／`threshold` 超出 0–1、是 NaN 或不是数字，或 OpenCV 无法匹配的图像。两者在 `AutoControlException` 下是兄弟，所以捕获其中一个的处理器不会捕获另一个。不存在检查因此遇到写错的路径会失败，不再通过：`AC_assert_image` 加 `present: false` 以“the template could not be used”失败，`AC_wait_image_gone` 与 `ac_wait_for_image` 直接抛出而不是等待，`AC_if_image_found` 记录为失败而不是执行 `else` 分支。模板不能用的图像触发器会被停用并记录；观察者规则、状态机的 `if_image_found` 守卫与 anchor locator 会抛出异常。自我修复仍会退回 VLM 步骤，并报告模板失败的原因。
+
+**框架以外的错误。** executor 会记录失败的动作并执行下一个（`raise_on_error=False`）。现在这也包括抛出 `cv2.error`、`sqlite3.Error` 或插件自定义异常类的命令：它在抛出的那个动作被包装成 `AutoControlForeignException`（`original` 与 `__cause__` 是原异常），所以 `AC_try` 会捕获、`AC_retry` 会重试、循环逐轮记录、`AC_parallel` 记录在它的分支里。`raise_on_error=True` 时抛出的是这个包装。无论 `raise_on_error` 如何设置都从不收纳的有：断言失败（`AutoControlAssertionException` 与插件自己的 `AssertionError`）、`AC_break`／`AC_continue`、停止请求、取消、`KeyboardInterrupt` 与 `SystemExit`。
+
 自愈定位器会在回退或点击前原样传递取消。稽核日志在写入或返回记录前遮蔽本次运行已解析的秘密值；返回的定位结果保留原值，读取时不改写既有日志文件。
 
 实时 image／VLM 自愈现在共用一次延迟逻辑截图及实际裁切原点，两条路径的 `screen_region` 均为 `[左, 上, 右, 下]`。Schema-v2 记录增加 run／step 身份、内容与配置版本、frame hash、策略／截图耗时及实际 backend／model，仍兼容旧记录。未配置验证的点击仅记录已送出或失败，验证保持未知。GUI 提供区域输入与所选记录证据，Script Builder 保留结构化区域 JSON。旧 `healed`／`heal_rate` 统计定位候选，独立的操作指标需要明确验证。

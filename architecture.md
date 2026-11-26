@@ -688,7 +688,7 @@ safe source strings/references and masks resolved input strings/dynamic keys.
 | Stable API | `je_auto_control.api` → `api/core.py` | `CancellationToken`, `TaskProgress`, `cancellation_scope`, `BackendContext`, `CapabilitySnapshot`, `CapabilityStatus`, `probe_capabilities`, `FailureBundleOptions`, `create_failure_bundle`, `execute_action`, `execute_action_with_vars`, `failure_bundle_on_error`, `generate_code`, `run_diagnostics`. |
 | Main CLI | `je_auto_control` → `je_auto_control.cli:main` | Subcommands `run` (`--var`, `--dry-run`), `validate` / `lint`, `fmt`, `list-commands`, `record`, `codegen`, `failure-bundle`, `list-jobs`, `start-server`, `start-rest`, `version`. |
 | Legacy CLI | `python -m je_auto_control` (`__main__.py`) | Private `_main()` owns dispatch and error conversion. `-e/--execute_file FILE`, `-d/--execute_dir DIR`, `-c/--create_project PATH`, `--execute_str JSON`. `--execute_str` also accepts a double-encoded JSON string. Any error exits 1 with a log line rather than a traceback, and a `-d` path that is not a directory is an error. |
-| MCP server | `je_auto_control_mcp` → `utils/mcp_server/__main__.py:main` | stdio; `start_mcp_stdio_server()`; HTTP transport via the `AC_start_mcp_http_server` command. |
+| MCP server | `je_auto_control_mcp` → `utils/mcp_server/__main__.py:main` | stdio; `start_mcp_stdio_server()`; HTTP transport via the `AC_start_mcp_http_server` command. Over HTTP a `resources/subscribe` belongs to its session and its updates go down that session's GET stream. |
 | REST API | `je_auto_control start-rest`, `python -m je_auto_control.utils.rest_api`, `start_rest_api_server()` | Default `127.0.0.1:9939`, bearer token + rate limit. |
 | TCP server | `je_auto_control start-server [--token T] [--token-file PATH] [--no-auth]`, `start_autocontrol_socket_server()`; client `send_socket_command()` | `utils/socket_server/auto_control_socket_server.py`, default `127.0.0.1:9938`, JSON action lists. Authenticated by default (`utils/socket_server/socket_auth.py`): each connection opens with `AUTH <token>` (answered `AUTH_OK`); the server token comes from the argument, `JE_AUTOCONTROL_SOCKET_TOKEN` or is generated, and is written owner-only to `~/.je_auto_control/socket_server_<port>.token`. Under RBAC only user tokens authenticate and each command runs under that user's role. `--no-auth` restores the unauthenticated protocol. |
 | pytest plugin | `pytest11` entry point `je_auto_control_pytest` (top-level module, imports only pytest; `je_auto_control.utils.pytest_plugin` re-exports it) | Loaded automatically once the package is installed, without importing the package (see coverage rule in §7). |
@@ -724,7 +724,10 @@ action.json → utils/json/json_file.read_action_json
 ```
 
 Errors of the `AutoControlException` family are recorded, not raised (unless `raise_on_error=True`);
-`AutoControlAssertionException` always propagates. Every path that runs an action file from disk (`execute_files`,
+an error from outside it (`cv2.error`, `sqlite3.Error`, a plugin's own class) is wrapped at the innermost action
+as `AutoControlForeignException` (`utils/executor/containment.py`, original as `__cause__`) and recorded the same way.
+`AutoControlAssertionException` and a plugin's `AssertionError` always propagate, as do loop signals, stops,
+cancellation and `KeyboardInterrupt` / `SystemExit`. Every path that runs an action file from disk (`execute_files`,
 the CLI, the scheduler, triggers, hotkeys, webhooks, the MCP run tool, the GUI) loads it with
 `read_executable_action_json`, which reads it once and verifies those bytes against the `.sig` sidecar when
 `JE_AUTOCONTROL_REQUIRE_SIGNED_ACTIONS` is set (`utils/action_signing/`).

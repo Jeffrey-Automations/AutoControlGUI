@@ -90,6 +90,7 @@ ac.send_socket_command("quit_server", port=9938, token="<RBAC 下某位 admin �
 ```
 
 自行打开 socket 的客户端可用 `read_socket_token(port)` 与 `authenticate_connection(connection, stream, token)`。现有客户端必须先发送 `AUTH <token>` 并在读取回复前读掉 `AUTH_OK` 那一行，或改以 `--no-auth` 启动服务器。
+**HTTP 上的 resource 订阅。** 在 MCP 的 HTTP 传输上，握手时代的 `resources/subscribe` 属于发送它的 session：请带上 `initialize` 返回的 `Mcp-Session-Id`，并打开该 session 常驻的 `GET` 流（`Accept: text/event-stream`）来接收 `notifications/resources/updated`。每个 session 各自持有订阅；session 没有打开流时到达的更新会被丢弃；结束 session（`DELETE`、空闲清除或被挤出）会释放它们。没有 session 的请求没有可送达的流，所以 `resources/subscribe` 以 JSON-RPC 错误 `-32600` 拒绝，而不是返回 `{}`。无状态 2026-07-28 的客户端使用 `subscriptions/listen`；stdio 传输不变。
 
 MCP 窗口状态工具 `ac_window_minimize`、`ac_window_maximize` 与 `ac_window_restore` 在后端接受请求时返回窗口 handle，被拒绝时回复 `isError: true`（包括 handle 失效或激活请求被拒）。Win32 原始 `ShowWindow` 的先前可见性由后端规范化处理。
 

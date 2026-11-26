@@ -27,11 +27,11 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,625 |
-| 程式碼總行數 | 253,601 |
+| Python 模組總數（含周邊子專案） | 1,626 |
+| 程式碼總行數 | 253,784 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
-| 套件門面 `__all__` 公開名稱數 | 1511 |
+| 套件門面 `__all__` 公開名稱數 | 1513 |
 | GUI 分頁數（`main_widget` 註冊） | 51 |
 | MCP 工具數（`build_default_tool_registry()` 實測） | 823 |
 | `test_*.py` 測試檔／測試函式 | 846 / 8,825 |
@@ -100,7 +100,7 @@ USB/IP 協定、Prometheus 指標），以維持這條輕相依基線。
 | 模式 | 落點 | 說明 |
 | --- | --- | --- |
 | **Strategy** | `wrapper/platform_wrapper.py` | 依 `sys.platform` 只匯入當前 OS 的 `keyboard`／`mouse`／`screen`／`recorder` 實作；Linux 再細分 Wayland／X11，Wayland 後端不可用時自動退回 XWayland 並記警告。新增平台不需要改 wrapper。 |
-| **Facade** | `je_auto_control/__init__.py` | 把 1511 個公開名稱集中再匯出，使用者只 `import je_auto_control`。`api/core.py` 另提供一個小而穩定的版本化門面（7 個名稱）給新整合使用。 |
+| **Facade** | `je_auto_control/__init__.py` | 把 1513 個公開名稱集中再匯出，使用者只 `import je_auto_control`。`api/core.py` 另提供一個小而穩定的版本化門面（7 個名稱）給新整合使用。 |
 | **Command** | `utils/executor/action_executor.py` | `Executor.event_dict` 是字串 → callable 的分派表；JSON 動作檔即指令序列，因此可錄製、序列化、重播、簽章。 |
 | **Observer** | `utils/callback/`、`utils/observer/`、`utils/triggers/` | 動作完成後觸發回呼；畫面出現／消失／變化與外部事件（webhook／IMAP／檔案）驅動腳本。 |
 | **Template Method** | `utils/generate_report/` | HTML／JSON／XML 三個產生器共用「收集紀錄 → 格式化 → 寫檔」骨架，各自實作渲染。 |
@@ -129,8 +129,10 @@ action.json ─► utils/json/json_file.read_action_json
 ```
 
 錯誤處理原則：`AutoControlException` 家族在此被「收納」成紀錄而非中止整份腳本；
-但 `AutoControlAssertionException`（`AC_assert_*` 失敗）即使在 `raise_on_error=False` 下仍會往上拋，
-確保斷言不會被靜默吃掉。從磁碟執行動作檔的路徑（`execute_files`、CLI、排程器、觸發器、熱鍵、
+家族之外的錯誤（`cv2.error`、`sqlite3.Error`、外掛自訂的例外）在最內層動作由 `containment.call_contained`
+包成 `AutoControlForeignException`（原例外是 `__cause__`），所以同樣被記成該動作的失敗，`AC_try`／`AC_retry`／`AC_parallel` 也照常處理；
+但 `AutoControlAssertionException`（`AC_assert_*` 失敗）與外掛自己的 `AssertionError` 即使在 `raise_on_error=False` 下仍會往上拋，
+確保斷言不會被靜默吃掉；迴圈訊號、停止、取消與 `KeyboardInterrupt`／`SystemExit` 也從不收納。從磁碟執行動作檔的路徑（`execute_files`、CLI、排程器、觸發器、熱鍵、
 webhook、MCP 執行工具、GUI）都經 `read_executable_action_json` 載入：檔案只讀一次，
 設定 `JE_AUTOCONTROL_REQUIRE_SIGNED_ACTIONS` 時就以這份位元組對 `.sig` 驗簽，再解析同一份位元組。
 
@@ -166,9 +168,9 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
-| `je_auto_control/__init__.py` | 2,749 | **套件門面**。按首次存取解析 1511 個公開名稱，具體型別宣告與 `__all__` 保留原始來源及順序。 |
+| `je_auto_control/__init__.py` | 2,752 | **套件門面**。按首次存取解析 1513 個公開名稱，具體型別宣告與 `__all__` 保留原始來源及順序。 |
 | `je_auto_control/_lazy_exports.py` | 29 | 公開名稱的來源屬性／模組繫結與首次存取解析；保留並行的明確指派。 |
-| `je_auto_control/_export_bindings.py` | 1,848 | 由具體型別宣告產生的公開名稱來源查表；CI 檢查產生結果與順序。 |
+| `je_auto_control/_export_bindings.py` | 1,850 | 由具體型別宣告產生的公開名稱來源查表；CI 檢查產生結果與順序。 |
 | `je_auto_control/__main__.py` | 107 | 舊版 argparse 進入點：`-e` 執行單檔、`-d` 執行整個目錄、`--execute_str` 執行 JSON 字串、`-c` 建立專案。 |
 | `je_auto_control/cli.py` | 470 | **主 CLI**（`je_auto_control` console script）。子命令：`run`（含 `--var`／`--dry-run`／`--journal`）、`journal`（依 run 篩選與有界遮罩快照）、`validate`／`lint`、`list-commands`、`fmt`、`record`、`codegen`、`failure-bundle`、`list-jobs`、`start-server`（`--token`／`--token-file`／`--no-auth`）、`start-rest`、`version`。所有子命令延遲匯入，確保不碰 Qt。 |
 | `je_auto_control/api/__init__.py` | 100 | 版本化整合進入點。 |
@@ -294,7 +296,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 19,998 行。
+> 25 個套件、約 20,037 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -306,7 +308,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/decision_table/` | 112 | DMN 風格決策表：規則 + 命中策略，把分支外部化 |
 | `utils/deterministic/` | 116 | 決定性執行控制：固定亂數種子 + 凍結時鐘 |
 | `utils/action_journal/` | 866 | 結構化動作日誌：schema v1、寫入前遮罩、跨行程排序／尾端復原、executor 明確 scope 擷取與本機 parallel／DAG parent 傳遞；門面、AC／MCP、Script Builder 與 CLI 擷取／有界查閱；observer／路徑政策隨巢狀根與 workers 保留，Run History 查閱與手動 history 關聯共用相同來源。 |
-| `utils/executor/` | 10,926 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
+| `utils/executor/` | 10,963 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
 | `utils/flow_debugger/` | 166 | action list 的單步除錯器與追蹤器 |
 | `utils/input_macro/` | 490 | 定時輸入事件：錄製結果的整形（`timeline`／`InputRecorder`，Windows 與 macOS 共用）、重播與宣告式輸入序列 DSL |
 | `utils/json/` | 99 | action JSON 檔讀寫與正規化格式化（`fmt --check` 的後端） |
@@ -319,14 +321,14 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/saga/` | 115 | Saga 協調器：失敗時以 LIFO 補償動作回滾 |
 | `utils/script_vars/` | 377 | 執行期變數作用域、插值與 context-local vault guard；受管操作拒絕隱式秘密存取 |
 | `utils/skill_library/` | 145 | 具名可重用 action 序列（skill）的持久化倉庫 |
-| `utils/state_machine/` | 304 | 宣告式有限狀態機驅動 action JSON；預設動作跨狀態共享單次執行範圍 |
+| `utils/state_machine/` | 306 | 宣告式有限狀態機驅動 action JSON；預設動作跨狀態共享單次執行範圍 |
 | `utils/stubs/` | 325 | 為 `AC_*` 指令面產生型別 stub |
 | `utils/test_record/` | 72 | 全域測試紀錄單例，記錄每個動作的參數與例外 |
 | `utils/work_queue/` | 290 | 交易式工作佇列（dispatcher／performer），支撐大量批次執行 |
 
 ### 5.4.2 框架基礎設施
 
-> 15 個套件、約 6,245 行。
+> 15 個套件、約 6,274 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -335,7 +337,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/critical_exit/` | 132 | 監看緊急停止鍵的守護執行緒，用於中止失控腳本 |
 | `utils/diagnostics/` | 370 | 跨子系統的「一切正常嗎」健檢，附 `python -m` 進入點 |
 | `utils/dbus_client/` | 827 | 只用標準函式庫的 D-Bus session bus 客戶端。原本在 `linux_wayland/` 為 portal 交握而寫，AT-SPI 無障礙後端成為第二個使用者後搬到這裡（`utils/` 在分層上在各 OS 套件之上） |
-| `utils/exception/` | 377 | **例外階層根**。框架錯誤繼承 `AutoControlException`；`control_signals.py` 共用無 executor 相依的取消載體／分類，保留 MCP 與 history 舊匯入別名；`cancellation.py` 提供 Qt-free 協作式 token 與 immutable progress；另有集中式錯誤訊息（`exception_tags`）。 |
+| `utils/exception/` | 406 | **例外階層根**。框架錯誤繼承 `AutoControlException`（影像搜尋的「不在畫面上」是 `ImageNotFoundException`，輸入不能用是同層的 `ImageSearchInputException`；executor 收納家族外錯誤用的是 `AutoControlForeignException`）；`control_signals.py` 共用無 executor 相依的取消載體／分類，保留 MCP 與 history 舊匯入別名；`cancellation.py` 提供 Qt-free 協作式 token 與 immutable progress；另有集中式錯誤訊息（`exception_tags`）。 |
 | `utils/failure_bundle/` | 232 | 可攜、已遮蔽的失敗診斷 ZIP（截圖 + 診斷 + log 尾段） |
 | `utils/file_process/` | 40 | 目錄檔案列舉（`execute_dir` 的後端） |
 | `utils/logging/` | 359 | `autocontrol_logger`、共用 handler、executor／CLI／REST／MCP／背景 run 的 vault 值遮罩與持久化診斷快照 |
@@ -348,18 +350,18 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.3 排程、觸發與背景監看
 
-> 11 個套件、約 4,517 行。
+> 11 個套件、約 4,527 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/hotkey/` | 879 | 全域熱鍵守護行程，把 OS 層熱鍵綁到 action 檔（Win/macOS/X11 三後端） |
 | `utils/idle_keepawake/` | 245 | 偵測使用者閒置時間並在無人值守執行期間阻止系統睡眠 |
 | `utils/lock_session/` | 200 | 鎖定工作站、等待解鎖並分類鎖定狀態轉換 |
-| `utils/observer/` | 270 | 反應式畫面觀察者；每條規則涵蓋 predicate／handler 的秘密遮罩與隔離 |
+| `utils/observer/` | 276 | 反應式畫面觀察者；每條規則涵蓋 predicate／handler 的秘密遮罩與隔離 |
 | `utils/recurrence/` | 482 | RFC 5545 重複規則解析與發生時間展開 |
 | `utils/scheduler/` | 512 | 間隔式與 cron 式的 action JSON 排程器 |
 | `utils/session_guard/` | 62 | 驅動輸入前先偵測工作階段是否已鎖定／非互動 |
-| `utils/triggers/` | 1,446 | 事件驅動觸發引擎：影像／視窗／像素／檔案／webhook／IMAP 郵件 |
+| `utils/triggers/` | 1,450 | 事件驅動觸發引擎：影像／視窗／像素／檔案／webhook／IMAP 郵件 |
 | `utils/voice/` | 99 | 語音指令路由：把辨識到的語句對應到 `AC_*` action list |
 | `utils/watchdog/` | 232 | 背景彈窗／中斷看門狗；每條規則涵蓋 matcher／action 與錯誤日誌的秘密遮罩 |
 | `utils/watcher/` | 90 | 無頭輪詢原語：滑鼠位置、像素顏色、log tail |
@@ -395,7 +397,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.5 影像辨識與畫面分析
 
-> 37 個套件、約 6,645 行。
+> 37 個套件、約 6,661 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -405,7 +407,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/color_region/` | 106 | 以顏色定位畫面區域（遮罩 + 連通元件） |
 | `utils/color_stats/` | 103 | 區域顏色統計：平均色與主色 |
 | `utils/coordinate_space/` | 93 | 模型網格座標與實體像素之間的座標空間對映 |
-| `utils/cv2_utils/` | 1,106 | OpenCV 基礎層：擷取後端選擇（`screen_grabber`，Pillow／mss 或平台後端）、截圖、`[left, top, right, bottom]` 區域擷取（`region_capture`，Windows 經 `grab_logical` 涵蓋所有螢幕）、樣板比對（走 `grab_logical`，涵蓋所有螢幕）、螢幕錄影、影片錄製（兩者都經 `frame_clock` 依 fps 配速）、連通元件、影像堆疊的取用口（`optional`，Windows arm64 沒有 wheel 時語意報錯）、非 ASCII 路徑也讀寫得到的影像檔存取（`image_file`） |
+| `utils/cv2_utils/` | 1,122 | OpenCV 基礎層：擷取後端選擇（`screen_grabber`，Pillow／mss 或平台後端）、截圖、`[left, top, right, bottom]` 區域擷取（`region_capture`，Windows 經 `grab_logical` 涵蓋所有螢幕）、樣板比對（走 `grab_logical`，涵蓋所有螢幕）、螢幕錄影、影片錄製（兩者都經 `frame_clock` 依 fps 配速）、連通元件、影像堆疊的取用口（`optional`，Windows arm64 沒有 wheel 時語意報錯）、非 ASCII 路徑也讀寫得到的影像檔存取（`image_file`） |
 | `utils/edge_lines/` | 131 | 以 Hough 轉換偵測線條／格線／分隔線 |
 | `utils/edge_match/` | 118 | 邊緣形狀（Chamfer／距離轉換）樣板比對 |
 | `utils/feature_match/` | 146 | ORB 特徵比對：在旋轉／縮放／主題變更下定位樣板 |
@@ -488,13 +490,13 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.8 元素定位、自我修復與智慧等待
 
-> 23 個套件、約 6,367 行。
+> 23 個套件、約 6,368 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/ab_locator/` | 389 | A/B 定位器框架：同時競速 N 種策略並記錄各自勝率 |
 | `utils/adaptive_timeout/` | 92 | 由觀測到的步驟耗時推導等待逾時，而非硬猜 |
-| `utils/anchor_locator/` | 476 | 錨點定位器：以空間關係組合 影像／OCR／VLM／a11y 四種來源 |
+| `utils/anchor_locator/` | 477 | 錨點定位器：以空間關係組合 影像／OCR／VLM／a11y 四種來源 |
 | `utils/app_idle/` | 113 | 等應用程式不再忙碌，再驅動下一步 |
 | `utils/change_localize/` | 83 | 把畫面變化歸因到實際改變的元素框 |
 | `utils/critic_features/` | 88 | 每步的 critic 特徵集合與規則式步驟評分 |
@@ -518,7 +520,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 61,101 行。
+> 14 個套件、約 61,177 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -532,7 +534,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cua_action/` | 204 | 標準化 computer-use 動作結構（Anthropic／OpenAI → `AC_*`） |
 | `utils/llm/` | 396 | 自然語言 → action list 規劃器 + Anthropic／null 後端；規劃執行隔離頂層變數並沿用巢狀範圍 |
 | `utils/mcp_registry/` | 97 | MCP registry `server.json` 資訊清單產生（可被發現） |
-| `utils/mcp_server/` | 22,489 | **無頭 MCP 伺服器**（預設註冊 823 個工具＝804 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
+| `utils/mcp_server/` | 22,565 | **無頭 MCP 伺服器**（預設註冊 823 個工具＝804 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
 | `utils/tool_use_schema/` | 194 | 把 `AC_*` 指令匯出成 Claude／OpenAI 的 tool-use schema |
 | `utils/trajectory_eval/` | 132 | agent 軌跡評估：依評分規準為一次執行打分 |
 | `utils/vision/` | 668 | VLM 元素定位器（依描述找元素）+ Anthropic／OpenAI／null 後端 |
@@ -595,13 +597,13 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.12 報表、可觀測性與測試治理
 
-> 34 個套件、約 8,052 行。
+> 34 個套件、約 8,056 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/anomaly/` | 114 | 單一序列異常偵測 |
 | `utils/approval/` | 131 | Approval testing：以核可基準線驗證產出物 |
-| `utils/assertion/` | 910 | 斷言 DSL：畫面狀態驗證 + 組合子 |
+| `utils/assertion/` | 914 | 斷言 DSL：畫面狀態驗證 + 組合子 |
 | `utils/baggage/` | 123 | W3C Baggage 傳遞 |
 | `utils/canonical_log/` | 96 | canonical log line 與結構化 JSON 日誌 |
 | `utils/ci_annotations/` | 65 | 由執行結果輸出 CI 工作流程註記（GitHub Actions） |
@@ -753,20 +755,21 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_window.py` | 65 | Query a specified HWND's current owner and child windows without activation or input. |
 | `windows_native.py` | 113 | Typed Win32 query/read bindings and caller-sized memory information layouts. |
 
-#### `utils/executor/`（10,926 行）— 執行核心
+#### `utils/executor/`（10,963 行）— 執行核心
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
-| `action_executor.py` | 8,727 | `Executor` 類別與 `event_dict` 分派表（774 個指令），另含數百個把 utils 能力接成指令的 adapter 函式；全域單例 `executor` 與 `add_command_to_executor()` 擴充點。 |
+| `action_executor.py` | 8,729 | `Executor` 類別與 `event_dict` 分派表（774 個指令），另含數百個把 utils 能力接成指令的 adapter 函式；全域單例 `executor` 與 `add_command_to_executor()` 擴充點。 |
 | `flow_control.py` | 727 | 真正的流程控制：`AC_loop`／`AC_for_each`／`AC_while_*`／`AC_if_*`／`AC_try`／`AC_retry`／`AC_parallel`／`AC_define_macro`／`AC_call_macro`／變數指令（`AC_set_var`／`AC_get_var`／`AC_inc_var`）。`LoopBreak`／`LoopContinue` 以例外實作。34 個區塊指令的分派表 `BLOCK_COMMANDS` 也在這裡，含下一列匯入的資料來源指令。 |
 | `flow_data_commands.py` | 275 | `AC_*_to_var` 資料來源與轉換指令：shell、時鐘、亂數、PDF、TOTP、SQL、檔案、HTTP、OCR，加上 `AC_assert_var`／`AC_assert_db`／`AC_assert_duration`／`AC_transform_var`。都不執行巢狀 action list，所以沒有迴圈／分支語意。 |
 | `action_schema.py` | 225 | action list 的結構驗證：形狀、參數型別、未知指令拒絕。單一走訪同時支援兩種消費方式：`validate_actions()` 遇到第一個問題就拋、`unknown_command_names()` 收齊全部不認得的名字（REST `/execute` 用它回 400）。 |
 | `action_redaction.py` | 227 | 記錄與紀錄鍵用的遮蔽：`AC_secret_*` 的參數（金庫通行碼、機密值）在寫進 log、當成結果紀錄的鍵之前換成 `***`，巢狀在區塊指令裡的也一樣。 |
 | `adapter_args.py` | 34 | executor adapter 共用的參數檢查：JSON 字串必須解成清單、門檻必須是有限數字。 |
 | `mouse_aliases.py` | 40 | 單鍵點擊別名（`AC_click_left` 等），executor 與 callback executor 共用。 |
+| `containment.py` | 35 | Bring an error from outside the framework family into the executor's per-action containment. |
 | `flags.py` | 19 | 旗標讀取 `as_bool`：依拼法（`"true"`／`"yes"`／`"on"`／`"1"`）而非 Python 真值判斷，所以 JSON、CLI、MCP 傳來的 `"false"` 是關；所有 adapter 與流程指令共用。 |
 
-#### `utils/mcp_server/`（22,489 行，823 個工具）— 最大子系統
+#### `utils/mcp_server/`（22,565 行，823 個工具）— 最大子系統
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -800,9 +803,9 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `tools/_handlers_vision_executor.py` | 564 | 70 個領域委派；保留函式內 executor 匯入、參數預設與轉送契約，使用 strict typing。 |
 | `tools/_handlers_locators.py` | 449 | 同一種 adapter，定位主題：無障礙樹、智慧等待、自我修復、螢幕觀察、座標空間、視覺與 OCR、影像去重、元件倉庫、A/B 定位。 |
 | `tools/_handlers_operations.py` | 709 | 同一種 adapter，營運主題：agent 與其記憶／追蹤、治理與合規、成本與遙測、失敗掛鉤、看門狗、速率限制、檢查點、核可、產物與資產、測試選擇與分片、佇列與 saga。 |
-| `server.py` | 637 | JSON-RPC 2.0 over stdio 的最小 MCP 伺服器：連線範圍狀態、行內／併發分派、resource／prompt 處理器；`tools/call` 的准入、執行與稽核在 `_tool_calls.py`；握手時代的方法表（`_run_method`），兩個協定時代的逐請求分派在 `_stateless.py`；工具清單／session profile 在 `_disclosure_server.py`。 |
+| `server.py` | 640 | JSON-RPC 2.0 over stdio 的最小 MCP 伺服器：連線範圍狀態、行內／併發分派、resource／prompt 處理器；`tools/call` 的准入、執行與稽核在 `_tool_calls.py`；握手時代的方法表（`_run_method`），兩個協定時代的逐請求分派在 `_stateless.py`；工具清單／session profile 在 `_disclosure_server.py`。 |
 | `_tool_calls.py` | 239 | `tools/call` 路徑（`ToolCallMixin`）：請求、RBAC、揭露目錄、schema、參數政策、限流與破壞性確認的准入，以 `ToolCallContext` 執行、寫稽核並轉成結果；失敗截圖在呼叫時才向 `server` 取 `_capture_error_screenshot`。 |
-| `http_transport.py` | 642 | MCP 的 HTTP 傳輸；宣告 2026-07-28 的請求走 `_http_stateless.py` 的標頭規則，不發 session。 |
+| `http_transport.py` | 664 | MCP 的 HTTP 傳輸；宣告 2026-07-28 的請求走 `_http_stateless.py` 的標頭規則，不發 session。伺服器本身是 resource sink：`resources/updated` 只送給仍存活、有 GET 串流的 session。 |
 | `_http_stateless.py` | 185 | MCP 2026-07-28 在 Streamable HTTP 上的規則：`MCP-Protocol-Version`／`Mcp-Method`／`Mcp-Name` 必須與 body 相符（`=?base64?…?=` 先解碼），不符是 400＋`HeaderMismatch`；版本與中繼資料錯誤 400、未知方法 404。純函式，由 `http_transport.py` 回覆。 |
 | `http_sessions.py` | 301 | MCP 的 HTTP 傳輸用的 session 身分:`Mcp-Session-Id` 註冊表,以及每個 session 那條常駐的 server→client SSE 串流。 |
 | `_call_authority.py` | 31 | Bind anonymous MCP sessions to operator authority across direct and nested tool calls. |
@@ -811,7 +814,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `_client_requests.py` | 281 | 伺服器主動送出的請求：`roots/list`／`elicitation/create`／`sampling/createMessage`,對應表與回應路由,以及破壞性工具的確認交握。只屬於握手時代：無狀態請求裡送出會丟例外。 |
 | `_stateless.py` | 267 | MCP 2026-07-28 無狀態版本，與以 `initialize` 握手的版本並存：逐請求的 `_meta`（版本、client 能力、`logLevel`）、`server/discover`、結果的 `resultType`／`serverInfo`／快取提示、`-32020`～`-32022` 錯誤碼，以及兩個時代逐請求分派的 mixin。 |
 | `_input_required.py` | 162 | 多輪往返請求（MRTR）：`input_required` 結果，與 HMAC 簽章、會過期、只兌換一次的 `requestState`；破壞性工具確認在無狀態請求裡的形式。 |
-| `_subscriptions.py` | 297 | 變更通知：握手時代的 `resources/subscribe`／`unsubscribe` 與未經訂閱的 `resources/updated`、`tools/list_changed`（不送給無狀態的對端）；2026-07-28 的 `subscriptions/listen`：確認、以訂閱 id 標記的通知、取消與伺服器結束時的完成回覆。 |
+| `_subscriptions.py` | 348 | 變更通知：握手時代的 `resources/subscribe`／`unsubscribe`（以連線為鍵；HTTP 上屬於發出它的 session，更新經傳輸註冊的 resource sink 送到該 session 的常駐 GET 串流，沒有 session 的請求回 -32600）與未經訂閱的 `resources/updated`、`tools/list_changed`（不送給無狀態的對端）；2026-07-28 的 `subscriptions/listen`：確認、以訂閱 id 標記的通知、取消與伺服器結束時的完成回覆。 |
 | `_protocol.py` | 243 | JSON-RPC 線路格式：版本與識別常數、`_MCPError`、決定失敗工具行為的錯誤 tuple、envelope 產生器、工具回傳值轉 `content` 區塊。不碰伺服器狀態。 |
 | `resources.py` | 308 | MCP resource 提供者。 |
 | `prompts.py` | 220 | MCP prompt 目錄。 |
@@ -938,7 +941,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `socket_auth.py` | 175 | Who may talk to the TCP socket server: its token, its file and the RBAC users. 伺服器 token、`~/.je_auto_control/socket_server_<port>.token`（僅擁有者可讀）、沿用 `RestAuthGate` 的失敗限流。 |
 | `socket_client.py` | 94 | Client for the TCP socket server: authenticate, send one command, read the reply. `send_socket_command`／`read_socket_token`／`authenticate_connection`。 |
 
-#### `utils/cv2_utils/`（1,106 行）— 擷取、影像與共用定位 frame
+#### `utils/cv2_utils/`（1,122 行）— 擷取、影像與共用定位 frame
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -952,7 +955,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cv2_utils/screen_grabber.py` | 229 | One place that decides how this platform's pixels are read. |
 | `utils/cv2_utils/screen_record.py` | 127 | Internal image/capture utilities. |
 | `utils/cv2_utils/screenshot.py` | 95 | Internal image/capture utilities. |
-| `utils/cv2_utils/template_detection.py` | 198 | Locate a template image on screen, in the coordinates the mouse takes. |
+| `utils/cv2_utils/template_detection.py` | 214 | Locate a template image on screen, in the coordinates the mouse takes. |
 | `utils/cv2_utils/video_recording.py` | 76 | Internal image/capture utilities. |
 
 #### `utils/config_sync/`（8,669 行）— 持久化、因果模型與本機重送
@@ -1598,6 +1601,13 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 **例外設計**（`utils/exception/exceptions.py`）：所有框架錯誤都繼承 `AutoControlException`，
 讓 executor、背景輪詢迴圈、請求處理器與 GUI slot 這四種收納邊界能用單一 `except` 攔住整個家族。
 **不可**新增直接繼承 `Exception` 的兄弟類別——那會靜默逃出每一道邊界。
+框架管不到的第三方例外（`cv2.error`、`sqlite3.Error`、外掛自訂類別）由 executor 的逐動作邊界
+包成 `AutoControlForeignException` 再收納（`utils/executor/containment.py`），不必在每個 adapter 加型別。
+`ImageSearchInputException` 刻意是 `ImageNotFoundException` 的**兄弟**而非子類別、也不帶內建基底：
+範本不存在或讀不出、單色範本、門檻超出 0–1 或 NaN、OpenCV 無法比對的影像都屬於「搜尋沒跑」，
+既有把 `ImageNotFoundException` 當成「不在畫面上」的 `except`（`AC_assert_image(present=False)`、`AC_wait_image_gone`、
+`AC_if_image_found` 的 else 分支）因此不會再把打錯的範本路徑當成通過；把整個家族當不存在的觸發器、觀察器、
+狀態機守衛與 anchor locator 則明確重新拋出。
 
 **「按下 → 放開」之間的失敗必須走 `finally`，不能靠 `except`**（2026-09-09）。
 `auto_control_keyboard` 的 `hotkey` 與 `type_keyboard` 原本是「按下，然後放開」而中間
@@ -1631,27 +1641,27 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
 | `gui/` | 171 | 46,385 |
-| `utils/mcp_server/` | 63 | 22,489 |
+| `utils/mcp_server/` | 63 | 22,565 |
 | `utils/remote_desktop/` | 77 | 17,407 |
-| `utils/executor/` | 12 | 10,926 |
+| `utils/executor/` | 13 | 10,963 |
 | `utils/usb/` | 22 | 5,558 |
-| `je_auto_control/`（頂層 3 檔） | 5 | 5,203 |
+| `je_auto_control/`（頂層 3 檔） | 5 | 5,208 |
 | `utils/accessibility/` | 17 | 3,524 |
-| `wrapper/` | 25 | 6,101 |
+| `wrapper/` | 25 | 6,104 |
 | `windows/` | 24 | 2,405 |
 | `utils/rest_api/` | 8 | 2,276 |
 | `utils/agent/` | 13 | 2,268 |
 | `linux_with_x11/` | 19 | 1,382 |
 | `linux_wayland/` | 25 | 4,503 |
-| `utils/triggers/` | 4 | 1,446 |
+| `utils/triggers/` | 4 | 1,450 |
 | `utils/ocr/` | 10 | 1,398 |
 | `utils/usbip/` | 5 | 1,016 |
-| `utils/assertion/` | 3 | 910 |
+| `utils/assertion/` | 3 | 914 |
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,044 |
-| **總計** | **1,613** | **252,852** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,098 |
+| **總計** | **1,614** | **253,035** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

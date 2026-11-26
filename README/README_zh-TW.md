@@ -89,6 +89,12 @@ MCP 唯讀標記不授予 viewer 存取權。已審查的即時畫面與呼叫�
 
 MCP 的 `tools/call` 以可停止的執行進行，列為 `mcp-…`。`notifications/cancelled` 會停掉它：`ac_execute_actions` 的動作清單在下一個動作前停下，`ac_wait_for_image`／`ac_wait_for_pixel` 在輪詢中途醒來；該次呼叫以 `-32800` 回覆。`ac_stop_execution` 與其他停止請求以同樣方式結束它，回報為工具錯誤。已經進到後端的單一指令仍會先跑完；例外的是擷取輸出的 shell 指令（`ac_shell`、`AC_shell_to_var`），它的行程樹會被結束；HTTP 請求（`AC_http_request`、`ac_http_request` 與其他走共用 HTTP client 的呼叫），它的 socket 會被關閉；以及一次範本比對、OCR、VLM 定位請求或唯讀無障礙樹走訪，呼叫不再等它（原生運算或請求在背景跑完、結果丟棄）；這些呼叫都隨即結束。單一手勢內的節奏等待也會醒來：`click_mouse` 連點之間的間隔、補間拖曳的每步與穩定停頓（按鍵在游標停下的位置放開），以及擬人移動與擬人打字的每步、每鍵延遲。
 
+影像搜尋無法使用輸入時拋出 `ImageSearchInputException`：範本不存在或讀不出、範本是單一顏色、門檻超出 0–1、是 NaN 或不是數字，或 OpenCV 無法比對的影像。`ImageNotFoundException` 現在只代表搜尋跑過、範本不在畫面上。兩者是兄弟而非父子，所以 `AC_assert_image` 加 `present: false`、`AC_wait_image_gone` 與 `AC_if_image_found` 的 `else` 分支遇到打錯的範本路徑會失敗，不再通過；用這種範本的影像觸發器會被停用並記錄，觀察者規則、狀態機守衛與 anchor locator 則會拋出例外。原本攔 `ImageNotFoundException` 來處理錯誤路徑的程式碼，必須同時攔 `ImageSearchInputException`。
+
+指令拋出框架家族以外的錯誤（`cv2.error`、`sqlite3.Error`、外掛自訂的例外類別）時，不再中止整份動作清單：它被記成該動作的失敗，包成 `AutoControlForeignException`（原例外是它的 `original` 與 `__cause__`），`AC_try`、`AC_retry`、`AC_loop` 與 `AC_parallel` 都把它當成一般的失敗動作。`raise_on_error=True` 時拋出的是這個包裝。從不收納的有：斷言失敗（`AutoControlAssertionException` 與外掛自己的 `AssertionError`）、`AC_break`／`AC_continue`、停止請求、取消、`KeyboardInterrupt` 與 `SystemExit`。
+
+在 MCP 的 HTTP 傳輸上，`resources/subscribe` 屬於送出它的 session（`initialize` 回傳的 `Mcp-Session-Id`），`notifications/resources/updated` 經該 session 常駐的 `GET` 串流送達；沒有串流開著時到達的更新會被丟棄。結束 session 會釋放它的訂閱。沒有 session 的請求沒有可送達的串流，會以 `-32600` 拒絕。stdio 傳輸不變。
+
 REST 主機資料讀取與對應 MCP 權限一致：排程、遠端 session、USB passthrough 狀態、loopback／remote 裝置清單及診斷需要 `read_data`。對應已註冊的狀態指令、`AC_probe_capabilities` 與 `AC_diagnose` 會在執行提供者之前檢查權限。唯讀標記不授予 viewer 存取權；operator／admin 仍可使用。USB 列舉／事件、保留的 inspector 統計與程序 metrics 也需要 `read_data`；`AC_list_usb_devices`、`AC_usb_recent_events`、`AC_inspector_recent`、`AC_inspector_summary` 同樣檢查此權限。Dashboard 各面板分別顯示缺少的權限並清除舊資料；session 重新整理成功後也會清除先前的錯誤狀態。未列入權限表格的 executor 指令仍屬另一項審查範圍。
 
 主機唯讀模式對外部提供的目錄及後續註冊套用相同限制，接收請求及重新核對身分後的呼叫都檢查混合用途參數。MCP 設定的失敗截圖需要可寫入的工具及重新核對後具輸入操作權限的呼叫者；唯讀呼叫與 viewer 不會觸發截圖。這不表示所有相依套件或診斷讀取均無初始化副作用。

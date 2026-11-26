@@ -69,6 +69,30 @@ Executing a JSON File
 
    execute_action(read_action_json("actions.json"))
 
+Errors and ``raise_on_error``
+=============================
+
+``execute_action`` records a failed action as its ``repr`` and runs the next
+one; ``raise_on_error=True`` raises at the first failure instead. Contained
+this way are the ``AutoControlException`` family and the builtin ``OSError``,
+``RuntimeError``, ``ArithmeticError``, ``AttributeError``, ``TypeError``,
+``ValueError``, ``LookupError`` and ``ImportError``.
+
+A command that raises anything else -- ``cv2.error``, ``sqlite3.Error``, a
+plugin's own exception class -- is wrapped at that action in
+``AutoControlForeignException``, whose ``original`` attribute and
+``__cause__`` hold the original error. It is then recorded like any other
+failure, ``AC_try`` catches it, ``AC_retry`` retries it, ``AC_loop`` records it
+per pass and ``AC_parallel`` records it in its branch. With
+``raise_on_error=True`` the wrapper is what is raised, so code that caught
+``cv2.error`` or ``sqlite3.Error`` around ``execute_action`` should catch
+``AutoControlForeignException`` and read ``original``.
+
+Never contained, whatever ``raise_on_error`` says: assertion failures
+(``AutoControlAssertionException``, and a plugin's own ``AssertionError``),
+``AC_break`` / ``AC_continue``, stop requests (``ExecutionStopped``),
+cancellation, ``KeyboardInterrupt`` and ``SystemExit``.
+
 Executing All JSON Files in a Directory
 =======================================
 

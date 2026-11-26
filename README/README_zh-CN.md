@@ -89,6 +89,12 @@ MCP 只读标记不授予 viewer 访问权限。已审查的实时画面与调�
 
 MCP 的 `tools/call` 以可停止的执行进行，列为 `mcp-…`。`notifications/cancelled` 会停掉它：`ac_execute_actions` 的动作列表在下一个动作前停下，`ac_wait_for_image`／`ac_wait_for_pixel` 在轮询中途醒来；该次调用以 `-32800` 回复。`ac_stop_execution` 与其他停止请求以同样方式结束它，报告为工具错误。已经进入后端的单个指令仍会先执行完；例外的是捕获输出的 shell 指令（`ac_shell`、`AC_shell_to_var`），它的进程树会被结束；HTTP 请求（`AC_http_request`、`ac_http_request` 与其他走共用 HTTP client 的调用），它的 socket 会被关闭；以及一次模板匹配、OCR、VLM 定位请求或只读无障碍树遍历，调用不再等它（原生运算或请求在后台跑完、结果丢弃）；这些调用都随即结束。单个手势内的节奏等待也会醒来：`click_mouse` 连点之间的间隔、补间拖拽的每步与稳定停顿（按键在光标停下的位置松开），以及拟人移动与拟人打字的每步、每键延迟。
 
+图像搜索无法使用输入时抛出 `ImageSearchInputException`：模板不存在或读不出、模板是单一颜色、阈值超出 0–1、是 NaN 或不是数字，或 OpenCV 无法匹配的图像。`ImageNotFoundException` 现在只表示搜索跑过、模板不在画面上。两者是兄弟而非父子，所以 `AC_assert_image` 加 `present: false`、`AC_wait_image_gone` 与 `AC_if_image_found` 的 `else` 分支遇到写错的模板路径会失败，不再通过；使用这种模板的图像触发器会被停用并记录，观察者规则、状态机守卫与 anchor locator 则会抛出异常。原本捕获 `ImageNotFoundException` 来处理错误路径的代码，必须同时捕获 `ImageSearchInputException`。
+
+命令抛出框架家族以外的错误（`cv2.error`、`sqlite3.Error`、插件自定义的异常类）时，不再中止整个动作列表：它被记录为该动作的失败，包装成 `AutoControlForeignException`（原异常是它的 `original` 与 `__cause__`），`AC_try`、`AC_retry`、`AC_loop` 与 `AC_parallel` 都把它当作普通的失败动作。`raise_on_error=True` 时抛出的是这个包装。从不收纳的有：断言失败（`AutoControlAssertionException` 与插件自己的 `AssertionError`）、`AC_break`／`AC_continue`、停止请求、取消、`KeyboardInterrupt` 与 `SystemExit`。
+
+在 MCP 的 HTTP 传输上，`resources/subscribe` 属于发送它的 session（`initialize` 返回的 `Mcp-Session-Id`），`notifications/resources/updated` 经该 session 常驻的 `GET` 流送达；没有流打开时到达的更新会被丢弃。结束 session 会释放它的订阅。没有 session 的请求没有可送达的流，会以 `-32600` 拒绝。stdio 传输不变。
+
 REST 主机数据读取与对应 MCP 权限一致：调度、远程 session、USB passthrough 状态、loopback／remote 设备列表及诊断需要 `read_data`。对应已注册的状态命令、`AC_probe_capabilities` 与 `AC_diagnose` 会在运行提供者之前检查权限。只读标记不授予 viewer 访问权；operator／admin 仍可使用。USB 枚举／事件、保留的 inspector 统计与进程 metrics 也需要 `read_data`；`AC_list_usb_devices`、`AC_usb_recent_events`、`AC_inspector_recent`、`AC_inspector_summary` 同样检查此权限。Dashboard 各面板分别显示缺少的权限并清除旧数据；session 刷新成功后也会清除先前的错误状态。未列入权限表的 executor 命令仍属于另一项审查范围。
 
 主机只读模式对外部提供的目录及后续注册应用相同限制，接收请求及重新核对身份后的调用都检查混合用途参数。MCP 配置的失败截图需要可写入的工具及重新核对后具输入操作权限的调用者；只读调用与 viewer 不会触发截图。这不表示所有依赖包或诊断读取均无初始化副作用。

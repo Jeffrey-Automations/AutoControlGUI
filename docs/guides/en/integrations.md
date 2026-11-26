@@ -92,6 +92,7 @@ ac.send_socket_command("quit_server", port=9938, token="<an admin's token under 
 ```
 
 `read_socket_token(port)` and `authenticate_connection(connection, stream, token)` cover clients that open their own socket. An existing client must send `AUTH <token>` and read the `AUTH_OK` line before its reply, or the server must be started with `--no-auth`.
+**Resource subscriptions over HTTP.** On the MCP HTTP transport a handshake-era `resources/subscribe` belongs to the session that sent it: send the `Mcp-Session-Id` that `initialize` returned, and open that session's standing `GET` stream (`Accept: text/event-stream`) to receive `notifications/resources/updated`. Each session holds its own subscriptions, an update that arrives while the session has no stream open is dropped, and ending the session (`DELETE`, idle sweep or eviction) releases them. A request without a session has no stream to deliver on, so `resources/subscribe` is refused with JSON-RPC error `-32600` rather than answered `{}`. Stateless 2026-07-28 clients use `subscriptions/listen`; the stdio transport is unchanged.
 
 The MCP window-state tools `ac_window_minimize`, `ac_window_maximize` and `ac_window_restore` return the window handle on accepted requests and `isError: true` on backend refusal (including a stale handle or rejected activation). Raw Win32 `ShowWindow` previous visibility is normalized by the backend.
 
