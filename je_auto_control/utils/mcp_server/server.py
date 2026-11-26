@@ -128,7 +128,9 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
         self._default_client_capabilities: Dict[str, Any] = {}
         self._client_caps_by_conn: Dict[Any, Dict[str, Any]] = {}
         self._caps_lock = threading.Lock()
-        self._resource_subscriptions: Dict[str, Any] = {}
+        # Keyed by (connection_id, uri): over HTTP a subscription is its session's.
+        self._resource_subscriptions: Dict[Any, Any] = {}
+        self._resource_sinks: Dict[Any, Any] = {}  # transports that deliver them
         self._subscriptions_lock = threading.Lock()
         self._listeners: Dict[Any, Any] = {}  # open subscriptions/listen, by (connection, id)
         self._listeners_lock = threading.Lock()
@@ -235,6 +237,7 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
         with self._caps_lock:
             self._client_caps_by_conn.pop(connection_id, None)
         self._end_listeners(lambda conn: conn == connection_id, graceful=False)
+        self._drop_resource_subscriptions(connection_id)
         with self._calls_lock:
             stale = [key for key in self._active_calls
                      if isinstance(key, tuple) and key[0] == connection_id]

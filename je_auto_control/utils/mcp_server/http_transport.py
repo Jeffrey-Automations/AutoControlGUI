@@ -501,6 +501,8 @@ class _MCPHttpServer(LocalThreadingHTTPServer):
             on_drop=lambda session: mcp.forget_connection(session.id),
         )
         self._tool_notifications = HTTPToolNotifications(mcp, self.sessions)
+        # pylint: disable-next=protected-access  # reason: the transport-owned sink attaches to its own dispatcher
+        mcp._register_resource_sink(self, self)
         # No sse_lock: SSE requests used to swap server-wide notifier/writer
         # state and needed serialising. They now bind that state to their own
         # thread via MCPServer.connection_scope, so concurrent SSE streams no
@@ -508,11 +510,31 @@ class _MCPHttpServer(LocalThreadingHTTPServer):
         # another connection's notifier either.
 
     def server_close(self) -> None:
-        """Detach the notification sink, including when binding failed during construction."""
+        """Detach the notification sinks, including when binding failed during construction."""
         notifications = getattr(self, "_tool_notifications", None)
         if notifications is not None:
             notifications.close()
+        mcp = getattr(self, "mcp", None)
+        if mcp is not None:
+            # pylint: disable-next=protected-access  # reason: detaches the sink registered in __init__
+            mcp._unregister_resource_sink(self)
         super().server_close()
+
+    def reaches(self, connection: Any) -> bool:
+        """Whether ``connection`` is one of this transport's live sessions.
+
+        Only a session has a channel that outlives one request (its ``GET``
+        stream); a connection-scoped id from a session-less request does not.
+        """
+        return any(session.id == connection for session in self.sessions.live())
+
+    def send(self, connection: Any, payload: str) -> bool:
+        """Write ``payload`` to that session's standing stream; ``False`` when none is open."""
+        for session_id, writer in self.sessions.stream_writers():
+            if session_id == connection:
+                writer(payload)
+                return True
+        return False
 
     def get_request(self) -> Tuple[Any, Any]:
         """Accept a connection, time-boxing any TLS handshake.
