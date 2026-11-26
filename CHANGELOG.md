@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- GUI: translated table and list cells follow a language switch, and 58 message-box titles,
+  validation messages and result lines that were hard-coded English are translated.
+
 - GUI: status lines, results, hints, window titles and the tray menu follow a language switch;
   Presence, Variables, Run History and WebRunner no longer re-run their query on a switch.
 
