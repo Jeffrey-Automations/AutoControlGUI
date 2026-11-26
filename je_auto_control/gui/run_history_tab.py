@@ -101,6 +101,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         self._records: List[RunRecord] = []
+        self._listed = False            # whether a query has answered: before that there is nothing to re-render
         self._filter = QComboBox()
         self._populate_filter()
         self._filter.currentIndexChanged.connect(self._refresh)
@@ -150,8 +151,9 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         TranslatableMixin.retranslate(self)
         self._apply_table_headers()
         self._repopulate_filter_labels()
-        self._render_runs()             # the rows already listed, in the new language: no new query
-        self._refresh_preview()
+        if self._listed:                # the rows already listed, in the new language: no new query
+            self._render_runs()
+            self._refresh_preview()
         self._journal.retranslate()
     def dispose(self) -> None:
         """Stop the refresh timer, the queries and any journal read; the registry calls it before deleting the tab."""
@@ -280,7 +282,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
     def _show_runs(self, runs: List[RunRecord]) -> None:
         if self._queried_source != self._filter.currentData():
             return                  # the filter changed meanwhile: the next query answers for it
-        self._records = runs
+        self._records, self._listed = runs, True
         self._render_runs()
         self._timeline.set_records(runs)
         self._refresh_preview()
