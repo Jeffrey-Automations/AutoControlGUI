@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 import sys
+from typing import Callable, Dict
 
 from je_auto_control.utils.exception.exception_tags import \
     argparse_get_wrong_data_error_message
@@ -46,7 +47,7 @@ def _preprocess_read_str_execute_action(execute_str: str) -> None:
 def _main() -> None:
     """Run the legacy CLI with its original flags, errors and exit statuses."""
     try:
-        argparse_event_dict = {
+        argparse_event_dict: Dict[str, Callable[[str], object]] = {
             "execute_file": _preprocess_execute_action,
             "execute_dir": _preprocess_execute_files,
             "execute_str": _preprocess_read_str_execute_action,
