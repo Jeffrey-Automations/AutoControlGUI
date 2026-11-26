@@ -119,9 +119,9 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 
 - **Windows UIA 後端的執行緒模型**已對真的 COM 驗過（U-20261113-01；U-20261121-17 再驗：讀取在呼叫者執行緒與 walker 上都可用、stop 能叫醒等待中的 `AC_wait_for_focus_change`、`system_volume` 的 Core Audio 改經同一條 apartment 路徑，主執行緒與 worker 執行緒皆可讀）。`comtypes` 已宣告為 `accessibility` extra，`windows-uia.yml` 已在 Windows runner 以真 COM 跑過（3 項通過）。
 - **GUI 審查留下的（U-20261126-12）**：
-  - `TODO`（維護者 2026-11-26：UI 的背景作業都不得卡主執行緒）：仍在 GUI 執行緒讀寫使用者挑的小 JSON 檔——DAG 編輯器載入、WebRTC 信任清單匯出、
-    已知主機、檢視端通訊錄、`remote_desktop/_helpers.py`、USB ACL 匯出入、管理主控台新增／移除主機；REST 使用者面板的一次性新 token 欄未遮蔽；
-    Diagnostics 的 `_probe_capabilities` 沒有權限檢查。
+  - `TODO`（維護者 2026-11-26：UI 的背景作業都不得卡主執行緒）：仍在 GUI 執行緒——`connection_screen`／`viewer_panel`／`host_panel` 預覽的每格 JPEG 解碼；
+    連線或啟動時的 `load_default_certs`／`load_cert_chain`；`webrtc_panel._on_pending_viewer` 的 `trust_pending_viewer`（核准與寫信任清單同一呼叫）；
+    `AuditLogDialog` 的 sqlite 查詢；`_image_detect_tab._crop_template`；`agent_observation_view`、`template_candidate_panel` 結果 slot 的解碼。
   - `TODO`：WebRTC 一次斷線的「disconnected」「failed」會用掉兩次重連；
     `test_suite_tab` 以兩個空白加「(」拆標籤解除隔離，案例名含該字串會拆錯；
     切換語言後部分暫態文字與品質提示仍是舊語言。

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- GUI: file and store operations of the editors, Run History, Test Suites, Self-Healing, REST users,
+  USB ACL, the admin console and the remote-desktop trust list, address book and known hosts run
+  off the GUI thread; the REST one-time token field is masked; Diagnostics' capability probe is
+  refused for roles without `read_data`.
+
 - `${...}` in `AC_agent_task_submit` / `_lookup` / `_act`, `AC_agent_dag`, `_trigger`, `_skill` and
   `_task_recovery` payloads is no longer expanded at dispatch; the runtime expands it against the
   task's `inputs`, so pass caller values through `spec.inputs`. `ClaimsPolicy` refuses a NaN,
