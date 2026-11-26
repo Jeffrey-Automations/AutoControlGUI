@@ -7,7 +7,8 @@ would, and shows a refusal on the panel instead of raising it; outside an
 RBAC scope (the desktop default) nothing is refused.
 
 A token is shown once, in the "new token" field, right after ``add`` or
-``rotate``; the next operation clears it. It is never written to a log.
+``rotate``; the next operation clears it. It is never written to a log. The
+field is masked until Show is pressed; Actions > Copy token copies it masked.
 """
 import os
 from typing import Any, Dict, List, Optional, Tuple
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._authorize import RefusalLabel, refusal
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._qt_typed import filled_item
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import set_role
@@ -84,7 +86,9 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
             ("rest_users_id", self._id_input), ("rest_users_name", self._name_input),
             ("rest_users_role", self._role_input)))))
         token_form = QFormLayout()
-        token_form.addRow(self._tr(QLabel(), "rest_users_new_token"), self._token_value)
+        # Copying stays in the Actions menu (rest_users_copy_token), so the field adds only Show.
+        token_form.addRow(self._tr(QLabel(), "rest_users_new_token"),
+                          SecretField(self._token_value, self._tr, copyable=False))
         root.addLayout(token_form)
         set_role(self._status_label, "hint")
         root.addWidget(self._status_label)

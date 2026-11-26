@@ -268,3 +268,14 @@ def test_every_new_key_is_translated_in_all_four_catalogues():
         assert "{count}" in words["rest_users_count"]
         assert "{path}" in words["rest_users_count"]
         assert "{user}" in words["rest_users_token_issued"]
+
+
+def test_the_one_time_token_is_masked_until_shown(panel, monkeypatch):
+    from headless._masked_secret import assert_masked_secret
+    # Masked, Show toggles; copying stays in the Actions menu, so the field offers no Copy button.
+    assert_masked_secret(panel._token_value, monkeypatch, copyable=False)
+    copied = []
+    monkeypatch.setattr(rbac_users_panel.QGuiApplication, "clipboard",
+                        lambda: type("Clip", (), {"setText": staticmethod(copied.append)})())
+    panel._on_copy_token()                          # Actions > Copy token copies it while masked
+    assert copied == ["tok-123"]
