@@ -110,6 +110,14 @@ def _kill_tree(process: subprocess.Popen[bytes]) -> None:
         pass
 
 
+def _kill_program(process: subprocess.Popen[bytes]) -> None:
+    """Kill ``process`` alone, leaving anything it started running."""
+    try:
+        process.kill()
+    except OSError:
+        pass
+
+
 _STOP_POLL_SECONDS = 0.1
 #: Output lines a manager keeps until they are read; the oldest make room.
 MAX_QUEUED_LINES = 10_000
@@ -136,7 +144,8 @@ def _communicate_stoppable(process: subprocess.Popen[bytes], argv: str | List[st
 
 
 def run_captured(argv: str | List[str], timeout_s: float,
-                 input_bytes: Optional[bytes] = None) -> subprocess.CompletedProcess[bytes]:
+                 input_bytes: Optional[bytes] = None, *,
+                 kill_tree: bool = True) -> subprocess.CompletedProcess[bytes]:
     """Run ``argv`` (no shell), capturing stdout and stderr as bytes, for at most ``timeout_s``.
 
     ``subprocess.run(timeout=...)`` kills only the program itself and then
@@ -149,6 +158,10 @@ def run_captured(argv: str | List[str], timeout_s: float,
     ``_STOP_POLL_SECONDS``: a stop or a cancellation kills the tree the same
     way and propagates (``ExecutionStopped`` / the token's own error) instead
     of holding the caller until the program or the timeout ends.
+
+    ``kill_tree=False`` ends only the program itself, as ``subprocess.run``
+    does, for a tool such as ``adb`` whose first call starts a shared daemon
+    as its child: killing the tree would take that daemon down with it.
     """
     # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
     process = subprocess.Popen(argv, stdin=subprocess.PIPE if input_bytes is not None else None,  # nosec B603  # reason: argv list or CreateProcess line, never a shell
@@ -158,7 +171,7 @@ def run_captured(argv: str | List[str], timeout_s: float,
     try:
         stdout, stderr = _communicate_stoppable(process, argv, timeout_s, input_bytes)
     except BaseException:  # reason: end the tree on a timeout, a stop or any other escape, then re-raise
-        _kill_tree(process)
+        (_kill_tree if kill_tree else _kill_program)(process)
         try:
             process.communicate(timeout=5)
         except subprocess.TimeoutExpired:

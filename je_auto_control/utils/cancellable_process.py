@@ -1,4 +1,9 @@
-"""Bounded, cooperative capture-helper execution; only a newly owned process group may be stopped."""
+"""Bounded, cooperative capture-helper execution; only a newly owned process group may be stopped.
+
+The wait looks at both stop signals: a cancellation scope's token and the
+stoppable run (``run_control``) the caller is inside. Either ends the wait
+within one 0.1 s slice and reaps the helper's process group.
+"""
 import contextlib
 import os
 import signal
@@ -11,9 +16,11 @@ from je_auto_control.utils.exception.cancellation import (
     cancellation_checkpoint, cancellation_scope, cancellation_timeout,
 )
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
+from je_auto_control.utils.executor.run_control import checkpoint, current_stop_token
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 _REAP_SECONDS = 0.25
+_STOP_POLL_SECONDS = 0.1
 
 
 def run_capture_helper(argv: list[str], timeout: float) -> subprocess.CompletedProcess[bytes]:
@@ -57,13 +64,16 @@ def _close_streams(process: subprocess.Popen[bytes], primary: Optional[BaseExcep
 def _communicate(process: subprocess.Popen[bytes], argv: list[str],
                  timeout: float) -> subprocess.CompletedProcess[bytes]:
     deadline = time.monotonic()+max(0.0, timeout)
+    in_run = current_stop_token() is not None
     while True:
         cancellation_checkpoint()
+        checkpoint()
         remaining = deadline-time.monotonic()
         if remaining <= 0:
             raise subprocess.TimeoutExpired(argv, timeout)
+        poll = min(remaining, _STOP_POLL_SECONDS) if in_run else cancellation_timeout(remaining)
         try:
-            stdout, stderr = process.communicate(timeout=cancellation_timeout(remaining))
+            stdout, stderr = process.communicate(timeout=poll)
         except subprocess.TimeoutExpired:
             continue
         if process.returncode:
