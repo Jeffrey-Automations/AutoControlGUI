@@ -189,4 +189,4 @@ def test_a_port_probe_is_given_no_more_than_the_time_left():
 
     wait_until_port("example.invalid", 80, timeout_s=0.2, poll_interval_s=0.05,
                     connect_timeout_s=30.0, connector=connector)
-    assert given and max(given) <= 0.2
+    assert given and max(given) <= 0.2 + 1e-6  # the time left, computed from a clock reading
