@@ -53,6 +53,7 @@ def test_outbox_version_two_upgrade_keeps_edit_cache_and_control_receipt_bytes(t
     control = SyncControlOperation('joined', identity, 'register')
     wire, digest = _logical(control)
     with sqlite3.connect(path) as connection:
+        connection.execute('ALTER TABLE sync_control_receipts DROP COLUMN recorded_at')     # as version 2 had it
         connection.execute('INSERT INTO sync_control_receipts VALUES (?,?,?,?,?,?)',
                            (ENDPOINT, 'alice', 'joined', wire, digest, 1))
         for name in ('sync_workspace_leases', 'sync_workspace_bindings', 'sync_workspace_baselines'):
@@ -60,12 +61,39 @@ def test_outbox_version_two_upgrade_keeps_edit_cache_and_control_receipt_bytes(t
         connection.execute('PRAGMA user_version=2')
         before = connection.execute('SELECT wire,digest FROM sync_operations').fetchall()
         receipt = connection.execute('SELECT * FROM sync_control_receipts').fetchall()
-    assert ac.SyncOutbox(path).pending(endpoint=ENDPOINT, user_id='alice') == (item,)
+    assert ac.SyncOutbox(path, clock=lambda: 1234.5).pending(endpoint=ENDPOINT, user_id='alice') == (item,)
     assert ac.SyncOutbox(path).snapshot(endpoint=ENDPOINT, user_id='alice') == snapshot
     with sqlite3.connect(path) as connection:
-        assert connection.execute('PRAGMA user_version').fetchone()[0] == 3
+        assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
         assert connection.execute('SELECT wire,digest FROM sync_operations').fetchall() == before
-        assert connection.execute('SELECT * FROM sync_control_receipts').fetchall() == receipt
+        assert connection.execute(_RECEIPT_V2_COLUMNS).fetchall() == receipt
+        assert connection.execute('SELECT recorded_at FROM sync_control_receipts').fetchall() == [(1234.5,)]
+
+
+_RECEIPT_V2_COLUMNS = 'SELECT endpoint,user_id,operation_id,wire,digest,revision FROM sync_control_receipts'
+
+
+def test_outbox_version_three_upgrade_stamps_control_receipts_with_the_migration_time(tmp_path):
+    from je_auto_control.utils.config_sync.control_models import SyncControlOperation
+    from je_auto_control.utils.config_sync.control_store import _logical
+    path = tmp_path / 'outbox.sqlite3'
+    queue = ac.SyncOutbox(path)
+    item = operation('offline')
+    queue.enqueue(item)
+    wire, digest = _logical(SyncControlOperation('joined', queue.identity(ENDPOINT, 'alice'), 'register'))
+    with sqlite3.connect(path) as connection:
+        connection.execute('ALTER TABLE sync_control_receipts DROP COLUMN recorded_at')     # as version 3 had it
+        connection.execute('INSERT INTO sync_control_receipts VALUES (?,?,?,?,?,?)',
+                           (ENDPOINT, 'alice', 'joined', wire, digest, 1))
+        connection.execute('PRAGMA user_version=3')
+        receipt = connection.execute('SELECT * FROM sync_control_receipts').fetchall()
+    upgraded = ac.SyncOutbox(path, clock=lambda: 1234.5)
+    assert upgraded.pending(endpoint=ENDPOINT, user_id='alice') == (item,)
+    assert upgraded.control_receipt(ENDPOINT, 'alice', 'joined') == 1
+    with sqlite3.connect(path) as connection:
+        assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
+        assert connection.execute(_RECEIPT_V2_COLUMNS).fetchall() == receipt
+        assert connection.execute('SELECT recorded_at FROM sync_control_receipts').fetchall() == [(1234.5,)]
 
 
 def test_adapter_version_one_upgrade_preserves_source_heads_and_receipts(tmp_path):

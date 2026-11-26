@@ -1,6 +1,7 @@
 """Durable account/endpoint-scoped edits with leased, bounded and cancellable retry delivery."""
 from __future__ import annotations
 
+import functools
 import json
 import math
 import time
@@ -90,10 +91,15 @@ class SyncOutbox:
 
     def __init__(self, path: Optional[str | Path] = None, *, clock: _Clock = time.time,
                  receipt_limit: int = _RECEIPT_LIMIT, receipt_max_age: float = _RECEIPT_MAX_AGE_S) -> None:
-        """``receipt_limit`` / ``receipt_max_age`` (seconds) bound the delivered rows kept per namespace."""
+        """``receipt_limit`` / ``receipt_max_age`` (seconds) bound the delivered rows kept per namespace.
+
+        The same bounds apply to peer-control receipts, except that one younger
+        than ``CONTROL_RECEIPT_RETRY_WINDOW_S`` is always kept (see ``control_store``).
+        """
         self._receipt_limit, self._receipt_max_age = _receipt_bounds(receipt_limit, receipt_max_age)
-        self._database = SyncDatabase(path, "AUTOCONTROL_SYNC_OUTBOX", "config-outbox.sqlite3", initialize_outbox)
         self._clock = clock
+        self._database = SyncDatabase(path, "AUTOCONTROL_SYNC_OUTBOX", "config-outbox.sqlite3",
+                                      functools.partial(initialize_outbox, clock=self._now))
 
     def _now(self) -> float:
         try:
@@ -265,7 +271,8 @@ class SyncOutbox:
         return self._controls().status(_scope(endpoint, user_id))
 
     def _controls(self) -> ControlStore:
-        return ControlStore(self._database, self._now, self._save_snapshot)
+        return ControlStore(self._database, self._now, self._save_snapshot,
+                            receipts=(self._receipt_limit, self._receipt_max_age))
 
     def flush(self, sender: _Sender, *, endpoint: str, user_id: str,
                  policy: Optional[SyncRetryPolicy] = None, cancelled: _Cancelled = None) -> SyncDrainResult:

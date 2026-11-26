@@ -23,6 +23,21 @@ if TYPE_CHECKING:
     from sqlite3 import Connection
 
 _SELECT = "SELECT wire,digest,prepared FROM sync_controls WHERE endpoint=? AND user_id=?"
+#: A confirmed control receipt is the idempotency record of its ``operation_id``: a caller that
+#: retries ``control()`` / ``request_control()`` with that ID gets the receipt back instead of
+#: sending the control again. One drain retries for at most 10 attempts x (30 s back-off + a
+#: 300 s lease) = 55 minutes (``SyncRetryPolicy``'s limits); a day covers that and a caller
+#: that retries after a restart. No receipt younger than this is pruned, whatever the bounds.
+CONTROL_RECEIPT_RETRY_WINDOW_S = 24 * 3600.0
+# Past the window, a receipt goes when it is older than the age bound or not among the newest
+# ``limit`` of its namespace; the newest full-resync receipt stays (``latest_reset`` reads it).
+_PRUNE_RECEIPTS = (
+    "DELETE FROM sync_control_receipts WHERE endpoint=? AND user_id=? AND recorded_at < ? "
+    "AND (recorded_at < ? OR rowid NOT IN (SELECT rowid FROM sync_control_receipts WHERE endpoint=? "
+    "AND user_id=? ORDER BY recorded_at DESC, rowid DESC LIMIT ?)) "
+    "AND rowid IS NOT (SELECT rowid FROM sync_control_receipts WHERE endpoint=? AND user_id=? "
+    "AND instr(wire,'\"kind\":\"full_resync\"')>0 ORDER BY rowid DESC LIMIT 1)"
+)
 _BEGIN_IMMEDIATE = "BEGIN IMMEDIATE"
 _Scope = tuple[str, str]
 
@@ -48,10 +63,13 @@ def _operation(row: tuple[object, ...]) -> SyncControlOperation:
 class ControlStore:
     """One outstanding control per endpoint/account, with idempotent recovery and atomic generation adoption."""
 
-    def __init__(self, database: SyncDatabase, clock: Callable[[], float], save_snapshot: SnapshotSaver) -> None:
+    def __init__(self, database: SyncDatabase, clock: Callable[[], float], save_snapshot: SnapshotSaver, *,
+                 receipts: tuple[int, float]) -> None:
+        """``receipts`` is ``(count, max age in seconds)`` of the confirmed receipts kept per namespace."""
         self._database = database
         self._clock = clock
         self._save_snapshot = save_snapshot
+        self._receipt_limit, self._receipt_max_age = receipts
 
     def enqueue(self, identity: SyncLocalIdentity, kind: ControlKind, *, peer_id: Optional[str] = None,
                  discard_pending: bool = False, operation_id: Optional[str] = None,
@@ -158,13 +176,22 @@ class ControlStore:
             current = _owned(connection, operation, owner)
             apply_control_receipt(connection, current, receipt, self._save_snapshot)
             wire, digest = _logical(current)
-            connection.execute("INSERT INTO sync_control_receipts VALUES (?,?,?,?,?,?)",
-                               (*scope, current.operation_id, wire, digest, receipt.revision))
+            now = self._clock()
+            connection.execute("INSERT INTO sync_control_receipts (endpoint,user_id,operation_id,wire,digest,"
+                               "revision,recorded_at) VALUES (?,?,?,?,?,?,?)",
+                               (*scope, current.operation_id, wire, digest, receipt.revision, now))
+            self._prune_receipts(connection, scope, now)
             connection.execute("UPDATE sync_controls SET status='delivered',receipt_revision=?,error='',"
                                "lease_owner='',lease_until=0 WHERE endpoint=? AND user_id=?",
                                (receipt.revision, *scope))
             connection.execute("COMMIT")
         return True
+
+    def _prune_receipts(self, connection: Connection, scope: _Scope, now: float) -> None:
+        """Drop receipts past the retry window that are beyond the count or age bound (same transaction)."""
+        window = now - CONTROL_RECEIPT_RETRY_WINDOW_S
+        connection.execute(_PRUNE_RECEIPTS, (*scope, window, now - self._receipt_max_age, *scope,
+                                             self._receipt_limit, *scope))
 
     def failed(self, operation: SyncControlOperation, owner: str, error: Exception, policy: SyncRetryPolicy) -> None:
         """Persist bounded retry/error state; definite generation failures block until explicit recovery."""

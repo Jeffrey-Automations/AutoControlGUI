@@ -247,7 +247,7 @@ def test_owned_version_one_database_migrates_without_changing_old_edit_wires(tmp
     assert queue.pending(endpoint=endpoint, user_id='alice') == (replace(operation, prepared=prepared),)
     assert queue.control_status(endpoint=endpoint, user_id='alice')['state'] == 'idle'
     with sqlite3.connect(path) as connection:
-        assert connection.execute('PRAGMA user_version').fetchone()[0] == 3
+        assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
         assert connection.execute('SELECT wire FROM sync_operations').fetchone()[0] == encoded
 
 
@@ -382,3 +382,46 @@ def test_invalid_owned_version_one_schema_is_refused_before_migration_writes(tmp
         assert connection.execute('PRAGMA user_version').fetchone()[0] == 1
         assert connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall() == [('important',)]
         assert connection.execute('SELECT value FROM important').fetchone()[0] == 'preserve'
+
+
+def _clocked_peer(tmp_path, monkeypatch, now, **bounds):
+    from je_auto_control.utils.http_client import http_client
+    server = ac.CausalConfigStore(tmp_path / 'server.sqlite3')
+    queue = ac.SyncOutbox(tmp_path / 'outbox.sqlite3', clock=lambda: now[0], **bounds)
+    queue.identity('https://controlled.invalid', 'alice', origin='desktop')
+    monkeypatch.setattr(http_client, 'perform_call', lambda call: perform_causal_call(server, call))
+    return ac.CausalSyncClient('https://controlled.invalid', user_id='alice'), queue
+
+
+def _receipt_ids(path):
+    import sqlite3
+    with sqlite3.connect(path) as connection:
+        return [row[0] for row in connection.execute('SELECT operation_id FROM sync_control_receipts ORDER BY rowid')]
+
+
+def test_control_receipts_past_the_retry_window_are_pruned_by_count(tmp_path, monkeypatch):
+    from je_auto_control.utils.config_sync.control_store import CONTROL_RECEIPT_RETRY_WINDOW_S
+    now = [1_000_000.0]
+    client, queue = _clocked_peer(tmp_path, monkeypatch, now, receipt_limit=2)
+    registered, reset, first, second = (client.control(queue, kind).operation_id
+                                        for kind in ('register', 'full_resync', 'ack', 'ack'))
+    assert _receipt_ids(tmp_path / 'outbox.sqlite3') == [registered, reset, first, second]   # all inside the window
+    now[0] += CONTROL_RECEIPT_RETRY_WINDOW_S + 1
+    third = client.control(queue, 'ack').operation_id
+    # The newest two stay, and the newest reset, which the workspace reads back.
+    assert _receipt_ids(tmp_path / 'outbox.sqlite3') == [reset, second, third]
+    assert queue.control_receipt('https://controlled.invalid', 'alice', registered) is None
+    assert queue.control_receipt('https://controlled.invalid', 'alice', second) is not None
+
+
+def test_control_receipts_are_pruned_by_age_but_never_inside_the_retry_window(tmp_path, monkeypatch):
+    from je_auto_control.utils.config_sync.control_store import CONTROL_RECEIPT_RETRY_WINDOW_S
+    now = [1_000_000.0]
+    client, queue = _clocked_peer(tmp_path, monkeypatch, now, receipt_max_age=60.0)
+    registered = client.control(queue, 'register').operation_id
+    now[0] += 61.0
+    first = client.control(queue, 'ack').operation_id
+    assert _receipt_ids(tmp_path / 'outbox.sqlite3') == [registered, first]    # older than 60 s, a retry may come
+    now[0] += CONTROL_RECEIPT_RETRY_WINDOW_S
+    second = client.control(queue, 'ack').operation_id
+    assert _receipt_ids(tmp_path / 'outbox.sqlite3') == [first, second]
