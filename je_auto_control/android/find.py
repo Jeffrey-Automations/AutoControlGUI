@@ -14,6 +14,7 @@ from je_auto_control.android.client import (
     UIAutomatorDevice, default_ui_device, translate_device_errors,
 )
 from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.executor.run_control import stoppable_call
 
 
 class ElementNotFoundError(AutoControlException, LookupError):
@@ -54,7 +55,9 @@ def find_element(text: Optional[str] = None,
     """Return the matched widget's bounding rect ``(x1, y1, x2, y2)``."""
     handle = (device or default_ui_device()).handle
     query = _build_query(handle, text, resource_id, description, class_name)
-    if not query.wait(timeout=float(timeout_s)):
+    # uiautomator2 polls the device for up to timeout_s; a stop ends the wait
+    # (the poll finishes in the background) and click_element never taps.
+    if not stoppable_call(query.wait, timeout=float(timeout_s)):
         raise ElementNotFoundError(
             f"no widget matched selectors text={text!r} "
             f"resource_id={resource_id!r} description={description!r} "
