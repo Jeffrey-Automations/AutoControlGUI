@@ -132,3 +132,38 @@ def test_facade_exports():
                  "ExpiredTokenError", "InvalidSignatureError"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+# --- ac_jwt_decode takes the helper's leeway, validated ----------------------
+
+def _mcp_decode(arguments):
+    from je_auto_control.utils.mcp_server.server import MCPServer
+    from je_auto_control.utils.mcp_server.tools._factories import jwt_tools
+    server = MCPServer(tools=jwt_tools())
+    reply = server.handle_line(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                           "params": {"name": "ac_jwt_decode", "arguments": arguments}}))
+    return json.loads(reply)["result"]
+
+
+def test_the_mcp_tool_passes_leeway_to_the_helper():
+    import time
+    token = encode_jwt({"sub": "u1", "exp": int(time.time()) - 5}, KEY)
+    assert json.loads(_mcp_decode({"token": token, "key": KEY})["content"][0]["text"])["ok"] is False
+    result = _mcp_decode({"token": token, "key": KEY, "leeway": 60})
+    assert result["isError"] is False
+    assert json.loads(result["content"][0]["text"])["claims"]["sub"] == "u1"
+
+
+@pytest.mark.parametrize("leeway", [float("nan"), float("inf"), -1, 3601, True, "10"])
+def test_a_leeway_that_would_disable_the_expiry_check_is_refused(leeway):
+    from je_auto_control.utils.mcp_server.tools import _handlers_operations as h_ops
+    token = encode_jwt({"sub": "u1", "exp": 1000}, KEY)   # long expired
+    with pytest.raises(JwtError, match="leeway"):
+        h_ops.jwt_decode(token, KEY, leeway=leeway)
+
+
+def test_the_mcp_schema_declares_the_leeway_bounds():
+    from je_auto_control.utils.mcp_server.tools._factories import jwt_tools
+    [decode] = [tool for tool in jwt_tools() if tool.name == "ac_jwt_decode"]
+    assert decode.input_schema["properties"]["leeway"] == {
+        "type": "number", "minimum": 0, "maximum": 3600}

@@ -6581,12 +6581,14 @@ def jwt_tools() -> List[MCPTool]:
             name="ac_jwt_decode",
             description=("Verify a JWT 'token' with 'key' and an 'algorithms' "
                          "allowlist (rejects alg=none/confusion), checking exp/"
-                         "nbf/aud (a token with aud needs 'audience'). Returns "
+                         "nbf/aud (a token with aud needs 'audience'); 'leeway' "
+                         "forgives up to 3600 s of clock skew on exp/nbf. Returns "
                          "{ok, claims} or {ok:false, error}."),
             input_schema=schema(
                 {"token": {"type": "string"}, "key": {"type": "string"},
                  "algorithms": {"type": "array"},
-                 "audience": {"type": "string"}},
+                 "audience": {"type": "string"},
+                 "leeway": {"type": "number", "minimum": 0, "maximum": 3600}},
                 ["token", "key"]),
             handler=h_ops.jwt_decode,
             annotations=READ_ONLY,
