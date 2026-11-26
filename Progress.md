@@ -143,8 +143,7 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - **socket server 驅動程式執行檔過舊**（U-20261126-35）：`autocontrol_driver/AutoControlDriverWindows.exe`（2023-05-18）與 `generate_autocontrol_driver_linux` 仍是沒有驗證的舊伺服器；倉庫裡只有指向作者舊機器絕對路徑的 `auto_py_to_exe.json`，沒有可在這裡執行的建置腳本，需要重建或移除。
 - **Intel Mac 安裝要編譯 `cryptography`**：下限拉到 50 之後 `macosx_10_9_x86_64` 沒有 wheel（探測：最新只到 48.0.1），
   `pip install je_auto_control` 在 Intel Mac 需要 Rust 工具鏈。沒有在 Intel Mac 上實際編過。
-- **遠端與 USB 審查留下的（U-20261126-17）**：`DECIDE`：未驗證的連線最多占一個 `max_clients` 名額 60 秒；H.264 over TCP 只留最新封包，慢的觀看者會掉 P-frame。
-  USB 直通斷線後，仍在後端裡的傳輸執行緒會跑到後端逾時（最長 60 秒）才結束；全程序同時最多 `WorkerLimits.max_abandoned`（預設 16）條，超過時新的 OPEN／RESUME 被拒（U-20261126-29）。
+- **USB 直通斷線後的執行緒**（U-20261126-17）：仍在後端裡的傳輸執行緒會跑到後端逾時（最長 60 秒）才結束；全程序同時最多 `WorkerLimits.max_abandoned`（預設 16）條，超過時新的 OPEN／RESUME 被拒（U-20261126-29）。
 - **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；
   私鑰支援選用通行碼加密，未設定時仍是明文 PEM（0600，Windows 上沒驗權限位元）；遷移模式開著時 HMAC 簽章會被接受。
 - **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：

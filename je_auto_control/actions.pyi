@@ -1179,7 +1179,11 @@ def AC_costs_record(
 def AC_costs_summary(limit: int = ...) -> Dict[str, Any]:
     """Executor adapter: aggregate cost events by model / provider / day."""
 
-def AC_create_project(project_path: str | None = ..., parent_name: str = ...) -> None:
+def AC_create_project(
+    project_path: str | None = ...,
+    parent_name: str = ...,
+    overwrite: bool = ...,
+) -> Dict[str, List[str]]:
     """Create project directory structure and templates."""
 
 def AC_create_signing_keypair(private_path: str, public_path: str, passphrase: str | None = ...) -> Dict[str, Any]:
@@ -1643,7 +1647,7 @@ def AC_generate_candidate_from_log(
 
 def AC_generate_code(
     source: Any,
-    output: str | None = ...,
+    output: Optional[str] = ...,
     target: str = ...,
     name: str = ...,
     style: str = ...,
@@ -1674,7 +1678,7 @@ def AC_generate_json_report(json_file_name: str = ...) -> None:
 def AC_generate_sbom(path: str | None = ..., root: str = ...) -> Dict[str, Any]:
     """Adapter: build (or write) a CycloneDX SBOM for the project."""
 
-def AC_generate_sop(actions: List[Any], title: str = ..., path: str | None = ...) -> Dict[str, Any]:
+def AC_generate_sop(actions: List[Any], title: str = ..., path: Optional[str] = ...) -> Dict[str, Any]:
     """Adapter: build (or write) a step-by-step SOP from an action list."""
 
 def AC_generate_xml() -> Tuple[str | bytes, str | bytes]:
