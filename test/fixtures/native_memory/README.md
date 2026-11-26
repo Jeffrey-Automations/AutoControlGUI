@@ -151,8 +151,8 @@ path runs either executable.
 The UI fixture accepts only `--challenge <32 lowercase hex digits>`. A dedicated
 thread creates a parent without `WS_VISIBLE`, with `WS_EX_NOACTIVATE` and
 `WS_EX_TOOLWINDOW`, at off-screen coordinates. It never calls ShowWindow, focus
-or foreground APIs. The same thread creates, pumps and destroys these read-only
-EDIT controls:
+or foreground APIs. The same thread creates, pumps and destroys these EDIT controls,
+all read-only except 1007:
 
 | Child ID | Fixture value / purpose |
 | --- | --- |
@@ -162,6 +162,7 @@ EDIT controls:
 | 1004 | `disabled`, disabled control |
 | 1005 | Password-style control containing synthetic fixture text |
 | 1006, twice | Different values to test ambiguous selection |
+| 1007 | Empty and writable, the only target of the native accessibility write check |
 
 Both inherited stdin and stdout must be pipes. After initialization, stdout emits
 one JSON line with exactly `id` and `result`. The ID is the launch challenge;

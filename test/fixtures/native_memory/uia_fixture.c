@@ -19,14 +19,16 @@ typedef struct {
     DWORD style;
 } Field;
 
+/* Every control is read-only except 1007, the one target of the native write check. */
 static const Field fields[] = {
-    {1001, L"17", 0},
-    {1002, L"ready", 0},
-    {1003, L"", 0},
-    {1004, L"disabled", WS_DISABLED},
-    {1005, L"fixture-only-secret", ES_PASSWORD},
-    {1006, L"duplicate-a", 0},
-    {1006, L"duplicate-b", 0}
+    {1001, L"17", ES_READONLY},
+    {1002, L"ready", ES_READONLY},
+    {1003, L"", ES_READONLY},
+    {1004, L"disabled", ES_READONLY | WS_DISABLED},
+    {1005, L"fixture-only-secret", ES_READONLY | ES_PASSWORD},
+    {1006, L"duplicate-a", ES_READONLY},
+    {1006, L"duplicate-b", ES_READONLY},
+    {1007, L"", 0}
 };
 
 static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM word, LPARAM value) {
@@ -59,7 +61,7 @@ static HWND create_window(void) {
     if (!window) return NULL;
     for (i = 0; i < sizeof(fields) / sizeof(fields[0]); ++i) {
         HWND child = CreateWindowExW(0, L"EDIT", fields[i].text,
-            WS_CHILD | WS_VISIBLE | ES_READONLY | fields[i].style,
+            WS_CHILD | WS_VISIBLE | fields[i].style,
             8, 8 + (int)i * 32, 240, 24, window,
             (HMENU)(INT_PTR)fields[i].id, instance, NULL);
         if (!child) {
