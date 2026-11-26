@@ -19,7 +19,7 @@ PLAINTEXT = "plaintext-vault-value-9f3"
 ENV_VALUE = "env-credential-value-4c1"
 STEPS = [["AC_write", {"write_string": "${secrets.PW}"}],
          ["AC_write", {"write_string": "${doc_user}"}],
-         ["AC_write", {"write_string": "${row}"}]]
+         ["AC_write", {"write_string": "${never_bound_row_9f3}"}]]
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ def test_a_generated_sop_keeps_secret_references_and_unbound_names(fake_vault, t
     sop = _run(["AC_generate_sop", {"actions": STEPS, "title": "Log in ${doc_user} ${secrets.PW}"}])
     text = json.dumps(sop)
     assert PLAINTEXT not in text
-    assert "${secrets.PW}" in text and "${row}" in text
+    assert "${secrets.PW}" in text and "${never_bound_row_9f3}" in text
     assert "alice" in text and "Log in alice" in sop["title"]
     target = tmp_path / "sop.html"
     _run(["AC_generate_sop", {"actions": STEPS, "path": str(target)}])
@@ -51,7 +51,7 @@ def test_generated_code_keeps_secret_references_and_unbound_names(fake_vault, tm
     code = _run(["AC_generate_code", {"source": STEPS, "output": str(output)}])
     for text in (code, output.read_text(encoding="utf-8")):
         assert PLAINTEXT not in text
-        assert "${secrets.PW}" in text and "${row}" in text and "alice" in text
+        assert "${secrets.PW}" in text and "${never_bound_row_9f3}" in text and "alice" in text
 
 
 def test_a_code_source_path_still_expands_its_variables(fake_vault, tmp_path):
