@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- `create_project_dir` / `AC_create_project` keep existing files unless `overwrite=True` and
+  return `{"written": [...], "skipped": [...]}`; `apply_unified` refuses a hunk past the end
+  of the text; `lock_session` commands stop after 10 s and raise `LockSessionTimeout`;
+  `ResourceProfiler` keeps the newest `max_samples` samples (default 7,200).
+
 - GUI: under RBAC the older tabs (secrets, webhooks, plugins, REST, admin console,
   audit log, USB, remote-desktop host panels, agent tasks) check the role before a
   privileged command and show a refusal in the tab. Token and secret fields are masked
