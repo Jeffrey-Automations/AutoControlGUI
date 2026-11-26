@@ -31,6 +31,15 @@ def test_apply_unified_no_op():
     assert apply_unified(A, unified_diff(A, A)) == A
 
 
+def test_apply_unified_inserts_at_the_end_of_the_file():
+    assert apply_unified(A, "@@ -3,0 +4,1 @@\n+line4") == A + "line4\n"
+
+
+def test_apply_unified_refuses_a_hunk_past_the_end_of_the_file():
+    with pytest.raises(PatchApplyError, match="past the end"):
+        apply_unified(A, "@@ -9,0 +10,1 @@\n+far away")
+
+
 BASE = "a\nb\nc\nd\ne\n"
 
 
