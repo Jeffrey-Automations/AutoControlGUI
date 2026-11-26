@@ -110,3 +110,50 @@ def test_cli_main_auto_generates_secret_when_missing(tmp_path):
     )
     secret = user_line.split(":", 1)[1]
     assert len(secret) >= 16  # token_urlsafe(24) → ~32 chars
+
+
+def _bundle(out):
+    write_bundle(
+        out, realm="r", user="u", secret="TOPSECRET",
+        listen_port=3478, tls_port=5349,
+        tls_cert=None, tls_key=None, external_ip=None,
+    )
+
+
+def _only_owner_can_read(path) -> bool:
+    import os
+    import stat
+    import sys
+    if sys.platform == "win32":
+        from je_auto_control.utils.action_signing._private_file import _windows_dacl_sddl
+        # Protected (inherits nothing) and one entry: the current user.
+        dacl = _windows_dacl_sddl(path).partition("D:")[2]
+        return dacl.startswith("P") and dacl.count("(") == 1
+    return stat.S_IMODE(os.stat(path).st_mode) & 0o077 == 0
+
+
+def test_files_holding_the_turn_secret_are_readable_by_their_owner_only(tmp_path):
+    out = tmp_path / "bundle"
+    out.mkdir()
+    (out / "turnserver.conf").write_text("old", encoding="utf-8")   # replaced, not reused
+    _bundle(out)
+    for name in ("turnserver.conf", "README.txt"):
+        assert "TOPSECRET" in (out / name).read_text(encoding="utf-8")
+        assert _only_owner_can_read(out / name), name
+
+
+def test_a_failed_secret_write_keeps_the_previous_file_and_leaves_no_temp(tmp_path, monkeypatch):
+    import pytest
+    from je_auto_control.utils.remote_desktop import turn_config
+    out = tmp_path / "bundle"
+    out.mkdir()
+    (out / "turnserver.conf").write_text("previous", encoding="utf-8")
+
+    def refuse(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(turn_config.os, "replace", refuse)
+    with pytest.raises(OSError, match="disk full"):
+        _bundle(out)
+    assert (out / "turnserver.conf").read_text(encoding="utf-8") == "previous"
+    assert sorted(p.name for p in out.iterdir()) == ["turnserver.conf"]

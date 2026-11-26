@@ -23,11 +23,13 @@ Outputs:
 from __future__ import annotations
 
 import argparse
+import os
 import secrets
 import sys
 from pathlib import Path
 from typing import Optional
 
+from je_auto_control.utils.action_signing._private_file import open_new_private_file
 from je_auto_control.utils.path_guard.path_guard import (
     PathNotAllowedError, validate_path,
 )
@@ -152,19 +154,38 @@ def render_readme(*, realm: str, listen_port: int, tls_port: int,
     )
 
 
+def _write_secret_file(path: Path, text: str) -> None:
+    """Replace ``path`` atomically with ``text``, readable by its owner only.
+
+    The text lands in a sibling created 0600 (POSIX) or with an access list
+    naming only the current user (Windows), then is renamed over ``path``:
+    the secret is never in a file others can read, and a failed write leaves
+    the previous file whole.
+    """
+    temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+    descriptor = open_new_private_file(temporary)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def write_bundle(output_dir: Path, *, realm: str, user: str,
                  secret: str, listen_port: int, tls_port: int,
                  tls_cert: Optional[str], tls_key: Optional[str],
                  external_ip: Optional[str]) -> None:
+    """Write the four deploy files; the two holding ``secret`` are owner-only."""
     # CLI callers reach this through main(), which bounds the path first.
     output_dir.mkdir(parents=True, exist_ok=True)
     conf_path = output_dir / "turnserver.conf"
-    conf_path.write_text(render_turnserver_conf(
+    _write_secret_file(conf_path, render_turnserver_conf(
         realm=realm, listen_port=listen_port, tls_port=tls_port,
         user=user, secret=secret,
         tls_cert=tls_cert, tls_key=tls_key,
         external_ip=external_ip,
-    ), encoding="utf-8")
+    ))
     (output_dir / "coturn.service").write_text(
         render_systemd_unit(conf_path=str(conf_path)),
         encoding="utf-8",
@@ -176,11 +197,11 @@ def write_bundle(output_dir: Path, *, realm: str, user: str,
         ),
         encoding="utf-8",
     )
-    (output_dir / "README.txt").write_text(
+    _write_secret_file(
+        output_dir / "README.txt",
         render_readme(realm=realm, listen_port=listen_port, tls_port=tls_port,
                       user=user, secret=secret,
                       tls=bool(tls_cert and tls_key)),
-        encoding="utf-8",
     )
 
 
