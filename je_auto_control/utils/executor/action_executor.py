@@ -34,6 +34,7 @@ from je_auto_control.utils.executor.action_schema import (
 from je_auto_control.utils.executor.flags import as_bool as _as_bool
 from je_auto_control.utils.executor.adapter_args import finite_float as _finite, json_list as _json_list
 from je_auto_control.utils.executor.dispatch import dispatch_checkpoint
+from je_auto_control.utils.executor.containment import call_contained
 from je_auto_control.utils.agent_runtime.commands import COMMANDS as AGENT_TASK_COMMANDS
 from je_auto_control.utils.executor.flow_control import (
     BLOCK_COMMANDS, LoopBreak, LoopContinue, MacroDepthExceeded,
@@ -8558,7 +8559,7 @@ class Executor:
         started = _time.monotonic()
         try:
             with default_profiler.measure(action_name):
-                record[key] = self._execute_event(action)
+                record[key] = call_contained(action_name, self._execute_event, action)
             report_result(action, record[key])  # a no-op unless a result hook watches this run
             _observe_executor_metrics(action_name, started, error=None)
         except (LoopBreak, LoopContinue, ExecutionStopped):
@@ -8573,7 +8574,8 @@ class Executor:
         # ArithmeticError: an OverflowError (a date past year 9999, int() of
         # an infinite float) or a ZeroDivisionError is a failed action too;
         # it used to abort every remaining action. ImportError: so is a command
-        # whose optional package is not installed.
+        # whose optional package is not installed. Anything else (cv2.error, a plugin's
+        # own class) arrives wrapped by call_contained as AutoControlForeignException.
         except (AutoControlException, OSError, RuntimeError, ArithmeticError,
                 AttributeError, TypeError, ValueError, LookupError, ImportError) as error:
             _observe_executor_metrics(action_name, started, error=error)

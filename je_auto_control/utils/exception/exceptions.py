@@ -87,6 +87,22 @@ class AutoControlActionException(AutoControlException):
     pass
 
 
+class AutoControlForeignException(AutoControlActionException):
+    """A command raised an error from outside the framework family.
+
+    ``cv2.error``, ``sqlite3.Error`` or a plugin's own exception class, which
+    no containment boundary names. The executor wraps it at the per-action
+    boundary so it is recorded as that action's failure instead of aborting
+    the action list; the original is ``original`` and the ``__cause__``.
+    """
+
+    def __init__(self, command: str, error: BaseException) -> None:
+        kind = type(error)
+        super().__init__(f"{command} raised {kind.__module__}.{kind.__qualname__}: {error}")
+        self.command = command
+        self.original = error
+
+
 class AutoControlAddCommandException(AutoControlException):
     pass
 
