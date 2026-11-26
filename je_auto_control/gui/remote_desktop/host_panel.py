@@ -1,7 +1,6 @@
 """``_HostPanel``: the 'host this machine' Remote Desktop sub-tab."""
 import functools
 import secrets
-import ssl
 from typing import Any, Optional
 
 from PySide6.QtCore import QTimer, Signal
@@ -19,7 +18,9 @@ from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
-from je_auto_control.gui.remote_desktop._host_ops import release_host, replace_host, stop_host
+from je_auto_control.gui.remote_desktop._host_ops import (
+    HostTlsError, release_host, replace_host, replace_tls_host, stop_host,
+)
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui.remote_desktop._helpers import (
     _CollapsibleSection, _StatusBadge, _t,
@@ -286,17 +287,15 @@ class _HostPanel(TranslatableMixin, QWidget):
         if path:
             self._tls_key.setText(path)
 
-    def _build_ssl_context(self) -> Optional[ssl.SSLContext]:
+    def _tls_paths(self) -> Optional[tuple[str, str]]:
+        """The certificate and key to serve TLS with, or ``None`` for neither; the files are read by the start."""
         cert_path = self._tls_cert.text().strip()
         key_path = self._tls_key.text().strip()
         if not cert_path and not key_path:
             return None
         if not cert_path or not key_path:
             raise ValueError(_t("rd_tls_both_required"))
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-        ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
-        return ctx
+        return cert_path, key_path
 
     def _start(self) -> None:
         if self._host_op.busy:          # a start or stop is still out; a second click is ignored
@@ -309,8 +308,8 @@ class _HostPanel(TranslatableMixin, QWidget):
             self._generate_token()
             token = self._token.text().strip()
         try:
-            ssl_context = self._build_ssl_context()
-        except (OSError, ValueError) as error:
+            tls = self._tls_paths()
+        except ValueError as error:
             QMessageBox.warning(self, _t("rd_host_start"), str(error))
             return
         host_cls = (WebSocketDesktopHost if transport == "WebSocket"
@@ -323,20 +322,23 @@ class _HostPanel(TranslatableMixin, QWidget):
             port=self._port.value(),
             fps=float(self._fps.value()),
             quality=self._quality.value(),
-            ssl_context=ssl_context,
+            ssl_context=None,
             audio_config=AudioCaptureConfig(
                 enabled=self._audio_available and self._enable_audio.isChecked(),
             ),
         )
         # The transport a viewer picks: with a certificate, TCP is TLS and
         # WebSocket is WSS, which the share text used to call TCP / WebSocket.
-        if ssl_context is not None:
+        on_displaced = self._view.callback("_on_displaced")
+        work = functools.partial(replace_host, self._owner, build, on_displaced)
+        if tls is not None:
             transport = {"TCP": "TLS", "WebSocket": "WSS"}[transport]
+            # The chain is read on the start's worker, before the running host is stopped.
+            work = functools.partial(replace_tls_host, self._owner, *tls, build, on_displaced)
         self._starting = {"bind": bind, "transport": transport, "token": token}
         self._pending_key = "gui_op_starting"
         self._host_op.run(
-            functools.partial(replace_host, self._owner, build, self._view.callback("_on_displaced")),
-            on_done=self._on_started, on_error=self._on_start_failed,
+            work, on_done=self._on_started, on_error=self._on_start_failed,
             discard=functools.partial(release_host, self._owner))
         self._refresh_status()
 
@@ -346,7 +348,8 @@ class _HostPanel(TranslatableMixin, QWidget):
         self._refresh_status()
 
     def _on_start_failed(self, error: Exception) -> None:
-        self._shared = None
+        if not isinstance(error, HostTlsError):     # a certificate that did not load stopped nothing
+            self._shared = None
         self._refresh_status()
         QMessageBox.warning(self, _t("rd_host_start"), str(error))
 

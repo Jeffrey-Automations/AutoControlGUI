@@ -23,7 +23,7 @@ from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui.remote_desktop._connect_task import connect_viewer
 from je_auto_control.gui.remote_desktop._helpers import (
     _CollapsibleSection, _StatusBadge, _build_insecure_client_context,
-    _build_verifying_client_context, _t,
+    _build_verifying_client_context, _t, trust_loader,
     wire_remote_input,
 )
 from je_auto_control.gui.remote_desktop.remote_screen_window import (
@@ -300,8 +300,10 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             return
         # The connect itself (TCP, TLS / WebSocket upgrade, auth: up to five
         # seconds each) held the GUI thread for all of it.
+        # The CA store a verifying TLS context needs is read there too, before the connect.
         self._connect_task = connect_viewer(
-            self, viewer, on_connected=self._on_connected, on_failed=self._on_connect_failed, before=previous)
+            self, viewer, on_connected=self._on_connected, on_failed=self._on_connect_failed, before=previous,
+            prepare=trust_loader(ssl_context))
         self._connect_task.finished.connect(self._on_connect_finished)
         self._refresh_status()
 

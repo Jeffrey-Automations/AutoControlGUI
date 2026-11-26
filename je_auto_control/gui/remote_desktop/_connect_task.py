@@ -31,8 +31,9 @@ def _disconnect_quietly(viewer: Any) -> None:
 
 
 def _connect(viewer: Any, timeout_s: float, before: Optional[Callable[[], Any]],
-             authority: DeferredAuthorization, token: CancellationToken) -> Any:
-    """Worker thread: run ``before`` (always), then connect ``viewer`` and return it."""
+             prepare: Optional[Callable[[], Any]], authority: DeferredAuthorization,
+             token: CancellationToken) -> Any:
+    """Worker thread: run ``before`` (always), then ``prepare``, then connect ``viewer`` and return it."""
     if before is not None:
         # The previous session's shutdown: it lets go of its seat before this
         # one connects, and it runs even when the connect was cancelled.
@@ -45,6 +46,9 @@ def _connect(viewer: Any, timeout_s: float, before: Optional[Callable[[], Any]],
     # runs out its timeout, and the viewer it produced is disconnected by
     # the task's ``discard``.
     token.raise_if_cancelled()
+    if prepare is not None:
+        prepare()                   # the TLS context's CA load; what it raises is the connect's error
+        token.raise_if_cancelled()
     viewer.connect(timeout=token.remaining(timeout_s))
     return viewer
 
@@ -53,7 +57,8 @@ def connect_viewer(owner: QObject, viewer: Any, *,
                    on_connected: Callable[[Any], None],
                    on_failed: Callable[[Exception], None],
                    timeout_s: float = CONNECT_TIMEOUT_S,
-                   before: Optional[Callable[[], Any]] = None) -> TaskHandle:
+                   before: Optional[Callable[[], Any]] = None,
+                   prepare: Optional[Callable[[], Any]] = None) -> TaskHandle:
     """Run ``viewer.connect`` off the GUI thread for ``owner``; return the task.
 
     ``on_connected(viewer)`` or ``on_failed(error)`` runs on the GUI thread,
@@ -63,8 +68,10 @@ def connect_viewer(owner: QObject, viewer: Any, *,
     connects anyway. ``before`` -- typically the shutdown of the session this
     one replaces, from ``registry.detach``
     -- runs on the same worker first, so it does not hold the GUI thread.
+    ``prepare`` runs there next, before the connect: loading the CA store into
+    the viewer's TLS context (``_helpers.trust_loader``), which reads files.
     """
-    handle = task_controller().submit(functools.partial(_connect, viewer, timeout_s, before,
+    handle = task_controller().submit(functools.partial(_connect, viewer, timeout_s, before, prepare,
                                                         DeferredAuthorization.capture()),
                                       owner=owner, discard=_disconnect_quietly)
     handle.result.connect(weak_slot(on_connected))

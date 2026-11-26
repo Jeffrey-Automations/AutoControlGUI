@@ -1,4 +1,5 @@
 """Shared helpers for the remote-desktop GUI panels."""
+import functools
 import inspect
 import ssl
 import weakref
@@ -141,13 +142,29 @@ def _write_json_file(path: str, data: Any) -> None:
 
 
 def _build_verifying_client_context() -> ssl.SSLContext:
-    """TLS client context with full hostname + cert verification enabled."""
+    """TLS client context with full hostname + cert verification enabled.
+
+    It trusts nothing yet: reading the system's CA store can take seconds, so
+    a connect hands :func:`load_default_trust` to its worker, which runs it
+    before the viewer dials.
+    """
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-    ctx.load_default_certs()
     ctx.check_hostname = True
     ctx.verify_mode = ssl.CERT_REQUIRED
     return ctx
+
+
+def load_default_trust(ctx: ssl.SSLContext) -> None:
+    """Worker thread: load the system's CA certificates into a context from :func:`_build_verifying_client_context`."""
+    ctx.load_default_certs()
+
+
+def trust_loader(ctx: Optional[ssl.SSLContext]) -> Optional[Callable[[], None]]:
+    """What a connect's worker runs before dialling with ``ctx``: the CA load a verifying context needs, or nothing."""
+    if ctx is None or ctx.verify_mode != ssl.CERT_REQUIRED:
+        return None
+    return functools.partial(load_default_trust, ctx)
 
 
 def _build_insecure_client_context() -> ssl.SSLContext:

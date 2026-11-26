@@ -43,7 +43,7 @@ from je_auto_control.gui.remote_desktop._connect_task import connect_viewer
 from je_auto_control.gui.remote_desktop._host_ops import release_host, replace_host, stop_host
 from je_auto_control.gui.remote_desktop.connection_recent import _RecentConnectionsMixin
 from je_auto_control.gui.remote_desktop._helpers import (
-    _StatusBadge, _build_verifying_client_context, _t,
+    _StatusBadge, _build_verifying_client_context, _t, trust_loader,
     wire_remote_input,
 )
 from je_auto_control.gui.remote_desktop.remote_screen_window import (
@@ -512,10 +512,12 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         if session == self._session:        # an error from a session already replaced or closed is not news
             self._on_error(message)
 
-    def _begin_connect(self, slot: str, build: Callable[[], Any], on_live: Callable[[], None]) -> None:
+    def _begin_connect(self, slot: str, build: Callable[[], Any], on_live: Callable[[], None],
+                       prepare: Optional[Callable[[], Any]] = None) -> None:
         """Take ``slot``, build the viewer, and connect it off the GUI thread (see ``_connect_task``).
 
-        ``on_live`` is a method of this screen or a partial of one; it is held weakly.
+        ``on_live`` is a method of this screen or a partial of one; it is held weakly. ``prepare``
+        (the TLS context's CA load) runs on the connect's worker before it dials.
         """
         self._cancel_pending_connect()
         previous = self._take_slot(slot)
@@ -529,7 +531,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         # The old session is closed on the connect's worker, before the new one connects.
         self._connect_task = connect_viewer(
             self, viewer, on_connected=functools.partial(self._on_viewer_live, slot, WeakCall(on_live)),
-            on_failed=self._on_connect_failed, before=previous)
+            on_failed=self._on_connect_failed, before=previous, prepare=prepare)
         self._connect_task.finished.connect(self._on_connect_finished)
         self._refresh_status()
 
@@ -573,7 +575,8 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         ssl_context = _build_verifying_client_context() if scheme == "wss" else None
         self._begin_connect(SLOT_WS_VIEWER, lambda: WebSocketDesktopViewer(
             host=host, port=port, token=token, path=path, ssl_context=ssl_context,
-            **self._viewer_callbacks()), functools.partial(self._ws_live, f"{scheme}://{host}:{port}", path))
+            **self._viewer_callbacks()), functools.partial(self._ws_live, f"{scheme}://{host}:{port}", path),
+            trust_loader(ssl_context))
 
     def _on_remote_cursor(self, x: int, y: int) -> None:
         """Cursor update, delivered on the GUI thread by ``_cursor_moved``."""
