@@ -1,9 +1,10 @@
 """RBAC users group of the REST API tab: list, add, re-role, rotate, remove.
 
 A thin Qt surface over :mod:`je_auto_control.utils.rbac.admin` -- the same
-functions ``AC_user_*`` and ``je_auto_control users`` call. The desktop user
-is not an authenticated caller, so nothing is authorised here: whoever can
-open this window can already edit the store file.
+functions ``AC_user_*`` and ``je_auto_control users`` call. Each operation
+first asks RBAC for the ``AC_user_*`` command it stands for, as the executor
+would, and shows a refusal on the panel instead of raising it; outside an
+RBAC scope (the desktop default) nothing is refused.
 
 A token is shown once, in the "new token" field, right after ``add`` or
 ``rotate``; the next operation clears it. It is never written to a log.
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QMessageBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel, refusal
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import filled_item
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
@@ -41,6 +43,10 @@ def _t(key: str) -> str:
 class RbacUsersPanel(TranslatableMixin, QGroupBox):
     """The user store behind the REST API: its path, its users, one-time tokens."""
 
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_user_list", "AC_user_add", "AC_user_set_role", "AC_user_rotate_token",
+                         "AC_user_remove")
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
@@ -62,6 +68,7 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
         self._status_label = QLabel()
         self._status_label.setWordWrap(True)
         self._status_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self._refusal = RefusalLabel()
         self._build_layout()
         self._retitle_columns()
 
@@ -81,6 +88,7 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
         root.addLayout(token_form)
         set_role(self._status_label, "hint")
         root.addWidget(self._status_label)
+        root.addWidget(self._refusal)
 
     def retranslate(self) -> None:
         """Re-apply the registered keys and the table's column titles."""
@@ -123,6 +131,11 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
             self._table.setRowCount(0)
             self._status_label.setText(_t("rest_users_no_store"))
             return False
+        refused = refusal("AC_user_list")
+        if refused is not None:
+            self._table.setRowCount(0)
+            self._status_label.setText(refused)
+            return False
         try:
             users = admin.list_users(users_path=path)
         except _ERRORS as error:
@@ -145,9 +158,11 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
         self._name_input.setText(filled_item(self._table, row, 1).text())
         self._role_input.setCurrentText(filled_item(self._table, row, 2).text())
 
-    def _target(self) -> Optional[Tuple[str, str]]:
-        """``(store path, user id)`` of the operation, or ``None`` with the reason shown."""
+    def _target(self, command: str) -> Optional[Tuple[str, str]]:
+        """``(store path, user id)`` of ``command``, or ``None`` with the reason (or the refusal) shown."""
         self._token_value.clear()
+        if not self._refusal.allows(command):
+            return None
         path = self.users_path()
         if path is None:
             self._status_label.setText(_t("rest_users_no_store"))
@@ -165,7 +180,7 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
             _t("rest_users_token_issued").format(user=issued["user_id"]))
 
     def _on_add(self) -> None:
-        target = self._target()
+        target = self._target("AC_user_add")
         if target is None:
             return
         try:
@@ -178,7 +193,7 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
         self._show_token(issued)
 
     def _on_rotate(self) -> None:
-        target = self._target()
+        target = self._target("AC_user_rotate_token")
         if target is None:
             return
         try:
@@ -189,7 +204,7 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
         self._show_token(issued)
 
     def _on_set_role(self) -> None:
-        target = self._target()
+        target = self._target("AC_user_set_role")
         if target is None:
             return
         try:
@@ -201,7 +216,7 @@ class RbacUsersPanel(TranslatableMixin, QGroupBox):
         self._reload()
 
     def _on_remove(self) -> None:
-        target = self._target()
+        target = self._target("AC_user_remove")
         if target is None:
             return
         confirm = QMessageBox.question(

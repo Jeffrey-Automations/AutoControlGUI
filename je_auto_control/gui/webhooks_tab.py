@@ -1,4 +1,9 @@
-"""Webhooks tab: bind HTTP requests to action scripts."""
+"""Webhooks tab: bind HTTP requests to action scripts.
+
+Starting and stopping the server and adding or removing a webhook first ask
+RBAC for ``AC_webhook_start`` / ``_stop`` / ``_add`` / ``_remove``; a refusal
+is shown in the tab and the server is not touched.
+"""
 from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer, Qt
@@ -8,6 +13,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import kept_selection
@@ -33,6 +39,9 @@ def _t(key: str) -> str:
 class WebhooksTab(TranslatableMixin, QWidget):
     """GUI front-end for :data:`default_webhook_server`."""
 
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_webhook_start", "AC_webhook_stop", "AC_webhook_add", "AC_webhook_remove")
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
@@ -41,6 +50,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
         self._port_input.setRange(0, 65535)
         self._port_input.setValue(0)
         self._status_label = QLabel()
+        self._refusal = RefusalLabel()
         self._server_op = SlowOp(self)
         self._path_input = QLineEdit()
         self._path_input.setPlaceholderText("/jobs")
@@ -100,6 +110,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
         self._status_label.setWordWrap(True)
         set_role(self._status_label, "hint")
         server_layout.addWidget(self._status_label)
+        server_layout.addWidget(self._refusal)
         root.addWidget(server_box)
 
         add_box = self._tr(QGroupBox(), "wh_add_group")
@@ -129,6 +140,8 @@ class WebhooksTab(TranslatableMixin, QWidget):
     def _on_start(self) -> None:
         if self._server_op.busy:        # still stopping: the port is not free yet
             return
+        if not self._refusal.allows("AC_webhook_start"):
+            return
         host = self._host_input.text().strip() or "127.0.0.1"
         port = int(self._port_input.value())
         try:
@@ -147,6 +160,8 @@ class WebhooksTab(TranslatableMixin, QWidget):
     def _on_stop(self) -> None:
         # stop() shuts the HTTP server down and joins its thread (up to 2 s),
         # which used to hold the GUI thread; a second Stop is ignored.
+        if not self._refusal.allows("AC_webhook_stop"):
+            return
         if self._server_op.run(default_webhook_server.stop, on_done=self._on_server_stopped,
                                on_error=self._on_server_stopped, retain_failure=True):
             self._refresh()
@@ -165,6 +180,8 @@ class WebhooksTab(TranslatableMixin, QWidget):
         return [m for m, c in self._method_checks.items() if c.isChecked()]
 
     def _on_register(self) -> None:
+        if not self._refusal.allows("AC_webhook_add"):
+            return
         path = self._path_input.text().strip()
         script = self._script_input.text().strip()
         if not path or not script:
@@ -189,7 +206,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
         if row < 0:
             return
         item = self._table.item(row, 0)
-        if item is None:
+        if item is None or not self._refusal.allows("AC_webhook_remove"):
             return
         default_webhook_server.remove(item.text())
         self._refresh()

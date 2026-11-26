@@ -19,7 +19,7 @@ pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox  # noqa: E402
 
 from headless._qt_settle import pump_until  # noqa: E402
-from je_auto_control.gui import plugins_tab, secrets_tab  # noqa: E402
+from je_auto_control.gui import plugins_tab, rbac_users_panel, rest_api_tab, secrets_tab, webhooks_tab  # noqa: E402
 from je_auto_control.gui._authorize import RefusalLabel, refusal  # noqa: E402
 from je_auto_control.utils.rbac import AuthorizationContext, Role, authorization_scope  # noqa: E402
 from je_auto_control.utils.rbac.policy import COMMAND_CAPABILITIES  # noqa: E402
@@ -164,9 +164,107 @@ def test_the_plugins_tab_loads_off_the_gui_thread_without_rbac(monkeypatch):
     _dispose(tab)
 
 
+# --- webhooks -----------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("slot, command", [
+    ("_on_start", "AC_webhook_start"), ("_on_stop", "AC_webhook_stop"),
+    ("_on_register", "AC_webhook_add"), ("_on_remove", "AC_webhook_remove"),
+])
+def test_the_webhooks_tab_refuses_a_viewer(monkeypatch, slot, command):
+    server = _Recorder()
+    monkeypatch.setattr(webhooks_tab, "default_webhook_server", server)
+    tab = webhooks_tab.WebhooksTab()
+    tab._path_input.setText("/jobs")
+    tab._script_input.setText("job.json")
+    tab._table.setRowCount(1)
+    tab._table.setItem(0, 0, webhooks_tab.QTableWidgetItem("hook-1"))
+    tab._table.setCurrentCell(0, 0)
+    server.calls.clear()
+    with _viewer():
+        getattr(tab, slot)()
+    assert not tab._server_op.busy
+    _assert_refused(tab, command, [call for call in server.calls if call != "list_webhooks"])
+    _dispose(tab)
+
+
+def test_the_webhooks_tab_is_unchanged_without_rbac(monkeypatch):
+    server = _Recorder()
+    monkeypatch.setattr(webhooks_tab, "default_webhook_server", server)
+    tab = webhooks_tab.WebhooksTab()
+    tab._path_input.setText("/jobs")
+    tab._script_input.setText("job.json")
+    tab._on_register()
+    assert "add" in server.calls and tab._refusal.isHidden()
+    _dispose(tab)
+
+
+# --- REST API and its users ---------------------------------------------------------------------------------
+
+def _rest_registry(monkeypatch):
+    registry = _Recorder()
+    registry.status = lambda: {"running": True, "url": "http://127.0.0.1:1", "token": "shared"}
+    monkeypatch.setattr(rest_api_tab, "rest_api_registry", registry)
+    return registry
+
+
+@pytest.mark.parametrize("slot, command", [
+    ("_on_start", "AC_rest_api_start"), ("_on_stop", "AC_rest_api_stop"),
+    ("_on_copy_token", "AC_rest_api_status"),
+    ("_on_config_export", "AC_config_export"), ("_on_config_import", "AC_config_import"),
+])
+def test_the_rest_tab_refuses_a_viewer(monkeypatch, slot, command):
+    registry, bundles = _rest_registry(monkeypatch), []
+    monkeypatch.setattr(rest_api_tab, "export_config_bundle", lambda: bundles.append("export"))
+    monkeypatch.setattr(rest_api_tab, "import_config_bundle", lambda bundle: bundles.append("import"))
+    copied = []
+    monkeypatch.setattr(rest_api_tab.QGuiApplication, "clipboard", lambda: type("C", (), {
+        "setText": staticmethod(copied.append)}))
+    tab = rest_api_tab.RestApiTab()
+    with _viewer():
+        getattr(tab, slot)()
+    assert not tab._server_op.busy and not tab._config_task.running
+    _assert_refused(tab, command, registry.calls + bundles + copied)
+    _dispose(tab)
+
+
+def test_the_rest_tab_does_not_show_the_shared_token_to_a_viewer(monkeypatch):
+    _rest_registry(monkeypatch)
+    tab = rest_api_tab.RestApiTab()
+    assert tab._token_value.text() == "shared"
+    with _viewer():
+        tab._refresh_status()
+    assert "shared" not in tab._token_value.text()
+    assert tab._shared_token is None
+    assert "AC_rest_api_status" in tab._status_label.text()
+    _dispose(tab)
+
+
+@pytest.mark.parametrize("slot, command", [
+    ("_on_add", "AC_user_add"), ("_on_rotate", "AC_user_rotate_token"),
+    ("_on_set_role", "AC_user_set_role"), ("_on_remove", "AC_user_remove"), ("refresh", "AC_user_list"),
+])
+def test_the_rest_users_panel_refuses_a_viewer(monkeypatch, tmp_path, slot, command):
+    admin = _Recorder()
+    monkeypatch.setattr(rbac_users_panel, "admin", admin)
+    panel = rbac_users_panel.RbacUsersPanel()
+    panel._path_input.setText(str(tmp_path / "users.json"))
+    panel._id_input.setText("alice")
+    with _viewer():
+        getattr(panel, slot)()
+    assert admin.calls == []
+    if slot == "refresh":
+        assert command in panel._status_label.text()
+    else:
+        _assert_refused(panel, command)
+    panel.deleteLater()
+
+
 # --- every tab names what it needs, for the page banner -----------------------------------------------------
 
-@pytest.mark.parametrize("cls", [secrets_tab.SecretsTab, plugins_tab.PluginsTab])
+@pytest.mark.parametrize("cls", [
+    secrets_tab.SecretsTab, plugins_tab.PluginsTab, webhooks_tab.WebhooksTab, rest_api_tab.RestApiTab,
+    rbac_users_panel.RbacUsersPanel,
+])
 def test_each_tab_declares_its_required_commands(cls):
     required = getattr(cls, "REQUIRED_COMMANDS", ())
     assert required, cls.__name__

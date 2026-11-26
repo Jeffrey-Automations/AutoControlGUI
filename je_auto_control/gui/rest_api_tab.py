@@ -4,8 +4,15 @@ Without a user store the server has one shared bearer token and the tab
 shows it. With one (RBAC) the shared token opens nothing, so the tab says
 whose tokens are accepted instead of displaying a credential the server
 refuses; the users themselves are managed in the group below.
+
+Each command first asks RBAC for the ``AC_*`` command it stands for
+(``AC_rest_api_start`` / ``_stop`` / ``_status``, ``AC_config_export`` /
+``_import``) and shows a refusal in the tab; the status line never shows the
+shared token to a role that may not read ``AC_rest_api_status``. Exporting and
+importing the configuration bundle read and write many files, so they run as
+a :class:`~je_auto_control.gui._tab_task.TabTask`.
 """
-from typing import Optional
+from typing import Any, Optional, Tuple
 
 import functools
 import json
@@ -18,10 +25,12 @@ from PySide6.QtWidgets import (
     QMessageBox, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel, refusal
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._slow_op import SlowOp
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import set_role
@@ -29,9 +38,8 @@ from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
 from je_auto_control.gui.rbac_users_panel import RbacUsersPanel
-from je_auto_control.utils.config_bundle import (
-    ConfigBundleError, export_config_bundle, import_config_bundle,
-)
+from je_auto_control.utils.config_bundle import export_config_bundle, import_config_bundle
+from je_auto_control.utils.rbac.policy import authorize_command
 from je_auto_control.utils.rest_api.rest_registry import rest_api_registry
 
 
@@ -39,8 +47,33 @@ def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
+def _export_work(path: str) -> Tuple[int, str]:
+    """Worker thread: build the bundle and write it to ``path``; return how many files it holds."""
+    authorize_command("AC_config_export")
+    bundle = export_config_bundle()
+    Path(path).write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
+    return len(bundle["files"]), path
+
+
+def _read_bundle_work(path: str) -> Any:
+    """Worker thread: read the bundle the user picked, before they confirm the import."""
+    authorize_command("AC_config_import")
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def _import_work(bundle: Any) -> Tuple[int, int]:
+    """Worker thread: write the bundle's files; return how many were written and skipped."""
+    authorize_command("AC_config_import")
+    report = import_config_bundle(bundle)
+    return len(report.written), len(report.skipped)
+
+
 class RestApiTab(TranslatableMixin, QWidget):
     """Thin Qt surface over :data:`rest_api_registry`."""
+
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_rest_api_start", "AC_rest_api_stop", "AC_rest_api_status",
+                         "AC_config_export", "AC_config_import")
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -62,6 +95,13 @@ class RestApiTab(TranslatableMixin, QWidget):
         self._token_field = SecretField(self._token_value, self._tr, copyable=False)  # Actions > Copy token
         self._token_field.set_value("-", secret=False)
         self._status_label = QLabel()
+        self._refusal = RefusalLabel()
+        # Exporting or importing the configuration bundle: many files, off the GUI thread.
+        self._config_task = TabTask(self)
+        self._config_task.result.connect(self._on_config_result)
+        self._config_task.error.connect(self._on_config_failed)
+        self._config_task.finished.connect(self._on_config_finished)
+        self._pending_bundle: Optional[Tuple[Any]] = None     # read, awaiting the user's confirmation
         # Start replaces a running server and Stop joins its thread: both off the GUI thread.
         self._server_op = SlowOp(self)
         self._pending_key = "gui_op_stopping"
@@ -82,6 +122,7 @@ class RestApiTab(TranslatableMixin, QWidget):
         root = QVBoxLayout(self)
         root.setSpacing(12)
         root.addWidget(ResponsiveBox(self._build_config_group(), self._build_status_group()))
+        root.addWidget(self._refusal)
         root.addWidget(self._users_panel, stretch=1)
 
     def menu_actions(self) -> list[tuple[str, object]]:
@@ -121,58 +162,57 @@ class RestApiTab(TranslatableMixin, QWidget):
         layout.addWidget(self._audit_check)
         return group
 
+    def _start_config(self, command: str, tag: str, work: Any) -> None:
+        if not self._refusal.allows(command):
+            return
+        if not self._config_task.start(work, tag=tag):
+            self._status_label.setText(_t("task_busy"))
+
     def _on_config_export(self) -> None:
+        if not self._refusal.allows("AC_config_export"):
+            return
         path_str, _ = QFileDialog.getSaveFileName(
             self, _t("rest_config_export"),
             "autocontrol-config.json",
             "JSON (*.json)",
         )
-        if not path_str:
-            return
-        try:
-            bundle = export_config_bundle()
-            Path(path_str).write_text(
-                json.dumps(bundle, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-        except (OSError, ValueError) as error:
-            QMessageBox.warning(self, _t("rest_config_export"), str(error))
-            return
-        QMessageBox.information(
-            self, _t("rest_config_export"),
-            _t("rest_config_export_done").format(
-                count=len(bundle["files"]), path=path_str,
-            ),
-        )
+        if path_str:
+            self._start_config("AC_config_export", "export", functools.partial(_export_work, path_str))
 
     def _on_config_import(self) -> None:
+        if not self._refusal.allows("AC_config_import"):
+            return
         path_str, _ = QFileDialog.getOpenFileName(
             self, _t("rest_config_import"), "", "JSON (*.json)",
         )
-        if not path_str:
-            return
-        try:
-            bundle = json.loads(Path(path_str).read_text(encoding="utf-8"))
-        except (OSError, ValueError) as error:
-            QMessageBox.warning(self, _t("rest_config_import"), str(error))
+        if path_str:
+            self._start_config("AC_config_import", "read", functools.partial(_read_bundle_work, path_str))
+
+    def _on_config_result(self, outcome: Any) -> None:
+        tag = self._config_task.tag
+        if tag == "read":
+            self._pending_bundle = (outcome,)   # confirmed once the read task has finished
+        elif tag == "export":
+            QMessageBox.information(self, _t("rest_config_export"), _t("rest_config_export_done").format(
+                count=outcome[0], path=outcome[1]))
+        else:
+            QMessageBox.information(self, _t("rest_config_import"), _t("rest_config_import_done").format(
+                written=outcome[0], skipped=outcome[1]))
+
+    def _on_config_failed(self, error: object) -> None:
+        title = "rest_config_export" if self._config_task.tag == "export" else "rest_config_import"
+        QMessageBox.warning(self, _t(title), str(error))
+
+    def _on_config_finished(self) -> None:
+        pending, self._pending_bundle = self._pending_bundle, None
+        if pending is None:
             return
         confirm = QMessageBox.question(
             self, _t("rest_config_import"),
             _t("rest_config_import_confirm"),
         )
-        if confirm != QMessageBox.StandardButton.Yes:
-            return
-        try:
-            report = import_config_bundle(bundle)
-        except ConfigBundleError as error:
-            QMessageBox.warning(self, _t("rest_config_import"), str(error))
-            return
-        QMessageBox.information(
-            self, _t("rest_config_import"),
-            _t("rest_config_import_done").format(
-                written=len(report.written), skipped=len(report.skipped),
-            ),
-        )
+        if confirm == QMessageBox.StandardButton.Yes:
+            self._start_config("AC_config_import", "import", functools.partial(_import_work, pending[0]))
 
     def _build_status_group(self) -> QGroupBox:
         group = self._tr(QGroupBox(), "rest_status_group")
@@ -188,6 +228,8 @@ class RestApiTab(TranslatableMixin, QWidget):
 
     def _on_start(self) -> None:
         if self._server_op.busy:        # a start or stop is still out; a second click is ignored
+            return
+        if not self._refusal.allows("AC_rest_api_start"):
             return
         host = self._host_input.text().strip() or "127.0.0.1"
         port = int(self._port_input.value())
@@ -208,7 +250,7 @@ class RestApiTab(TranslatableMixin, QWidget):
         QMessageBox.warning(self, _t("rest_start"), str(error))
 
     def _on_stop(self) -> None:
-        if self._server_op.busy:
+        if self._server_op.busy or not self._refusal.allows("AC_rest_api_stop"):
             return
         self._pending_key = "gui_op_stopping"
         self._server_op.run(rest_api_registry.stop, on_done=self._on_server_op_done,
@@ -224,17 +266,24 @@ class RestApiTab(TranslatableMixin, QWidget):
             QGuiApplication.clipboard().setText(text)
 
     def _on_copy_token(self) -> None:
-        if self._shared_token:
+        if self._refusal.allows("AC_rest_api_status") and self._shared_token:
             QGuiApplication.clipboard().setText(self._shared_token)
+
+    def _show_no_status(self, text: str) -> None:
+        self._shared_token = None
+        self._url_value.setText("-")
+        self._token_field.set_value("-", secret=False)
+        self._status_label.setText(text)
 
     def _refresh_status(self) -> None:
         if self._server_op.busy:
             # Not status(): it waits for the registry's lock, which a start
             # holds until the previous server has been joined.
-            self._shared_token = None
-            self._url_value.setText("-")
-            self._token_field.set_value("-", secret=False)
-            self._status_label.setText(_t(self._pending_key))
+            self._show_no_status(_t(self._pending_key))
+            return
+        refused = refusal("AC_rest_api_status")     # its reply carries the shared token
+        if refused is not None:
+            self._show_no_status(refused)
             return
         status = rest_api_registry.status()
         # With RBAC each user has their own token, so the shared-token field is disabled.
@@ -242,9 +291,7 @@ class RestApiTab(TranslatableMixin, QWidget):
         self._token_input.setEnabled(not rbac)
         self._shared_token = None
         if not status["running"]:
-            self._url_value.setText("-")
-            self._token_field.set_value("-", secret=False)
-            self._status_label.setText(_t("rest_stopped"))
+            self._show_no_status(_t("rest_stopped"))
             return
         self._url_value.setText(status["url"])
         if rbac:

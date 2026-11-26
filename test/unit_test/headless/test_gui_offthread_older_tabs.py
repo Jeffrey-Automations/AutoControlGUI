@@ -14,7 +14,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 
-from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox  # noqa: E402
 
 from headless._qt_settle import pump_until  # noqa: E402
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper  # noqa: E402
@@ -54,6 +54,11 @@ def boxes(monkeypatch):
     shown = []
     for name in ("warning", "information", "critical"):
         monkeypatch.setattr(QMessageBox, name, lambda *args: shown.append(args[-1]))
+    # No real dialog ever opens: a test that needs a path patches the one it uses.
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: ("", ""))
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: ("", ""))
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args, **kwargs: "")
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.No)
     return shown
 
 
@@ -120,4 +125,69 @@ def test_disposing_the_secrets_tab_drops_an_unlock_still_out(boxes, monkeypatch)
     gate.release.set()
     pump_until(lambda: False, timeout=0.5)
     assert shown == [] and tab._list.count() == 0
+    tab.deleteLater()
+
+
+# --- REST tab: configuration bundle -------------------------------------------------------------------------
+
+def _rest_tab(monkeypatch):
+    from je_auto_control.gui import rest_api_tab as module
+    registry = type("R", (), {"status": staticmethod(lambda: {"running": False}), "stop": staticmethod(
+        lambda: None)})
+    monkeypatch.setattr(module, "rest_api_registry", registry)
+    return module, module.RestApiTab()
+
+
+def test_exporting_the_configuration_runs_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    module, tab = _rest_tab(monkeypatch)
+    gate = _Gate(result={"files": {"a.json": "{}"}})
+    target = tmp_path / "bundle.json"
+    monkeypatch.setattr(module, "export_config_bundle", gate)
+    monkeypatch.setattr(module.QFileDialog, "getSaveFileName", lambda *args: (str(target), ""))
+    monkeypatch.setattr(module.QFileDialog, "getOpenFileName", lambda *args: (str(target), ""))
+    _returns_at_once(tab._on_config_export)
+    assert gate.entered.wait(_WAIT)
+    tab._on_config_import()                         # one bundle operation at a time
+    assert tab._status_label.text() == _t("task_busy")
+    gate.release.set()
+    assert pump_until(lambda: not tab._config_task.running)
+    assert gate.off_gui_thread() and target.is_file()
+    assert boxes == [_t("rest_config_export_done").format(count=1, path=str(target))]
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_importing_the_configuration_reads_and_writes_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    import json
+    module, tab = _rest_tab(monkeypatch)
+    source = tmp_path / "bundle.json"
+    source.write_text(json.dumps({"files": {}}), encoding="utf-8")
+    report = type("Report", (), {"written": ["a"], "skipped": []})()
+    gate = _Gate(result=report)
+    asked = []
+    monkeypatch.setattr(module, "import_config_bundle", gate)
+    monkeypatch.setattr(module.QFileDialog, "getOpenFileName", lambda *args: (str(source), ""))
+    monkeypatch.setattr(module.QMessageBox, "question", lambda *args: asked.append(args[-1]) or
+                        QMessageBox.StandardButton.Yes)
+    _returns_at_once(tab._on_config_import)
+    assert pump_until(gate.entered.is_set)          # read, confirmed, then written on a worker
+    assert asked == [_t("rest_config_import_confirm")]
+    gate.release.set()
+    assert pump_until(lambda: not tab._config_task.running)
+    assert gate.off_gui_thread()
+    assert boxes == [_t("rest_config_import_done").format(written=1, skipped=0)]
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_a_configuration_file_that_cannot_be_read_is_reported(boxes, monkeypatch, tmp_path):
+    module, tab = _rest_tab(monkeypatch)
+    source = tmp_path / "broken.json"
+    source.write_text("{not json", encoding="utf-8")
+    monkeypatch.setattr(module.QFileDialog, "getOpenFileName", lambda *args: (str(source), ""))
+    monkeypatch.setattr(module.QMessageBox, "question", lambda *args: pytest.fail("nothing to confirm"))
+    tab._on_config_import()
+    assert pump_until(lambda: not tab._config_task.running)
+    assert len(boxes) == 1 and "Expecting" in boxes[0]
+    tab.dispose()
     tab.deleteLater()
