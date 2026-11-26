@@ -1647,7 +1647,7 @@ def AC_generate_candidate_from_log(
 
 def AC_generate_code(
     source: Any,
-    output: Optional[str] = ...,
+    output: str | None = ...,
     target: str = ...,
     name: str = ...,
     style: str = ...,
@@ -1678,7 +1678,7 @@ def AC_generate_json_report(json_file_name: str = ...) -> None:
 def AC_generate_sbom(path: str | None = ..., root: str = ...) -> Dict[str, Any]:
     """Adapter: build (or write) a CycloneDX SBOM for the project."""
 
-def AC_generate_sop(actions: List[Any], title: str = ..., path: Optional[str] = ...) -> Dict[str, Any]:
+def AC_generate_sop(actions: List[Any], title: str = ..., path: str | None = ...) -> Dict[str, Any]:
     """Adapter: build (or write) a step-by-step SOP from an action list."""
 
 def AC_generate_xml() -> Tuple[str | bytes, str | bytes]:

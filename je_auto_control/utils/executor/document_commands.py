@@ -11,7 +11,6 @@ known ``${var}`` placeholders are substituted as before -- including a
 ``source`` path built from variables -- while secret references and names not
 yet defined stay as written.
 """
-from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 

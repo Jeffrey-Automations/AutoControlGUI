@@ -10,7 +10,6 @@ of the run; and :func:`~je_auto_control.utils.executor.action_redaction.redact_r
 masks ``AC_resolve_ref``'s ``value`` and ``AC_resolve_refs``'s ``resolved`` in
 the logged and displayed result.
 """
-from __future__ import annotations
 
 import json
 from typing import Any, Dict, List, Tuple
