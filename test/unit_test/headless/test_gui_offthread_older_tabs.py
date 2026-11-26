@@ -246,3 +246,80 @@ def test_clearing_the_audit_log_runs_off_the_gui_thread_then_rereads_it(boxes, m
     assert tab._verify_status.text() == _t("audit_clear_done").format(count=3)
     tab.dispose()
     tab.deleteLater()
+
+
+# --- data sources -------------------------------------------------------------------------------------------
+
+def test_loading_a_data_source_runs_off_the_gui_thread(boxes, monkeypatch):
+    from je_auto_control.gui import data_source_tab as module
+    gate = _Gate(result=[{"user": "alice"}])
+    monkeypatch.setattr(module, "load_rows", gate)
+    tab = module.DataSourceTab()
+    tab._kind.setCurrentText("csv")
+    tab._path.setText("rows.csv")
+    _returns_at_once(tab._on_load)
+    assert gate.entered.wait(_WAIT)
+    assert tab._status.text() == _t("task_running")
+    tab._on_load()
+    assert tab._status.text() == _t("task_busy")
+    gate.release.set()
+    assert pump_until(lambda: not tab._loads.running)
+    assert gate.off_gui_thread() and tab._table.rowCount() == 1
+    tab.dispose()
+    tab.deleteLater()
+
+
+# --- trace replay -------------------------------------------------------------------------------------------
+
+def _recording(directory, filenames):
+    import json
+    directory.mkdir(exist_ok=True)
+    entries = [{"timestamp": float(index), "filename": name} for index, name in enumerate(filenames)]
+    (directory / "manifest.json").write_text(json.dumps({"entries": entries}), encoding="utf-8")
+    return directory
+
+
+def _jpeg(path):
+    from PySide6.QtGui import QImage
+    image = QImage(4, 4, QImage.Format.Format_RGB32)
+    image.fill(0x336699)
+    assert image.save(str(path), "JPEG")
+
+
+def test_opening_a_recording_and_reading_frames_run_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui import trace_replay_tab as module
+    recording = _recording(tmp_path / "rec", ["f0.jpg", "f1.jpg"])
+    _jpeg(recording / "f0.jpg")
+    _jpeg(recording / "f1.jpg")
+    opened = _Gate()
+    real_open = module._open_controller
+    monkeypatch.setattr(module, "_open_controller", lambda directory: opened(directory) or real_open(directory))
+    monkeypatch.setattr(module.QFileDialog, "getExistingDirectory", lambda *args: str(recording))
+    tab = module.TraceReplayTab()
+    _returns_at_once(tab._on_open)
+    assert opened.entered.wait(_WAIT)
+    assert tab._controller is None
+    opened.release.set()
+    assert pump_until(lambda: tab._controller is not None and not tab._frames.running)
+    assert opened.off_gui_thread()
+    assert tab._frame_label.pixmap() is not None and not tab._frame_label.pixmap().isNull()
+    tab._on_next()
+    assert pump_until(lambda: not tab._frames.running)
+    assert tab._slider.value() == 1
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_a_frame_named_outside_the_recording_is_not_read(boxes, tmp_path):
+    from je_auto_control.gui import trace_replay_tab as module
+    outside = tmp_path / "secret.jpg"
+    _jpeg(outside)
+    recording = _recording(tmp_path / "rec", ["../secret.jpg"])
+    tab = module.TraceReplayTab()
+    tab.load_recording(str(recording))
+    assert pump_until(lambda: not tab._frames.running)
+    pixmap = tab._frame_label.pixmap()
+    assert pixmap is None or pixmap.isNull()
+    assert "outside the allowed roots" in tab._frame_label.text()
+    tab.dispose()
+    tab.deleteLater()

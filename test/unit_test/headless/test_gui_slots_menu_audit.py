@@ -72,18 +72,19 @@ def test_an_assertion_backend_error_is_shown_once_the_run_is_delivered(monkeypat
     assert "GetPixel failed" in tab._result.text()
 
 
-@pytest.mark.parametrize("module_name, cls_name, setup", [
-    ("data_source_tab", "DataSourceTab",
-     lambda m, mp: (mp.setattr(m, "load_rows", _raiser(AutoControlActionException("bad query"))),
-                    {"_limit": types.SimpleNamespace(value=lambda: 0), "_build_source": lambda: {},
-                     "_status": _Text()})[1]),
-])
-def test_framework_errors_are_shown_by_the_slot(module_name, cls_name, setup, monkeypatch):
-    from je_auto_control.gui import data_source_tab
-    module = {"data_source_tab": data_source_tab}[module_name]
-    stub = types.SimpleNamespace(**setup(module, monkeypatch))
-    getattr(module, cls_name)._on_load(stub)
-    assert stub._status.value, "the slot did not report the error"
+def test_a_data_source_framework_error_is_shown_once_the_load_is_delivered(monkeypatch):
+    # The load runs off the GUI thread, so this needs the real tab.
+    from je_auto_control.gui import data_source_tab as module
+    _app()
+    monkeypatch.setattr(module, "load_rows", _raiser(AutoControlActionException("bad query")))
+    tab = module.DataSourceTab()
+    tab._kind.setCurrentText("csv")
+    tab._path.setText("rows.csv")
+    tab._on_load()
+    assert settle(tab._loads, "task")
+    assert "bad query" in tab._status.text(), "the slot did not report the error"
+    tab.dispose()
+    tab.deleteLater()
 
 
 def test_a_failed_self_heal_click_is_shown_once_the_run_is_delivered(monkeypatch):
@@ -118,9 +119,14 @@ def test_a_broken_recording_folder_is_reported(monkeypatch, tmp_path):
     warned = []
     monkeypatch.setattr(tab.QMessageBox, "warning", lambda *args: warned.append(args[-1]))
     monkeypatch.setattr(tab.QFileDialog, "getExistingDirectory", lambda *_args: str(tmp_path))
-    stub = types.SimpleNamespace(load_recording=_raiser(ValueError("Expecting value: line 1")))
-    tab.TraceReplayTab._on_open(stub)
-    assert warned
+    (tmp_path / "manifest.json").write_text('{"entries": [', encoding="utf-8")
+    _app()
+    replay = tab.TraceReplayTab()
+    replay._on_open()
+    assert settle(replay._opening, "task")      # the manifest is read off the GUI thread
+    assert warned and "Expecting" in warned[0]
+    replay.dispose()
+    replay.deleteLater()
 
 
 def test_seeding_variables_is_all_or_nothing(monkeypatch):
