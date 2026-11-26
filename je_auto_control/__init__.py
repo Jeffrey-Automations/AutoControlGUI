@@ -1960,6 +1960,9 @@ if _TYPE_CHECKING:
     from je_auto_control.linux_wayland.global_shortcuts import (
         ShortcutPermissionError, ShortcutUnavailable, StopShortcutSession,
     )
+    from je_auto_control.utils.executor.named_registry import (
+        MAX_REGISTRY_NAMES, RegistryFullError,
+    )
     from je_auto_control.utils.rbac.admin import (
         add_user as rbac_add_user, list_users as rbac_list_users, remove_user as rbac_remove_user,
         rotate_user_token as rbac_rotate_user_token, set_user_role as rbac_set_user_role,
@@ -2733,6 +2736,7 @@ __all__ = [
     "SimctlExtension", "list_ios_simulators", "use_ios_simulator",
     "stop_app", "stop_execution", "stoppable_run", "use_device",
     "wait_for_app",
+    "MAX_REGISTRY_NAMES", "RegistryFullError",
     "start_autocontrol_gui"
 ]
 

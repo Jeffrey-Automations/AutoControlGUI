@@ -2,7 +2,7 @@
 from je_auto_control._lazy_exports import AttributeBinding, ExportBinding, ModuleBinding
 
 
-PUBLIC_ORDER_SHA256 = '469ecde22e476bdec00c0e250cb7793905caa51e0ea0ad6c62bde9a7740499ef'
+PUBLIC_ORDER_SHA256 = '5e2ccb205283db542475d96aded0a1b4a7072c747245f333efa515f4565d102c'
 
 _IOS_SIMCTL = 'je_auto_control.ios.simctl'
 _LINUX_WAYLAND_GLOBAL_SHORTCUTS = 'je_auto_control.linux_wayland.global_shortcuts'
@@ -107,6 +107,7 @@ _UTILS_EVENTS = 'je_auto_control.utils.events'
 _UTILS_EXCEPTION_CANCELLATION = 'je_auto_control.utils.exception.cancellation'
 _UTILS_EXCEPTION_EXCEPTIONS = 'je_auto_control.utils.exception.exceptions'
 _UTILS_EXECUTOR_ACTION_EXECUTOR = 'je_auto_control.utils.executor.action_executor'
+_UTILS_EXECUTOR_NAMED_REGISTRY = 'je_auto_control.utils.executor.named_registry'
 _UTILS_EXECUTOR_RUN_CONTROL = 'je_auto_control.utils.executor.run_control'
 _UTILS_EXPECT_POLL = 'je_auto_control.utils.expect_poll'
 _UTILS_FAILURE_HOOKS = 'je_auto_control.utils.failure_hooks'
@@ -1847,4 +1848,6 @@ EXPORTS: dict[str, ExportBinding] = {
     'stoppable_run': AttributeBinding(_UTILS_EXECUTOR_RUN_CONTROL, 'stoppable_run'),
     'use_device': AttributeBinding(_WRAPPER_DEVICE_CONTEXT, 'use_device'),
     'wait_for_app': AttributeBinding(_WRAPPER_MOBILE_EXTENSIONS, 'wait_for_app'),
+    'MAX_REGISTRY_NAMES': AttributeBinding(_UTILS_EXECUTOR_NAMED_REGISTRY, 'MAX_REGISTRY_NAMES'),
+    'RegistryFullError': AttributeBinding(_UTILS_EXECUTOR_NAMED_REGISTRY, 'RegistryFullError'),
 }

@@ -7,7 +7,8 @@ returned to the caller, but registered with the run's secret masking
 (:mod:`je_auto_control.utils.logging.secret_scope`) as vault values are, so
 the log, the journal and the MCP audit show ``***`` in its place for the rest
 of the run; and :func:`~je_auto_control.utils.executor.action_redaction.redact_result`
-masks ``AC_resolve_ref``'s ``value`` in the logged and displayed result.
+masks ``AC_resolve_ref``'s ``value`` and ``AC_resolve_refs``'s ``resolved`` in
+the logged and displayed result.
 """
 from __future__ import annotations
 

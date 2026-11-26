@@ -19,7 +19,8 @@ uses it for its result log and the Script Builder for its result pane, and
 :func:`masked_fields` lists exactly what it masked, which is what the builder
 offers once. A few commands answer a secret under an ordinary name;
 :data:`RESULT_SECRETS` lists those fields, masked the same way
-(``AC_resolve_ref``'s ``value``, which may be an ``env://`` credential).
+(``AC_resolve_ref``'s ``value`` and ``AC_resolve_refs``'s ``resolved``, which
+may hold an ``env://`` credential).
 
 Generated secret or identifier. A value is a secret when holding it is enough
 to act: a bearer token (``AC_user_add``, ``AC_user_rotate_token``,
@@ -90,6 +91,7 @@ RESULT_IDENTIFIERS: Mapping[str, FrozenSet[str]] = MappingProxyType({
 #: Result fields with an ordinary name that hold a secret: command -> field names.
 RESULT_SECRETS: Mapping[str, FrozenSet[str]] = MappingProxyType({
     "AC_resolve_ref": frozenset({"value"}),
+    "AC_resolve_refs": frozenset({"resolved"}),
 })
 _NO_FIELDS: FrozenSet[str] = frozenset()
 # A record key is "execute: " + str(action); the command is its first element.

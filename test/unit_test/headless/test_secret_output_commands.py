@@ -92,4 +92,5 @@ def test_a_resolved_value_is_masked_in_the_displayed_result():
     assert [field.path for field in masked_fields("AC_resolve_ref", {"value": ENV_VALUE})] == [("value",)]
     nested = {"execute: ['AC_resolve_ref', {'ref': 'env://X'}]": {"value": ENV_VALUE}}
     assert ENV_VALUE not in str(redact_result("AC_execute_action", nested))
+    assert redact_result("AC_resolve_refs", {"resolved": {"k": [ENV_VALUE]}}) == {"resolved": "***"}
     assert redact_result("AC_get_var", {"value": "plain"}) == {"value": "plain"}
