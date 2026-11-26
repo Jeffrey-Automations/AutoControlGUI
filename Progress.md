@@ -163,9 +163,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   relay 的交握逾時是每次讀取、交握執行緒無上限；systemd／launchd 產生器沒有跳脫路徑；turn_config 以預設權限寫入祕密；
   config outbox 前面堆滿 `conflict` 會餓死後面的編輯，回條從不修剪。
   USB 直通斷線後，仍在後端裡的傳輸執行緒會跑到後端逾時（最長 60 秒）才結束；一直重連的觀看者每個斷掉的工作階段最多可占 max_claims + 1 條這種執行緒。
-- **agent_runtime 審查留下的（U-20261126-18）**：Linux／macOS presence listener 在 `accept` 的對端身分失敗會撤銷整個 listener（Windows 版已修）；
-  `windows_image_trust` 接受 FILE_ADD_SUBDIRECTORY，磁碟根目錄下的映像旁可放 `.exe.local`；`task_recovery._check_scope` 允許審核者拿掉 `resume_conditions`；
-  八份以上損壞的待發布報告仍會占滿每次 `flush`；`stop_all` 回傳前仍等 DAG 鎖（輸入已先停）。
 - **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；
   私鑰支援選用通行碼加密，未設定時仍是明文 PEM（0600，Windows 上沒驗權限位元）；遷移模式開著時 HMAC 簽章會被接受。
 - **RBAC**（`JE_AUTOCONTROL_RBAC_USERS`，預設關閉）：

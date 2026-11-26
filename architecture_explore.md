@@ -27,8 +27,8 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 
 | 指標 | 數值 |
 | --- | ---: |
-| Python 模組總數（含周邊子專案） | 1,619 |
-| 程式碼總行數 | 250,714 |
+| Python 模組總數（含周邊子專案） | 1,620 |
+| 程式碼總行數 | 250,941 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -325,7 +325,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.2 框架基礎設施
 
-> 15 個套件、約 6,236 行。
+> 15 個套件、約 6,245 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -341,7 +341,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/package_manager/` | 198 | 動態載入套件並把 executor 注入其中；載入前先過套件閘門（允許清單加上只能從 Python 呼叫的開關，工作區 X-12） |
 | `utils/path_guard/` | 267 | 命令列及伺服器的路徑邊界、客戶端根目錄隔離與受管任務來源政策紀錄 |
 | `utils/platform_id/` | 62 | 作業系統家族的單一判定點。`sys.platform` 原本在一百多處跟字面清單比對，而那些清單都沒有 BSD；`is_x11_unix()` 問的是「這是不是 X11 unix」，這才是守衛一直想問的問題 |
-| `utils/process_memory/` | 2,340 | 內部受審 probe 的有界語意觀察、typed Windows provider、獨立映像檔觀測、自有啟動加釘選雜湊的 attestor 與失敗 handle 回收；檔案證據不等於載入程式碼身分，原生驗收及 runtime 整合待完成 |
+| `utils/process_memory/` | 2,349 | 內部受審 probe 的有界語意觀察、typed Windows provider、獨立映像檔觀測、自有啟動加釘選雜湊的 attestor 與失敗 handle 回收；檔案證據不等於載入程式碼身分，原生驗收及 runtime 整合待完成 |
 | `utils/shell_process/` | 343 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
 | `utils/start_exe/` | 36 | 啟動另一個執行檔行程 |
 
@@ -517,13 +517,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 60,788 行。
+> 14 個套件、約 61,006 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,268 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 33,531 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 33,749 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 178 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -732,7 +732,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 上表以子套件為單位；以下把行數最大的幾個子系統展開到檔案層。
 
-#### `utils/process_memory/`（2,340 行／15 檔）
+#### `utils/process_memory/`（2,349 行／15 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -747,7 +747,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_facts.py` | 55 | Measure native birth, session and architecture through a retained process handle. |
 | `windows_image.py` | 326 | Observe an image file while retaining its process and deny-write/delete file leases. |
 | `windows_image_native.py` | 62 | Typed process-image filename and read-only file acquisition calls. |
-| `windows_image_trust.py` | 257 | Refuse a pinned image another local account could redirect or plant code beside. |
+| `windows_image_trust.py` | 266 | Refuse a pinned image another local account could redirect or plant code beside. |
 | `windows_launch.py` | 242 | Attest a process this host launched itself, from an image file pinned by SHA-256. |
 | `windows_window.py` | 65 | Query a specified HWND's current owner and child windows without activation or input. |
 | `windows_native.py` | 113 | Typed Win32 query/read bindings and caller-sized memory information layouts. |
@@ -1055,7 +1055,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（33,531 行／241 檔）
+#### `utils/agent_runtime/`（33,749 行／242 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1100,20 +1100,20 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `control_admission.py` | 29 | Closed runtime stop requests share a bounded reserve separate from ordinary HTTP polling. |
 | `dag_admission.py` | 80 | Trusted local DAG admission records bind original ownership, caller authority and a live attempt. |
 | `dag_batch_recording.py` | 93 | Durable dispatch claims and independent destination verification for one managed DAG batch. |
-| `dag_batches.py` | 379 | Owner-scoped graph lifecycle and runtime-owned task/artifact host adapters. |
+| `dag_batches.py` | 402 | Owner-scoped graph lifecycle and runtime-owned task/artifact host adapters. |
 | `dag_continuation.py` | 345 | Whole-graph review and one-shot continuation approval never replay a possible delivery. |
 | `dag_continuation_evidence.py` | 171 | Bounded read-only destination evidence for explicit whole-batch continuation decisions. |
 | `dag_continuation_plan.py` | 91 | Explicit per-node decisions preserve graph scope and never reset a possible delivery claim. |
 | `dag_jobs.py` | 144 | Service-owned durable DAG deliveries never replay an interrupted coordinator attempt. |
 | `dag_local.py` | 98 | Closed local-node transport admits claimed DAG work under the original owner's authority. |
 | `dag_retention.py` | 127 | Expire settled DAG records while retaining unresolved input and referenced recovery evidence. |
-| `dag_service_client.py` | 53 | Runtime-bound batch coordination and destination calls refresh both approving and original owners. |
+| `dag_service_client.py` | 55 | Runtime-bound batch coordination and destination calls refresh both approving and original owners. |
 | `delegation.py` | 43 | Short-lived, authenticated principal forwarding across the local service boundary. |
 | `dialog_scope.py` | 54 | Pause managed desktop work at unsaved-content or unrecognized modal windows. |
 | `document_launch.py` | 46 | Bounded document handoff runs outside the disposable native input helper's process tree. |
 | `dom_observation.py` | 196 | Normalize host-declared DOM fields of a managed browser session into the shared observation report. |
-| `errors.py` | 27 | Typed failures for managed tasks, observations and control ownership. |
-| `evidence.py` | 221 | Service-owned task provenance, redacted artifacts and thirty-day metadata retention. |
+| `errors.py` | 31 | Typed failures for managed tasks, observations and control ownership. |
+| `evidence.py` | 259 | Service-owned task provenance, redacted artifacts and thirty-day metadata retention. |
 | `evidence_cache.py` | 92 | Database-bound evidence paths never turn historical journal references into filesystem ownership. |
 | `evidence_handoff.py` | 376 | Explicit revocable evidence-only grants preserve ordinary task ownership and input isolation. |
 | `file_dialog_scope.py` | 62 | Bind the existing file-dialog executor to one task-owned window and rooted absolute path. |
@@ -1150,8 +1150,8 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `readiness.py` | 85 | Passive readiness of the desktop, presence source, devices, browser and models; never a grant or evidence. |
 | `resume_gate.py` | 88 | A task's first action waits until a fresh observation passes every declared resume condition. |
 | `policy.py` | 140 | Explicit task scopes, rooted data paths and secret-safe durable payloads. |
-| `presence_channel_darwin.py` | 321 | Own authenticated macOS stream channels and protected listeners, with the Linux lease owner. |
-| `presence_channel_linux.py` | 434 | Own authenticated Linux packet channels, bounded leases and protected listeners. |
+| `presence_channel_darwin.py` | 305 | Own authenticated macOS stream channels and protected listeners, with the Linux lease owner. |
+| `presence_channel_linux.py` | 464 | Own authenticated Linux packet channels, bounded leases and protected listeners. |
 | `presence_endpoint_darwin.py` | 113 | Own protected macOS socket paths, reusing the Linux identity checks where POSIX allows. |
 | `presence_endpoint_wire.py` | 29 | Carry a presence endpoint through owned launches, choosing the Linux or macOS shape by the metadata itself. |
 | `presence_endpoint_linux.py` | 226 | Own protected Linux socket paths without stale-path reuse or recursive cleanup. |
@@ -1167,7 +1167,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `presence_peer_darwin.py` | 220 | Retain macOS connected-process evidence only; no desktop session or input authority. |
 | `presence_peer_linux.py` | 218 | Retain Linux connected-process evidence only; no desktop session or input authority. |
 | `presence_pipe_darwin.py` | 142 | macOS presence transport behind the Windows pipe's interface; its endpoint arrives only through the owned launch. |
-| `presence_pipe_linux.py` | 211 | Linux presence transport behind the Windows pipe's interface; its endpoint arrives only through the owned launch. |
+| `presence_pipe_linux.py` | 220 | Linux presence transport behind the Windows pipe's interface; its endpoint arrives only through the owned launch. |
 | `presence_pipe_windows.py` | 215 | Secured local byte pipes for owned helpers; no desktop observation or runtime binding. |
 | `presence_pool.py` | 404 | Host-only shared presence ownership; task cancellation never cancels another runtime's source. |
 | `presence_protocol.py` | 74 | Per-connection sequences and issued-token ownership; shared source lifetime remains separate. |
@@ -1196,7 +1196,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `retained_browser.py` | 148 | Bounded effect-task ownership of actual permanently read-only browser helper processes. |
 | `retained_browser_runtime.py` | 91 | Connect actual browser retirement to existing runtime leases and private completion bindings. |
 | `retained_browser_target.py` | 98 | Closed transient read borrowers; the runtime collection owns the original helper lifetime. |
-| `runtime.py` | 750 | Shared managed-task lifecycle with fenced dispatch and evidence-based completion. |
+| `runtime.py` | 694 | Shared managed-task lifecycle with fenced dispatch and evidence-based completion. |
 | `owned_channel_launch.py` | 126 | Retain one pinned process channel through measurement, publication and failed retirement. |
 | `uia_channel.py` | 80 | Receive one correlated UI-fixture startup without writing commands or input acknowledgments. |
 | `scoped_uia.py` | 294 | Read explicit fields beneath one retained-process window inside its owned helper. |
@@ -1241,6 +1241,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `semantic_native_target.py` | 85 | Owned semantic helper proxy that refuses every desktop input event. |
 | `semantic_worker.py` | 83 | Validate grounded helper requests against the worker's immutable task scope. |
 | `runtime_lock.py` | 86 | Cross-process ownership for one runtime database; imports never acquire locks. |
+| `runtime_stop.py` | 180 | Emergency stop of every visible task; a busy DAG batch is fenced in the background, never awaited. |
 | `service.py` | 118 | Explicit local runtime service lifecycle over the existing authenticated REST server. |
 | `skill_completion.py` | 129 | Private read-only evidence for skill recording and publication preserves original workflow identity. |
 | `skill_execution.py` | 115 | Exact original skill effects across real reviewed recovery, without granting input or replacing trials. |
@@ -1256,7 +1257,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `targets.py` | 193 | Explicit target adapters; native imports occur only during requested operations. |
 | `task_authority.py` | 322 | Trusted source-owner recovery admission and live owner/reviewer authority checks. |
 | `task_handoff.py` | 82 | Real non-DAG source identity for explicit completion evidence, without fabricated admission. |
-| `task_recovery.py` | 494 | Review stopped tasks and create one explicitly approved successor without replay. |
+| `task_recovery.py` | 498 | Review stopped tasks and create one explicitly approved successor without replay. |
 | `task_skills.py` | 377 | Immutable managed skill candidates require a verified trial and explicit version publication. |
 | `task_triggers.py` | 272 | Durable preauthorized task bindings with owner refresh, bounded backlog and event deduplication. |
 | `transfer_destination_scope.py` | 33 | Injected destination profiles and live origin ceilings confine reviewed import directories. |
@@ -1639,8 +1640,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 113,982 |
-| **總計** | **1,607** | **249,969** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,076 | 114,209 |
+| **總計** | **1,608** | **250,196** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

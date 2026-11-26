@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Agent runtime: `stop_all` returns without waiting for a busy DAG batch (it is fenced in the
+  background and listed in `batch_fence_pending`); a pinned image directly under a default
+  drive root is refused; a recovery successor may only add resume conditions.
+
 - `create_project_dir` / `AC_create_project` keep existing files unless `overwrite=True` and
   return `{"written": [...], "skipped": [...]}`; `apply_unified` refuses a hunk past the end
   of the text; `lock_session` commands stop after 10 s and raise `LockSessionTimeout`;
