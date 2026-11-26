@@ -27,7 +27,7 @@ from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
 )
 import je_auto_control as ac
 from je_auto_control.utils.quarantine import (
-    auto_quarantine_from_flakiness, default_quarantine_store,
+    QuarantineEntry, auto_quarantine_from_flakiness, default_quarantine_store,
 )
 from je_auto_control.utils.test_suite import TestSuiteResult
 
@@ -50,7 +50,7 @@ def _read_spec(path: str) -> str:
         return handle.read()
 
 
-def _change_quarantine(change: Optional[Callable[[], Any]]) -> list:
+def _change_quarantine(change: Optional[Callable[[], Any]]) -> list[QuarantineEntry]:
     """Worker thread: make ``change`` to the quarantine store (when given), then list it."""
     if change is not None:
         change()
@@ -224,7 +224,7 @@ class TestSuiteTab(TranslatableMixin, QWidget):
         if not self._store.start(functools.partial(_change_quarantine, change)):
             self._summary.setText(_t("task_busy"))
 
-    def _show_quarantine(self, entries: list) -> None:
+    def _show_quarantine(self, entries: list[QuarantineEntry]) -> None:
         self._quarantine.clear()
         for entry in entries:
             label = entry.name
