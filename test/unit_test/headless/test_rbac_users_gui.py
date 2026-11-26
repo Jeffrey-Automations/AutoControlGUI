@@ -26,7 +26,7 @@ from je_auto_control.gui.rbac_users_panel import RbacUsersPanel  # noqa: E402
 from je_auto_control.gui.rest_api_tab import RestApiTab  # noqa: E402
 from je_auto_control.utils.rbac import USERS_ENV, Role, UserStore, admin  # noqa: E402
 from je_auto_control.utils.rest_api.rest_registry import rest_api_registry  # noqa: E402
-from headless._qt_settle import settle_op  # noqa: E402
+from headless._qt_settle import pump_until, settle_op  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -155,6 +155,12 @@ def test_the_tab_offers_the_user_commands_in_its_menu(tab):
 
 # --- the users group --------------------------------------------------------
 
+def _op(panel, slot):
+    """Run one panel command; its read and write of the user file finish off the GUI thread."""
+    slot()
+    assert pump_until(lambda: not panel._ops.running)
+
+
 @pytest.fixture
 def panel(app, tmp_path):
     widget = RbacUsersPanel()
@@ -174,19 +180,19 @@ def test_the_path_defaults_to_the_configured_store(app, tmp_path, monkeypatch):
     empty._path_input.clear()
     assert empty.users_path() is None
     assert empty.user_store() is None
-    empty.refresh()
+    _op(empty, empty.refresh)
     assert empty._status_label.text() == _t("rest_users_no_store")
     empty.deleteLater()
 
 
 def test_add_shows_the_token_once(panel, tmp_path):
     _fill(panel, "alice", Role.ADMIN, "Alice")
-    panel._on_add()
+    _op(panel, panel._on_add)
     token = panel._token_value.text()
     assert UserStore(tmp_path / "users.json").authenticate(token).role == Role.ADMIN
     assert _rows(panel) == [("alice", "Alice", "admin")]
     assert token not in panel._status_label.text()
-    panel.refresh()
+    _op(panel, panel.refresh)
     assert panel._token_value.text() == "", "gone after the next operation"
     assert _rows(panel) == [("alice", "Alice", "admin")]
 
@@ -194,19 +200,19 @@ def test_add_shows_the_token_once(panel, tmp_path):
 def test_select_a_row_then_change_role_rotate_and_remove(panel, tmp_path, monkeypatch):
     store_path = tmp_path / "users.json"
     _fill(panel, "alice", Role.ADMIN)
-    panel._on_add()
+    _op(panel, panel._on_add)
     _fill(panel, "bob", Role.VIEWER, "Bob")
-    panel._on_add()
+    _op(panel, panel._on_add)
     first_token = panel._token_value.text()
     panel._id_input.clear()
     panel._table.selectRow(1)
     assert panel._id_input.text() == "bob"
     assert panel._role_input.currentText() == "viewer"
     panel._role_input.setCurrentText(Role.OPERATOR)
-    panel._on_set_role()
+    _op(panel, panel._on_set_role)
     assert _rows(panel)[1] == ("bob", "Bob", "operator")
     assert panel._token_value.text() == ""
-    panel._on_rotate()
+    _op(panel, panel._on_rotate)
     rotated = panel._token_value.text()
     assert rotated
     assert rotated != first_token
@@ -214,35 +220,35 @@ def test_select_a_row_then_change_role_rotate_and_remove(panel, tmp_path, monkey
     answers = iter([QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes])
     monkeypatch.setattr(rbac_users_panel.QMessageBox, "question",
                         lambda *_args, **_kwargs: next(answers))
-    panel._on_remove()
+    _op(panel, panel._on_remove)
     assert len(_rows(panel)) == 2, "declined"
-    panel._on_remove()
+    _op(panel, panel._on_remove)
     assert _rows(panel) == [("alice", "alice", "admin")]
 
 
 def test_errors_are_shown_in_the_panel_not_in_a_dialog(panel, monkeypatch):
     monkeypatch.setattr(rbac_users_panel.QMessageBox, "question",
                         lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes)
-    panel._on_add()
+    _op(panel, panel._on_add)
     assert panel._status_label.text() == _t("rest_users_no_user")
     _fill(panel, "alice", Role.ADMIN)
-    panel._on_add()
-    panel._on_add()
+    _op(panel, panel._on_add)
+    _op(panel, panel._on_add)
     assert "already exists" in panel._status_label.text()
     assert panel._token_value.text() == ""
-    panel._on_remove()
+    _op(panel, panel._on_remove)
     assert "only admin" in panel._status_label.text()
     _fill(panel, "nobody")
-    panel._on_rotate()
+    _op(panel, panel._on_rotate)
     assert "unknown user_id" in panel._status_label.text()
 
 
 def test_an_unreadable_store_is_reported(panel, tmp_path):
     (tmp_path / "users.json").write_text("not json", encoding="utf-8")
-    panel.refresh()
+    _op(panel, panel.refresh)
     assert _rows(panel) == []
     _fill(panel, "alice", Role.ADMIN)
-    panel._on_add()
+    _op(panel, panel._on_add)
     assert "unreadable" in panel._status_label.text()
     assert (tmp_path / "users.json").read_text(encoding="utf-8") == "not json"
 
@@ -279,3 +285,49 @@ def test_the_one_time_token_is_masked_until_shown(panel, monkeypatch):
                         lambda: type("Clip", (), {"setText": staticmethod(copied.append)})())
     panel._on_copy_token()                          # Actions > Copy token copies it while masked
     assert copied == ["tok-123"]
+
+
+def test_user_operations_run_off_the_gui_thread_one_at_a_time(panel, monkeypatch):
+    import threading
+    import time
+    entered, release, threads = threading.Event(), threading.Event(), []
+    real_add = admin.add_user
+
+    def gated_add(*args, **kwargs):
+        threads.append(threading.get_ident())
+        entered.set()
+        release.wait(10)
+        return real_add(*args, **kwargs)
+
+    monkeypatch.setattr(rbac_users_panel.admin, "add_user", gated_add)
+    _fill(panel, "alice", Role.ADMIN)
+    started = time.monotonic()
+    panel._on_add()
+    assert time.monotonic() - started < 5.0, "the slot held the GUI thread"
+    assert entered.wait(10)
+    assert panel._status_label.text() == _t("task_running")
+    panel.refresh()                                 # one operation at a time
+    assert panel._status_label.text() == _t("task_busy")
+    release.set()
+    assert pump_until(lambda: not panel._ops.running)
+    assert threads and threads[0] != threading.get_ident()
+    assert _rows(panel) == [("alice", "alice", "admin")] and panel._token_value.text()
+
+
+def test_starting_the_rest_server_reads_the_user_store_off_the_gui_thread(tab, tmp_path, monkeypatch):
+    import threading
+    from je_auto_control.gui import rest_api_tab
+    path = tmp_path / "users.json"
+    UserStore(path).add_user(user_id="alice", display_name="Alice", role=Role.ADMIN)
+    threads = []
+    real_store = admin.management_store
+    monkeypatch.setattr(rest_api_tab.admin, "management_store",
+                        lambda users_path: threads.append(threading.get_ident()) or real_store(users_path))
+    tab._users_panel._path_input.setText(str(path))
+    tab._users_panel._enable_check.setChecked(True)
+    tab._port_input.setValue(0)
+    tab._audit_check.setChecked(False)
+    tab._on_start()
+    assert settle_op(tab._server_op)
+    assert threads and all(ident != threading.get_ident() for ident in threads)
+    assert rest_api_registry.server.user_store is not None

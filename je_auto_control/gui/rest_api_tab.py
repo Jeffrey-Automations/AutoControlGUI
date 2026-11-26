@@ -39,6 +39,7 @@ from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
 )
 from je_auto_control.gui.rbac_users_panel import RbacUsersPanel
 from je_auto_control.utils.config_bundle import export_config_bundle, import_config_bundle
+from je_auto_control.utils.rbac import admin
 from je_auto_control.utils.rbac.policy import authorize_command
 from je_auto_control.utils.rest_api.rest_registry import rest_api_registry
 
@@ -66,6 +67,14 @@ def _import_work(bundle: Any) -> Tuple[int, int]:
     authorize_command("AC_config_import")
     report = import_config_bundle(bundle)
     return len(report.written), len(report.skipped)
+
+
+def _start_server(*, host: str, port: int, token: Optional[str], enable_audit: bool,
+                  users_path: Optional[str]) -> Any:
+    """Worker thread: read the user store (when one is ticked), then start the REST server with it."""
+    user_store = None if users_path is None else admin.management_store(users_path)
+    return rest_api_registry.start(host=host, port=port, token=token, enable_audit=enable_audit,
+                                   user_store=user_store)
 
 
 class RestApiTab(TranslatableMixin, QWidget):
@@ -138,11 +147,12 @@ class RestApiTab(TranslatableMixin, QWidget):
         ]
 
     def dispose(self) -> None:
-        """Release what the tab holds beyond its widgets: its status timer (the server keeps running).
+        """Release what the tab holds beyond its widgets: its status timer and a user operation still out.
 
-        Called by ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
+        The server keeps running. Called by ``close_tab(key, release=True)`` before the widget is
+        deleted; safe to call twice.
         """
-        release_resources(self)
+        release_resources(self, self._users_panel.dispose)
 
     def retranslate(self) -> None:
         """Re-translate the tab, its users group and the status texts."""
@@ -236,10 +246,11 @@ class RestApiTab(TranslatableMixin, QWidget):
         token = self._token_input.text().strip() or None
         # start() first stops a running server (a 2 s join), all under the
         # registry's lock, which used to hold the GUI thread.
+        # The user store is read from its file on the worker too.
         work = functools.partial(
-            rest_api_registry.start, host=host, port=port, token=token,
+            _start_server, host=host, port=port, token=token,
             enable_audit=self._audit_check.isChecked(),
-            user_store=self._users_panel.user_store(),
+            users_path=self._users_panel.enabled_users_path(),
         )
         self._pending_key = "gui_op_starting"
         self._server_op.run(work, on_done=self._on_server_op_done, on_error=self._on_start_failed)
