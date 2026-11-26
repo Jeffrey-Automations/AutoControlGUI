@@ -8,8 +8,8 @@ future opens of the same device skip the prompt.
 
 The prompt callback wired into :class:`UsbPassthroughSession` is
 synchronous — it must return ``True`` / ``False`` from a non-GUI
-thread (the callback runs on the WebRTC/asyncio bridge thread, not
-the Qt main thread). :class:`PromptBridge` does the cross-thread
+thread (the callback runs on the USB session's worker thread, see
+``session_worker``, not the Qt main thread). :class:`PromptBridge` does the cross-thread
 marshalling: the worker thread calls ``decide()``, which emits a queued
 signal to the GUI thread, waits on a ``threading.Event``, and returns the
 operator's verdict.

@@ -62,6 +62,13 @@ fields, then send ``{"request_id": "..."}``). Every reply to that request
 value under the same key; CREDIT never does. A request without a usable
 id is answered exactly as before, so a viewer older than the field sees
 no change. See ``protocol`` for the rule in full.
+
+Concurrency: ``handle_frame`` may run on several threads at once -- the
+channel host serves each claim on its own lane (``session_worker``) so a
+transfer blocked in the backend never stalls the WebRTC event loop. A claim
+released (CLOSE or ``close_all``) while one of its transfers is still in
+the backend has its handle closed by that transfer when it returns, once,
+and that late result is discarded.
 """
 from __future__ import annotations
 
@@ -69,7 +76,7 @@ import secrets
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
@@ -79,7 +86,7 @@ from je_auto_control.utils.usb.passthrough.protocol import (
     Frame, Opcode, fragment_payload, request_id_of,
 )
 # The wire bounds are re-exported here, where callers have always read them.
-from je_auto_control.utils.usb.passthrough.session_frames import (  # noqa: F401  # reason: re-export
+from je_auto_control.utils.usb.passthrough.session_frames import (  # noqa: F401  # pylint: disable=unused-import  # reason: re-export
     MAX_CONTROL_LENGTH, MAX_ENDPOINT_LENGTH, MAX_TIMEOUT_MS,
 )
 from je_auto_control.utils.usb.passthrough.session_frames import (
@@ -99,6 +106,9 @@ _TOPUP_PER_REPLY = 1
 _ABUSE_MAX_STRIKES = 20.0
 _ABUSE_DECAY_PER_S = 5.0
 _ABUSE_LOCKOUT_S = 5.0
+# Frames a peer may legitimately have queued beyond its transfer credits:
+# OPEN / LIST / RESUME / CLOSE / CREDIT, which no credit governs.
+_CONTROL_FRAME_ALLOWANCE = 16
 
 
 class SessionError(AutoControlException):
@@ -139,12 +149,20 @@ class _AbuseTracker:
 
 @dataclass
 class _ClaimState:
-    """Per-claim handle + credit accounting + resume token."""
+    """Per-claim handle + credit accounting + resume token.
+
+    ``in_flight`` counts transfers inside the backend; ``released`` is set
+    once, by whoever removes the claim from the table. The handle is closed
+    by that remover if nothing is in flight, otherwise by the last transfer
+    to return -- exactly once either way, and never under a running call.
+    """
 
     handle: UsbHandle
     inbound_credits: int = _DEFAULT_INITIAL_CREDITS
     outbound_credits: int = _DEFAULT_INITIAL_CREDITS
     resume_token: str = ""
+    in_flight: int = 0
+    released: bool = False
 
 
 class UsbPassthroughSession:
@@ -180,6 +198,16 @@ class UsbPassthroughSession:
         with self._lock:
             return len(self._claims)
 
+    @property
+    def frame_budget(self) -> int:
+        """How many frames a well-behaved peer can have outstanding at once."""
+        return self._max_claims * self._initial_credits + _CONTROL_FRAME_ALLOWANCE
+
+    def has_claim(self, claim_id: int) -> bool:
+        """True while ``claim_id`` names a live claim."""
+        with self._lock:
+            return int(claim_id) in self._claims
+
     def credits_for(self, claim_id: int) -> Optional[Dict[str, int]]:
         """Inspect (inbound, outbound) credits for a claim — for tests."""
         with self._lock:
@@ -192,19 +220,21 @@ class UsbPassthroughSession:
             }
 
     def close_all(self) -> None:
-        """Release every outstanding claim — call on peer disconnect."""
+        """Release every outstanding claim — call on peer disconnect.
+
+        Never waits on the device: a claim whose transfer is still inside
+        the backend leaves the table now, and that transfer closes the
+        handle when it returns (its result is discarded). An OPEN still in
+        the backend when this runs closes the handle it gets.
+        """
         with self._lock:
             self._closings += 1
-            handles = [c.handle for c in self._claims.values()]
+            claims = list(self._claims.values())
             self._claims.clear()
             self._resume_index.clear()
-        for handle in handles:
-            try:
-                handle.close()
-            except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: best-effort cleanup; surface via logger
-                autocontrol_logger.warning(
-                    "passthrough close_all: handle.close() raised %r", error,
-                )
+            idle = [claim.handle for claim in claims if _release_locked(claim)]
+        for handle in idle:
+            _close_quietly(handle, "close_all")
 
     def is_locked_out(self) -> bool:
         """True while the peer is in a rate-limit cool-down."""
@@ -218,10 +248,25 @@ class UsbPassthroughSession:
                 _error_frame(frame.claim_id, "rate limited; locked out"), request_id)]
         replies = [_with_request_id(reply, request_id)
                    for reply in self._dispatch(frame, request_id)]
+        self._count_misbehaviour(replies)
+        return replies
+
+    def refuse(self, frame: Frame, message: str, *, strike: bool = True) -> List[Frame]:
+        """Answer ``frame`` with ERROR(``message``) without serving it.
+
+        ``strike`` counts it against the viewer (a flood past the queue
+        bound); a host-side fault passes ``strike=False``.
+        """
+        replies = [_with_request_id(_error_frame(frame.claim_id, message),
+                                    request_id_of(frame.payload))]
+        if strike:
+            self._count_misbehaviour(replies)
+        return replies
+
+    def _count_misbehaviour(self, replies: List[Frame]) -> None:
         if _is_misbehaviour(replies) and self._abuse.record_strike():
             self._audit("usb_rate_limited", "?", "?", None,
                         detail="viewer locked out for repeated failures")
-        return replies
 
     def _dispatch(self, frame: Frame, request_id: Optional[str] = None) -> List[Frame]:
         """Route one incoming frame; return zero or more reply frames.
@@ -343,7 +388,7 @@ class UsbPassthroughSession:
             if not closed and not full:
                 claim_id = self._add_claim_locked(handle, resume_token)
         if closed or full:
-            self._discard_handle(handle)
+            _close_quietly(handle, "open")
             if closed:
                 return _opened_failure(frame.claim_id, "session closed while the device was opened")
             return self._max_claims_reached(frame, vendor_id, product_id, serial)
@@ -376,15 +421,6 @@ class UsbPassthroughSession:
         )
         self._resume_index[resume_token] = claim_id
         return claim_id
-
-    @staticmethod
-    def _discard_handle(handle: UsbHandle) -> None:
-        try:
-            handle.close()
-        except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: best-effort cleanup; surface via logger
-            autocontrol_logger.warning(
-                "passthrough open: handle.close() raised %r", error,
-            )
 
     def _handle_resume(self, frame: Frame) -> Frame:
         """Re-bind a still-open claim to a reconnecting viewer.
@@ -491,14 +527,16 @@ class UsbPassthroughSession:
     def _handle_close(self, frame: Frame) -> Frame:
         with self._lock:
             claim = self._claims.pop(int(frame.claim_id), None)
-            if claim is not None and claim.resume_token:
+            if claim is not None:
                 self._resume_index.pop(claim.resume_token, None)
+            close_now = claim is not None and _release_locked(claim)
         if claim is None:
             return _error_frame(
                 frame.claim_id, f"unknown claim_id {frame.claim_id}",
             )
         try:
-            claim.handle.close()
+            if close_now:  # else the transfer still in the backend closes it
+                claim.handle.close()
         except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: log-and-acknowledge; the claim is already gone from our table
             return _error_frame(frame.claim_id, f"close failed: {error}")
         self._audit("usb_close", "?", "?", None,
@@ -513,24 +551,20 @@ class UsbPassthroughSession:
     def _handle_transfer(self, frame: Frame,
                          dispatcher: Callable[[UsbHandle, Dict[str, Any]], bytes],
                          request_id: Optional[str] = None) -> List[Frame]:
-        with self._lock:
-            claim = self._claims.get(int(frame.claim_id))
-            if claim is None:
-                return [_error_frame(
-                    frame.claim_id, f"unknown claim_id {frame.claim_id}",
-                )]
-            if claim.inbound_credits <= 0:
-                return [_error_frame(frame.claim_id, "credit exhausted")]
-            claim.inbound_credits -= 1
-            handle = claim.handle
+        claim = self._begin_transfer(frame)
+        if isinstance(claim, Frame):
+            return [claim]
         try:
             request = _decode_json_payload(frame.payload)
         except ValueError as error:
             with self._lock:
                 claim.inbound_credits += 1  # nothing was served; refund it
+            self._finish_transfer(claim)
             return [_error_frame(frame.claim_id, f"bad payload: {error}")]
         reply_payload = _encode_json_payload(_identified(
-            _run_transfer(dispatcher, handle, request), request_id))
+            _run_transfer(dispatcher, claim.handle, request), request_id))
+        if self._finish_transfer(claim):
+            return []   # released meanwhile: nobody is left to answer
         # Fragment so an oversize IN transfer (open question 2) spans
         # multiple EOF-terminated frames instead of breaching the cap.
         frames = fragment_payload(
@@ -543,6 +577,34 @@ class UsbPassthroughSession:
             claim.inbound_credits += _TOPUP_PER_REPLY
         frames.append(self._make_credit_frame(frame.claim_id, _TOPUP_PER_REPLY))
         return frames
+
+    def _begin_transfer(self, frame: Frame) -> Union[_ClaimState, Frame]:
+        """Spend a credit and mark the claim busy, or return the ERROR reply."""
+        with self._lock:
+            claim = self._claims.get(int(frame.claim_id))
+            if claim is None:
+                return _error_frame(
+                    frame.claim_id, f"unknown claim_id {frame.claim_id}",
+                )
+            if claim.inbound_credits <= 0:
+                return _error_frame(frame.claim_id, "credit exhausted")
+            claim.inbound_credits -= 1
+            claim.in_flight += 1
+            return claim
+
+    def _finish_transfer(self, claim: _ClaimState) -> bool:
+        """Mark one transfer done; True if the claim was released meanwhile.
+
+        The last transfer out of a released claim closes its handle, which
+        the releaser left open rather than close it under a running call.
+        """
+        with self._lock:
+            claim.in_flight -= 1
+            released = claim.released
+            close_now = released and claim.in_flight == 0
+        if close_now:
+            _close_quietly(claim.handle, "late transfer")
+        return released
 
     def _handle_credit(self, frame: Frame) -> None:
         try:
@@ -568,6 +630,25 @@ class UsbPassthroughSession:
         return Frame(
             op=Opcode.CREDIT, claim_id=claim_id,
             payload=_encode_json_payload({"credits": int(grant)}),
+        )
+
+
+def _release_locked(claim: _ClaimState) -> bool:
+    """Mark ``claim`` released; True if its handle can be closed right now.
+
+    The caller holds the session lock and has just removed the claim from
+    the table, so this runs once per claim.
+    """
+    claim.released = True
+    return claim.in_flight == 0
+
+
+def _close_quietly(handle: UsbHandle, where: str) -> None:
+    try:
+        handle.close()
+    except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: best-effort cleanup; surface via logger
+        autocontrol_logger.warning(
+            "passthrough %s: handle.close() raised %r", where, error,
         )
 
 
