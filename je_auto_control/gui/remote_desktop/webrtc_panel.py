@@ -193,8 +193,8 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
             self._tray.hide()
 
     def _on_tray_open(self) -> None:
-        # Not self.window(): for a few event-loop turns after a theme switch
-        # this page is parked outside the main window's tree.
+        # The page stays in the main window's tree, a theme switch included
+        # (test_gui_workspace_navigation.py), so its window is the main one.
         win = self.window()
         win.showNormal()
         win.raise_()
