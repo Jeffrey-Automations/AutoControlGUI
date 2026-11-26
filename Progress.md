@@ -156,9 +156,9 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 - **utils L–Z 審查留下的（U-20261126-15）**：`TODO`：`gui/trace_replay_tab.py:163` 直接接上 manifest 的檔名（與 player 同一根因）；
   `ResourceProfiler` 執行中的樣本無上限；LLM planner 請求（60 秒加 SDK 重試）不理會 stop；`create_project_dir` 靜默覆寫既有檔案；
   `text_diff.apply_unified` 在檔尾之後插入不報錯；截圖遮蔽逐 OCR token 比對，拆成四段的卡號不會被遮；`set_of_marks._last_marks` 全程序共用；
-  `lock_session._run_argv` 沒有 subprocess 逾時。`DECIDE`：`Outbox` 永遠保留已送出的項目（修剪會改變 `to_dict`／`save`）。
+  `lock_session._run_argv` 沒有 subprocess 逾時。
 - **utils A–L 審查留下的（U-20261126-16）**：`TODO`：`json_store._file_lock` 判定過期鎖時有競爭，兩個等待者可同時接手（需改成帶擁有者 token）；
-  `http_cassette` 以 `want_bytes=True` 錄製時 `save()` 失敗且內容未遮蔽。`DECIDE`：`AssetStore` 用非嚴格 `SharedJsonDict`，手改壞的檔案會在下次 `set()` 被抹掉。
+  `http_cassette` 以 `want_bytes=True` 錄製時 `save()` 失敗且內容未遮蔽。
 - **`DECIDE`（agent_runtime 審查）**：`ReadOnlyWorker` 無法設定任何桌面任務（基底 worker 要求在場綁定，而主機刻意不傳），桌面唯讀完成驗證目前完全不能用；
   修法是一處覆寫，但等於移除一個拒絕條件。
 - **遠端與 USB 審查留下的（U-20261126-17）**：`DECIDE`：USB `handle_frame` 跑在共用的 WebRTC 事件迴圈上，一次傳輸（最長 60 秒）凍住所有工作階段；
