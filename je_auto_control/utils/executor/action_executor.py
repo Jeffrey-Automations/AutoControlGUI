@@ -4978,7 +4978,11 @@ def _expect_poll(action: Any, key: Any = None, op: str = "truthy",
                 "gt": lambda: to_be_greater_than(expected),
                 "regex": lambda: to_match_regex(str(expected)),
                 "truthy": to_be_truthy}
-    matcher = builders.get(str(op), to_be_truthy)()
+    inner = builders.get(str(op), to_be_truthy)()
+    failed = object()  # a failed attempt: distinct from a result of None, so it never matches
+
+    def matcher(value: Any) -> bool:
+        return value is not failed and inner(value)
 
     def getter() -> Any:
         try:
@@ -4989,7 +4993,7 @@ def _expect_poll(action: Any, key: Any = None, op: str = "truthy",
             # With raise_on_error=False the record would hold repr(error) — a
             # truthy string that satisfies the default truthy matcher and ends
             # the poll on the first attempt instead of waiting for success.
-            return None
+            return failed
         value = next(iter(record.values()), None)
         if key is not None and isinstance(value, dict):
             return value.get(key)
@@ -4997,7 +5001,8 @@ def _expect_poll(action: Any, key: Any = None, op: str = "truthy",
 
     result = expect_poll(getter, matcher, timeout_s=float(timeout_s),
                          interval_s=float(interval_s))
-    return {"ok": result.ok, "value": result.value, "attempts": result.attempts,
+    value = None if result.value is failed else result.value
+    return {"ok": result.ok, "value": value, "attempts": result.attempts,
             "waited_s": result.waited_s}
 
 

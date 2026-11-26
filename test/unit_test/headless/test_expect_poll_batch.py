@@ -113,3 +113,10 @@ def test_assert_poll_inherits_the_interval_guard():
     with pytest.raises(ValueError, match="interval_s must be positive"):
         assert_poll(lambda: False, lambda v: bool(v),
                     timeout_s=1.0, interval_s=0.0)
+
+
+def test_a_failing_polled_action_never_equals_none():
+    from je_auto_control.utils.executor.action_executor import _expect_poll
+    result = _expect_poll(["AC_no_such_command_for_poll"], op="equals", expected=None, timeout_s=0.0)
+    assert result["ok"] is False
+    assert result["value"] is None
