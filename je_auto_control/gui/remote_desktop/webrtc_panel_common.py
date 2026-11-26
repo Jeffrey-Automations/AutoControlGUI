@@ -1,6 +1,7 @@
 """Signals, defaults and config readers shared by the WebRTC host and viewer panels."""
 from __future__ import annotations
 
+import functools
 import weakref
 from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple
 
@@ -119,6 +120,36 @@ def start_panel_task(panel: QWidget, attribute: str, work: Callable[..., object]
     task.error.connect(weak_slot(on_error))
     task.finished.connect(weak_slot(_clear_panel_task, weakref.ref(panel), attribute, weakref.ref(task)))
     return True
+
+
+def start_panel_call(panel: QWidget, attribute: str, call: Callable[[], object],
+                     on_result: Callable[[Any], object],
+                     on_error: Callable[[Any], object]) -> bool:
+    """As :func:`start_panel_task`, for ``call()`` that takes no token (a store write, a file read)."""
+    return start_panel_task(panel, attribute, functools.partial(_call_without_token, call), on_result, on_error)
+
+
+def submit_panel_call(panel: QWidget, call: Callable[[], object],
+                      on_result: Optional[Callable[[Any], object]] = None) -> None:
+    """Run ``call()`` off the GUI thread for a store write nobody waits on; several may be out.
+
+    For what a panel records as a side effect (a session's host in the address
+    book, a pinned fingerprint): it is never refused for being busy, and a
+    failure is logged, as it was when the write ran in the slot.
+    """
+    task = task_controller().submit(functools.partial(_call_without_token, call), owner=panel)
+    if on_result is not None:
+        task.result.connect(weak_slot(on_result))
+    task.error.connect(_log_panel_call_failure)
+
+
+def _log_panel_call_failure(error: object) -> None:
+    autocontrol_logger.debug("panel store write failed: %r", error)
+
+
+def _call_without_token(call: Callable[[], object], _token: object) -> object:
+    """Worker thread: run ``call``; it has no cancellation checkpoint to hand the token to."""
+    return call()
 
 
 def _clear_panel_task(panel_ref: Callable[[], Optional[QWidget]], attribute: str,

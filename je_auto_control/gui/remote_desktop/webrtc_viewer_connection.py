@@ -10,7 +10,7 @@ from je_auto_control.gui.remote_desktop.view_frames import ViewFrames
 from je_auto_control.gui.remote_desktop.webrtc_panel_state import _ViewerPanelPart
 
 import functools
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
@@ -37,6 +37,7 @@ else:
     from je_auto_control.utils.remote_desktop import WebRTCDesktopViewer
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
     _read_webrtc_config,
+    submit_panel_call,
 )
 
 if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
@@ -47,6 +48,19 @@ def _process_offer(viewer: WebRTCDesktopViewerT, offer_sdp: str, expected_dtls: 
                    _token: CancellationToken) -> str:
     """Worker thread: answer the host's offer (up to 12 s; the backend takes no timeout or cancel)."""
     return viewer.process_offer(offer_sdp, expected_dtls_fingerprint=expected_dtls)
+
+
+def _remember_session(book: Any, known_hosts: Any, host_id: str, server_url: str) -> None:
+    """Worker thread: record an authenticated session's host in the address book and mark it seen."""
+    if server_url:
+        try:
+            book.upsert(host_id=host_id, server_url=server_url)
+        except (ValueError, OSError) as error:
+            autocontrol_logger.debug("address book upsert: %r", error)
+    try:
+        known_hosts.touch(host_id)
+    except OSError as error:
+        autocontrol_logger.debug("known_hosts touch: %r", error)
 
 
 class _ViewerConnectionMixin(_ViewerPanelPart):
@@ -124,8 +138,9 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
                 extract_dtls_fingerprint,
             )
             new_fp = extract_dtls_fingerprint(offer_sdp)
-            if new_fp:
-                self._known_hosts.remember_dtls_fingerprint(host_id, new_fp)
+            if new_fp:          # the pin is a file write: off the GUI thread
+                submit_panel_call(self, functools.partial(
+                    self._known_hosts.remember_dtls_fingerprint, host_id, new_fp))
         self._answer_view.setPlainText(answer)
         self._status_label.setText(_t("rd_webrtc_pushing_answer"))
         self._answer_worker = ViewerAnswerPushWorker(
@@ -256,19 +271,10 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
             self._auto_reconnect_attempts = 0  # reset on successful auth
             host_id = self._host_id_edit.text().strip()
             server_url = self._server_edit.text().strip()
-            if host_id and server_url:
-                try:
-                    self._address_book.upsert(
-                        host_id=host_id, server_url=server_url,
-                    )
-                    self._refresh_address_book()
-                except (ValueError, OSError) as error:
-                    autocontrol_logger.debug("address book upsert: %r", error)
-            if host_id:
-                try:
-                    self._known_hosts.touch(host_id)
-                except OSError as error:
-                    autocontrol_logger.debug("known_hosts touch: %r", error)
+            if host_id:         # file writes: off the GUI thread, then the book is repainted
+                submit_panel_call(self, functools.partial(
+                    _remember_session, self._address_book, self._known_hosts, host_id, server_url),
+                    self._on_book_changed)
             self._start_stats_polling()
             # AnyDesk-style: surface the live screen in its own window
             # so the workspace isn't fighting the control panel for

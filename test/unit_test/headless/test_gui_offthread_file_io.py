@@ -139,3 +139,319 @@ def test_disposing_the_dag_tab_drops_a_load_still_out(boxes, monkeypatch, tmp_pa
     pump_until(lambda: False, timeout=0.5)
     assert tab._editor.toPlainText() == ""
     tab.deleteLater()
+
+
+# --- WebRTC host: trust list --------------------------------------------------------------------------------
+
+def _host_panel(tmp_path):
+    pytest.importorskip("av")
+    pytest.importorskip("aiortc")
+    from je_auto_control.gui.remote_desktop import webrtc_panel
+    from je_auto_control.utils.remote_desktop.trust_list import TrustList
+    panel = webrtc_panel._WebRTCHostPanel()
+    panel._trust_list = TrustList(tmp_path / "trusted.json")      # never the user's own list
+    return panel
+
+
+def _close(panel) -> None:
+    panel.dispose()
+    panel.deleteLater()
+
+
+def test_exporting_the_trust_list_writes_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import _helpers
+    panel = _host_panel(tmp_path)
+    panel._trust_list.add("viewer-1", label="desk")
+    target = tmp_path / "export.json"
+    _pick_save(monkeypatch, target)
+    _pick_open(monkeypatch, target)
+    gate = _gated_open(monkeypatch, _helpers)
+    _returns_at_once(panel._on_export_trust)
+    assert gate.entered.wait(_WAIT)
+    panel._on_import_trust()                        # one trust-list file at a time
+    assert boxes == [_t("task_busy")]
+    gate.release.set()
+    assert pump_until(lambda: panel._trust_task is None)
+    assert gate.off_gui_thread()
+    import json
+    assert [entry["viewer_id"] for entry in json.loads(target.read_text(encoding="utf-8"))["viewers"]] == [
+        "viewer-1"]
+    _close(panel)
+
+
+def test_importing_a_trust_list_reads_and_adds_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import _helpers
+    source = tmp_path / "import.json"
+    source.write_text('{"viewers": [{"viewer_id": "v1", "label": "a"}, {"viewer_id": 5}]}', encoding="utf-8")
+    _pick_open(monkeypatch, source)
+    panel = _host_panel(tmp_path)
+    gate = _gated_open(monkeypatch, _helpers)
+    _returns_at_once(panel._on_import_trust)
+    assert gate.entered.wait(_WAIT)
+    assert panel._trusted_list.count() == 0
+    gate.release.set()
+    assert pump_until(lambda: panel._trust_task is None)
+    assert gate.off_gui_thread()
+    assert boxes == [_t("rd_webrtc_trust_import_done").format(n=1)]
+    assert [entry["viewer_id"] for entry in panel._trust_list.list_entries()] == ["v1"]
+    assert panel._trusted_list.count() == 1
+    _close(panel)
+
+
+def test_a_trust_import_that_cannot_be_read_is_reported(boxes, monkeypatch, tmp_path):
+    source = tmp_path / "import.json"
+    source.write_bytes(b"\xff\xfe\x00binary")
+    _pick_open(monkeypatch, source)
+    panel = _host_panel(tmp_path)
+    panel._on_import_trust()
+    assert pump_until(lambda: panel._trust_task is None)
+    assert len(boxes) == 1 and boxes[0] != _t("rd_webrtc_trust_import_done").format(n=0)
+    _close(panel)
+
+
+def test_removing_and_clearing_trust_write_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    panel = _host_panel(tmp_path)
+    panel._trust_list.add("v1")
+    panel._trust_list.add("v2")
+    panel._refresh_trusted_list()
+    remove = _Gate(then=panel._trust_list.remove)
+    monkeypatch.setattr(panel._trust_list, "remove", remove)
+    _returns_at_once(panel._on_remove_trust, "v1")
+    assert remove.entered.wait(_WAIT)
+    remove.release.set()
+    assert pump_until(lambda: panel._trust_task is None)
+    assert remove.off_gui_thread() and panel._trusted_list.count() == 1
+    clear = _Gate(then=panel._trust_list.clear)
+    monkeypatch.setattr(panel._trust_list, "clear", clear)
+    _returns_at_once(panel._on_clear_trust)
+    assert clear.entered.wait(_WAIT)
+    clear.release.set()
+    assert pump_until(lambda: panel._trust_task is None)
+    assert clear.off_gui_thread() and panel._trusted_list.count() == 0
+    _close(panel)
+
+
+def test_disposing_the_host_panel_drops_a_trust_import_still_out(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import _helpers
+    source = tmp_path / "import.json"
+    source.write_text('{"viewers": [{"viewer_id": "v1"}]}', encoding="utf-8")
+    _pick_open(monkeypatch, source)
+    panel = _host_panel(tmp_path)
+    gate = _gated_open(monkeypatch, _helpers)
+    panel._on_import_trust()
+    assert gate.entered.wait(_WAIT)
+    panel.dispose()
+    gate.release.set()
+    pump_until(lambda: False, timeout=0.5)
+    assert boxes == [] and panel._trusted_list.count() == 0
+    panel.deleteLater()
+
+
+# --- WebRTC viewer: address book, Wake-on-LAN, session bookkeeping ------------------------------------------
+
+def _viewer_panel(tmp_path):
+    pytest.importorskip("av")
+    pytest.importorskip("aiortc")
+    from je_auto_control.gui.remote_desktop import webrtc_panel
+    from je_auto_control.utils.remote_desktop.address_book import AddressBook
+    from je_auto_control.utils.remote_desktop.fingerprint import KnownHosts
+    panel = webrtc_panel._WebRTCViewerPanel()
+    panel._address_book = AddressBook(tmp_path / "book.json")       # never the user's own book
+    panel._known_hosts = KnownHosts(tmp_path / "known.json")
+    return panel
+
+
+def test_exporting_and_importing_the_address_book_run_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import _helpers
+    panel = _viewer_panel(tmp_path)
+    panel._address_book.upsert(host_id="123", server_url="http://s")       # NOSONAR never contacted
+    target = tmp_path / "export.json"
+    _pick_save(monkeypatch, target)
+    _pick_open(monkeypatch, target)
+    gate = _gated_open(monkeypatch, _helpers)
+    _returns_at_once(panel._on_ab_export)
+    assert gate.entered.wait(_WAIT)
+    panel._on_ab_import()                           # one address-book call at a time
+    assert boxes == [_t("task_busy")]
+    gate.release.set()
+    assert pump_until(lambda: panel._book_task is None)
+    assert gate.off_gui_thread() and target.exists()
+    panel._address_book.clear()
+    gate.release.clear()
+    gate.entered.clear()
+    _returns_at_once(panel._on_ab_import)
+    assert gate.entered.wait(_WAIT)
+    gate.release.set()
+    assert pump_until(lambda: panel._book_task is None)
+    assert boxes[-1] == _t("rd_webrtc_ab_import_done").format(n=1)
+    assert [entry["host_id"] for entry in panel._address_book.list_entries()] == ["123"]
+    _close(panel)
+
+
+@pytest.mark.parametrize("slot, method", [
+    ("_on_save_current_address", "upsert"), ("_on_address_removed", "remove"),
+    ("_on_address_favorite", "toggle_favorite"), ("_on_ab_clear", "clear"),
+])
+def test_address_book_writes_run_off_the_gui_thread(boxes, monkeypatch, tmp_path, slot, method):
+    panel = _viewer_panel(tmp_path)
+    panel._address_book.upsert(host_id="123", server_url="http://s")       # NOSONAR never contacted
+    panel._host_id_edit.setText("456")
+    panel._server_edit.setText("http://s")                                 # NOSONAR never contacted
+    gate = _Gate(then=getattr(panel._address_book, method))
+    monkeypatch.setattr(panel._address_book, method, gate)
+    entry = {"host_id": "123", "server_url": "http://s"}                   # NOSONAR never contacted
+    args = (entry,) if slot in ("_on_address_removed", "_on_address_favorite") else ()
+    _returns_at_once(getattr(panel, slot), *args)
+    assert gate.entered.wait(_WAIT)
+    gate.release.set()
+    assert pump_until(lambda: panel._book_task is None)
+    assert gate.off_gui_thread() and boxes == []
+    _close(panel)
+
+
+def test_wake_on_lan_sends_and_remembers_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import webrtc_viewer_address_book as module
+    panel = _viewer_panel(tmp_path)
+    panel._address_book.upsert(host_id="123", server_url="http://s")       # NOSONAR never contacted
+    panel._refresh_address_book()
+    entry = panel._address_book.list_entries()[0]
+    monkeypatch.setattr(panel._address_list, "selected_entry", lambda: entry)
+    answers = iter([("aa:bb:cc:dd:ee:ff", True), ("192.0.2.255", True)])
+    monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: next(answers))
+    gate = _Gate()
+    monkeypatch.setattr(module, "send_magic_packet", gate)
+    _returns_at_once(panel._on_wake_on_lan)
+    assert gate.entered.wait(_WAIT)
+    gate.release.set()
+    assert pump_until(lambda: panel._book_task is None)
+    assert gate.off_gui_thread()
+    assert gate.calls == [(("aa:bb:cc:dd:ee:ff",), {"broadcast_address": "192.0.2.255"})]
+    assert boxes == [_t("rd_webrtc_wol_sent")]
+    assert panel._address_book.list_entries()[0]["mac_address"] == "aa:bb:cc:dd:ee:ff"
+    _close(panel)
+
+
+def test_a_failed_wake_on_lan_is_reported_and_not_remembered(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import webrtc_viewer_address_book as module
+    panel = _viewer_panel(tmp_path)
+    answers = iter([("not-a-mac", True), ("", True)])
+    monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: next(answers))
+    gate = _Gate(error=ValueError("bad MAC"))
+    gate.release.set()
+    monkeypatch.setattr(module, "send_magic_packet", gate)
+    panel._on_wake_on_lan()
+    assert pump_until(lambda: panel._book_task is None)
+    assert boxes == ["bad MAC"]
+    _close(panel)
+
+
+def test_an_authenticated_session_is_recorded_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    panel = _viewer_panel(tmp_path)
+    monkeypatch.setattr(panel, "_start_stats_polling", lambda: None)
+    monkeypatch.setattr(panel, "_ensure_screen_window", lambda: _Window())
+    panel._host_id_edit.setText("123456789")
+    panel._server_edit.setText("http://s")                                 # NOSONAR never contacted
+    gate = _Gate(then=panel._address_book.upsert)
+    monkeypatch.setattr(panel._address_book, "upsert", gate)
+    _returns_at_once(panel._on_auth, True)
+    assert gate.entered.wait(_WAIT)
+    gate.release.set()
+    assert pump_until(lambda: panel._address_list.count() == 1)
+    assert gate.off_gui_thread()
+    assert panel._known_hosts.last_seen("123456789") is not None
+    _close(panel)
+
+
+class _Window:
+    def show(self):
+        pass
+
+    def raise_(self):
+        pass
+
+    def activateWindow(self):  # noqa: N802  # reason: the Qt name the panel calls
+        pass
+
+
+# --- WebRTC viewer: known hosts dialog ----------------------------------------------------------------------
+
+def _known_hosts_dialog(tmp_path):
+    from je_auto_control.gui.remote_desktop.webrtc_known_hosts import KnownHostsDialog
+    from je_auto_control.utils.remote_desktop.fingerprint import KnownHosts
+    known = KnownHosts(tmp_path / "known.json")
+    return KnownHostsDialog(known), known
+
+
+def test_exporting_known_hosts_writes_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import _helpers
+    dialog, known = _known_hosts_dialog(tmp_path)
+    known.remember("123", "a" * 64)
+    target = tmp_path / "export.json"
+    _pick_save(monkeypatch, target)
+    gate = _gated_open(monkeypatch, _helpers)
+    _returns_at_once(dialog._on_export)
+    assert gate.entered.wait(_WAIT)
+    dialog._on_import()                             # one known-hosts file at a time
+    assert boxes == [_t("task_busy")]
+    gate.release.set()
+    assert pump_until(lambda: dialog._write_task is None)
+    assert gate.off_gui_thread() and "123" in target.read_text(encoding="utf-8")
+    dialog.deleteLater()
+
+
+def test_importing_known_hosts_reads_then_pins_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import webrtc_known_hosts as module
+    dialog, known = _known_hosts_dialog(tmp_path)
+    known.remember("old", "b" * 64)
+    dialog._refresh()
+    source = tmp_path / "import.json"
+    source.write_text('{"old": "' + "c" * 64 + '", "new": {"dtls_fp": "' + "d" * 64 + '"}, "bad": 5}',
+                      encoding="utf-8")
+    _pick_open(monkeypatch, source)
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.No)
+    read = _gated_open(monkeypatch, module)
+    pin = _Gate(then=known.remember_dtls_fingerprint)
+    monkeypatch.setattr(known, "remember_dtls_fingerprint", pin)
+    _returns_at_once(dialog._on_import)
+    assert read.entered.wait(_WAIT)
+    read.release.set()
+    assert pump_until(pin.entered.is_set)           # the overwrite of "old" was declined
+    assert dialog._table.rowCount() == 1
+    pin.release.set()
+    assert pump_until(lambda: dialog._write_task is None and dialog._read_task is None)
+    assert read.off_gui_thread() and pin.off_gui_thread()
+    assert boxes == [_t("rd_webrtc_kh_import_done").format(added=1, skipped=1)]
+    assert known.fingerprint_for("old") == "b" * 64 and known.dtls_fingerprint_for("new") == "d" * 64
+    assert dialog._table.rowCount() == 2
+    dialog.deleteLater()
+
+
+def test_forgetting_known_hosts_writes_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    dialog, known = _known_hosts_dialog(tmp_path)
+    known.remember("123", "a" * 64)
+    dialog._refresh()
+    gate = _Gate(then=known.forget)
+    monkeypatch.setattr(known, "forget", gate)
+    _returns_at_once(dialog._on_clear_all)
+    assert gate.entered.wait(_WAIT)
+    assert dialog._table.rowCount() == 1
+    gate.release.set()
+    assert pump_until(lambda: dialog._write_task is None)
+    assert gate.off_gui_thread() and dialog._table.rowCount() == 0
+    dialog.deleteLater()
+
+
+def test_closing_the_known_hosts_dialog_drops_an_import_still_out(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import webrtc_known_hosts as module
+    dialog, known = _known_hosts_dialog(tmp_path)
+    source = tmp_path / "import.json"
+    source.write_text('{"new": "' + "c" * 64 + '"}', encoding="utf-8")
+    _pick_open(monkeypatch, source)
+    read = _gated_open(monkeypatch, module)
+    dialog._on_import()
+    assert read.entered.wait(_WAIT)
+    dialog.reject()
+    read.release.set()
+    pump_until(lambda: False, timeout=0.5)
+    assert boxes == [] and known.fingerprint_for("new") is None
+    dialog.deleteLater()

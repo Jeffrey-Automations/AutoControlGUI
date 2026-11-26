@@ -115,6 +115,8 @@ def wire_remote_input(window: Any, send: Callable[[dict[str, Any]], None]) -> No
 def _read_import_entries(path: str, key: str) -> list[dict[str, Any]]:
     """The object entries of an exported JSON file: ``{key: [...]}`` or a bare list.
 
+    It reads the file, so the panels call it on a worker, never in a slot.
+
     Raises ``OSError`` or ``ValueError`` for a file that cannot be read or has
     another shape. A binary file raised ``UnicodeDecodeError``, ``{key: 5}`` a
     ``TypeError`` and deep nesting ``RecursionError`` out of the import slots.
@@ -129,6 +131,13 @@ def _read_import_entries(path: str, key: str) -> list[dict[str, Any]]:
     if not isinstance(entries, list):
         raise ValueError(f"{path}: expected a list under {key!r}")
     return [entry for entry in entries if isinstance(entry, dict)]
+
+
+def _write_json_file(path: str, data: Any) -> None:
+    """Worker thread: write ``data`` to ``path`` as indented UTF-8 JSON (an export)."""
+    import json
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2, ensure_ascii=False)
 
 
 def _build_verifying_client_context() -> ssl.SSLContext:

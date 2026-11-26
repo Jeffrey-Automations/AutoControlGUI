@@ -1,5 +1,9 @@
 """Address book, known hosts, LAN browse and Wake-on-LAN for the WebRTC viewer panel.
 
+Every change to the address book, its export and import, and the Wake-on-LAN
+packet run off the GUI thread as the panel's ``_book_task``, one at a time;
+the book is repainted once each has reported.
+
 One interaction group of ``webrtc_panel._WebRTCViewerPanel``, kept as a mixin so the panel class
 still owns every widget and slot under its original name.
 """
@@ -7,14 +11,15 @@ from __future__ import annotations
 
 from je_auto_control.gui.remote_desktop.webrtc_panel_state import _ViewerPanelPart
 
-from typing import Any, Dict, Optional
+import functools
+from typing import Any, Callable, Dict, Optional
 
 from PySide6.QtWidgets import (
     QFileDialog, QInputDialog, QMessageBox,
 )
 
 from je_auto_control.gui.remote_desktop._helpers import (
-    _read_import_entries, _t,
+    _read_import_entries, _t, _write_json_file,
 )
 from je_auto_control.gui.remote_desktop.webrtc_dialogs import (
     KnownHostsDialog, LanBrowseDialog,
@@ -25,6 +30,7 @@ from je_auto_control.utils.remote_desktop import (
 )
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
     _JSON_FILE_FILTER,
+    start_panel_call,
 )
 
 
@@ -39,17 +45,17 @@ class _ViewerAddressBookMixin(_ViewerPanelPart):
         return (entry.get("mac_address", "") or "",
                 entry.get("broadcast_address", "") or "")
 
-    def _persist_wol_entry(self, entry: Optional[Dict[str, Any]], mac: str,
-                           broadcast: str) -> None:
-        """Save the MAC / broadcast just used back onto the book entry."""
-        if entry is None:
-            return
-        self._address_book.upsert(
-            host_id=entry.get("host_id", ""),
-            server_url=entry.get("server_url", ""),
-            mac_address=mac.strip(),
-            broadcast_address=broadcast.strip() or None,
-        )
+    def _run_book_io(self, call: Callable[[], object],
+                     on_result: Optional[Callable[[Any], object]] = None) -> None:
+        """Send a packet, or read or write the address book (or its export), off the GUI thread; one at a time."""
+        if not start_panel_call(self, "_book_task", call, on_result or self._on_book_changed, self._book_failed):
+            QMessageBox.information(self, "WebRTC", _t("task_busy"))
+
+    def _on_book_changed(self, _outcome: object = None) -> None:
+        self._refresh_address_book()
+
+    def _book_failed(self, error: object) -> None:
+        QMessageBox.warning(self, "WebRTC", str(error))
         self._refresh_address_book()
 
     def _on_wake_on_lan(self) -> None:
@@ -68,60 +74,33 @@ class _ViewerAddressBookMixin(_ViewerPanelPart):
         )
         if not ok2:
             return
-        try:
-            send_magic_packet(mac.strip(),
-                              broadcast_address=broadcast.strip() or None)
-        except (ValueError, OSError) as error:
-            QMessageBox.warning(self, "WebRTC", str(error))
-            return
-        self._persist_wol_entry(entry, mac, broadcast)
+        self._run_book_io(functools.partial(_wake_and_remember, self._address_book, entry, mac, broadcast),
+                          self._on_woken)
+
+    def _on_woken(self, _outcome: object = None) -> None:
+        self._refresh_address_book()
         QMessageBox.information(
             self, _t("rd_webrtc_wake_on_lan"), _t("rd_webrtc_wol_sent"),
         )
 
     def _on_ab_export(self) -> None:
-        import json as _json
         path, _filter = QFileDialog.getSaveFileName(
             self, _t("rd_webrtc_ab_export"), "address_book.json",
             _JSON_FILE_FILTER,
         )
-        if not path:
-            return
-        try:
-            with open(path, "w", encoding="utf-8") as fh:
-                _json.dump({"entries": self._address_book.list_entries()},
-                           fh, indent=2, ensure_ascii=False)
-        except OSError as error:
-            QMessageBox.warning(self, "WebRTC", str(error))
+        if path:
+            entries = {"entries": self._address_book.list_entries()}
+            self._run_book_io(functools.partial(_write_json_file, path, entries))
 
     def _on_ab_import(self) -> None:
         path, _filter = QFileDialog.getOpenFileName(
             self, _t("rd_webrtc_ab_import"), "", _JSON_FILE_FILTER,
         )
-        if not path:
-            return
-        try:
-            entries = _read_import_entries(path, "entries")
-        except (OSError, ValueError) as error:
-            QMessageBox.warning(self, "WebRTC", str(error))
-            return
-        added = 0
-        for entry in entries:
-            # Strings only: a numeric host_id was saved, then dropped on the
-            # next load, and a numeric MAC reached Wake-on-LAN.
-            text = {key: value for key, value in entry.items() if isinstance(value, str) and value}
-            if not ("host_id" in text and "server_url" in text):
-                continue
-            try:
-                self._address_book.upsert(
-                    host_id=text["host_id"], server_url=text["server_url"],
-                    label=text.get("label", ""),
-                    mac_address=text.get("mac_address"),
-                    broadcast_address=text.get("broadcast_address"),
-                )
-                added += 1
-            except (ValueError, OSError) as error:
-                autocontrol_logger.debug("ab import upsert: %r", error)
+        if path:
+            self._run_book_io(functools.partial(_import_address_book, self._address_book, path),
+                              self._on_ab_imported)
+
+    def _on_ab_imported(self, added: int) -> None:
         QMessageBox.information(
             self, "WebRTC", _t("rd_webrtc_ab_import_done").format(n=added),
         )
@@ -134,8 +113,7 @@ class _ViewerAddressBookMixin(_ViewerPanelPart):
         )
         if result != QMessageBox.StandardButton.Yes:
             return
-        self._address_book.clear()
-        self._refresh_address_book()
+        self._run_book_io(self._address_book.clear)
 
     def _on_manage_known_hosts(self) -> None:
         dialog = KnownHostsDialog(self._known_hosts, parent=self)
@@ -169,15 +147,9 @@ class _ViewerAddressBookMixin(_ViewerPanelPart):
         if not ok:
             return
         new_tags = [t.strip() for t in text.split(",") if t.strip()]
-        try:
-            self._address_book.set_tags(
-                host_id=entry.get("host_id", ""),
-                server_url=entry.get("server_url", ""),
-                tags=new_tags,
-            )
-        except (ValueError, OSError) as error:
-            autocontrol_logger.debug("set_tags: %r", error)
-        self._refresh_address_book()
+        self._run_book_io(functools.partial(
+            self._address_book.set_tags, host_id=entry.get("host_id", ""),
+            server_url=entry.get("server_url", ""), tags=new_tags))
 
     def _on_address_chosen(self, entry: Dict[str, Any]) -> None:
         self._server_edit.setText(entry.get("server_url", ""))
@@ -185,21 +157,14 @@ class _ViewerAddressBookMixin(_ViewerPanelPart):
         self._on_connect_via_server()
 
     def _on_address_removed(self, entry: Dict[str, Any]) -> None:
-        self._address_book.remove(
-            host_id=entry.get("host_id", ""),
-            server_url=entry.get("server_url", ""),
-        )
-        self._refresh_address_book()
+        self._run_book_io(functools.partial(
+            self._address_book.remove, host_id=entry.get("host_id", ""),
+            server_url=entry.get("server_url", "")))
 
     def _on_address_favorite(self, entry: Dict[str, Any]) -> None:
-        try:
-            self._address_book.toggle_favorite(
-                host_id=entry.get("host_id", ""),
-                server_url=entry.get("server_url", ""),
-            )
-        except (RuntimeError, OSError) as error:
-            autocontrol_logger.debug("toggle favorite: %r", error)
-        self._refresh_address_book()
+        self._run_book_io(functools.partial(
+            self._address_book.toggle_favorite, host_id=entry.get("host_id", ""),
+            server_url=entry.get("server_url", "")))
 
     def _on_connect_selected_address(self) -> None:
         entry = self._address_list.selected_entry()
@@ -218,8 +183,7 @@ class _ViewerAddressBookMixin(_ViewerPanelPart):
                 self, "WebRTC", _t("rd_webrtc_save_address_missing_fields"),
             )
             return
-        self._address_book.upsert(host_id=host_id, server_url=server_url)
-        self._refresh_address_book()
+        self._run_book_io(functools.partial(self._address_book.upsert, host_id=host_id, server_url=server_url))
 
     def _on_remove_selected_address(self) -> None:
         entry = self._address_list.selected_entry()
@@ -238,6 +202,40 @@ class _ViewerAddressBookMixin(_ViewerPanelPart):
             self._host_id_edit.setText(host_id)
         if signaling:
             self._server_edit.setText(signaling)
+
+
+def _wake_and_remember(book: Any, entry: Optional[Dict[str, Any]], mac: str, broadcast: str) -> None:
+    """Worker thread: send the magic packet, then save the MAC and broadcast just used onto the book entry."""
+    send_magic_packet(mac.strip(), broadcast_address=broadcast.strip() or None)
+    if entry is not None:
+        book.upsert(
+            host_id=entry.get("host_id", ""),
+            server_url=entry.get("server_url", ""),
+            mac_address=mac.strip(),
+            broadcast_address=broadcast.strip() or None,
+        )
+
+
+def _import_address_book(book: Any, path: str) -> int:
+    """Worker thread: add every entry an exported book names; return how many were added."""
+    added = 0
+    for entry in _read_import_entries(path, "entries"):
+        # Strings only: a numeric host_id was saved, then dropped on the
+        # next load, and a numeric MAC reached Wake-on-LAN.
+        text = {key: value for key, value in entry.items() if isinstance(value, str) and value}
+        if not ("host_id" in text and "server_url" in text):
+            continue
+        try:
+            book.upsert(
+                host_id=text["host_id"], server_url=text["server_url"],
+                label=text.get("label", ""),
+                mac_address=text.get("mac_address"),
+                broadcast_address=text.get("broadcast_address"),
+            )
+            added += 1
+        except (ValueError, OSError) as error:
+            autocontrol_logger.debug("ab import upsert: %r", error)
+    return added
 
 
 __all__ = ["_ViewerAddressBookMixin"]

@@ -295,6 +295,7 @@ def test_forget_stale_takes_every_row_the_table_shows_as_stale(monkeypatch):
     monkeypatch.setattr(QMessageBox, "question", lambda *_args: QMessageBox.StandardButton.Yes)
     dialog = module.KnownHostsDialog(known)
     dialog._on_forget_stale()
+    assert settle(dialog, "_write_task")            # forgetting rewrites the file, off the GUI thread
     assert sorted(known.entries) == ["fresh"]
     dialog.deleteLater()
 
@@ -307,6 +308,7 @@ def test_a_known_hosts_file_that_cannot_be_read_is_reported(qapp, monkeypatch, t
     monkeypatch.setattr(module.QFileDialog, "getOpenFileName", lambda *_args: (str(path), ""))
     dialog = module.KnownHostsDialog(_KnownHosts({}))
     dialog._on_import()
+    assert settle(dialog, "_read_task")             # the file is read off the GUI thread
     assert len(qapp.warnings) == 1
     dialog.deleteLater()
 

@@ -151,6 +151,7 @@ class _ViewerPanelPart(_PanelPart):
     _reconnect_timer: QTimer
     _record_btn: QPushButton
     _refresh_address_book: Callable[[], None]
+    _on_book_changed: Callable[[object], None]
     _remote_files_table: RemoteFilesTable
     _screen_window: Optional[RemoteScreenWindow]
     _show_error: Callable[[Exception], None]
