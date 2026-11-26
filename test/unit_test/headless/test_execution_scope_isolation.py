@@ -201,6 +201,7 @@ def test_socket_commands_do_not_leak(seen):
 
 def _socket_exchange(server, actions):
     with socket.create_connection(server.server_address, timeout=10) as sock:
+        sock.sendall(f"AUTH {server.token}\n".encode("utf-8"))
         sock.sendall((json.dumps(actions) + "\n").encode("utf-8"))
         reply = b""
         while b"Return_Data_Over_JE" not in reply:

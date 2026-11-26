@@ -9,6 +9,7 @@ two config-bundle imports in the same second overwrote the first backup.
 """
 import json
 import logging
+import types
 
 import pytest
 
@@ -59,10 +60,12 @@ def test_a_failing_secret_command_does_not_leak_either(caplog):
 
 def test_the_socket_server_does_not_log_the_command_text(caplog):
     from je_auto_control.utils.socket_server import auto_control_socket_server as server
+    from je_auto_control.utils.socket_server.socket_auth import SocketAuth
 
     class _Request:
         def __init__(self):
-            self.chunks = [json.dumps([["AC_secret_unlock", {"passphrase": _PASSPHRASE}]]).encode() + b"\n"]
+            self.chunks = [b"AUTH audit-token" + bytes([10]),
+                           json.dumps([["AC_secret_unlock", {"passphrase": _PASSPHRASE}]]).encode() + b"\n"]
             self.sent = []
 
         def settimeout(self, _seconds):
@@ -76,7 +79,7 @@ def test_the_socket_server_does_not_log_the_command_text(caplog):
 
     handler = server.TCPServerHandler.__new__(server.TCPServerHandler)
     handler.request = _Request()
-    handler.server = None
+    handler.server = types.SimpleNamespace(socket_auth=SocketAuth("audit-token"))
     with caplog.at_level(logging.INFO, logger="AutoControlGUI"):
         handler.handle()
     assert _PASSPHRASE not in caplog.text
