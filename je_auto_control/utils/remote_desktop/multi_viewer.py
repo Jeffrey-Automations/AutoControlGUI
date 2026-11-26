@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import time
 from dataclasses import dataclass
 from functools import partial
 import threading
@@ -40,6 +41,10 @@ if TYPE_CHECKING:
 SessionStateCallback = Callable[[str, str], None]
 SessionAuthCallback = Callable[[str], None]
 SessionPendingCallback = Callable[[str, Optional[str]], None]
+
+#: Waits between retries of a retirement whose peer stop is still running
+#: (about a minute in all); a new session attempt starts the schedule again.
+_RETIRE_RETRY_DELAYS_S = (0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 30.0)
 
 
 class _ScreenSource:
@@ -139,6 +144,9 @@ class MultiViewerHost:
         self._source: Optional[_ScreenSource] = None
         self._lock = threading.Lock()
         self._admission_closed = False
+        self._retire_retry_delays_s: Tuple[float, ...] = _RETIRE_RETRY_DELAYS_S
+        # Session ids whose retirement a webrtc-prune thread is retrying.
+        self._retry_running: set[str] = set()
 
     def _capture_origin(self) -> Tuple[int, int]:
         source = self._source
@@ -203,6 +211,7 @@ class MultiViewerHost:
             if self._admission_closed:
                 raise PeerStopPending("admission is closed: the host is stopping")
             if self._retiring or self._source_stopping or self._source_failed:
+                self._resume_pending_retirements()
                 raise PeerStopPending("finish retiring previous sessions before creating another")
             if self._source is None:
                 self._source = _ScreenSource(self._config)
@@ -474,13 +483,50 @@ class MultiViewerHost:
             source = self._source
         if host is None:
             return
-        def retire() -> None:
-            try:
-                self._stop_owned_session(session_id, host)
-                self._maybe_release_source(source)
-            except (RuntimeError, OSError):
-                autocontrol_logger.warning("session retirement remains pending")
-        threading.Thread(target=retire, name="webrtc-prune", daemon=True).start()
+        with self._lock:
+            self._start_retire_thread(session_id, host, source)
+
+    def _resume_pending_retirements(self) -> None:
+        """Restart the retry schedule for each retiring session nobody is retrying; caller holds the lock."""
+        for session_id, host in self._retiring.items():
+            self._start_retire_thread(session_id, host, self._source)
+
+    def _start_retire_thread(self, session_id: str, host: WebRTCDesktopHost,
+                             source: Optional[_ScreenSource]) -> None:
+        """Run one bounded retry schedule for this session's retirement; caller holds the lock."""
+        if session_id in self._retry_running:
+            return
+        self._retry_running.add(session_id)
+        threading.Thread(target=self._retire_with_retry, args=(session_id, host, source),
+                         name="webrtc-prune", daemon=True).start()
+
+    def _retire_with_retry(self, session_id: str, host: WebRTCDesktopHost,
+                           source: Optional[_ScreenSource]) -> None:
+        """Stop a session, retrying while its peer stop is pending; the session stays owed a stop if it never settles.
+
+        Until the stop goes through the session stays in ``_retiring`` and
+        new sessions are refused; the next refused attempt (or
+        :meth:`stop_session` / :meth:`stop_all`) starts the schedule again.
+        """
+        delays = iter(self._retire_retry_delays_s)
+        try:
+            while True:
+                try:
+                    self._stop_owned_session(session_id, host)
+                    self._maybe_release_source(source)
+                    return
+                except PeerStopPending:
+                    delay = next(delays, None)
+                    if delay is None:
+                        autocontrol_logger.warning("session %s retirement remains pending", session_id)
+                        return
+                    time.sleep(delay)
+                except (RuntimeError, OSError) as error:
+                    autocontrol_logger.warning("session %s retirement failed: %r", session_id, error)
+                    return
+        finally:
+            with self._lock:
+                self._retry_running.discard(session_id)
 
     def _wrap_auth_callback(self, session_id: str, token: object = None) -> Callable[[], None]:
         cb = self._on_session_authenticated

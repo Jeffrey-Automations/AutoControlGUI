@@ -728,3 +728,56 @@ def test_a_failed_build_drops_its_subscription_and_spares_a_source_others_use(mo
     assert not source._track.stopped
     assert coordinator.session_count() == 1
     first.retirement.stop()
+
+
+class _SlowStopHost(_FakeHost):
+    """A peer whose stop stays pending for the first ``pending`` attempts."""
+
+    pending = 2
+
+    def stop(self):
+        self.calls.append("stop")
+        if self.calls.count("stop") <= self.pending:
+            raise PeerStopPending("peer stop is still running")
+        self.stopped = True
+
+
+def _wait_until(predicate, timeout: float = 3.0) -> bool:
+    import time
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return predicate()
+
+
+def test_a_pending_pruned_retirement_is_retried_and_then_admits_new_sessions(monkeypatch):
+    monkeypatch.setattr(mv, "WebRTCDesktopHost", _SlowStopHost)
+    coordinator = _host()
+    coordinator._retire_retry_delays_s = (0.01,) * 5
+    coordinator.create_session_offer()
+    peer = _FakeHost.instances[-1]
+    peer.kwargs["on_state_change"]("failed")
+    assert _wait_until(lambda: peer.stopped and coordinator.session_count() == 0)
+    assert coordinator._retiring == {}
+    assert coordinator._source is None
+    coordinator.create_session_offer()                     # the settled retirement no longer blocks
+    assert coordinator.session_count() == 1
+
+
+def test_an_exhausted_retry_schedule_keeps_the_pending_stop_and_a_new_session_restarts_it(monkeypatch):
+    monkeypatch.setattr(mv, "WebRTCDesktopHost", _SlowStopHost)
+    monkeypatch.setattr(_SlowStopHost, "pending", 3)
+    coordinator = _host()
+    coordinator._retire_retry_delays_s = (0.01,)
+    session_id, _ = coordinator.create_session_offer()
+    peer = _FakeHost.instances[-1]
+    peer.kwargs["on_state_change"]("closed")
+    assert _wait_until(lambda: peer.calls.count("stop") == 2 and not coordinator._retry_running)
+    assert coordinator._retiring == {session_id: peer}     # not lost: still owed a stop
+    with pytest.raises(PeerStopPending):
+        coordinator.create_session_offer()                 # refused, but the retry restarts
+    assert _wait_until(lambda: peer.stopped and coordinator._retiring == {})
+    coordinator.create_session_offer()
+    assert coordinator.session_count() == 1
