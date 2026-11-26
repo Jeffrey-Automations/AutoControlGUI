@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QApplication  # noqa: E402  # reason: optional Qt 
 
 from je_auto_control.gui.agent_tasks_tab import AgentTasksTab  # noqa: E402  # reason: optional Qt after skip
 from je_auto_control.gui.task_controller import TaskOutcome  # noqa: E402  # reason: optional Qt after skip
+from headless._qt_settle import pump_until  # noqa: E402  # reason: optional Qt after skip
 
 
 @pytest.fixture
@@ -149,6 +150,7 @@ def test_image_click_uses_unscaled_rendered_pixels_and_never_dispatches(tab, mon
     monkeypatch.setattr(tab, "_dispatch", lambda *args: calls.append(args))
     tab._present_result(observation())
     preview = tab._observation._image
+    assert pump_until(lambda: not preview.pixmap().isNull())     # decoded off the GUI thread
     assert preview.pixmap().devicePixelRatio() == 1.0
     assert (preview.width(), preview.height()) == (20, 10)
     event = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(12, 7), QPointF(12, 7),
@@ -164,6 +166,7 @@ def test_changing_task_invalidates_frame_and_prevents_old_action(tab, monkeypatc
     tab._present_result(observation())
     tab._task_id.setText("task-b")
     assert tab._observation._elements.rowCount() == 0
+    assert pump_until(lambda: not tab._observation._decoder.busy)     # the old frame's image arrives and is dropped
     assert tab._observation._image.pixmap().isNull()
     dict(tab.menu_actions())["agent_act"]()
     assert calls == []
@@ -183,9 +186,11 @@ def test_stale_view_reply_cannot_replace_new_task_selection(tab, monkeypatch):
 
 def test_untrusted_image_clears_existing_preview(tab):
     tab._present_result(observation())
+    assert pump_until(lambda: not tab._observation._image.pixmap().isNull())
     image = observation(frame="frame-b")
     image["data"]["image"]["image_size"] = [2000, 1000]
     tab._present_result(image)
+    assert pump_until(lambda: bool(tab._observation._notice.text()))
     assert tab._observation._image.pixmap().isNull()
     assert tab._observation._elements.rowCount() == 1
 
@@ -206,6 +211,7 @@ def test_new_frame_requires_reselection_before_reusing_an_old_index(tab, monkeyp
 def test_pixel_selection_floors_fractional_positions_at_the_frame_edge(tab):
     tab._present_result(observation())
     preview = tab._observation._image
+    assert pump_until(lambda: not preview.pixmap().isNull())
     event = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(19.9, 9.9), QPointF(19.9, 9.9),
                         Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     preview.mousePressEvent(event)

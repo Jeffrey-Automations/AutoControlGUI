@@ -271,6 +271,10 @@ class AgentTasksTab(TranslatableMixin, QWidget):
         self._transfer.detach()
         super().closeEvent(event)
 
+    def dispose(self) -> None:
+        """Drop an observation image still being decoded; service-owned work keeps running, as on close."""
+        self._observation.dispose()
+
     def _lookup(self) -> None:
         self._dispatch("lookup", {"idempotency_key": self._request_key.text()})
 

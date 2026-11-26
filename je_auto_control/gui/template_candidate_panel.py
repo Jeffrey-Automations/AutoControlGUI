@@ -4,12 +4,13 @@ from functools import partial
 from typing import Callable, Optional
 
 from PySide6.QtCore import Qt, Slot
-from PySide6.QtGui import QCloseEvent, QPixmap
+from PySide6.QtGui import QCloseEvent, QImage, QPixmap
 from PySide6.QtWidgets import (
     QDoubleSpinBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._latest_decoder import LatestDecoder
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.template_candidate_worker import (
@@ -24,6 +25,17 @@ _OPERATIONS: tuple[CandidateOperation, ...] = ("create", "preview", "verify", "a
 
 def _t(key: str) -> str:
     return language_wrapper.translate("template_candidate_" + key)
+
+
+def _decode_thumbnails(pngs: tuple[bytes, bytes]) -> tuple[QImage, QImage]:
+    """Decoder thread: both preview PNGs decoded and scaled to the thumbnail size."""
+    thumbnails = []
+    for data in pngs:
+        image = QImage()
+        image.loadFromData(data)
+        thumbnails.append(image.scaled(400, 240, Qt.AspectRatioMode.KeepAspectRatio,
+                                       Qt.TransformationMode.SmoothTransformation))
+    return thumbnails[0], thumbnails[1]
 
 
 # pylint: disable-next=too-many-instance-attributes  # reason: form controls, preview views and one owned task
@@ -45,6 +57,9 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
         self._task.error.connect(self._task_failed)
         self._task.progress.connect(self._progress)
         self._task.finished.connect(self._thread_done)
+        # The thumbnails are decoded on a thread of the panel's own; clearing them drops one still out.
+        self._thumbnails = 0
+        self._decoder = LatestDecoder(self, _decode_thumbnails, self._thumbnails_decoded)
         self._template, self._candidate, self._bundle, self._dataset = (QLineEdit() for _ in range(4))
         self._revision = QLineEdit()
         self._revision.setReadOnly(True)
@@ -116,8 +131,7 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
         self.cancel()
         self._generation += 1
         self._revision.clear()
-        self._original.clear()
-        self._replacement.clear()
+        self._clear_thumbnails()
         self._details.clear()
         self._set_status("idle")
 
@@ -199,8 +213,7 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
             self._show_preview(outcome)
         elif outcome.state is not None and self._revision.text() != outcome.state.revision:
             self._revision.clear()
-            self._original.clear()
-            self._replacement.clear()
+            self._clear_thumbnails()
         if self._operation == "verify" and outcome.data is not None:
             eligible = outcome.data.get("eligible") is True
             self._set_status("eligible" if eligible else "ineligible")
@@ -218,11 +231,21 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
             self._revision.setText(preview.state.revision)
         finally:
             self._updating = False
-        for label, data in ((self._original, preview.original_png), (self._replacement, preview.candidate_png)):
-            image = QPixmap()
-            image.loadFromData(data)
-            label.setPixmap(image.scaled(400, 240, Qt.AspectRatioMode.KeepAspectRatio,
-                                          Qt.TransformationMode.SmoothTransformation))
+        self._clear_thumbnails()
+        for label in (self._original, self._replacement):
+            label.setText(language_wrapper.translate("gui_op_loading", "Loading…"))
+        self._decoder.submit((preview.original_png, preview.candidate_png), self._thumbnails)
+
+    def _thumbnails_decoded(self, shown: int, images: tuple[QImage, QImage]) -> None:
+        if shown != self._thumbnails:
+            return                          # cleared or replaced while it was decoded
+        for label, image in zip((self._original, self._replacement), images):
+            label.setPixmap(QPixmap.fromImage(image))
+
+    def _clear_thumbnails(self) -> None:
+        self._thumbnails += 1
+        self._original.clear()
+        self._replacement.clear()
 
     def _task_failed(self, error: object) -> None:
         self._failed(str(error))
@@ -235,13 +258,20 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
     def _failed(self, error: str) -> None:
         self._details.clear()
         self._revision.clear()
-        self._original.clear()
-        self._replacement.clear()
+        self._clear_thumbnails()
         self._set_status("error", scrub_secret_text(error))
+
+    def dispose(self) -> None:
+        """Cancel the operation still out and drop thumbnails still being decoded; safe to call twice."""
+        self.cancel()
+        self._generation += 1
+        self._thumbnails += 1
+        self._decoder.stop()
 
     # pylint: disable-next=invalid-name  # reason: Qt override
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802  # reason: Qt override
         """Discard stale responses and request cancellation before the view closes."""
         self.cancel()
         self._generation += 1
+        self._thumbnails += 1
         super().closeEvent(event)

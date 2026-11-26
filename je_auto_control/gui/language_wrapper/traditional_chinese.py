@@ -924,6 +924,7 @@ traditional_chinese_word_dict = {
     "jr_diff_keep": "保留目前內容",
     "gui_op_stopping": "正在停止…",
     "gui_op_starting": "正在啟動…",
+    "gui_op_loading": "正在載入…",
     "eml_host_label": "主機：",
     "eml_port_label": "埠號：",
     "eml_user_label": "使用者：",

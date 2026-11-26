@@ -56,6 +56,10 @@ def test_actions_complete_preview_verify_accept_and_revert(panel, app, revision_
     panel._start("preview")
     until_idle(app, panel)
     assert len(panel._revision.text()) == 64
+    deadline = time.monotonic() + 5                 # the thumbnails are decoded off the GUI thread
+    while panel._original.pixmap().isNull() and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(0.005)
     assert not panel._original.pixmap().isNull()
     assert not panel._replacement.pixmap().isNull()
     panel._start("verify")

@@ -16,7 +16,8 @@ from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._qt_typed import as_plain, decoded_image
+from je_auto_control.gui._latest_decoder import LatestDecoder, decode_jpeg
+from je_auto_control.gui._qt_typed import as_plain
 from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui.remote_desktop._connect_task import connect_viewer
@@ -114,6 +115,8 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         # can be delivered ahead of the connect's own result: dropped, the
         # window stayed blank until something moved on the host.
         self._early_frame: Optional[QImage] = None
+        # Frames are decoded on a thread of this panel's own; the newest one wins.
+        self._decoder = LatestDecoder(self, decode_jpeg, self._on_frame_decoded)
         # The connect in progress, off the GUI thread; None once it answered.
         self._connect_task: Optional[TaskHandle] = None
         self._audio_player: Optional[AudioPlayer] = None
@@ -241,7 +244,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         """
         self._view.retire()
         release_resources(self, self._cancel_pending_connect, self._retire_audio_player,
-                          self._close_screen_window)
+                          self._close_screen_window, self._decoder.stop)
 
     def _connect(self) -> None:
         host = self._host_field.text().strip()
@@ -468,9 +471,11 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             self._on_error_main(message)
 
     def _on_frame_main(self, payload: bytes) -> None:
-        image = decoded_image(payload, "JPEG")
-        if image.isNull():
-            return
+        self._decoder.submit(payload, self._session)    # decoded off the GUI thread
+
+    def _on_frame_decoded(self, session: int, image: QImage) -> None:
+        if session != self._session or image.isNull():
+            return                          # a frame of a session since replaced or closed
         if self._screen_window is None:
             self._early_frame = image       # shown by _on_connected
             return

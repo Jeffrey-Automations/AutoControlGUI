@@ -152,7 +152,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
 
         Called by ``close_tab(key)`` before the widget is deleted; safe to call twice.
         """
-        release_resources(self, self._source.cancel, self._candidates.cancel, self._evaluation.cancel)
+        release_resources(self, self._source.cancel, self._candidates.dispose, self._evaluation.cancel)
 
     def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""

@@ -5,7 +5,7 @@ import ssl
 from typing import Any, Optional
 
 from PySide6.QtCore import QTimer, Signal
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QImage
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
     QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget,
@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._authorize import RefusalLabel
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._qt_typed import decoded_image
+from je_auto_control.gui._latest_decoder import LatestDecoder, decode_jpeg
 from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
@@ -95,6 +95,11 @@ class _HostPanel(TranslatableMixin, QWidget):
         # Preview is read-only — a host watching their own stream shouldn't
         # trigger fake input on themselves through the local widget.
         self._preview.setEnabled(False)
+        # Preview frames are decoded on a thread of this panel's own; a clear
+        # bumps the generation so a frame still being decoded is not painted.
+        self._preview_decoder = LatestDecoder(self, decode_jpeg, self._on_preview_decoded)
+        self._preview_generation = 0
+        self._preview_source: Optional[bytes] = None
         self._start_btn: Optional[QPushButton] = None
         self._stop_btn: Optional[QPushButton] = None
         self._copy_id_btn: Optional[QPushButton] = None
@@ -118,7 +123,7 @@ class _HostPanel(TranslatableMixin, QWidget):
         """
         self._view.retire()
         release_resources(self._host_op)
-        release_resources(self)
+        release_resources(self, self._preview_decoder.stop)
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
@@ -399,11 +404,16 @@ class _HostPanel(TranslatableMixin, QWidget):
             return
         host = registry.host
         if host is None or not host.is_running:
+            self._preview_generation += 1
+            self._preview_source = None
             self._preview.clear()
             return
         frame = host.latest_frame()
-        if frame is None:
-            return
-        image = decoded_image(frame, "JPEG")
-        if not image.isNull():
+        if frame is None or frame is self._preview_source:
+            return                          # nothing new since the last tick
+        self._preview_source = frame
+        self._preview_decoder.submit(frame, self._preview_generation)
+
+    def _on_preview_decoded(self, generation: int, image: QImage) -> None:
+        if generation == self._preview_generation and not image.isNull():
             self._preview.set_image(image)

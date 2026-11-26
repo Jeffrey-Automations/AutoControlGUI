@@ -951,6 +951,7 @@ japanese_word_dict = {
     "jr_diff_keep": "現在のままにする",
     "gui_op_stopping": "停止しています…",
     "gui_op_starting": "開始しています…",
+    "gui_op_loading": "読み込んでいます…",
     "eml_host_label": "ホスト：",
     "eml_port_label": "ポート：",
     "eml_user_label": "ユーザー：",

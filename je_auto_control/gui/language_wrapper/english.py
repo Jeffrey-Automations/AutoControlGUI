@@ -1058,6 +1058,7 @@ english_word_dict = {
     "jr_diff_keep": "Keep current",
     "gui_op_stopping": "Stopping…",
     "gui_op_starting": "Starting…",
+    "gui_op_loading": "Loading…",
     "eml_host_label": _HOST_LABEL,
     "eml_port_label": _PORT_LABEL,
     "eml_user_label": "User:",

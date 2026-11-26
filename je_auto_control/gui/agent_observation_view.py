@@ -1,18 +1,35 @@
-"""Read-only scoped controls and a one-to-one pixel preview for managed task requests."""
+"""Read-only scoped controls and a one-to-one pixel preview for managed task requests.
+
+The preview image is checked and decoded on a thread of the view's own
+(:class:`~je_auto_control.gui._latest_decoder.LatestDecoder`); the newest
+observation wins, and one cleared or replaced meanwhile is not painted.
+"""
 from __future__ import annotations
 
 from typing import Any
 import math
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QMouseEvent, QPixmap
+from PySide6.QtGui import QImage, QMouseEvent, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QLabel, QScrollArea, QTableWidget,
                                QTableWidgetItem, QVBoxLayout, QWidget)
 
+from je_auto_control.gui._latest_decoder import LatestDecoder
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.images import observation_image_bytes
+
+
+def _decode_observation_image(image: dict[str, Any]) -> QImage:
+    """Decoder thread: the strict-masked JPEG checked, then decoded; :class:`AgentTaskError` when it is not."""
+    pixels = observation_image_bytes(image)
+    decoded = QImage()
+    # No format argument: the header says JPEG, and that argument's type
+    # differs between the PySide6 releases the contract is checked against.
+    if not decoded.loadFromData(pixels):
+        raise AgentTaskError("observation preview image could not be decoded")
+    return decoded
 
 
 class _Image(QLabel):
@@ -39,6 +56,8 @@ class AgentObservationView(QWidget):
         super().__init__(parent)
         self.observation_id = ""
         self._indices: list[int] = []
+        self._shown = 0                     # bumped by clear(): an image decoded for an older frame is dropped
+        self._decoder = LatestDecoder(self, _decode_observation_image, self._image_decoded, self._image_failed)
         self._elements = QTableWidget(0, 4)
         self._elements.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._elements.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -68,6 +87,7 @@ class AgentObservationView(QWidget):
     def clear(self) -> None:
         """Discard all frame-local selections and pixels on task changes or action dispatch."""
         self.observation_id = ""
+        self._shown += 1
         self._indices.clear()
         self._elements.setRowCount(0)
         self._image.setPixmap(QPixmap())
@@ -101,19 +121,33 @@ class AgentObservationView(QWidget):
                     value = {"selector": element["selector"], "frame": element.get("frame", "")}
                 self._elements.setItem(index, column, QTableWidgetItem(str(value)))
 
+    def dispose(self) -> None:
+        """Drop an image still being decoded and end the decoder's thread; safe to call twice."""
+        self._shown += 1
+        self._decoder.stop()
+
     def _present_image(self, image: dict[str, Any]) -> None:
-        try:
-            pixels = observation_image_bytes(image)
-            pixmap = QPixmap()
-            # No format argument: the header says JPEG, and that argument's type
-            # differs between the PySide6 releases the contract is checked against.
-            if not pixmap.loadFromData(pixels):
-                raise AgentTaskError("observation preview image could not be decoded")
-            pixmap.setDevicePixelRatio(1.0)
-            self._image.setPixmap(pixmap)
-            self._image.setFixedSize(pixmap.size())
-        except AgentTaskError as error:
+        self._image.setText(language_wrapper.translate("gui_op_loading", "Loading…"))
+        self._image.setFixedSize(self._image.sizeHint())
+        self._decoder.submit(image, self._shown)
+
+    def _image_decoded(self, shown: int, image: QImage) -> None:
+        if shown != self._shown:
+            return
+        pixmap = QPixmap.fromImage(image)
+        pixmap.setDevicePixelRatio(1.0)
+        self._image.setPixmap(pixmap)
+        self._image.setFixedSize(pixmap.size())
+
+    def _image_failed(self, shown: int, error: object) -> None:
+        if shown != self._shown:
+            return
+        self._image.clear()
+        self._image.setFixedSize(1, 1)
+        if isinstance(error, AgentTaskError):
             self._notice.setText(str(error))
+        else:
+            self._notice.setText(f"observation preview image could not be decoded: {error}")
 
     def _pick_element(self, row: int, _column: int) -> None:
         if self.observation_id and 0 <= row < len(self._indices):

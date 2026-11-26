@@ -301,6 +301,7 @@ def test_a_frame_delivered_before_the_connect_result_is_shown_when_the_window_op
     panel = viewer_panel._ViewerPanel()
     assert panel._screen_window is None
     panel._on_frame_main(bytes(buffer.data()))          # the frame's queued signal ran first
+    assert pump_until(lambda: panel._early_frame is not None)     # decoded off the GUI thread
     viewer = _Viewer()
     viewer.connected = True
     panel._on_connected(viewer)                         # then the connect task's result

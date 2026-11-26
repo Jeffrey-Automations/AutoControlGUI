@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QImage
 from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QMessageBox, QPushButton, QVBoxLayout, QWidget,
@@ -29,7 +29,8 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._authorize import RefusalLabel
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._qt_typed import as_plain, decoded_image
+from je_auto_control.gui._latest_decoder import LatestDecoder, decode_jpeg
+from je_auto_control.gui._qt_typed import as_plain
 from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import set_role
@@ -150,9 +151,11 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._disconnect_btn: Optional[QPushButton] = None
         self._screen_window: Optional[RemoteScreenWindow] = None
         # Phase 2.3 motion-dedup interaction: a frame can arrive before
-        # the popup window is open, so we cache the most recent payload
+        # the popup window is open, so we cache the most recent image
         # and replay it the moment the window is created.
-        self._pending_frame: Optional[bytes] = None
+        self._pending_image: Optional[QImage] = None
+        # Frames are decoded on a thread of this screen's own; the newest one wins.
+        self._decoder = LatestDecoder(self, decode_jpeg, self._on_frame_decoded)
         self._connect_task: Optional[TaskHandle] = None    # the connect in progress, off-thread
         # Starting and stopping the host join threads; so does closing a viewer.
         self._host_op = SlowOp(self)
@@ -199,7 +202,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         # A host start still out is cancelled and the host it brings up released;
         # sessions already let go of keep closing on the stop queue.
         release_resources(self._host_op)
-        release_resources(self, self._cancel_pending_connect, self._close_screen_window)
+        release_resources(self, self._cancel_pending_connect, self._close_screen_window, self._decoder.stop)
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
@@ -486,7 +489,7 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
     def _on_displaced(self, slot: str, _by: str) -> None:
         """GUI thread: another panel or a script took one of this screen's slots."""
         if slot != SLOT_HOST and self._own_viewer() is None:
-            self._pending_frame = None
+            self._pending_image = None
             self._close_screen_window()
         self._refresh_status()
 
@@ -604,15 +607,16 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
     # --- frame plumbing ----------------------------------------------
 
     def _on_frame(self, payload: bytes) -> None:
-        # Cache the latest payload so a frame that lands before the
-        # popup window is open can be replayed by _open_screen_window.
-        self._pending_frame = payload
-        window = self._screen_window
-        if window is None:
+        self._decoder.submit(payload, self._session)    # decoded off the GUI thread
+
+    def _on_frame_decoded(self, session: int, image: QImage) -> None:
+        # Cache the latest image so a frame that lands before the popup
+        # window is open can be replayed by _open_screen_window.
+        if session != self._session or image.isNull():
             return
-        image = decoded_image(payload, "JPEG")
-        if not image.isNull():
-            window.set_image(image)
+        self._pending_image = image
+        if self._screen_window is not None:
+            self._screen_window.set_image(image)
 
     def _on_error(self, message: str) -> None:
         # The session is over: the popup stayed open on its last frame and
@@ -631,10 +635,8 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
             self._screen_window = window
         # If frames arrived before this window existed (race with the
         # motion-dedup capture path), apply the most recent now.
-        if self._pending_frame is not None:
-            image = decoded_image(self._pending_frame, "JPEG")
-            if not image.isNull():
-                self._screen_window.set_image(image)
+        if self._pending_image is not None:
+            self._screen_window.set_image(self._pending_image)
         self._screen_window.show()
         self._screen_window.raise_()
         self._screen_window.activateWindow()
