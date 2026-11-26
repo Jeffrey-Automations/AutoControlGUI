@@ -29,6 +29,7 @@ from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.rbac.authorization import authorization_scope, current_authorization
 from je_auto_control.utils.action_journal.capture import bound_journal, current_journal
 from je_auto_control.utils.executor.dispatch import bound_command_guards, capture_command_guards
+from je_auto_control.utils.executor.registrant_authority import define_macro, macro_authority, registrant_and_caller
 from je_auto_control.utils.executor.result_hook import bound_branch_hook, capture_branch_hook
 from je_auto_control.utils.exception.cancellation import cancellation_scope, current_cancellation_token
 from je_auto_control.utils.logging.secret_scope import bound_secret_scope, current_secret_scope
@@ -616,14 +617,14 @@ _MACRO_DEPTH = threading.local()
 
 
 def exec_define_macro(executor: Any, args: Mapping[str, Any]) -> Dict[str, Any]:
-    """Register a named, parameterised macro for later ``AC_call_macro``."""
+    """Register a named, parameterised macro for later ``AC_call_macro``, owned by the caller."""
     name = args["name"]
     raw_params = args.get("params") or []
     if isinstance(raw_params, str):
         params = [part.strip() for part in raw_params.split(",") if part.strip()]
     else:
         params = [str(part) for part in raw_params]
-    executor.macros[name] = {"params": params, "body": args.get("body") or []}
+    define_macro(executor.macros, name, params, args.get("body") or [])
     return {"defined": name, "params": params}
 
 
@@ -631,7 +632,8 @@ def exec_call_macro(executor: Any, args: Mapping[str, Any]) -> Any:
     """Invoke a macro registered by ``AC_define_macro``, binding call args.
 
     Each parameter is bound into the executor's variable scope before the
-    macro body runs, so the body reads ``${param}`` as usual.
+    macro body runs, so the body reads ``${param}`` as usual. Each step must be
+    allowed for both the macro's definer and the caller.
     """
     name = args["name"]
     macro = executor.macros.get(name)
@@ -655,7 +657,8 @@ def exec_call_macro(executor: Any, args: Mapping[str, Any]) -> Any:
         executor.variables.set(param, raw_args.get(param))
     _MACRO_DEPTH.value = depth + 1
     try:
-        return _run_branch(executor, macro["body"])
+        with registrant_and_caller(macro_authority(macro), f"macro {name!r}"):
+            return _run_branch(executor, macro["body"])
     finally:
         _MACRO_DEPTH.value = depth
         _restore_params(executor.variables, macro["params"], saved)
