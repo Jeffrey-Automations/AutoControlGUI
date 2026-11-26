@@ -2,7 +2,7 @@
 from je_auto_control._lazy_exports import AttributeBinding, ExportBinding, ModuleBinding
 
 
-PUBLIC_ORDER_SHA256 = '2f1fa13b31794b9584f329c69fff3e351ce6ba9d0eab4e334e4003c51f0ace7b'
+PUBLIC_ORDER_SHA256 = '51909c0bac824012d0aaf47b87809847214b2bdc8be6c2cf0ebc279ecce2e19b'
 
 _IOS_SIMCTL = 'je_auto_control.ios.simctl'
 _LINUX_WAYLAND_GLOBAL_SHORTCUTS = 'je_auto_control.linux_wayland.global_shortcuts'
@@ -263,6 +263,7 @@ _UTILS_SKILL_LIBRARY = 'je_auto_control.utils.skill_library'
 _UTILS_SLO = 'je_auto_control.utils.slo'
 _UTILS_SMART_WAITS = 'je_auto_control.utils.smart_waits'
 _UTILS_SMOOTHING = 'je_auto_control.utils.smoothing'
+_UTILS_SOCKET_SERVER_SOCKET_CLIENT = 'je_auto_control.utils.socket_server.socket_client'
 _UTILS_SOFT_ASSERT = 'je_auto_control.utils.soft_assert'
 _UTILS_SSE_CLIENT = 'je_auto_control.utils.sse_client'
 _UTILS_SSIM = 'je_auto_control.utils.ssim'
@@ -1768,6 +1769,9 @@ EXPORTS: dict[str, ExportBinding] = {
     'start_autocontrol_socket_server': AttributeBinding(
         'je_auto_control.utils.socket_server.auto_control_socket_server', 'start_autocontrol_socket_server',
     ),
+    'send_socket_command': AttributeBinding(_UTILS_SOCKET_SERVER_SOCKET_CLIENT, 'send_socket_command'),
+    'read_socket_token': AttributeBinding(_UTILS_SOCKET_SERVER_SOCKET_CLIENT, 'read_socket_token'),
+    'authenticate_connection': AttributeBinding(_UTILS_SOCKET_SERVER_SOCKET_CLIENT, 'authenticate_connection'),
     'callback_executor':
         AttributeBinding('je_auto_control.utils.callback.callback_function_executor', 'callback_executor'),
     'package_manager':

@@ -1847,6 +1847,11 @@ if _TYPE_CHECKING:
     from je_auto_control.utils.socket_server.auto_control_socket_server import (
         start_autocontrol_socket_server,
     )
+    from je_auto_control.utils.socket_server.socket_client import (
+        authenticate_connection,
+        read_socket_token,
+        send_socket_command,
+    )
     from je_auto_control.utils.start_exe.start_another_process import start_exe
     from je_auto_control.utils.test_record.record_test_class import test_record_instance
     from je_auto_control.wrapper.auto_control_image import locate_all_image
@@ -2704,6 +2709,7 @@ __all__ = [
     "default_virtual_gamepad", "is_virtual_gamepad_available",
     "generate_html", "generate_html_report", "generate_json", "generate_json_report", "generate_xml",
     "generate_xml_report", "get_dir_files_as_list", "create_project_dir", "start_autocontrol_socket_server",
+    "send_socket_command", "read_socket_token", "authenticate_connection",
     "callback_executor", "package_manager", "ShellManager", "default_shell_manager",
     "RecordingThread", "send_key_event_to_window", "send_mouse_event_to_window", "windows_window_manage",
     "ScreenRecorder", "get_pixel",
