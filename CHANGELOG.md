@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Executor flags spelled `"false"` are honoured by `AC_usb_passthrough_enable`, `AC_usb_acl_add`,
+  `AC_usb_acl_import`, `AC_assert_visual`, `AC_soft_assert`, the fuzzy commands and `AC_execute_action`
+  (`dry_run`). List arguments given as a JSON string must decode to a list. `AC_wait_color`,
+  `AC_assert_audio`, `AC_assert_video_changes` and `AC_perceptual_diff` refuse NaN or infinite thresholds.
+  `AC_expect_poll` rejects unknown ops. `AC_usb_watch_start` reports the interval in use.
+
 - GUI: remote-desktop frames and result images decode off the GUI thread; a CA-store load failure
   is reported as the connect error; audit-log query errors and template-crop errors show in place.
 

@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-31 | 2026-11-26 | Read every executor adapter and fix what was wrong | #done #fix #security #review #usb | [2026-11-c](2026-11-c.md) |
 | U-20261126-30 | 2026-11-26 | Decode frames, load TLS and query the audit log off the GUI thread | #done #gui #remote-desktop | [2026-11-c](2026-11-c.md) |
 | U-20261126-29 | 2026-11-26 | Fix the reconnect count, label parsing and stale language texts; bound receipts and USB threads | #done #fix #gui #remote-desktop #usb | [2026-11-c](2026-11-c.md) |
 | U-20261126-28 | 2026-11-26 | Review the server files the last pass had not read | #done #fix #security #review | [2026-11-c](2026-11-c.md) |
