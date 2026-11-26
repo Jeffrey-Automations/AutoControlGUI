@@ -149,4 +149,4 @@ def test_wait_for_text_never_sleeps_past_its_timeout(monkeypatch, poll):
     with pytest.raises(AutoControlActionException, match="timeout"):
         ocr_engine.wait_for_text("nope", timeout=0.2, poll=poll)
     assert slept
-    assert max(slept) <= 0.2
+    assert max(slept) <= 0.2 + 1e-6  # the time left, computed from a clock reading

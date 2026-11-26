@@ -139,6 +139,7 @@ def test_an_unknown_mouse_button_is_refused():
         mouse.press_mouse(10, 10, 99)
 
 
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="the uinput module loads glibc on import")
 def test_a_uinput_click_commits_the_press_before_the_release(monkeypatch):
     """Both edges in one SYN frame: libinput compares frames, saw no change, and lost the click."""
     import importlib

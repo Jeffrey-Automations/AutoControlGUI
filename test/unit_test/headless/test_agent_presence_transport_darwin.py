@@ -308,9 +308,17 @@ def test_an_endpoint_naming_another_listener_identity_is_refused(runtime):
     try:
         forged = replace(listener.endpoint,
                          listener_process=replace(listener.endpoint.listener_process, birth=1))
-        threading.Thread(target=lambda: listener.accept(timeout=1).close(), daemon=True).start()
+        checked = threading.Event()
+
+        def accept_and_hold():
+            # Closed at once, the connector could lose the peer before reading its identity.
+            connection = listener.accept(timeout=1)
+            checked.wait(5)
+            connection.close()
+        threading.Thread(target=accept_and_hold, daemon=True).start()
         with pytest.raises(AgentTaskError, match="differs from the trusted launch identity"):
             DarwinChannel.connect(forged, timeout=1)
+        checked.set()
         replaced = replace(listener.endpoint, socket_identity=FileIdentity(0, 0, 0, 0))
         with pytest.raises(AgentTaskError):
             DarwinChannel.connect(replaced, timeout=1)
