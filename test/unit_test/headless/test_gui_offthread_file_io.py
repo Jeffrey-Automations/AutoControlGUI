@@ -633,3 +633,46 @@ def test_disposing_the_admin_console_drops_a_host_edit_still_out(boxes, monkeypa
     pump_until(lambda: False, timeout=0.5)
     assert tab._table.rowCount() == 0 and tab._label_input.text() == "alpha"
     tab.deleteLater()
+
+
+# --- Quick Connect: the Recent list ------------------------------------------------------------------------
+
+def _quick_connect(monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import connection_screen
+    from je_auto_control.utils.remote_desktop.address_book import AddressBook
+    from je_auto_control.utils.remote_desktop.registry import registry
+    monkeypatch.setattr(registry, "_viewer", None)
+    monkeypatch.setattr(registry, "_ws_viewer", None)
+    screen = connection_screen.QuickConnectScreen()
+    screen._book = AddressBook(tmp_path / "book.json")             # never the user's own book
+    return screen
+
+
+def test_a_connected_target_is_remembered_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    screen = _quick_connect(monkeypatch, tmp_path)
+    gate = _Gate(then=screen._book.upsert)
+    monkeypatch.setattr(screen._book, "upsert", gate)
+    _returns_at_once(screen._remember_tcp, "127.0.0.1", 9938)
+    assert gate.entered.wait(_WAIT)
+    gate.release.set()
+    assert pump_until(lambda: screen._recent.count() == 1)
+    assert gate.off_gui_thread()
+    screen.dispose()
+    screen.deleteLater()
+
+
+def test_quick_connect_wake_on_lan_sends_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.remote_desktop import connection_recent
+    screen = _quick_connect(monkeypatch, tmp_path)
+    gate = _Gate()
+    monkeypatch.setattr(connection_recent, "send_magic_packet", gate)
+    entry = {"host_id": "h", "server_url": "h", "mac_address": "aa:bb:cc:dd:ee:ff"}
+    _returns_at_once(screen._send_wake_on_lan, entry, "h")
+    assert gate.entered.wait(_WAIT)
+    assert boxes == []
+    gate.release.set()
+    assert pump_until(lambda: len(boxes) == 1)
+    assert gate.off_gui_thread()
+    assert boxes == [_t("rd_quick_wol_sent").replace("{mac}", "aa:bb:cc:dd:ee:ff")]
+    screen.dispose()
+    screen.deleteLater()
