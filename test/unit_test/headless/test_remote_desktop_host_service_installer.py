@@ -30,7 +30,7 @@ def test_generate_systemd_unit(tmp_path):
     text = output.read_text(encoding="utf-8")
     assert "[Service]" in text
     assert "ExecStart=" in text
-    assert str(config) in text
+    assert _exec_start_argv(text)[-1] == str(config)
     assert "Restart=on-failure" in text
 
 
@@ -76,3 +76,74 @@ def test_arg_parser_includes_uninstall_commands():
     assert "uninstall-windows-service" in choices
     assert "uninstall-launchd" in choices
     assert "uninstall-systemd" in choices
+
+
+def _exec_start_argv(unit_text):
+    """Split ExecStart= the way systemd does: specifiers, quoted words with C escapes, then ``$$``."""
+    line = next(row for row in unit_text.splitlines() if row.startswith("ExecStart="))
+    line = line[len("ExecStart="):].replace("%%", "%")
+    words, word, quoted, index = [], None, False, 0
+    while index < len(line):
+        char = line[index]
+        if char == '"':
+            quoted, word = not quoted, word or ""
+        elif char == "\\" and quoted:
+            index += 1
+            word += line[index]
+        elif char == " " and not quoted:
+            if word is not None:
+                words.append(word)
+            word = None
+        else:
+            word = (word or "") + char
+        index += 1
+    assert not quoted, "unbalanced quote"
+    if word is not None:
+        words.append(word)
+    return [item.replace("$$", "$") for item in words]
+
+
+_AWKWARD = 'dir with space/quo"te/back\\slash/100% $HOME ${X} & <tag>'
+
+
+def test_unit_generators_quote_and_escape_awkward_paths(tmp_path, monkeypatch):
+    import plistlib
+    python = str(tmp_path / _AWKWARD / "python3")
+    config = tmp_path / _AWKWARD / "service.json"
+    monkeypatch.setattr(host_service.sys, "executable", python)
+    unit, plist = tmp_path / "rd-host.service", tmp_path / "rd-host.plist"
+    host_service._generate_systemd_unit(config, unit)
+    host_service._generate_launchd_plist(config, plist)
+    expected = [python, "-m", "je_auto_control.utils.remote_desktop.host_service", "run", "--config", str(config)]
+    assert _exec_start_argv(unit.read_text(encoding="utf-8")) == expected
+    assert plistlib.loads(plist.read_bytes())["ProgramArguments"] == expected
+
+
+def test_launchd_plist_keeps_the_whitespace_xml_can_hold(tmp_path):
+    import plistlib
+    config = tmp_path / "line\nbreak\rreturn\ttab" / "service.json"
+    plist = tmp_path / "rd-host.plist"
+    host_service._generate_launchd_plist(config, plist)
+    assert plistlib.loads(plist.read_bytes())["ProgramArguments"][-1] == str(config)
+
+
+@pytest.mark.parametrize("generator,bad", [
+    *[("_generate_systemd_unit", bad) for bad in ("line\nbreak", "tab\t", "nul\x00", "bell\x07", "del\x7f",
+                                                  "surrogate\udcff")],
+    *[("_generate_launchd_plist", bad) for bad in ("nul\x00", "bell\x07", "surrogate\udcff", "nonchar￿")],
+])
+def test_unit_generators_reject_paths_the_format_cannot_hold(tmp_path, generator, bad):
+    from je_auto_control.utils.exception.exceptions import AutoControlException
+    output = tmp_path / "unit"
+    with pytest.raises(AutoControlException, match="cannot"):
+        getattr(host_service, generator)(tmp_path / bad / "service.json", output)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("command", ["generate-systemd", "generate-launchd"])
+def test_generate_commands_report_an_unrepresentable_path_without_a_traceback(tmp_path, command, capsys):
+    output = tmp_path / "unit"
+    bad_config = str(tmp_path / "bad") + chr(7)
+    assert host_service.main([command, str(output), "--config", bad_config]) == 2
+    assert "Cannot write" in capsys.readouterr().err
+    assert not output.exists()

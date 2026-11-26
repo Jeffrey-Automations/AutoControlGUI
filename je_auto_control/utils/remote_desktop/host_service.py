@@ -23,12 +23,15 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
+from xml.sax.saxutils import escape as xml_escape
 
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 
@@ -180,8 +183,45 @@ def _serve_one_viewer(multi: Any, config: HostServiceConfig,
 # --- service installation helpers ----------------------------------------
 
 
+class ServiceUnitError(AutoControlException, ValueError):
+    """A path cannot be written into a launchd plist or systemd unit."""
+
+
+# Never valid in either file: lone surrogates (an undecodable POSIX filename)
+# cannot be written as UTF-8, and XML 1.0 has no form for the rest.
+_NEVER_REPRESENTABLE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
+# A systemd line also ends at a newline; tabs and DEL are refused rather
+# than relying on C escapes inside the quoted word.
+_SYSTEMD_UNREPRESENTABLE = re.compile("[\x00-\x1f\x7f\ud800-\udfff\ufffe\uffff]")
+
+
+def _checked(value: object, what: str, pattern: re.Pattern[str]) -> str:
+    """``str(value)``, or :class:`ServiceUnitError` when it holds a character the format cannot."""
+    text = str(value)
+    bad = pattern.search(text)
+    if bad is not None:
+        raise ServiceUnitError(f"the {what} {text!r} holds {bad.group()!r}, which this file format cannot hold")
+    return text
+
+
+def _plist_text(value: object, what: str) -> str:
+    """Escape ``value`` for a plist ``<string>``; a carriage return is kept as a reference."""
+    escaped = xml_escape(_checked(value, what, _NEVER_REPRESENTABLE))
+    return escaped.replace("\r", "&#13;")
+
+
+def _systemd_word(value: object, what: str) -> str:
+    """Quote ``value`` as one ExecStart word: C escapes, then ``%%`` specifiers and ``$$`` variables."""
+    text = _checked(value, what, _SYSTEMD_UNREPRESENTABLE)
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
+    return f'"{escaped}"'
+
+
 def _generate_launchd_plist(config_path: Path, output_path: Path) -> None:
-    python = sys.executable
+    """Write a launchd plist for the host service; :class:`ServiceUnitError` writes nothing."""
+    python = _plist_text(sys.executable, "Python interpreter path")
+    config = _plist_text(config_path, "config path")
+    logs = _plist_text(f"{Path.home()}/Library/Logs", "log directory")
     plist = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -196,16 +236,16 @@ def _generate_launchd_plist(config_path: Path, output_path: Path) -> None:
         <string>je_auto_control.utils.remote_desktop.host_service</string>
         <string>run</string>
         <string>--config</string>
-        <string>{config_path}</string>
+        <string>{config}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>{Path.home()}/Library/Logs/je_auto_control_host.log</string>
+    <string>{logs}/je_auto_control_host.log</string>
     <key>StandardErrorPath</key>
-    <string>{Path.home()}/Library/Logs/je_auto_control_host.err</string>
+    <string>{logs}/je_auto_control_host.err</string>
 </dict>
 </plist>
 """
@@ -213,14 +253,16 @@ def _generate_launchd_plist(config_path: Path, output_path: Path) -> None:
 
 
 def _generate_systemd_unit(config_path: Path, output_path: Path) -> None:
-    python = sys.executable
+    """Write a systemd user unit for the host service; :class:`ServiceUnitError` writes nothing."""
+    python = _systemd_word(sys.executable, "Python interpreter path")
+    config = _systemd_word(config_path, "config path")
     unit = f"""[Unit]
 Description=AutoControl WebRTC remote-desktop host
 After=network.target
 
 [Service]
 Type=simple
-ExecStart={python} -m je_auto_control.utils.remote_desktop.host_service run --config {config_path}
+ExecStart={python} -m je_auto_control.utils.remote_desktop.host_service run --config {config}
 Restart=on-failure
 RestartSec=5
 
@@ -531,7 +573,11 @@ def _cmd_install_windows_service(args: argparse.Namespace) -> int:
 
 
 def _cmd_generate_launchd(args: argparse.Namespace) -> int:
-    _generate_launchd_plist(args.config or _default_config_path(), args.output)
+    try:
+        _generate_launchd_plist(args.config or _default_config_path(), args.output)
+    except ServiceUnitError as error:
+        print(f"Cannot write launchd plist: {error}", file=sys.stderr)
+        return 2
     print(f"Wrote launchd plist: {args.output}")
     print("Activate with:")
     print(f"  cp {args.output} ~/Library/LaunchAgents/")
@@ -540,7 +586,11 @@ def _cmd_generate_launchd(args: argparse.Namespace) -> int:
 
 
 def _cmd_generate_systemd(args: argparse.Namespace) -> int:
-    _generate_systemd_unit(args.config or _default_config_path(), args.output)
+    try:
+        _generate_systemd_unit(args.config or _default_config_path(), args.output)
+    except ServiceUnitError as error:
+        print(f"Cannot write systemd unit: {error}", file=sys.stderr)
+        return 2
     print(f"Wrote systemd unit: {args.output}")
     print("Activate with:")
     print(f"  mkdir -p ~/.config/systemd/user && cp {args.output} "
