@@ -17,7 +17,9 @@ command answered: a field whose name is in :data:`SENSITIVE_ARGUMENT_NAMES`
 is masked wherever it sits in the result, whatever the command. The executor
 uses it for its result log and the Script Builder for its result pane, and
 :func:`masked_fields` lists exactly what it masked, which is what the builder
-offers once.
+offers once. A few commands answer a secret under an ordinary name;
+:data:`RESULT_SECRETS` lists those fields, masked the same way
+(``AC_resolve_ref``'s ``value``, which may be an ``env://`` credential).
 
 Generated secret or identifier. A value is a secret when holding it is enough
 to act: a bearer token (``AC_user_add``, ``AC_user_rotate_token``,
@@ -85,6 +87,10 @@ RESULT_IDENTIFIERS: Mapping[str, FrozenSet[str]] = MappingProxyType({
     # The request id the maker gives the checker, who must be somebody else.
     "AC_approval_request": frozenset({"token"}),
 })
+#: Result fields with an ordinary name that hold a secret: command -> field names.
+RESULT_SECRETS: Mapping[str, FrozenSet[str]] = MappingProxyType({
+    "AC_resolve_ref": frozenset({"value"}),
+})
 _NO_FIELDS: FrozenSet[str] = frozenset()
 # A record key is "execute: " + str(action); the command is its first element.
 _RECORD_COMMAND = re.compile(r"^(?:execute|dry-run): \['(AC_\w+)'")
@@ -121,7 +127,7 @@ def redact_result(command: Optional[str], result: Any, *, show_identifiers: bool
     when one is given. ``result`` is not changed.
     """
     visible = RESULT_IDENTIFIERS.get(command or "", _NO_FIELDS) if show_identifiers else _NO_FIELDS
-    return _redact_value(result, visible, (), _Walk(show_identifiers, found))
+    return _redact_answer(command, result, visible, (), _Walk(show_identifiers, found))
 
 
 def masked_fields(command: Optional[str], result: Any, *,
@@ -142,6 +148,17 @@ class _Walk:
         self.found = found
 
 
+def _redact_answer(command: Optional[str], value: Any, visible: FrozenSet[str], path: FieldPath,
+                   walk: _Walk) -> Any:
+    """What ``command`` answered: its :data:`RESULT_SECRETS` fields masked, the rest by name."""
+    secret = RESULT_SECRETS.get(command or "", _NO_FIELDS)
+    if not secret or not isinstance(value, dict):
+        return _redact_value(value, visible, path, walk)
+    return {key: _hide(item, path + (key,), walk) if key in secret
+            else _redact_field(key, item, visible, path + (key,), walk)
+            for key, item in value.items()}
+
+
 def _redact_value(value: Any, visible: FrozenSet[str], path: FieldPath, walk: _Walk) -> Any:
     if isinstance(value, dict):
         return {key: _redact_field(key, item, visible, path + (key,), walk)
@@ -158,11 +175,17 @@ def _redact_field(key: Any, item: Any, visible: FrozenSet[str], path: FieldPath,
     nested = record_command(key)
     if nested is not None:  # a record inside the result: its own command's rule applies
         shown = RESULT_IDENTIFIERS.get(nested, _NO_FIELDS) if walk.show_identifiers else _NO_FIELDS
-        return _redact_value(item, shown, path, walk)
+        return _redact_answer(nested, item, shown, path, walk)
     name = str(key).lower()
-    empty = item is None or (isinstance(item, str) and not item)
-    if name not in SENSITIVE_ARGUMENT_NAMES or name in visible or empty:
+    if name not in SENSITIVE_ARGUMENT_NAMES or name in visible:
         return _redact_value(item, _NO_FIELDS, path, walk)
+    return _hide(item, path, walk)
+
+
+def _hide(item: Any, path: FieldPath, walk: _Walk) -> Any:
+    """``***`` for a secret field, noted in ``walk.found``; an empty one has nothing to hide."""
+    if item is None or (isinstance(item, str) and not item):
+        return item
     if walk.found is not None:
         walk.found.append(MaskedField(path, item))
     return _MASK

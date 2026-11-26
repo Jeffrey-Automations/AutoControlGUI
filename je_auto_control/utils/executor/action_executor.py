@@ -35,6 +35,12 @@ from je_auto_control.utils.executor.flags import as_bool as _as_bool
 from je_auto_control.utils.executor.adapter_args import finite_float as _finite, json_list as _json_list
 from je_auto_control.utils.executor.dispatch import dispatch_checkpoint
 from je_auto_control.utils.executor.containment import call_contained
+from je_auto_control.utils.executor.document_commands import (
+    generate_code_command as _generate_code, generate_sop_command as _generate_sop,
+)
+from je_auto_control.utils.executor.ref_commands import (
+    resolve_ref_command as _resolve_ref, resolve_refs_command as _resolve_refs,
+)
 from je_auto_control.utils.executor.named_registry import NamedRegistry
 from je_auto_control.utils.agent_runtime.commands import COMMANDS as AGENT_TASK_COMMANDS
 from je_auto_control.utils.executor.flow_control import (
@@ -109,7 +115,6 @@ from je_auto_control.utils.http_client.http_client import http_request
 from je_auto_control.utils.generate_report.generate_html_report import generate_html, generate_html_report
 from je_auto_control.utils.generate_report.generate_json_report import generate_json, generate_json_report
 from je_auto_control.utils.generate_report.generate_xml_report import generate_xml, generate_xml_report
-from je_auto_control.utils.json.json_file import read_action_json
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.mcp_server.http_transport import start_mcp_http_server
 from je_auto_control.utils.mcp_server.discovery import search_mcp_tools, get_mcp_tool_schema
@@ -2518,20 +2523,6 @@ def _region_color_stats(region: Optional[List[int] | str] = None,
             os.unlink(tmp)
         except OSError:
             pass
-
-
-def _generate_code(source: Any, output: Optional[str] = None,
-                   target: str = "pytest", name: str = "recorded_flow",
-                   style: str = "calls") -> str:
-    """Render an action list/file as code, optionally writing a file."""
-    from je_auto_control.utils.codegen.codegen import (
-        generate_code, generate_code_file,
-    )
-    if output:
-        return generate_code_file(source, output, target=target,
-                                  name=name, style=style)
-    actions = source if isinstance(source, list) else read_action_json(source)
-    return generate_code(actions, target=target, name=name, style=style)
 
 
 def _send_email(message: Any, smtp: Any) -> Dict[str, Any]:
@@ -5904,23 +5895,6 @@ def _validate_config(schema: Any, config: Any) -> Dict[str, Any]:
     return validate_config(schema, config)
 
 
-def _resolve_ref(ref: str) -> Dict[str, Any]:
-    """Adapter: resolve an env:// / file:// reference; secret:// is refused (it would be recorded)."""
-    from je_auto_control.utils.secret_ref import refuse_secret_refs, resolve_ref
-    refuse_secret_refs(ref)
-    return {"value": resolve_ref(ref)}
-
-
-def _resolve_refs(obj: Any) -> Dict[str, Any]:
-    """Adapter: recursively resolve references in a structure (or JSON str); no secret://."""
-    import json
-    from je_auto_control.utils.secret_ref import refuse_secret_refs, resolve_refs_in
-    if isinstance(obj, str):
-        obj = json.loads(obj)
-    refuse_secret_refs(obj)
-    return {"resolved": resolve_refs_in(obj)}
-
-
 def _redact_config(obj: Any, mask: str = "***") -> Dict[str, Any]:
     """Adapter: redact secret-looking values from a config structure."""
     import json
@@ -6600,15 +6574,6 @@ def _jwt_decode(token: str, key: str, algorithms: Any = None,
     except JwtError as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, "claims": claims}
-
-
-def _generate_sop(actions: List[Any], title: str = "Automation Procedure",
-                  path: Optional[str] = None) -> Dict[str, Any]:
-    """Adapter: build (or write) a step-by-step SOP from an action list."""
-    from je_auto_control.utils.process_doc import generate_sop, write_sop
-    if path:
-        return {"path": write_sop(actions, path, title=title)}
-    return generate_sop(actions, title=title)
 
 
 def _tween_drag(start: List[int], end: List[int], steps: int = 30,
@@ -7324,6 +7289,10 @@ class Executor:
         "AC_agent_task_submit": frozenset({"spec"}),
         "AC_agent_task_lookup": frozenset({"spec"}),  # digested like the submitted spec
         "AC_agent_task_act": frozenset({"action"}),
+        # Written out, not run: expanded by document_commands, which keeps
+        # ${secrets.*} and names not yet bound as placeholders.
+        "AC_generate_sop": frozenset({"actions", "title"}),
+        "AC_generate_code": frozenset({"source"}),
         **{name: frozenset({"request"}) for name in (
             "AC_agent_dag", "AC_agent_trigger", "AC_agent_skill", "AC_agent_task_recovery")},
         **{name: frozenset({"actions"}) for name in (
