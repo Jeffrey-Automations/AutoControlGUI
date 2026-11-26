@@ -219,9 +219,11 @@ def test_run_history_stays_on_the_selected_run_as_newer_ones_arrive(monkeypatch)
     monkeypatch.setattr(module, "default_history_store", _record(list_runs=lambda **_kwargs: list(runs)))
     tab = module.RunHistoryTab()
     try:
+        assert pump_until(lambda: tab._table.rowCount() == 1)   # queried off the GUI thread
         tab._table.setCurrentCell(0, 0)
         runs.insert(0, RunRecord(6, "manual", "x", "s.json", 3.0, 4.0, "ok", None))
         tab._refresh()
+        assert pump_until(lambda: tab._table.rowCount() == 2)
         assert tab._selected_record().id == 5
     finally:
         tab.dispose()

@@ -1,17 +1,27 @@
-"""Run History tab: browse recorded runs, artifacts and explicit journal links."""
+"""Run History tab: browse recorded runs, artifacts and explicit journal links.
+
+The history is a SQLite store polled every two seconds, and the preview is a
+screenshot decoded from disk: the query, the clear, the journal lookup and the
+image decode all run as tab tasks, and the GUI thread only paints what they
+return. A refresh asked for while a query is still out runs once it reports.
+"""
 import datetime as _dt
+import functools
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 from PySide6.QtCore import QTimer, Qt, QUrl
-from PySide6.QtGui import QCloseEvent, QDesktopServices, QPixmap, QResizeEvent
+from PySide6.QtGui import QCloseEvent, QDesktopServices, QImage, QPixmap, QResizeEvent
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QFrame, QHeaderView, QLabel,
     QMessageBox, QSplitter, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import authorized
+from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveSplitter
@@ -31,6 +41,8 @@ from je_auto_control.utils.run_history.history_store import (
 
 _COLUMN_COUNT = 8
 _REFRESH_INTERVAL_MS = 2000
+#: The preview is decoded at most this size, so painting it again on a resize stays cheap.
+_PREVIEW_BOUND = (1024, 768)
 _SOURCES = (
     ("rh_source_all", None),
     ("rh_source_scheduler", SOURCE_SCHEDULER),
@@ -63,6 +75,23 @@ def _format_duration(seconds: Optional[float]) -> str:
     if seconds < 1.0:
         return f"{int(seconds * 1000)} ms"
     return f"{seconds:.2f} s"
+
+
+def _list_runs(source: Optional[str]) -> List[RunRecord]:
+    """Worker thread: the newest 500 runs, of ``source`` only when one is given."""
+    try:
+        return default_history_store.list_runs(limit=500, source_type=source)
+    except ValueError:
+        return []
+
+
+def _decode_preview(path: str) -> Tuple[str, QImage]:
+    """Worker thread: the screenshot at ``path``, bounded to ``_PREVIEW_BOUND`` (null when it does not decode)."""
+    image = QImage(path)
+    if not image.isNull() and (image.width() > _PREVIEW_BOUND[0] or image.height() > _PREVIEW_BOUND[1]):
+        image = image.scaled(*_PREVIEW_BOUND, Qt.AspectRatioMode.KeepAspectRatio,
+                             Qt.TransformationMode.SmoothTransformation)
+    return path, image
 
 
 class RunHistoryTab(TranslatableMixin, QWidget):
@@ -99,6 +128,18 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         self._timer.setInterval(_REFRESH_INTERVAL_MS)
         self._timer.timeout.connect(self._refresh)
         self._auto_refresh = True
+        self._queries = TabTask(self, details=False)       # the history query (also on every timer tick)
+        self._queries.result.connect(self._show_runs)
+        self._queries.finished.connect(self._query_settled)
+        self._requery = False
+        self._queried_source: Optional[str] = None         # the filter the query still out was made for
+        self._edits = TabTask(self)                        # clear, journal lookup
+        self._edits.result.connect(self._on_edit_done)
+        self._edits.error.connect(self._on_edit_failed)
+        self._images = TabTask(self, details=False)        # decoding the selected run's screenshot
+        self._images.result.connect(self._on_preview_decoded)
+        self._preview_path: Optional[str] = None           # the path _preview_image holds
+        self._preview_image: Optional[QImage] = None
         self._journal = JournalBrowser(self)
         self._build_layout()
         self._refresh()
@@ -111,9 +152,9 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         self._refresh()
         self._journal.retranslate()
     def dispose(self) -> None:
-        """Stop the refresh timer and any journal read; the registry calls it before deleting the tab."""
+        """Stop the refresh timer, the queries and any journal read; the registry calls it before deleting the tab."""
         self._journal.cancel()
-        self._timer.stop()
+        release_resources(self)
 
     # pylint: disable-next=invalid-name  # reason: Qt override
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802  # reason: Qt override
@@ -189,28 +230,54 @@ class RunHistoryTab(TranslatableMixin, QWidget):
     def _selected_journals(self) -> None:
         try:
             authorize_command("AC_journal_read")
-            record = self._selected_record()
-            links = default_history_store.journals_for_run(record.id) if record is not None else []
-        except (AutoControlException, OSError, ValueError) as error:
+        except AutoControlException as error:
             self._journal.report_error(str(error))
             return
-        self._journal.set_links(links)
+        record = self._selected_record()
+        if record is None:
+            self._journal.set_links([])
+            return
+        work = functools.partial(authorized, "AC_journal_read", default_history_store.journals_for_run, record.id)
+        if not self._edits.start(work, tag="journals"):
+            self._journal.report_error(_t("task_busy"))
 
     def _on_clear(self) -> None:
         reply = QMessageBox.question(
             self, _t("rh_clear"), _t("rh_confirm_clear"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
         )
-        if reply == QMessageBox.StandardButton.Yes:
-            default_history_store.clear()
+        if reply == QMessageBox.StandardButton.Yes and not self._edits.start(default_history_store.clear,
+                                                                              tag="clear"):
+            self._count_label.setText(_t("task_busy"))
+
+    def _on_edit_done(self, result: object) -> None:
+        if self._edits.tag == "journals":
+            self._journal.set_links(result)  # type: ignore[arg-type]  # reason: journals_for_run returns the links
+        else:
             self._refresh()
 
+    def _on_edit_failed(self, error: object) -> None:
+        if self._edits.tag == "journals":
+            self._journal.report_error(str(error))
+        else:
+            QMessageBox.warning(self, _t("rh_clear"), str(error))
+
     def _refresh(self) -> None:
+        """Query the history off the GUI thread; asked again while one is out, it runs once that reports."""
         source = self._filter.currentData()
-        try:
-            runs = default_history_store.list_runs(limit=500, source_type=source)
-        except ValueError:
-            runs = []
+        if self._queries.start(functools.partial(_list_runs, source)):
+            self._queried_source = source
+        else:
+            self._requery = True
+
+    def _query_settled(self) -> None:
+        if self._requery:
+            self._requery = False
+            self._refresh()
+
+    def _show_runs(self, runs: List[RunRecord]) -> None:
+        if self._queried_source != self._filter.currentData():
+            return                  # the filter changed meanwhile: the next query answers for it
         self._records = runs
         with kept_selection(self._table):       # newest first: each new run moves every row down
             self._table.setRowCount(len(runs))
@@ -266,20 +333,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
             self._thumb_label.setText(_t("rh_preview_empty"))
             self._thumb_caption.setText("")
             return
-        path = record.artifact_path
-        if not path:
-            self._thumb_label.clear()
-            self._thumb_label.setText(_t("rh_preview_no_artifact"))
-        else:
-            pixmap = QPixmap(path)
-            if pixmap.isNull():
-                self._thumb_label.clear()
-                self._thumb_label.setText(_t("rh_artifact_missing"))
-            else:
-                self._thumb_label.setPixmap(pixmap.scaled(
-                    self._thumb_label.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                ))
+        self._paint_preview(record.artifact_path)
         caption = (
             f"#{record.id} • {record.source_type}/{record.source_id}\n"
             f"{record.script_path}\n"
@@ -289,6 +343,30 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         if record.error_text:
             caption += f"\n{record.error_text}"
         self._thumb_caption.setText(caption)
+
+    def _paint_preview(self, path: Optional[str]) -> None:
+        """Paint the screenshot at ``path``: from the decoded copy, or once a worker has decoded it."""
+        if not path:
+            self._thumb_label.clear()
+            self._thumb_label.setText(_t("rh_preview_no_artifact"))
+            return
+        if path != self._preview_path:
+            self._images.start(functools.partial(_decode_preview, path))    # one out at a time
+            return
+        if self._preview_image is None or self._preview_image.isNull():
+            self._thumb_label.clear()
+            self._thumb_label.setText(_t("rh_artifact_missing"))
+            return
+        self._thumb_label.setPixmap(QPixmap.fromImage(self._preview_image.scaled(
+            self._thumb_label.size(), Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )))
+
+    def _on_preview_decoded(self, decoded: Tuple[str, QImage]) -> None:
+        self._preview_path, self._preview_image = decoded
+        record = self._selected_record()
+        if record is not None:
+            self._paint_preview(record.artifact_path)
 
     def _selected_artifact_path(self) -> Optional[str]:
         row = self._table.currentRow()

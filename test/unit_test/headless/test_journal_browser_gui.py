@@ -268,12 +268,14 @@ def test_history_menu_loads_links_without_reading(app, monkeypatch, tmp_path):
     tab = history_module.RunHistoryTab()
     try:
         tab._timer.stop()
+        _until(app, lambda: tab._table.rowCount() == 1)            # queried off the GUI thread
         tab._table.selectRow(0)
         actions = dict(tab.menu_actions())
         assert "journal_selected_run" in actions
         assert "journal_read" in actions
         assert "journal_cancel" in actions
         actions["journal_selected_run"]()
+        _until(app, lambda: not tab._edits.running)                 # looked up off the GUI thread
         assert tab._journal._path.text() == str(tmp_path / "events.jsonl")
         assert tab._journal._run_id.text() == "chosen"
         assert not tab._journal._task.running
@@ -347,6 +349,7 @@ def test_history_viewer_cannot_resolve_private_links(app, monkeypatch, tmp_path)
     tab = history_module.RunHistoryTab()
     try:
         tab._timer.stop()
+        _until(app, lambda: tab._table.rowCount() == 1)            # queried off the GUI thread
         tab._table.selectRow(0)
         with authorization_scope(AuthorizationContext("viewer", Role.VIEWER)):
             dict(tab.menu_actions())["journal_selected_run"]()
