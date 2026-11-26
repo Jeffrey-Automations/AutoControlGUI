@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,634 |
-| 程式碼總行數 | 254,840 |
+| 程式碼總行數 | 254,870 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1515 |
@@ -296,7 +296,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 20,373 行。
+> 25 個套件、約 20,389 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -308,7 +308,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/decision_table/` | 112 | DMN 風格決策表：規則 + 命中策略，把分支外部化 |
 | `utils/deterministic/` | 116 | 決定性執行控制：固定亂數種子 + 凍結時鐘 |
 | `utils/action_journal/` | 866 | 結構化動作日誌：schema v1、寫入前遮罩、跨行程排序／尾端復原、executor 明確 scope 擷取與本機 parallel／DAG parent 傳遞；門面、AC／MCP、Script Builder 與 CLI 擷取／有界查閱；observer／路徑政策隨巢狀根與 workers 保留，Run History 查閱與手動 history 關聯共用相同來源。 |
-| `utils/executor/` | 11,254 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
+| `utils/executor/` | 11,270 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
 | `utils/flow_debugger/` | 166 | action list 的單步除錯器與追蹤器 |
 | `utils/input_macro/` | 490 | 定時輸入事件：錄製結果的整形（`timeline`／`InputRecorder`，Windows 與 macOS 共用）、重播與宣告式輸入序列 DSL |
 | `utils/json/` | 99 | action JSON 檔讀寫與正規化格式化（`fmt --check` 的後端） |
@@ -755,7 +755,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_window.py` | 65 | Query a specified HWND's current owner and child windows without activation or input. |
 | `windows_native.py` | 113 | Typed Win32 query/read bindings and caller-sized memory information layouts. |
 
-#### `utils/executor/`（11,254 行）— 執行核心
+#### `utils/executor/`（11,270 行）— 執行核心
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -763,7 +763,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `flow_control.py` | 730 | 真正的流程控制：`AC_loop`／`AC_for_each`／`AC_while_*`／`AC_if_*`／`AC_try`／`AC_retry`／`AC_parallel`／`AC_define_macro`／`AC_call_macro`／變數指令（`AC_set_var`／`AC_get_var`／`AC_inc_var`）。`LoopBreak`／`LoopContinue` 以例外實作。34 個區塊指令的分派表 `BLOCK_COMMANDS` 也在這裡，含下一列匯入的資料來源指令。 |
 | `flow_data_commands.py` | 275 | `AC_*_to_var` 資料來源與轉換指令：shell、時鐘、亂數、PDF、TOTP、SQL、檔案、HTTP、OCR，加上 `AC_assert_var`／`AC_assert_db`／`AC_assert_duration`／`AC_transform_var`。都不執行巢狀 action list，所以沒有迴圈／分支語意。 |
 | `action_schema.py` | 225 | action list 的結構驗證：形狀、參數型別、未知指令拒絕。單一走訪同時支援兩種消費方式：`validate_actions()` 遇到第一個問題就拋、`unknown_command_names()` 收齊全部不認得的名字（REST `/execute` 用它回 400）。 |
-| `action_redaction.py` | 252 | 記錄與紀錄鍵用的遮蔽：`AC_secret_*` 的參數（金庫通行碼、機密值）在寫進 log、當成結果紀錄的鍵之前換成 `***`，巢狀在區塊指令裡的也一樣；結果中名稱敏感的欄位與 `RESULT_SECRETS` 列出的欄位（`AC_resolve_ref` 的 `value`、`AC_resolve_refs` 的 `resolved`）也遮蔽。 |
+| `action_redaction.py` | 268 | 記錄與紀錄鍵用的遮蔽：`AC_secret_*` 的參數（金庫通行碼、機密值）在寫進 log、當成結果紀錄的鍵之前換成 `***`，巢狀在區塊指令裡的也一樣；結果中名稱敏感的欄位與 `RESULT_SECRETS` 列出的欄位（`AC_resolve_ref` 的 `value`、`AC_resolve_refs` 的 `resolved`）也遮蔽。 |
 | `adapter_args.py` | 34 | executor adapter 共用的參數檢查：JSON 字串必須解成清單、門檻必須是有限數字。 |
 | `mouse_aliases.py` | 40 | 單鍵點擊別名（`AC_click_left` 等），executor 與 callback executor 共用。 |
 | `containment.py` | 35 | Bring an error from outside the framework family into the executor's per-action containment. |
@@ -1431,7 +1431,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `journal_browser.py` | 260 | Run History 與 Self-Healing 共用的唯讀日誌檢視：來源連結／路徑／run／step 篩選、有界快照表與明細，舊結果以 request ID 隔離。 |
 | `journal_browser_worker.py` | 88 | 背景查閱與逐筆取消；帶入 context 並在開檔前重查 deferred 擁有者，以 queued counts 回報進度。 |
 | `manual_run_controls.py` | 72 | 手動執行的 history 勾選與獨立 journal 路徑；以共用無頭 scope 包住既有 GUI 執行，不改結果與變數。 |
-| `language_wrapper/` | 8,922 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
+| `language_wrapper/` | 8,926 | 四語系字典（英／日／簡中／繁中）+ `multi_language_wrapper` 執行期切換器與監聽註冊表。 |
 | `selector/` | 225 | 拖曳選取螢幕區域的半透明全螢幕覆蓋層與樣板裁切工具（互動式，但都有對應的程式化 API）。 |
 
 > **分頁指令一律走 Actions 選單**：分頁本身只放輸入、表格與結果檢視，指令由視窗層選單暴露。
@@ -1481,7 +1481,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | dag_runner | `dag_tab.py` | 377 | 編輯、驗證、執行跨主機 DAG。 |
 | chatops | `chatops_tab.py` | 139 | 在接上 Slack 前先本機測試 slash 指令。 |
 | trace_replay | `trace_replay_tab.py` | 248 | 拖曳捲動時光回溯錄製內容。 |
-| remote_desktop | `remote_desktop/`（40 檔） | 9,024 | 見下。 |
+| remote_desktop | `remote_desktop/`（40 檔） | 9,034 | 見下。 |
 | presence | `presence_tab.py` | 174 | 多檢視者在場名單。 |
 | rest_api | `rest_api_tab.py` | 319 | 啟停 HTTP 前端並顯示 URL、實際驗證模式與可用 token。 |
 | admin_console | `admin_console_tab.py` | 384 | 管理多個遠端 AutoControl REST 端點。 |
@@ -1499,7 +1499,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | --- | ---: | --- |
 | `gui/diagnostics_capabilities.py` | 60 | 只呈現既有不可變能力快照與四語狀態；不探測、不連線，不持有原生物件。 |
 
-#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／9,024 行）
+#### 遠端桌面 GUI（`gui/remote_desktop/`，41 檔／9,034 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1514,7 +1514,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `webrtc_dialogs.py` | 583 | WebRTC GUI 用的自訂對話框與清單元件（待審檢視者、信任清單、通訊錄、遠端檔案表、稽核記錄、LAN 瀏覽）。 |
 | `advanced_group.py` | 99 | 兩個 WebRTC 面板共用的 Advanced STUN／TURN（含選用硬體編碼器）群組，含分離的 STUN／TURN 與選用主機硬體編碼器 Protocol。 |
 | `trusted_group.py` | 79 | WebRTC host 面板的信任 viewer 清單群組（移除／清空／匯入／匯出），含它寫回面板的 Protocol。 |
-| `connection_screen.py` | 740 | Quick Connect —— AnyDesk 風格單畫面入口。 |
+| `connection_screen.py` | 750 | Quick Connect —— AnyDesk 風格單畫面入口。 |
 | `viewer_panel.py` | 620 | 「控制另一台機器」子分頁。 |
 | `webrtc_known_hosts.py` | 377 | TOFU 釘選庫瀏覽器：`KnownHostsDialog` 與帶外釘選用的小表單。由 `webrtc_dialogs` 再匯出。 |
 | `host_panel.py` | 440 | 「分享這台機器」子分頁。 |
@@ -1646,10 +1646,10 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 171 | 46,421 |
+| `gui/` | 171 | 46,435 |
 | `utils/mcp_server/` | 63 | 22,576 |
 | `utils/remote_desktop/` | 79 | 17,946 |
-| `utils/executor/` | 17 | 11,254 |
+| `utils/executor/` | 17 | 11,270 |
 | `utils/usb/` | 22 | 5,558 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,215 |
 | `utils/accessibility/` | 17 | 3,524 |
@@ -1667,7 +1667,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,154 |
-| **總計** | **1,620** | **253,975** |
+| **總計** | **1,620** | **254,005** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-40 | 2026-11-26 | Reveal embedded action-list secrets once and explain a replaced Quick Connect | #done #gui #fix | [2026-11-c](2026-11-c.md) |
 | U-20261126-39 | 2026-11-26 | Build the socket driver with Nuitka in CI instead of committing binaries | #done #socket #build #ci | [2026-11-c](2026-11-c.md) |
 | U-20261126-38 | 2026-11-26 | Keep authenticating connections out of viewer slots and resync slow H.264 viewers | #done #fix #decide #remote-desktop | [2026-11-c](2026-11-c.md) |
 | U-20261126-37 | 2026-11-26 | Run stored action lists under both authorities, cap named registries and keep secrets out of generated output | #done #security #decide #rbac | [2026-11-c](2026-11-c.md) |

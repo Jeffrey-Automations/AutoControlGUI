@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- GUI: Script Builder offers the secret arguments of an action list returned in a result as one-time
+  values; Quick Connect says when its session or host was taken over instead of just closing.
+
 - The prebuilt `autocontrol_driver/AutoControlDriverWindows.exe` and `generate_autocontrol_driver_linux`
   are removed: they shipped the old unauthenticated socket server. The `Driver` workflow builds the
   driver with Nuitka (a windowless `AutoControlDriver.exe`, a Linux `AutoControlDriver`), smoke-tests
