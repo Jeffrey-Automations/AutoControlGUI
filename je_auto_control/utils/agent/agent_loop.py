@@ -10,7 +10,7 @@ from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.exception.control_signals import raise_if_run_interrupted
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.executor.flow_control import LoopBreak, LoopContinue
-from je_auto_control.utils.executor.run_control import ExecutionStopped, checkpoint
+from je_auto_control.utils.executor.run_control import ExecutionStopped, checkpoint, stoppable_call
 
 
 @dataclass
@@ -147,8 +147,10 @@ class AgentLoop:
     def _take_one_step(self, goal: str, index: int,
                        result: AgentResult, metrics: Optional[Dict[str, Any]]) -> bool:
         """Run one observe→decide→act cycle. Returns True when the loop should stop."""
-        decision = self._backend.decide_next_action(
-            goal, self._screenshot_fn(), result.steps,
+        # One model round trip can take tens of seconds: a stop ends the wait,
+        # the request finishes in the background and its decision is dropped.
+        decision = stoppable_call(
+            self._backend.decide_next_action, goal, self._screenshot_fn(), result.steps,
         )
         if not isinstance(decision, dict):   # None crashed at .get()
             result.final_message = f"backend returned a non-object decision: {decision!r}"

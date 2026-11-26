@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass
 import dataclasses
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.visual_match.visual_match import (
     _contain_cv2_error, _haystack_gray_with_origin, _to_gray,
 )
@@ -120,7 +121,9 @@ def feature_match(template: ImageSource, *,
     """
     template_gray = _to_gray(template)
     scene_gray, origin_x, origin_y = _haystack_gray_with_origin(haystack, region)
-    found = _keypoint_matches(template_gray, scene_gray, max_features, ratio)
+    # ORB detection and the brute-force match are native passes that cannot
+    # look at a stop; a stop ends the wait and the pass finishes unused.
+    found = stoppable_call(_keypoint_matches, template_gray, scene_gray, max_features, ratio)
     if found is None:
         return None
     kp1, kp2, good = found
