@@ -8,6 +8,10 @@ skipping and drops the rows.
 The health poll and the thumbnail fetch are tasks too, with a deadline and
 **Stop polling** in the Actions menu: stopping either, or closing the tab,
 skips the hosts not reached yet and drops the answer.
+
+Every command first asks RBAC for its ``AC_admin_*`` command, in the slot
+(the refusal is shown in the tab) and, for the background ones, again on the
+worker; the host list is not shown to a role that may not read it.
 """
 import functools
 import json
@@ -22,6 +26,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel, authorized, refusal
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import decoded_image
@@ -49,6 +54,10 @@ def _t(key: str) -> str:
 class AdminConsoleTab(TranslatableMixin, QWidget):
     """Thin Qt surface over :class:`AdminConsoleClient`."""
 
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_admin_add_host", "AC_admin_remove_host", "AC_admin_list_hosts", "AC_admin_poll",
+                         "AC_admin_broadcast_execute")
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
@@ -75,6 +84,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._polls = TabTask(self)
         self._polls.result.connect(self._apply_poll_result)
         self._polls.error.connect(self._apply_poll_failure)
+        self._refusal = RefusalLabel()
         self._broadcast_status = QLabel()
         self._broadcast_status.setWordWrap(True)
         set_role(self._broadcast_status, "hint")
@@ -109,6 +119,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         root = QVBoxLayout(self)
         root.setSpacing(12)
         root.addWidget(self._build_add_group())
+        root.addWidget(self._refusal)
         # Hosts and their thumbnails in one column, the broadcast beside them:
         # side by side the page stays one screen tall; stacked it keeps the old order.
         hosts = QWidget()
@@ -171,6 +182,8 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         return group
 
     def _on_add(self) -> None:
+        if not self._refusal.allows("AC_admin_add_host"):
+            return
         label = self._label_input.text().strip()
         url = self._url_input.text().strip()
         token = self._token_input.text().strip()
@@ -186,14 +199,16 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
 
     def _on_remove(self) -> None:
         labels = self._selected_labels()
-        if not labels:
+        if not labels or not self._refusal.allows("AC_admin_remove_host"):
             return
         for label in labels:
             self._client.remove_host(label)
         self._refresh_table()
 
     def _on_refresh(self) -> None:
-        self._polls.start(self._client.poll_all, timeout_s=POLL_DEADLINE_S)
+        if self._refusal.allows("AC_admin_poll"):
+            self._polls.start(functools.partial(authorized, "AC_admin_poll", self._client.poll_all),
+                              timeout_s=POLL_DEADLINE_S)
 
     def _on_poll_stop(self) -> None:
         """Cancel the poll and the thumbnail fetch still out; the hosts not reached yet are skipped."""
@@ -202,7 +217,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
 
     def _on_broadcast(self) -> None:
         text = self._actions_input.toPlainText().strip()
-        if not text:
+        if not text or not self._refusal.allows("AC_admin_broadcast_execute"):
             return
         try:
             actions = json.loads(text)
@@ -212,7 +227,8 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         # Each host stops at its first failing action and its row says so.
         # Off the GUI thread: every host is an HTTP round trip.
         stop = threading.Event()
-        work = functools.partial(self._client.broadcast_execute, actions=actions,
+        work = functools.partial(authorized, "AC_admin_broadcast_execute", self._client.broadcast_execute,
+                                 actions=actions,
                                  raise_on_error=True, stop_event=stop)
         if not self._broadcasts.start(work):
             self._broadcast_status.setText(_t("task_busy"))
@@ -262,7 +278,9 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
 
     def _refresh_thumbnails(self) -> None:
         # A tick while the previous fetch is still out is skipped.
-        self._thumbs.start(self._client.fetch_thumbnails, timeout_s=POLL_DEADLINE_S)
+        if self._refusal.allows("AC_admin_poll"):
+            self._thumbs.start(functools.partial(authorized, "AC_admin_poll", self._client.fetch_thumbnails),
+                               timeout_s=POLL_DEADLINE_S)
 
     def _on_thumbnails_failed(self, error: object) -> None:
         # A failed round shows every host as a placeholder, as an empty answer does.
@@ -314,6 +332,11 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         ])
 
     def _refresh_table(self, statuses: Optional[List[HostStatus]] = None) -> None:
+        refused = refusal("AC_admin_list_hosts")
+        if refused is not None:
+            self._table.setRowCount(0)
+            self._broadcast_status.setText(refused)
+            return
         hosts = self._client.list_hosts()
         status_by_label = {s.label: s for s in (statuses or [])}
         self._table.setRowCount(len(hosts))

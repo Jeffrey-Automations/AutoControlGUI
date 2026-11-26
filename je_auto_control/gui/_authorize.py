@@ -8,8 +8,12 @@ the executor and the servers use. A refusal is written on the tab's
 :class:`RefusalLabel` and, when the tab sits on a workspace page, on that
 page's banner. Outside an RBAC scope (the default) nothing is refused, the
 label stays hidden and the tab behaves exactly as before.
+
+Work a tab hands to a worker checks again there with :func:`authorized`:
+the task runs as whoever started it, so a role that changed in between is
+still held to its command.
 """
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QWidget
@@ -28,6 +32,12 @@ def refusal(*commands: str) -> Optional[str]:
         except AuthorizationError as error:
             return str(error)
     return None
+
+
+def authorized(command: str, work: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    """Worker thread: refuse ``command`` as the executor would, then return ``work(*args, **kwargs)``."""
+    authorize_command(command)
+    return work(*args, **kwargs)
 
 
 class RefusalLabel(QLabel):
@@ -52,4 +62,4 @@ class RefusalLabel(QLabel):
         return reason is None
 
 
-__all__ = ["RefusalLabel", "refusal"]
+__all__ = ["RefusalLabel", "authorized", "refusal"]

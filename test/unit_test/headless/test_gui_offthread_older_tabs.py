@@ -191,3 +191,58 @@ def test_a_configuration_file_that_cannot_be_read_is_reported(boxes, monkeypatch
     assert len(boxes) == 1 and "Expecting" in boxes[0]
     tab.dispose()
     tab.deleteLater()
+
+
+# --- audit log ----------------------------------------------------------------------------------------------
+
+class _Log:
+    """An audit log whose chain check is a gate."""
+
+    def __init__(self, gate) -> None:
+        self.verify_chain = gate
+        self.queried = []
+
+    def query(self, **kwargs):
+        self.queried.append((kwargs, threading.get_ident()))
+        return [{"ts": "", "event_type": "usb_close", "host_id": "h", "viewer_id": "", "detail": "d"}]
+
+    def clear(self):
+        return 3
+
+
+def test_the_audit_log_is_read_and_verified_off_the_gui_thread(boxes, monkeypatch):
+    from types import SimpleNamespace
+    from je_auto_control.gui import audit_log_tab as module
+    gate = _Gate(result=SimpleNamespace(ok=True, total_rows=1, broken_at_id=None))
+    log = _Log(gate)
+    monkeypatch.setattr(module, "default_audit_log", lambda: log)
+    tab = module.AuditLogTab()
+    assert pump_until(lambda: not tab._runs.running)
+    assert tab._table.rowCount() == 1
+    assert all(ident != threading.get_ident() for _kwargs, ident in log.queried)
+    _returns_at_once(tab._verify)
+    assert gate.entered.wait(_WAIT)
+    assert tab._verify_status.text() == _t("task_running")
+    tab._refresh()                                  # one log operation at a time
+    assert tab._verify_status.text() == _t("task_busy")
+    gate.release.set()
+    assert pump_until(lambda: not tab._runs.running)
+    assert gate.off_gui_thread()
+    assert tab._verify_status.text() == _t("audit_verify_ok").format(total=1)
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_clearing_the_audit_log_runs_off_the_gui_thread_then_rereads_it(boxes, monkeypatch):
+    from je_auto_control.gui import audit_log_tab as module
+    log = _Log(_Gate())
+    monkeypatch.setattr(module, "default_audit_log", lambda: log)
+    monkeypatch.setattr(module.QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
+    tab = module.AuditLogTab()
+    assert pump_until(lambda: not tab._runs.running)
+    reads = len(log.queried)
+    tab._clear()
+    assert pump_until(lambda: len(log.queried) > reads and not tab._runs.running)
+    assert tab._verify_status.text() == _t("audit_clear_done").format(count=3)
+    tab.dispose()
+    tab.deleteLater()

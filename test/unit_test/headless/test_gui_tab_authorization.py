@@ -19,7 +19,9 @@ pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox  # noqa: E402
 
 from headless._qt_settle import pump_until  # noqa: E402
-from je_auto_control.gui import plugins_tab, rbac_users_panel, rest_api_tab, secrets_tab, webhooks_tab  # noqa: E402
+from je_auto_control.gui import (  # noqa: E402
+    admin_console_tab, audit_log_tab, plugins_tab, rbac_users_panel, rest_api_tab, secrets_tab, webhooks_tab,
+)
 from je_auto_control.gui._authorize import RefusalLabel, refusal  # noqa: E402
 from je_auto_control.utils.rbac import AuthorizationContext, Role, authorization_scope  # noqa: E402
 from je_auto_control.utils.rbac.policy import COMMAND_CAPABILITIES  # noqa: E402
@@ -259,11 +261,67 @@ def test_the_rest_users_panel_refuses_a_viewer(monkeypatch, tmp_path, slot, comm
     panel.deleteLater()
 
 
+# --- admin console ------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("slot, command", [
+    ("_on_add", "AC_admin_add_host"), ("_on_remove", "AC_admin_remove_host"),
+    ("_on_refresh", "AC_admin_poll"), ("_on_broadcast", "AC_admin_broadcast_execute"),
+    ("_refresh_thumbnails", "AC_admin_poll"),
+])
+def test_the_admin_console_refuses_a_viewer(monkeypatch, slot, command):
+    client = _Recorder()
+    monkeypatch.setattr(admin_console_tab, "default_admin_console", lambda: client)
+    tab = admin_console_tab.AdminConsoleTab()
+    tab._thumb_timer.stop()
+    tab._label_input.setText("a")
+    tab._url_input.setText("http://h:1")
+    tab._actions_input.setPlainText('[["AC_get_mouse_position"]]')
+    monkeypatch.setattr(tab, "_selected_labels", lambda: ["a"])
+    client.calls.clear()
+    with _viewer():
+        getattr(tab, slot)()
+    assert not (tab._polls.running or tab._thumbs.running or tab._broadcasts.running)
+    _assert_refused(tab, command, client.calls)
+    _dispose(tab)
+
+
+def test_the_admin_console_hides_its_hosts_from_a_viewer(monkeypatch):
+    client = _Recorder()
+    client.list_hosts = lambda: [type("H", (), {"label": "a", "base_url": "http://h:1"})()]
+    monkeypatch.setattr(admin_console_tab, "default_admin_console", lambda: client)
+    tab = admin_console_tab.AdminConsoleTab()
+    tab._thumb_timer.stop()
+    assert tab._table.rowCount() == 1
+    with _viewer():
+        tab._refresh_table()
+    assert tab._table.rowCount() == 0
+    assert "AC_admin_list_hosts" in tab._broadcast_status.text()
+    _dispose(tab)
+
+
+# --- audit log ----------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("slot, command", [
+    ("_refresh", "AC_audit_log_list"), ("_verify", "AC_audit_log_verify"), ("_clear", "AC_audit_log_clear"),
+])
+def test_the_audit_log_tab_refuses_a_viewer(monkeypatch, slot, command):
+    log = _Recorder()
+    monkeypatch.setattr(audit_log_tab, "default_audit_log", lambda: log)
+    tab = audit_log_tab.AuditLogTab()
+    assert pump_until(lambda: not tab._runs.running)
+    log.calls.clear()
+    with _viewer():
+        getattr(tab, slot)()
+    assert not tab._runs.running
+    _assert_refused(tab, command, log.calls)
+    _dispose(tab)
+
+
 # --- every tab names what it needs, for the page banner -----------------------------------------------------
 
 @pytest.mark.parametrize("cls", [
     secrets_tab.SecretsTab, plugins_tab.PluginsTab, webhooks_tab.WebhooksTab, rest_api_tab.RestApiTab,
-    rbac_users_panel.RbacUsersPanel,
+    rbac_users_panel.RbacUsersPanel, admin_console_tab.AdminConsoleTab, audit_log_tab.AuditLogTab,
 ])
 def test_each_tab_declares_its_required_commands(cls):
     required = getattr(cls, "REQUIRED_COMMANDS", ())
