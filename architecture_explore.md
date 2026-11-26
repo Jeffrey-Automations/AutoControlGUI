@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,634 |
-| 程式碼總行數 | 254,988 |
+| 程式碼總行數 | 254,991 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1515 |
@@ -1451,7 +1451,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | script | `_script_tab.py` | 182 | 載入／執行單檔或整個目錄、內建編輯器執行。 |
 | recording_editor | `recording_editor_tab.py` | 291 | 裁切、過濾、重新縮放錄製內容；Actions 提供背景日誌候選審閱。 |
 | variables | `variables_tab.py` | 170 | 檢視、灌入、清除 executor 執行期作用域。 |
-| secrets | `secrets_tab.py` | 241 | 解鎖保險庫並管理 `${secrets.NAME}`。 |
+| secrets | `secrets_tab.py` | 244 | 解鎖保險庫並管理 `${secrets.NAME}`。 |
 | vlm | `vlm_tab.py` | 151 | 用文字描述 UI 元素，交由模型定位。 |
 | self_healing | `self_healing_tab.py`、`healing_evaluation_panel.py`、`healing_evaluation_worker.py`、`template_candidate_panel.py`、`template_candidate_worker.py` | 1,043 | 執行時定位／記錄、固定影像版本比較、原始步驟與候選樣板生命週期；背景工作可取消並丟棄過期結果。 |
 | ocr_reader | `ocr_tab.py` | 192 | 傾印區域文字或以 regex 搜尋。 |
@@ -1646,7 +1646,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 171 | 46,435 |
+| `gui/` | 171 | 46,438 |
 | `utils/mcp_server/` | 63 | 22,576 |
 | `utils/remote_desktop/` | 79 | 17,946 |
 | `utils/executor/` | 17 | 11,270 |
@@ -1667,7 +1667,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,248 |
-| **總計** | **1,620** | **254,123** |
+| **總計** | **1,620** | **254,126** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

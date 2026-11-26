@@ -31,7 +31,10 @@ from je_auto_control.utils.rbac.policy import authorize_command
 from je_auto_control.utils.secrets import SecretStoreError, default_secret_manager
 
 #: What a finished command says, keyed by its label key; unlock says only when the passphrase was wrong.
-_DONE_MESSAGES = {"secret_init": "secret_init_done", "secret_change_passphrase": "secret_change_done"}
+_DONE_MESSAGES = {
+    "secret_init": "secret_init_done",  # nosec B105  # reason: a translation key, not a password
+    "secret_change_passphrase": "secret_change_done",  # nosec B105  # reason: a translation key, not a password
+}
 
 
 def _t(key: str) -> str:
