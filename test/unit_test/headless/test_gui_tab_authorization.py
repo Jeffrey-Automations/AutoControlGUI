@@ -20,7 +20,8 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageB
 
 from headless._qt_settle import pump_until  # noqa: E402
 from je_auto_control.gui import (  # noqa: E402
-    admin_console_tab, audit_log_tab, plugins_tab, rbac_users_panel, rest_api_tab, secrets_tab, webhooks_tab,
+    admin_console_tab, audit_log_tab, plugins_tab, rbac_users_panel, rest_api_tab, secrets_tab, usb_devices_tab,
+    usb_passthrough_panel, webhooks_tab,
 )
 from je_auto_control.gui._authorize import RefusalLabel, refusal  # noqa: E402
 from je_auto_control.utils.rbac import AuthorizationContext, Role, authorization_scope  # noqa: E402
@@ -317,11 +318,56 @@ def test_the_audit_log_tab_refuses_a_viewer(monkeypatch, slot, command):
     _dispose(tab)
 
 
+# --- USB ----------------------------------------------------------------------------------------------------
+
+def test_the_usb_devices_tab_refuses_a_viewer(monkeypatch):
+    listed = []
+    monkeypatch.setattr(usb_devices_tab, "list_usb_devices", lambda: listed.append(1))
+    tab = usb_devices_tab.UsbDevicesTab()
+    with _viewer():
+        tab._refresh()
+    assert not tab._listing.running
+    _assert_refused(tab, "AC_list_usb_devices", listed)
+    _dispose(tab)
+
+
+@pytest.mark.parametrize("slot, command", [
+    ("_enable_sharing", "AC_usb_passthrough_enable"), ("_on_disable_sharing", "AC_usb_passthrough_enable"),
+    ("_allow_selected", "AC_usb_acl_"), ("_block_selected", "AC_usb_acl_"),
+    ("_export_acl", "AC_usb_acl_export"), ("_import_acl", "AC_usb_acl_import"),
+    ("_refresh_local_devices", "AC_list_usb_devices"), ("_list_shared", "AC_usb_loopback_list"),
+])
+def test_the_usb_sharing_panel_refuses_a_viewer(monkeypatch, tmp_path, slot, command):
+    from je_auto_control.utils.usb.passthrough import UsbAcl
+    touched = []
+    monkeypatch.setattr(usb_passthrough_panel, "enable_usb_passthrough", touched.append)
+    monkeypatch.setattr(usb_passthrough_panel, "export_acl_to_file", lambda *args: touched.append("export"))
+    monkeypatch.setattr(usb_passthrough_panel, "import_acl_from_file", lambda *args: touched.append("import"))
+    monkeypatch.setattr(usb_passthrough_panel, "list_usb_devices", lambda: touched.append("list"))
+    acl = UsbAcl(path=tmp_path / "acl.json")
+    loop = _Recorder()
+    panel = usb_passthrough_panel.UsbPassthroughPanel(acl=acl, loopback_factory=lambda: loop)
+    panel._share.loopback = loop if slot in ("_on_disable_sharing", "_list_shared") else None
+    panel._local_table.setRowCount(1)
+    for column, text in enumerate(("1234", "5678", "pad", "")):
+        panel._local_table.setItem(0, column, usb_passthrough_panel.QTableWidgetItem(text))
+    panel._local_table.setCurrentCell(0, 0)
+    with _viewer():
+        getattr(panel, slot)()
+    assert not (panel._listing.running or panel._requests.running or panel._share_op.busy)
+    _assert_refused(panel, command, touched + loop.calls)
+    assert acl.list_rules() == []
+    assert panel._loopback is panel._share.loopback
+    panel._share.loopback = None
+    _dispose(panel)
+
+
 # --- every tab names what it needs, for the page banner -----------------------------------------------------
 
 @pytest.mark.parametrize("cls", [
     secrets_tab.SecretsTab, plugins_tab.PluginsTab, webhooks_tab.WebhooksTab, rest_api_tab.RestApiTab,
     rbac_users_panel.RbacUsersPanel, admin_console_tab.AdminConsoleTab, audit_log_tab.AuditLogTab,
+    usb_devices_tab.UsbDevicesTab, usb_passthrough_panel.UsbPassthroughPanel,
 ])
 def test_each_tab_declares_its_required_commands(cls):
     required = getattr(cls, "REQUIRED_COMMANDS", ())

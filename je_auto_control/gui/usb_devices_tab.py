@@ -4,6 +4,7 @@ The enumeration runs as a :class:`~je_auto_control.gui._tab_task.TabTask`:
 closing the tab cancels it, which ends the enumeration tool's process
 (PowerShell, ``lsusb``, ``system_profiler``) instead of leaving it to time out.
 """
+import functools
 from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QTimer
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel, authorized
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
@@ -34,12 +36,16 @@ def _t(key: str) -> str:
 class UsbDevicesTab(TranslatableMixin, QWidget):
     """Show currently connected USB devices via the headless enumerator."""
 
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_list_usb_devices",)
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
         self._backend_label = QLabel("-")
         self._error_label = QLabel("")
         self._events_label = QLabel("")
+        self._refusal = RefusalLabel()
         self._auto_check = QCheckBox()
         self._auto_check.toggled.connect(self._on_auto_toggled)
         self._table = QTableWidget(0, 6)
@@ -76,6 +82,7 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
             label.setWordWrap(True)
             set_role(label, role)
             root.addWidget(label)
+        root.addWidget(self._refusal)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: its hotplug timer, its share of the USB watcher
@@ -118,7 +125,9 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
 
     def _refresh(self) -> None:
         # One enumeration at a time; a tick during one is skipped.
-        if self._listing.start(list_usb_devices):
+        if not self._refusal.allows("AC_list_usb_devices"):
+            return
+        if self._listing.start(functools.partial(authorized, "AC_list_usb_devices", list_usb_devices)):
             self._listed = True
 
     def _show_list_error(self, error: object) -> None:

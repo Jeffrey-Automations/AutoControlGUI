@@ -17,6 +17,11 @@ business logic lives here. Blocking calls run off the GUI thread as
 one use request at a time (list shared, open, remote fetch) with a deadline
 and **Stop run** in the Actions menu. A stopped, timed-out or abandoned
 request's answer is dropped.
+
+Each sharing and ACL command first asks RBAC for its ``AC_usb_*`` command
+(``AC_usb_passthrough_enable``, ``AC_usb_acl_add`` / ``_remove`` /
+``_export`` / ``_import``, ``AC_list_usb_devices``, the shared listings) and
+shows a refusal on the panel; closing the panel always lets go of sharing.
 """
 from __future__ import annotations
 
@@ -35,6 +40,7 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import kept_selection
+from je_auto_control.gui._authorize import RefusalLabel, authorized
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.tab_task_controller import TaskTimeout
@@ -82,6 +88,10 @@ def _close_sharing(loop: Optional[UsbLoopback]) -> None:
 class UsbPassthroughPanel(TranslatableMixin, QWidget):
     """Simple AnyDesk-style share + use surface for USB passthrough."""
 
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_usb_passthrough_enable", "AC_list_usb_devices", "AC_usb_acl_add", "AC_usb_acl_remove",
+                         "AC_usb_acl_export", "AC_usb_acl_import")
+
     def __init__(self, parent: Optional[QWidget] = None, *,
                  acl: Optional[UsbAcl] = None,
                  loopback_factory: Optional[Callable[[], UsbLoopback]] = None,
@@ -106,6 +116,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         self._share_op = SlowOp(self)
         self._host_badge = _StatusBadge()
         self._viewer_status = QLabel("")
+        self._refusal = RefusalLabel()
         self._source_combo = QComboBox()
         self._auto_check = QCheckBox()
         self._auto_check.toggled.connect(self._on_auto_toggled)
@@ -146,12 +157,13 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         root = QVBoxLayout(self)
         root.setSpacing(12)
         root.addWidget(ResponsiveBox(self._build_host_section(), self._build_viewer_section()), stretch=1)
+        root.addWidget(self._refusal)
 
     def menu_actions(self) -> List[Tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("usb_share_enable", self._enable_sharing),
-            ("usb_share_disable", self._disable_sharing),
+            ("usb_share_disable", self._on_disable_sharing),
             ("usb_share_refresh_local", self._refresh_local_devices),
             ("usb_share_allow", self._allow_selected),
             ("usb_share_block", self._block_selected),
@@ -242,6 +254,8 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
     def _enable_sharing(self) -> None:
         if self._loopback is not None or self._share_op.busy:
             return
+        if not self._refusal.allows("AC_usb_passthrough_enable"):
+            return
         enable_usb_passthrough(True)
         try:
             self._share.loopback = self._loopback_factory()
@@ -250,6 +264,11 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
             QMessageBox.warning(self, _t("usb_share_host_group"), str(error))
             return
         self._refresh_host_badge()
+
+    def _on_disable_sharing(self) -> None:
+        """The Actions menu's Disable: turning the passthrough flag off is the same command as turning it on."""
+        if self._refusal.allows("AC_usb_passthrough_enable"):
+            self._disable_sharing()
 
     def _stop_sharing_if_on(self) -> None:
         """Close the loopback this panel opened; a panel that never shared leaves the passthrough flag alone."""
@@ -289,7 +308,9 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
             self._refresh_local_devices()
 
     def _refresh_local_devices(self) -> None:
-        if self._listing.start(list_usb_devices):
+        if not self._refusal.allows("AC_list_usb_devices"):
+            return
+        if self._listing.start(functools.partial(authorized, "AC_list_usb_devices", list_usb_devices)):
             self._listed = True
 
     def _show_list_error(self, error: object) -> None:
@@ -341,6 +362,8 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         self._set_policy(False)
 
     def _set_policy(self, allow: bool) -> None:
+        if not self._refusal.allows("AC_usb_acl_remove", "AC_usb_acl_add"):
+            return
         row = _selected_row(self._local_table)
         if row is None:
             self._info(_t("usb_share_select_first"))
@@ -363,6 +386,8 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         self._refresh_local_devices()
 
     def _export_acl(self) -> None:
+        if not self._refusal.allows("AC_usb_acl_export"):
+            return
         path, _ = QFileDialog.getSaveFileName(
             self, _t("usb_share_export_acl"), "usb_acl_export.json",
             "JSON (*.json)",
@@ -379,6 +404,8 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         self._viewer_status.setText(_t("usb_share_acl_exported"))
 
     def _import_acl(self) -> None:
+        if not self._refusal.allows("AC_usb_acl_import"):
+            return
         path, _ = QFileDialog.getOpenFileName(
             self, _t("usb_share_import_acl"), "", "JSON (*.json)",
         )
@@ -425,10 +452,13 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
             return None
 
     def _list_shared(self) -> None:
+        command = "AC_usb_remote_list" if self._source_is_remote() else "AC_usb_loopback_list"
+        if not self._refusal.allows(command):
+            return
         client = self._use_client_or_warn()
         if client is None:
             return
-        if self._start(client.list_devices, "shared"):
+        if self._start(functools.partial(authorized, command, client.list_devices), "shared"):
             self._viewer_status.setText(_t("usb_share_listing"))
 
     def _apply_shared(self, devices: List[Dict[str, Any]]) -> None:
