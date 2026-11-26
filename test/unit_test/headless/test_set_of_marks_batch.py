@@ -82,8 +82,10 @@ def test_each_caller_clicks_its_own_marks(monkeypatch):
     for thread in threads:
         thread.join(10)
     assert sorted(clicks) == [("A", 10, 10), ("B", 510, 510)]
-    # A caller that marked nothing still gets the newest marks, as before.
-    assert last_marks()[0]["center"] == [510, 510]
+    # A caller that marked nothing still gets the newest marks, as before. A fresh context, since
+    # an earlier test in this process may have marked something on this thread.
+    import contextvars
+    assert contextvars.Context().run(last_marks)[0]["center"] == [510, 510]
 
 
 # --- wiring ---------------------------------------------------------------
