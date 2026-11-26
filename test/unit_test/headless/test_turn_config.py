@@ -144,7 +144,7 @@ def test_files_holding_the_turn_secret_are_readable_by_their_owner_only(tmp_path
 
 def test_a_failed_secret_write_keeps_the_previous_file_and_leaves_no_temp(tmp_path, monkeypatch):
     import pytest
-    from je_auto_control.utils.remote_desktop import turn_config
+    from je_auto_control.utils.action_signing import _private_file
     out = tmp_path / "bundle"
     out.mkdir()
     (out / "turnserver.conf").write_text("previous", encoding="utf-8")
@@ -152,7 +152,8 @@ def test_a_failed_secret_write_keeps_the_previous_file_and_leaves_no_temp(tmp_pa
     def refuse(*_args, **_kwargs):
         raise OSError("disk full")
 
-    monkeypatch.setattr(turn_config.os, "replace", refuse)
+    # The bundle's secret files go through the shared owner-only writer.
+    monkeypatch.setattr(_private_file.os, "replace", refuse)
     with pytest.raises(OSError, match="disk full"):
         _bundle(out)
     assert (out / "turnserver.conf").read_text(encoding="utf-8") == "previous"

@@ -23,13 +23,12 @@ Outputs:
 from __future__ import annotations
 
 import argparse
-import os
 import secrets
 import sys
 from pathlib import Path
 from typing import Optional
 
-from je_auto_control.utils.action_signing._private_file import open_new_private_file
+from je_auto_control.utils.action_signing._private_file import write_private_text
 from je_auto_control.utils.path_guard.path_guard import (
     PathNotAllowedError, validate_path,
 )
@@ -155,21 +154,8 @@ def render_readme(*, realm: str, listen_port: int, tls_port: int,
 
 
 def _write_secret_file(path: Path, text: str) -> None:
-    """Replace ``path`` atomically with ``text``, readable by its owner only.
-
-    The text lands in a sibling created 0600 (POSIX) or with an access list
-    naming only the current user (Windows), then is renamed over ``path``:
-    the secret is never in a file others can read, and a failed write leaves
-    the previous file whole.
-    """
-    temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
-    descriptor = open_new_private_file(temporary)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(text)
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
+    """Replace ``path`` atomically with ``text``, readable by its owner only."""
+    write_private_text(path, text)
 
 
 def write_bundle(output_dir: Path, *, realm: str, user: str,
