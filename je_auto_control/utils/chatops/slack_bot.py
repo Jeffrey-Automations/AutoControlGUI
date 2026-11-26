@@ -28,9 +28,16 @@ Three pieces of state are tracked per channel:
   don't loop on our own replies;
 * ``error_backoff_s`` — multiplicative back-off on consecutive
   failures, capped so the poller stays responsive.
+
+The loop polls every ``poll_interval_s`` (5 s) when idle and every
+``run_poll_interval_s`` (1 s) while a background command runs, so a ``/stop``
+lands within about a second. The fast interval applies from the wait right
+after the run starts. A Slack ``429`` holds every poll back until its
+``Retry-After`` has passed, whichever interval is in force.
 """
 from __future__ import annotations
 
+import math
 import re
 import threading
 import time
@@ -40,8 +47,9 @@ import urllib.request
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, List, Optional
+from typing import Any, Callable, Dict, FrozenSet, List, Optional
 
+from je_auto_control.utils.bulkhead.bulkhead import parse_retry_after
 from je_auto_control.utils.chatops.handlers import chatops_run_id
 from je_auto_control.utils.chatops.router import (
     ChatOpsError, CommandResult, CommandRouter,
@@ -60,6 +68,10 @@ _HTTP_TIMEOUT = 15.0
 _MIN_POLL_INTERVAL = 1.0
 _MAX_PAGES = 20  # 1000 messages per poll
 _MAX_BACKOFF = 60.0
+#: The longest ``Retry-After`` honoured; a larger one is cut to this.
+_MAX_RETRY_AFTER = 3600.0
+#: The HTTP status Slack answers a rate-limited call with.
+_RATE_LIMITED = 429
 #: How long the poll thread waits for a started command to be listed as a run.
 _START_WAIT = 10.0
 #: How long :meth:`SlackBot.stop` waits for the running command by default.
@@ -104,7 +116,8 @@ class SlackBot:
     (case-insensitive, without the prefix); see the module docstring.
     ``state_path`` is the file the position is saved to (``None``: the default
     under ``~/.je_auto_control/chatops/``); a ``last_seen_ts`` passed here is
-    used instead of the saved one.
+    used instead of the saved one. ``run_poll_interval_s`` is the interval
+    while a background command runs (finite, > 0, at most ``poll_interval_s``).
     """
 
     token: str
@@ -116,6 +129,12 @@ class SlackBot:
     _stop: threading.Event = field(default_factory=threading.Event)
     background_commands: FrozenSet[str] = frozenset({"run"})
     state_path: Optional[str] = None
+    run_poll_interval_s: float = 1.0
+    # Set to cut the poll loop's wait short: by stop() and when a run starts.
+    _wake: threading.Event = field(default_factory=threading.Event, init=False, repr=False)
+    # The clock (monotonic) reading before which Slack asked not to be called again.
+    _retry_at: float = field(default=0.0, init=False, repr=False)
+    _clock: Callable[[], float] = field(default=time.monotonic, init=False, repr=False)
     # Whether the saved position has been read (only when none was passed).
     _position_loaded: bool = field(default=False, init=False, repr=False)
     # The one background command in progress: its thread and its stop token.
@@ -136,10 +155,12 @@ class SlackBot:
             raise SlackError("Slack token must start with 'xox' (bot token)")
         if not self.channel_id:
             raise SlackError("channel_id must be a non-empty string")
-        if self.poll_interval_s < _MIN_POLL_INTERVAL:
+        if not _is_finite_number(self.poll_interval_s)                 or self.poll_interval_s < _MIN_POLL_INTERVAL:
             raise SlackError(
                 f"poll_interval_s must be >= {_MIN_POLL_INTERVAL}",
             )
+        self.run_poll_interval_s = _check_run_interval(
+            self.run_poll_interval_s, self.poll_interval_s)
         if isinstance(self.background_commands, str):
             raise SlackError("background_commands must be a set of command names")
         self.background_commands = frozenset(
@@ -257,7 +278,29 @@ class SlackBot:
             iteration += 1
             if max_iterations is not None and iteration >= max_iterations:
                 return
-            stop.wait(self.poll_interval_s + backoff)
+            self._pause(stop, backoff)
+
+    def _pause(self, stop: threading.Event, backoff: float) -> None:
+        """Wait until the next poll is due, or ``stop`` is set.
+
+        The due time is worked out again whenever the wait is woken, so a run
+        that starts meanwhile shortens it at once and ``stop()`` ends it.
+        """
+        began = self._clock()
+        while not stop.is_set():
+            left = self._poll_due(began, backoff) - self._clock()
+            if left <= 0:
+                return
+            self._wake.wait(left)
+            self._wake.clear()
+
+    def _poll_due(self, began: float, backoff: float) -> float:
+        """The clock reading the next poll is due at, for a wait that began at ``began``."""
+        with self._state_lock:
+            running = self._worker is not None and self._worker.is_alive()
+            retry_at = self._retry_at
+        interval = self.run_poll_interval_s if running else self.poll_interval_s
+        return max(began + interval + backoff, retry_at)
 
     def stop(self, timeout: float = _JOIN_TIMEOUT) -> bool:
         """End the poll loop, stop the running background command and join it.
@@ -274,6 +317,7 @@ class SlackBot:
         refused rather than started.
         """
         self._stop.set()
+        self._wake.set()
         with self._state_lock:
             worker, token = self._worker, self._run_token
         if worker is None or not worker.is_alive():
@@ -387,6 +431,7 @@ class SlackBot:
                     target=self._run_background, args=(text, message, token, listed),
                     name=f"{_WORKER_PREFIX}{token.run_id}", daemon=True)
                 self._worker.start()
+        self._wake.set()  # a waiting poll loop switches to the run interval now
         if refusal:
             self.post_message(refusal, thread_ts=str(message.get("ts") or ""))
             return
@@ -502,6 +547,7 @@ class SlackBot:
             response = perform_call(call)
         except (OSError, ValueError) as error:  # URLError, EgressBlocked
             raise SlackError(f"HTTP failure: {error}") from error
+        self._note_rate_limit(response)
         body = response["json"]
         if not isinstance(body, dict):
             # A list or string body raised AttributeError, which run_forever
@@ -513,6 +559,32 @@ class SlackBot:
                 f"Slack {url} returned {body.get('error', 'unknown')}",
             )
         return body
+
+    def _note_rate_limit(self, response: Dict[str, Any]) -> None:
+        """On a ``429``, hold every poll back until its ``Retry-After`` has passed."""
+        if response.get("status") != _RATE_LIMITED:
+            return
+        delay = parse_retry_after(response.get("headers") or {})
+        if delay is None:
+            return  # no advice: the error back-off applies
+        until = self._clock() + min(delay, _MAX_RETRY_AFTER)
+        with self._state_lock:
+            self._retry_at = max(self._retry_at, until)
+        autocontrol_logger.warning(f"chatops slack: rate limited; next poll in {delay:g}s")
+
+
+def _is_finite_number(value: Any) -> bool:
+    """Whether ``value`` is a real int or float (not a bool) and finite."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)         and math.isfinite(value)
+
+
+def _check_run_interval(value: Any, idle: float) -> float:
+    """``run_poll_interval_s`` as a float: finite, > 0 and at most ``idle``."""
+    if not _is_finite_number(value) or not 0 < value <= idle:
+        raise SlackError(
+            f"run_poll_interval_s must be a finite number > 0 and <= poll_interval_s "
+            f"({idle}); got {value!r}")
+    return float(value)
 
 
 def make_default_slack_bot(*, token: str, channel_id: str,
