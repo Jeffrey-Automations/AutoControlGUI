@@ -11,6 +11,7 @@ from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt  # noqa: E402
 from PySide6.QtGui import QImage  # noqa: E402
 from PySide6.QtWidgets import QAbstractItemView, QApplication, QLabel, QPushButton, QTableWidget, QTableWidgetItem  # noqa: E402
 
+from headless._qt_settle import pump_until  # noqa: E402
 from je_auto_control.gui._i18n_helpers import TranslatableMixin  # noqa: E402
 from je_auto_control.gui._qt_typed import (  # noqa: E402
     as_plain, as_widget, decoded_image, filled_item, kept_selection,
@@ -256,6 +257,7 @@ def test_allow_and_block_stay_on_the_device_that_was_selected():
         panel._show_local_devices(UsbEnumerationResult(backend="fake", devices=[second, third]))   # one unplugged
         panel._listing.start(lambda: UsbEnumerationResult(backend="fake", devices=[]))   # no real enumeration
         panel._allow_selected()
+        assert pump_until(lambda: not panel._acl_ops.running)      # the ACL is written off the GUI thread
         assert [rule.vendor_id for rule in ruled] == ["2222"]
     finally:
         panel.dispose()

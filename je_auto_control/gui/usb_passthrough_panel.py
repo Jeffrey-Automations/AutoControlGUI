@@ -22,6 +22,9 @@ Each sharing and ACL command first asks RBAC for its ``AC_usb_*`` command
 (``AC_usb_passthrough_enable``, ``AC_usb_acl_add`` / ``_remove`` /
 ``_export`` / ``_import``, ``AC_list_usb_devices``, the shared listings) and
 shows a refusal on the panel; closing the panel always lets go of sharing.
+Changing, exporting and importing the ACL write or read its signed file, so
+they run as one more tab task, one at a time, and so does the ACL's
+integrity check behind the sharing badge.
 """
 from __future__ import annotations
 
@@ -114,6 +117,13 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         self._requests.error.connect(self._show_request_error)
         # Closing the loopback joins its pump thread; done off the GUI thread.
         self._share_op = SlowOp(self)
+        # Allow / Block, export and import: the ACL's signed file is read or written.
+        self._acl_ops = TabTask(self)
+        self._acl_ops.result.connect(self._acl_done)
+        self._acl_ops.error.connect(self._acl_failed)
+        self._acl_outcome: Tuple[str, bool] = ("", False)     # what the running ACL task shows when it returns
+        self._integrity = TabTask(self, details=False)      # re-reads the file and checks its HMAC
+        self._integrity.result.connect(self._show_integrity)
         self._host_badge = _StatusBadge()
         self._viewer_status = QLabel("")
         self._refusal = RefusalLabel()
@@ -296,7 +306,11 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
             self._host_badge.set_state("stopped", _t("usb_share_sharing_off"))
         else:
             self._host_badge.set_state("running", _t("usb_share_sharing_on"))
-        if not self._acl.verify_integrity():
+        # A check already out answers for this one too.
+        self._integrity.start(self._acl.verify_integrity)
+
+    def _show_integrity(self, intact: bool) -> None:
+        if not intact:
             self._viewer_status.setText(_t("usb_share_acl_tampered"))
 
     # --- local devices + ACL ----------------------------------------------
@@ -376,14 +390,12 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         try:
             rule = AclRule(vendor_id=vid, product_id=pid, serial=serial,
                            label=f"gui {vid}:{pid}", allow=allow, prompt_on_open=False)
-            self._acl.remove_rule(vendor_id=vid, product_id=pid, serial=serial)
-            self._acl.add_rule(rule)
-        except (ValueError, OSError) as error:
+        except ValueError as error:
             self._viewer_status.setText(str(error))
             return
         key = "usb_share_allowed" if allow else "usb_share_blocked"
-        self._viewer_status.setText(_t(key).format(vid=vid, pid=pid))
-        self._refresh_local_devices()
+        self._start_acl(functools.partial(_replace_rule, self._acl, rule),
+                        _t(key).format(vid=vid, pid=pid))
 
     def _export_acl(self) -> None:
         if not self._refusal.allows("AC_usb_acl_export"):
@@ -392,16 +404,10 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
             self, _t("usb_share_export_acl"), "usb_acl_export.json",
             "JSON (*.json)",
         )
-        if not path:
-            return
-        try:
-            export_acl_to_file(self._acl, Path(path))
-        except OSError as error:
-            self._viewer_status.setText(
-                _t("usb_share_acl_import_failed").format(error=str(error)),
-            )
-            return
-        self._viewer_status.setText(_t("usb_share_acl_exported"))
+        if path:
+            self._start_acl(functools.partial(authorized, "AC_usb_acl_export", export_acl_to_file,
+                                              self._acl, Path(path)),
+                            _t("usb_share_acl_exported"), refresh=False)
 
     def _import_acl(self) -> None:
         if not self._refusal.allows("AC_usb_acl_import"):
@@ -409,19 +415,31 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         path, _ = QFileDialog.getOpenFileName(
             self, _t("usb_share_import_acl"), "", "JSON (*.json)",
         )
-        if not path:
+        if path:
+            self._start_acl(functools.partial(authorized, "AC_usb_acl_import", import_acl_from_file,
+                                              self._acl, Path(path)),
+                            _t("usb_share_acl_imported"))
+
+    def _start_acl(self, work: Callable[[], Any], done_text: str, *, refresh: bool = True) -> None:
+        """Run one ACL change, export or import off the GUI thread.
+
+        ``done_text`` is shown when it returns, with ``{count}`` filled from
+        its result; with ``refresh`` the local devices are listed again.
+        """
+        if not self._acl_ops.start(work):
+            self._viewer_status.setText(_t("task_busy"))
             return
-        try:
-            count = import_acl_from_file(self._acl, Path(path))
-        except (OSError, ValueError) as error:
-            self._viewer_status.setText(
-                _t("usb_share_acl_import_failed").format(error=str(error)),
-            )
-            return
-        self._viewer_status.setText(
-            _t("usb_share_acl_imported").format(count=count),
-        )
-        self._refresh_local_devices()
+        self._acl_outcome = (done_text, refresh)
+        self._viewer_status.setText(_t("task_running"))
+
+    def _acl_done(self, result: object) -> None:
+        text, refresh = self._acl_outcome
+        self._viewer_status.setText(text.replace("{count}", str(result)))
+        if refresh:
+            self._refresh_local_devices()
+
+    def _acl_failed(self, error: object) -> None:
+        self._viewer_status.setText(_t("usb_share_acl_import_failed").format(error=str(error)))
 
     # --- use (loopback or live WebRTC) -------------------------------------
 
@@ -576,6 +594,13 @@ class _ShareState:
         if loop is not None:
             loop.close()
             enable_usb_passthrough(False)
+
+
+def _replace_rule(acl: UsbAcl, rule: AclRule) -> None:
+    """Worker thread: replace the device's rule (the ACL's signed file is rewritten), as RBAC allows."""
+    authorized("AC_usb_acl_remove", acl.remove_rule,
+               vendor_id=rule.vendor_id, product_id=rule.product_id, serial=rule.serial)
+    authorized("AC_usb_acl_add", acl.add_rule, rule)
 
 
 def _make_table(columns: int) -> QTableWidget:

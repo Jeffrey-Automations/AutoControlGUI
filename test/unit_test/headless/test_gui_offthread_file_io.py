@@ -455,3 +455,106 @@ def test_closing_the_known_hosts_dialog_drops_an_import_still_out(boxes, monkeyp
     pump_until(lambda: False, timeout=0.5)
     assert boxes == [] and known.fingerprint_for("new") is None
     dialog.deleteLater()
+
+
+# --- USB passthrough: the ACL ------------------------------------------------------------------------------
+
+def _usb_panel(tmp_path):
+    from je_auto_control.gui import usb_passthrough_panel as module
+    from je_auto_control.utils.usb.passthrough import UsbAcl
+    acl = UsbAcl(path=tmp_path / "acl.json", hmac_key=b"k" * 32)
+    panel = module.UsbPassthroughPanel(acl=acl)
+    panel._listing.start(lambda: module.UsbEnumerationResult(backend="fake", devices=[]))   # no real listing
+    return panel, acl
+
+
+def _select_device(panel) -> None:
+    from PySide6.QtWidgets import QTableWidgetItem
+    panel._local_table.setRowCount(1)
+    for column, text in enumerate(("1050", "0407", "key", "")):
+        panel._local_table.setItem(0, column, QTableWidgetItem(text))
+    panel._local_table.setCurrentCell(0, 0)
+
+
+@pytest.mark.parametrize("slot, name", [("_export_acl", "export_acl_to_file"),
+                                        ("_import_acl", "import_acl_from_file")])
+def test_exporting_and_importing_the_usb_acl_run_off_the_gui_thread(boxes, monkeypatch, tmp_path, slot, name):
+    from je_auto_control.gui import usb_passthrough_panel as module
+    panel, _acl = _usb_panel(tmp_path)
+    _pick_save(monkeypatch, tmp_path / "out.json")
+    _pick_open(monkeypatch, tmp_path / "in.json")
+    gate = _Gate(result=2)
+    monkeypatch.setattr(module, name, gate)
+    _returns_at_once(getattr(panel, slot))
+    assert gate.entered.wait(_WAIT)
+    assert panel._viewer_status.text() == _t("task_running")
+    panel._export_acl()                             # one ACL task at a time
+    assert panel._viewer_status.text() == _t("task_busy")
+    gate.release.set()
+    assert pump_until(lambda: not panel._acl_ops.running)
+    assert gate.off_gui_thread() and len(gate.calls) == 1
+    expected = _t("usb_share_acl_exported") if slot == "_export_acl" else _t(
+        "usb_share_acl_imported").format(count=2)
+    assert panel._viewer_status.text() == expected
+    panel.dispose()
+    panel.deleteLater()
+
+
+def test_a_usb_acl_import_that_fails_is_reported(boxes, monkeypatch, tmp_path):
+    panel, _acl = _usb_panel(tmp_path)
+    _pick_open(monkeypatch, tmp_path / "missing.json")
+    panel._import_acl()
+    assert pump_until(lambda: not panel._acl_ops.running)
+    assert panel._viewer_status.text().startswith(_t("usb_share_acl_import_failed").split("{")[0])
+    panel.dispose()
+    panel.deleteLater()
+
+
+def test_allowing_a_usb_device_writes_the_acl_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    panel, acl = _usb_panel(tmp_path)
+    _select_device(panel)
+    gate = _Gate(then=acl.add_rule)
+    monkeypatch.setattr(acl, "add_rule", gate)
+    _returns_at_once(panel._allow_selected)
+    assert gate.entered.wait(_WAIT)
+    assert acl.list_rules() == []
+    gate.release.set()
+    assert pump_until(lambda: not panel._acl_ops.running)
+    assert gate.off_gui_thread()
+    assert [(rule.vendor_id, rule.allow) for rule in acl.list_rules()] == [("1050", True)]
+    assert panel._viewer_status.text() == _t("usb_share_allowed").format(vid="1050", pid="0407")
+    panel.dispose()
+    panel.deleteLater()
+
+
+def test_the_usb_acl_integrity_check_runs_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui import usb_passthrough_panel as module
+    from je_auto_control.utils.usb.passthrough import UsbAcl
+    gate = _Gate(result=False)
+    acl = UsbAcl(path=tmp_path / "acl.json", hmac_key=b"k" * 32)
+    monkeypatch.setattr(acl, "verify_integrity", gate)
+    started = time.monotonic()
+    panel = module.UsbPassthroughPanel(acl=acl)
+    assert time.monotonic() - started < 5.0, "the badge waited for the ACL file"
+    assert gate.entered.wait(_WAIT)
+    gate.release.set()
+    assert pump_until(lambda: not panel._integrity.running)
+    assert gate.off_gui_thread()
+    assert panel._viewer_status.text() == _t("usb_share_acl_tampered")
+    panel.dispose()
+    panel.deleteLater()
+
+
+def test_disposing_the_usb_panel_drops_an_acl_import_still_out(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui import usb_passthrough_panel as module
+    panel, _acl = _usb_panel(tmp_path)
+    _pick_open(monkeypatch, tmp_path / "in.json")
+    gate = _Gate(result=3)
+    monkeypatch.setattr(module, "import_acl_from_file", gate)
+    panel._import_acl()
+    assert gate.entered.wait(_WAIT)
+    panel.dispose()
+    gate.release.set()
+    pump_until(lambda: False, timeout=0.5)
+    assert panel._viewer_status.text() == _t("task_running")
+    panel.deleteLater()
