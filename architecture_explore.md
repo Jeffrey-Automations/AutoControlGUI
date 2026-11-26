@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,620 |
-| 程式碼總行數 | 251,166 |
+| 程式碼總行數 | 251,450 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -293,7 +293,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 19,802 行。
+> 25 個套件、約 19,905 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -305,11 +305,11 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/decision_table/` | 112 | DMN 風格決策表：規則 + 命中策略，把分支外部化 |
 | `utils/deterministic/` | 116 | 決定性執行控制：固定亂數種子 + 凍結時鐘 |
 | `utils/action_journal/` | 856 | 結構化動作日誌：schema v1、寫入前遮罩、跨行程排序／尾端復原、executor 明確 scope 擷取與本機 parallel／DAG parent 傳遞；門面、AC／MCP、Script Builder 與 CLI 擷取／有界查閱；observer／路徑政策隨巢狀根與 workers 保留，Run History 查閱與手動 history 關聯共用相同來源。 |
-| `utils/executor/` | 10,855 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
+| `utils/executor/` | 10,863 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
 | `utils/flow_debugger/` | 166 | action list 的單步除錯器與追蹤器 |
 | `utils/input_macro/` | 490 | 定時輸入事件：錄製結果的整形（`timeline`／`InputRecorder`，Windows 與 macOS 共用）、重播與宣告式輸入序列 DSL |
 | `utils/json/` | 99 | action JSON 檔讀寫與正規化格式化（`fmt --check` 的後端） |
-| `utils/json_store/` | 340 | JSON 字典檔持久化的共用小工具（內部管線） |
+| `utils/json_store/` | 435 | JSON 字典檔持久化的共用小工具（內部管線） |
 | `utils/loop_guard/` | 158 | 機械式卡死迴圈偵測（agent loop 用） |
 | `utils/plugin_loader/` | 147 | 掃描外部 Python 外掛目錄並註冊其 `AC_` callable |
 | `utils/plugin_sdk/` | 80 | 外掛 SDK：透過 entry points 發佈／載入第三方 `AC_*` 指令 |
@@ -517,7 +517,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 61,006 行。
+> 14 個套件、約 61,069 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -531,7 +531,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cua_action/` | 204 | 標準化 computer-use 動作結構（Anthropic／OpenAI → `AC_*`） |
 | `utils/llm/` | 396 | 自然語言 → action list 規劃器 + Anthropic／null 後端；規劃執行隔離頂層變數並沿用巢狀範圍 |
 | `utils/mcp_registry/` | 97 | MCP registry `server.json` 資訊清單產生（可被發現） |
-| `utils/mcp_server/` | 22,424 | **無頭 MCP 伺服器**（預設註冊 823 個工具＝804 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
+| `utils/mcp_server/` | 22,487 | **無頭 MCP 伺服器**（預設註冊 823 個工具＝804 個 `ac_*` + 19 個別名）：stdio + HTTP 傳輸、工具工廠與處理器、資源、prompt、稽核、限流、外掛熱重載 |
 | `utils/tool_use_schema/` | 194 | 把 `AC_*` 指令匯出成 Claude／OpenAI 的 tool-use schema |
 | `utils/trajectory_eval/` | 132 | agent 軌跡評估：依評分規準為一次執行打分 |
 | `utils/vision/` | 668 | VLM 元素定位器（依描述找元素）+ Anthropic／OpenAI／null 後端 |
@@ -563,7 +563,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.11 伺服器、網路協定與外部整合
 
-> 24 個套件、約 8,074 行。
+> 24 個套件、約 8,147 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -572,12 +572,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/cookie_jar/` | 203 | RFC 6265 cookie jar |
 | `utils/email_send/` | 118 | SMTP 寄信（email 觸發器的發送端搭檔） |
 | `utils/events/` | 106 | 對外 CloudEvents 發送（執行生命週期事件） |
-| `utils/http_cassette/` | 205 | 錄製／重播 HTTP 互動，做離線決定性 API 測試 |
+| `utils/http_cassette/` | 246 | 錄製／重播 HTTP 互動，做離線決定性 API 測試 |
 | `utils/http_client/` | 471 | 零依賴 HTTP(S) 用戶端，供 action 步驟呼叫 API |
 | `utils/http_conditional/` | 150 | 條件式 HTTP 請求與快取驗證器 |
 | `utils/http_content/` | 158 | HTTP 內容協商與回應解壓縮 |
 | `utils/http_problem/` | 122 | RFC 9457 problem+json 解析 |
-| `utils/jwt/` | 271 | JWT（HMAC 家族）編碼、解碼與 claim 驗證 |
+| `utils/jwt/` | 278 | JWT（HMAC 家族）編碼、解碼與 claim 驗證 |
 | `utils/link_header/` | 176 | RFC 8288 Link header 解析與分頁 |
 | `utils/multipart/` | 224 | multipart/form-data 建構與解析 |
 | `utils/notify/` | 108 | 跨平台桌面通知 |
@@ -585,7 +585,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/otp/` | 37 | TOTP 一次性密碼產生（自動化 2FA 登入） |
 | `utils/outbox/` | 208 | 交易式 outbox，保證至少一次的事件投遞 |
 | `utils/pytest_plugin/` | 283 | pytest 外掛 + BDD step library（`pytest11` entry point） |
-| `utils/rest_api/` | 2,251 | 純標準庫 REST 前端：路由、Bearer 驗證、限流、Prometheus 指標、OpenAPI 3.1 產生 |
+| `utils/rest_api/` | 2,276 | 純標準庫 REST 前端：路由、Bearer 驗證、限流、Prometheus 指標、OpenAPI 3.1 產生 |
 | `utils/socket_server/` | 169 | 執行 action JSON 的執行緒式 TCP 指令伺服器（預設綁 127.0.0.1） |
 | `utils/sse_client/` | 145 | Server-Sent Events 用戶端解析 |
 | `utils/tls_acme/` | 475 | TLS 自動化：HTTP-01 挑戰伺服器、金鑰／CSR、自動續期 |
@@ -666,7 +666,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.14 安全、機密與合規
 
-> 13 個套件、約 4,868 行。
+> 13 個套件、約 4,913 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -675,7 +675,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/governance/` | 263 | 治理：maker-checker 核准閘門與即時憑證租約 |
 | `utils/license_policy/` | 240 | 以 SBOM 元件評估 SPDX 授權允許／拒絕政策 |
 | `utils/provenance/` | 126 | SLSA 建置來源證明（in-toto v1） |
-| `utils/rbac/` | 2,018 | 角色型存取控制：使用者與權杖驗證、REST／MCP／executor 的能力政策，`deferred.py` 將背景工作綁定註冊者並在觸發時重新驗證來源 store；不保存 bearer token。；MCP 的 tool_classification.py 擁有明確畫面／呼叫者資料清單、標準別名與混合參數權限；未知唯讀提示要求 read_data；command_review.py 記錄 `COMMAND_CAPABILITIES` 以外每個 `AC_*` 指令的審查（只需提交入口的 drive_input），新指令未分類時 CI 失敗 |
+| `utils/rbac/` | 2,063 | 角色型存取控制：使用者與權杖驗證、REST／MCP／executor 的能力政策，`deferred.py` 將背景工作綁定註冊者並在觸發時重新驗證來源 store；不保存 bearer token。；MCP 的 tool_classification.py 擁有明確畫面／呼叫者資料清單、標準別名與混合參數權限；未知唯讀提示要求 read_data；command_review.py 記錄 `COMMAND_CAPABILITIES` 以外每個 `AC_*` 指令的審查（只需提交入口的 drive_input），新指令未分類時 CI 失敗 |
 | `utils/redaction/` | 573 | 截圖遮蔽層：規則偵測 + 政策 + 協調器（上傳 VLM 前先遮） |
 | `utils/sbom/` | 170 | SBOM（CycloneDX）產生 |
 | `utils/secret_ref/` | 242 | URI scheme 形式的值參照解析 |
@@ -752,11 +752,11 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_window.py` | 65 | Query a specified HWND's current owner and child windows without activation or input. |
 | `windows_native.py` | 113 | Typed Win32 query/read bindings and caller-sized memory information layouts. |
 
-#### `utils/executor/`（10,855 行）— 執行核心
+#### `utils/executor/`（10,863 行）— 執行核心
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
-| `action_executor.py` | 8,721 | `Executor` 類別與 `event_dict` 分派表（774 個指令），另含數百個把 utils 能力接成指令的 adapter 函式；全域單例 `executor` 與 `add_command_to_executor()` 擴充點。 |
+| `action_executor.py` | 8,729 | `Executor` 類別與 `event_dict` 分派表（774 個指令），另含數百個把 utils 能力接成指令的 adapter 函式；全域單例 `executor` 與 `add_command_to_executor()` 擴充點。 |
 | `flow_control.py` | 727 | 真正的流程控制：`AC_loop`／`AC_for_each`／`AC_while_*`／`AC_if_*`／`AC_try`／`AC_retry`／`AC_parallel`／`AC_define_macro`／`AC_call_macro`／變數指令（`AC_set_var`／`AC_get_var`／`AC_inc_var`）。`LoopBreak`／`LoopContinue` 以例外實作。34 個區塊指令的分派表 `BLOCK_COMMANDS` 也在這裡，含下一列匯入的資料來源指令。 |
 | `flow_data_commands.py` | 275 | `AC_*_to_var` 資料來源與轉換指令：shell、時鐘、亂數、PDF、TOTP、SQL、檔案、HTTP、OCR，加上 `AC_assert_var`／`AC_assert_db`／`AC_assert_duration`／`AC_transform_var`。都不執行巢狀 action list，所以沒有迴圈／分支語意。 |
 | `action_schema.py` | 225 | action list 的結構驗證：形狀、參數型別、未知指令拒絕。單一走訪同時支援兩種消費方式：`validate_actions()` 遇到第一個問題就拋、`unknown_command_names()` 收齊全部不認得的名字（REST `/execute` 用它回 400）。 |
@@ -764,11 +764,11 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `mouse_aliases.py` | 40 | 單鍵點擊別名（`AC_click_left` 等），executor 與 callback executor 共用。 |
 | `flags.py` | 19 | 旗標讀取 `as_bool`：依拼法（`"true"`／`"yes"`／`"on"`／`"1"`）而非 Python 真值判斷，所以 JSON、CLI、MCP 傳來的 `"false"` 是關；所有 adapter 與流程指令共用。 |
 
-#### `utils/mcp_server/`（22,424 行，823 個工具）— 最大子系統
+#### `utils/mcp_server/`（22,487 行，823 個工具）— 最大子系統
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
-| `tools/_factories.py` | 9,390 | 工具工廠：每個函式回傳一個領域的 `MCPTool` 清單（把 `AC_*` 能力包成 MCP 工具）。 |
+| `tools/_factories.py` | 9,392 | 工具工廠：每個函式回傳一個領域的 `MCPTool` 清單（把 `AC_*` 能力包成 MCP 工具）。 |
 | `tools/_handlers.py` | 574 | 把 MCP 工具呼叫橋接到 AutoControl 無頭 API 的 adapter；主題模組拆完之後這裡留的是資料／文字／HTTP 那一類與 WebRunner 橋接。 |
 | `tools/_handlers_qa.py` | 619 | 同一種 adapter，QA 主題：斷言 DSL、資料驅動、SQL／PDF／郵件／HTTP 步驟、codegen、視覺回歸、狀態機、flaky 偵測與隔離、suite runner、無障礙稽核、裝置矩陣、媒體斷言。從 `_handlers.py` 依主題拆出的第一塊（750 行上限）；兩者互不引用。 |
 | `tools/_handlers_input.py` | 221 | 同一種 adapter，輸入主題：滑鼠、鍵盤、虛擬手把（ViGEm）。 |
@@ -797,9 +797,9 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `tools/_handlers_mobile_executor.py` | 135 | 10 個領域委派；保留函式內 executor 匯入、參數預設與轉送契約，使用 strict typing。 |
 | `tools/_handlers_vision_executor.py` | 564 | 70 個領域委派；保留函式內 executor 匯入、參數預設與轉送契約，使用 strict typing。 |
 | `tools/_handlers_locators.py` | 449 | 同一種 adapter，定位主題：無障礙樹、智慧等待、自我修復、螢幕觀察、座標空間、視覺與 OCR、影像去重、元件倉庫、A/B 定位。 |
-| `tools/_handlers_operations.py` | 689 | 同一種 adapter，營運主題：agent 與其記憶／追蹤、治理與合規、成本與遙測、失敗掛鉤、看門狗、速率限制、檢查點、核可、產物與資產、測試選擇與分片、佇列與 saga。 |
+| `tools/_handlers_operations.py` | 709 | 同一種 adapter，營運主題：agent 與其記憶／追蹤、治理與合規、成本與遙測、失敗掛鉤、看門狗、速率限制、檢查點、核可、產物與資產、測試選擇與分片、佇列與 saga。 |
 | `server.py` | 637 | JSON-RPC 2.0 over stdio 的最小 MCP 伺服器：連線範圍狀態、行內／併發分派、resource／prompt 處理器；`tools/call` 的准入、執行與稽核在 `_tool_calls.py`；握手時代的方法表（`_run_method`），兩個協定時代的逐請求分派在 `_stateless.py`；工具清單／session profile 在 `_disclosure_server.py`。 |
-| `_tool_calls.py` | 200 | `tools/call` 路徑（`ToolCallMixin`）：請求、RBAC、揭露目錄、schema、參數政策、限流與破壞性確認的准入，以 `ToolCallContext` 執行、寫稽核並轉成結果；失敗截圖在呼叫時才向 `server` 取 `_capture_error_screenshot`。 |
+| `_tool_calls.py` | 239 | `tools/call` 路徑（`ToolCallMixin`）：請求、RBAC、揭露目錄、schema、參數政策、限流與破壞性確認的准入，以 `ToolCallContext` 執行、寫稽核並轉成結果；失敗截圖在呼叫時才向 `server` 取 `_capture_error_screenshot`。 |
 | `http_transport.py` | 642 | MCP 的 HTTP 傳輸；宣告 2026-07-28 的請求走 `_http_stateless.py` 的標頭規則，不發 session。 |
 | `_http_stateless.py` | 185 | MCP 2026-07-28 在 Streamable HTTP 上的規則：`MCP-Protocol-Version`／`Mcp-Method`／`Mcp-Name` 必須與 body 相符（`=?base64?…?=` 先解碼），不符是 400＋`HeaderMismatch`；版本與中繼資料錯誤 400、未知方法 404。純函式，由 `http_transport.py` 回覆。 |
 | `http_sessions.py` | 301 | MCP 的 HTTP 傳輸用的 session 身分:`Mcp-Session-Id` 註冊表,以及每個 session 那條常駐的 server→client SSE 串流。 |
@@ -820,7 +820,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `tools/_validation.py` | 124 | MCP 工具用到的 JSON Schema 子集驗證器。 |
 | `tools/plugin_tools.py` | 150 | 把外掛載入的 `AC_*` callable 包成 `MCPTool`。 |
 | `log_bridge.py` | 118 | 把 Python logging 記錄橋接成 MCP `notifications/message`；2026-07-28 的請求只收到自己設了 `logLevel` 時產生的記錄。 |
-| `audit.py` | 127 | MCP 工具呼叫稽核記錄。 |
+| `audit.py` | 129 | MCP 工具呼叫稽核記錄。 |
 | `context.py` | 81 | 傳給 opt-in 工具處理器的每次呼叫上下文，含取消（同時停掉該次呼叫的 `StopToken`）、進度與伺服器路徑政策。 |
 | `rate_limit.py` | 48 | 工具呼叫的 token bucket 限流。 |
 | `__main__.py` | 126 | `je_auto_control_mcp` console script 進入點。 |
@@ -916,14 +916,14 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `usbip/libusb_backend.py` | 224 | 以 PyUSB／libusb 執行 URB 的正式後端。 |
 | `usbip/backend.py` | 87 | 可插拔 URB 執行後端。 |
 
-#### `utils/rest_api/`（2,251 行）
+#### `utils/rest_api/`（2,276 行）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
 | `rest_server.py` | 736 | HTTP 前端主體；相容 check-only gate，RBAC 必須帶使用者身分。 |
 | `rest_handlers.py` | 539 | 端點實作。 |
 | `rest_openapi.py` | 503 | 走訪路由表產生 OpenAPI 3.1 規格。 |
-| `rest_auth.py` | 227 | Bearer token 驗證 + 逐 client 限流閘門。 |
+| `rest_auth.py` | 252 | Bearer token 驗證 + 逐 client 限流閘門。 |
 | `rest_metrics.py` | 75 | Prometheus 曝露端點。 |
 | `rest_registry.py` | 91 | 保存執行中 REST 伺服器的行程級單例，狀態包含 RBAC 模式並隱去停用的共用 token。 |
 | `__main__.py` | 66 | `python -m je_auto_control.utils.rest_api` 進入點。 |
@@ -1621,15 +1621,15 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
 | `gui/` | 169 | 44,975 |
-| `utils/mcp_server/` | 63 | 22,424 |
+| `utils/mcp_server/` | 63 | 22,487 |
 | `utils/remote_desktop/` | 77 | 17,421 |
-| `utils/executor/` | 11 | 10,855 |
+| `utils/executor/` | 11 | 10,863 |
 | `utils/usb/` | 22 | 5,507 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,178 |
 | `utils/accessibility/` | 17 | 3,524 |
 | `wrapper/` | 25 | 6,101 |
 | `windows/` | 24 | 2,405 |
-| `utils/rest_api/` | 8 | 2,251 |
+| `utils/rest_api/` | 8 | 2,276 |
 | `utils/agent/` | 13 | 2,268 |
 | `linux_with_x11/` | 19 | 1,382 |
 | `linux_wayland/` | 25 | 4,503 |
@@ -1640,8 +1640,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,076 | 114,246 |
-| **總計** | **1,608** | **250,421** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,076 | 114,434 |
+| **總計** | **1,608** | **250,705** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

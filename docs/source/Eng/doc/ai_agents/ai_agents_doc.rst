@@ -378,6 +378,8 @@ model stop text is not proof. Skills use WorkQueue and local inference uses a co
 Ollama model without downloads, redirects or external fallback. Closing the view leaves
 submitted work owned by the service. Native/platform acceptance and remaining workflows
 are tracked in ``Progress.md``; full contracts are in ``docs/AGENT_TASKS.md``.
+``${...}`` inside a task spec, an action or a DAG/trigger/skill/recovery request is left for the
+runtime, which expands it against the task's own ``inputs``; pass caller values through ``spec.inputs``.
 
 ``agent-task readiness`` (``agent_runtime_readiness``, ``AC_agent_runtime_readiness``) reports passively
 what the desktop, presence source, Android, iOS, browser and local model still need, as

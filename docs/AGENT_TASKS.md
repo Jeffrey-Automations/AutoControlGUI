@@ -108,7 +108,10 @@ Submit a JSON file with `je_auto_control agent-task submit task.json`, or call
 `submit_agent_task(spec)` from Python. `AgentTaskSpec.from_dict` validates and freezes caller data.
 Required fields are `goal`, nonempty `allowed_tools` and nonempty `success_criteria`.
 Optional fields are `target`, `mode`, `roots`, `apps`, `inputs`, `actions`, `options`, `budget` and
-`resume_conditions`.
+`resume_conditions`. When the spec arrives through `AC_agent_task_submit`, `${...}` in it is not
+expanded at dispatch: the runtime expands it against the task's own `inputs`, so caller values go in
+`inputs`. The same holds for `AC_agent_task_act`'s `action` and the `request` of `AC_agent_dag`,
+`AC_agent_trigger`, `AC_agent_skill` and `AC_agent_task_recovery`.
 
 - `mode`: `external` (default), `skill` or `ollama`. Internal modes are delivered through WorkQueue.
 - `target`: a host-configured adapter identity; the default is `local-desktop`.

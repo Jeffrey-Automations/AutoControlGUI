@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- `${...}` in `AC_agent_task_submit` / `_lookup` / `_act`, `AC_agent_dag`, `_trigger`, `_skill` and
+  `_task_recovery` payloads is no longer expanded at dispatch; the runtime expands it against the
+  task's `inputs`, so pass caller values through `spec.inputs`. `ClaimsPolicy` refuses a NaN,
+  infinite or negative `leeway`; `ac_jwt_decode` accepts `leeway` (0-3600 s). The MCP audit log
+  records admission refusals (`refused`, `invalid_arguments`, `rate_limited`, `unconfirmed`).
+
 - Remote desktop: chat, clipboard and file sends queue per viewer (a stalled viewer's overflow
   is dropped); `RelayServer(max_handshakes=64)` caps handshakes; `generate-systemd` /
   `generate-launchd` escape paths and refuse unrepresentable ones (`ServiceUnitError`, exit 2);

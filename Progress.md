@@ -151,11 +151,7 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   `pip install je_auto_control` 在 Intel Mac 需要 Rust 工具鏈。沒有在 Intel Mac 上實際編過。
 - **伺服器與 executor 審查留下的（U-20261126-13）**：
   - `DECIDE`：`cv2.error`／`sqlite3.Error`／外掛自訂例外仍會中止整份動作清單；HTTP 上交握式 `resources/subscribe` 回 `{}` 但從不通知；macro 是全程序共用。
-  - `TODO`：使用者檔只在單一程序內序列化（CLI 與伺服器同時改仍互蓋）；`RestAuthGate._buckets` 依來源 IP 無上限成長；
-    MCP 在准入前拒絕的呼叫沒有稽核（`AuditLogger` 說每次都有）；`ac_jwt_decode` 沒有 `leeway`；
-    尚未追查 `AC_agent_task_*`／`AC_agent_dag` 的參數會不會在 runtime 再展開一次；上述未讀檔案待審。
-- **utils A–L 審查留下的（U-20261126-16）**：`TODO`：`json_store._file_lock` 判定過期鎖時有競爭，兩個等待者可同時接手（需改成帶擁有者 token）；
-  `http_cassette` 以 `want_bytes=True` 錄製時 `save()` 失敗且內容未遮蔽。
+  - `TODO`：這輪伺服器審查沒有讀到的檔案還待審。
 - **`DECIDE`（agent_runtime 審查）**：`ReadOnlyWorker` 無法設定任何桌面任務（基底 worker 要求在場綁定，而主機刻意不傳），桌面唯讀完成驗證目前完全不能用；
   修法是一處覆寫，但等於移除一個拒絕條件。
 - **遠端與 USB 審查留下的（U-20261126-17）**：`DECIDE`：未驗證的連線最多占一個 `max_clients` 名額 60 秒；H.264 over TCP 只留最新封包，慢的觀看者會掉 P-frame。

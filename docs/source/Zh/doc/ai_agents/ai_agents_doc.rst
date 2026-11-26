@@ -251,6 +251,8 @@ Python、AC、MCP、REST、CLI 與 Agent 任務面板共用提交、觀察、動
 技能經 WorkQueue 派送；本機推論使用明確設定的 Ollama 模型，不下載、不重新導向或切換外部服務。
 關閉面板後已提交工作仍由服務擁有。原生平台驗收與其餘流程列在 ``Progress.md``；
 完整契約見 ``docs/AGENT_TASKS.md``。
+任務 spec、動作與 DAG／trigger／skill／recovery 請求中的 ``${...}`` 留給 runtime，
+以任務自己的 ``inputs`` 展開；呼叫端的值請透過 ``spec.inputs`` 傳入。
 
 ``agent-task readiness``（``agent_runtime_readiness``、``AC_agent_runtime_readiness``）被動回報桌面、
 真人在場來源、Android、iOS、瀏覽器與本機模型尚缺的條件：``unsupported``、``missing_dependency``、
