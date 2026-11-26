@@ -118,15 +118,10 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 `TODO` — U-20261009-27、-28、-34、-36、-38、-40 之後還開著的
 
 - **Windows UIA 後端的執行緒模型**已對真的 COM 驗過（U-20261113-01；U-20261121-17 再驗：讀取在呼叫者執行緒與 walker 上都可用、stop 能叫醒等待中的 `AC_wait_for_focus_change`、`system_volume` 的 Core Audio 改經同一條 apartment 路徑，主執行緒與 worker 執行緒皆可讀）。`comtypes` 已宣告為 `accessibility` extra，`windows-uia.yml` 已在 Windows runner 以真 COM 跑過（3 項通過）。
-- **Script Builder 的一次性值**：一次執行最多保留 200 個（`MAX_ONE_TIME_VALUES`，留前面的）。
-  對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件。
-  `AC_approval_request` 的 `token`（請求編號）在結果畫面保持可見，但在 log 裡仍被遮蔽。
-- **stop 還叫不醒的**：已經進到後端的單一指令只剩其他未接合的原生呼叫（擷取輸出的 shell 指令已可停止，U-20261115-23；共用 HTTP client 的請求連 TCP 交握都可中斷，正在進行的 DNS 查詢也不必等（查詢在背景跑完、之後不會送出請求），U-20261116-08／-10／-15；套件內每個 `cv2.matchTemplate` 與 OCR 引擎的單次原生運算都改由 `stoppable_call` 不再等待，但運算本身在背景跑完，U-20261116-11／-14）；單一手勢內的節奏 sleep 已可停止（U-20261121-04）；VLM 定位請求同樣改由 `stoppable_call` 不再等待（U-20261121-10）；唯讀無障礙讀取（列出／焦點／值／狀態／表格）改在單一常駐執行緒上跑，stop 不再等待（U-20261121-15，本機以真 UIA 驗過）；寫入（設值／invoke／toggle）仍在呼叫者執行緒，不可中斷；
-  非腳本分頁已傳遞協作取消。adb、USB／Wayland 擷取工具、行動裝置呼叫與 find-element 等待、`AC_wait_for_port` 探測、`AC_send_email`、`AC_feature_match`、agent 每次的模型呼叫、聲音／影片斷言與管理主控台的輪詢／廣播也已接上 stop（U-20261126-41）。
-  無障礙寫入（設值／invoke／toggle）在執行中整個交給 walker 執行緒：動作前收到 stop 就不會寫入，動作開始後最多等 5 秒，超過則回 `AccessibilityWriteOutcomeUnknown`；2026-11-26 對自有隱藏 fixture 原生驗過（U-20261126-43）。Linux／macOS 後端尚無動作前的 stop 閘門。
-  仍不可中斷，各有原因：`AC_parallel` 等分支結束才放開按住的鍵；錄影的 `stop_recording` 收尾（中斷會毀掉 MP4）；已在 `stoppable_call` 後面的原生運算仍在背景跑完。
-  ChatOps 的 Slack bot：`/run` 現在在工作執行緒上跑，執行中每 1 秒輪詢一次（`run_poll_interval_s`，閒置 5 秒），`/stop` 約 1 秒內生效，429 會照 `Retry-After` 暫停（U-20261126-42）；卡在不可中斷的後端呼叫裡的執行仍停不掉，`stop()` 逾時後回 `False`；在指令 handler 裡呼叫 `stop()`／`wait_idle()` 會立刻回 `False`、不再等到逾時（U-20261116-15）。沒對真的 Slack workspace 跑過。
-  新轉成可停止的等待裡，`AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過。
+- **Script Builder 的一次性值**（`WIP`，桌面驗收）：對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件；要等桌面沒有其他程式在用時驗收。
+- **stop 的實機驗收**（`WIP`／外部服務）：能停止與刻意不中斷的範圍見 executor 文件「Stopping a run」（U-20261126-41、-43）。
+  `AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過（桌面與裝置驗收）；
+  Slack bot 沒對真的 workspace 跑過（需要 Slack workspace）。
 - **WebRTC**：LAN 廣播的註冊與取消已移出 GUI 執行緒，但真的 zeroconf 的時間與名稱衝突行為只對假物件測過。
 - 系統匣路徑在 offscreen 下沒有 tray，`_on_tray_open` 是直接呼叫測的。基準（`benchmarks/gui_*.py`）CI 仍不設門檻。
 - **把 Python 建的 widget 放進分頁列在結束時崩潰**：已查明觸發條件——分頁列按鈕上接了 Python callable、又有排隊中的 `deleteLater()`、而行程經 `os._exit` 離開；
@@ -712,7 +707,7 @@ IPC fixture 已驗證成功回條但未生效及 helper 重啟；程序內 targe
 嚴格比對回條身分、版本與欄位；以自有緩衝區及真實 reader 邏輯驗證 runtime 閉環，
 OwnedFixtureControl 已接上有界背景 RPC、取消與回收；OwnedChannelLauncher 已將映像檔核對
 接到同一受管 channel 的啟動 handle，並拒絕 bootstrap PID／位元寬度不符（只有注入測試）。
-可信來源交付、載入映像綁定的原生相容性與 attestation 驗收尚未完成。
+`BLOCKED`（部署與原生驗收）：可信來源交付（需實際主機部署）、DLL 解析信任與 attestation 驗收尚未完成。
 另有 `test/fixtures/native_memory/` 的 x64 靜態 CRT fixture 原始碼與僅建置工具；
 已編譯、靜態盤點直接 OS DLL 匯入並記錄來源／產物雜湊；原生執行結果見本檔上方。
 DLL 解析信任與完整故障矩陣仍未驗證。
@@ -731,7 +726,7 @@ DLL 解析信任與完整故障矩陣仍未驗證。
 並拒絕回呼替換 operation 或 worker 綁定；目前以真實暫存帳號檔及注入 buffer 驗證。
 取消與即時 profile 停用仍由主機 RPC 輪詢及 helper 退場處理，不能把 checkpoint 當成原子撤權或 syscall 中斷。
 語意 helper 已使用既有非顯示路由，Linux 有主機 binding 時只走精確 argv 的 owner service，
-政策缺失或服務失敗不得退回本機。此項僅有注入路由測試，尚未證明 Linux 原生隔離。
+政策缺失或服務失敗不得退回本機。此項僅有注入路由測試；`BLOCKED`（需 Linux 原生環境）：尚未證明 Linux 原生隔離。
 套件已有私有 `fixture_worker` 入口，使用主機提供的固定設定及獨立 config SHA；
 先核對封閉 schema、映像 pin 與 PE 範圍，再交由受管 readiness 啟動。此路徑僅以靜態／注入測試驗證。
 Python／helper 來源及 DLL 的可信交付、服務獨立身分／空環境下的套件與帳號檔存取，

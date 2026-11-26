@@ -422,7 +422,8 @@ Slack adapter（``SlackBot``）把 ``/run`` 放到工作執行緒上執行，執
 同樣成為名稱為 ``chatops-<第一個參數>-<id>`` 的可停止執行。``bot.stop(timeout=10.0)``
 結束輪詢、停止執行中的命令、最多等 ``timeout`` 秒讓工作執行緒結束，並回傳是否已沒有
 工作執行緒；``bot.wait_idle(timeout)`` 只等待、不停止任何東西；``bot.running_run_id``
-是執行中的 run id。工作執行緒的回覆送不出去時只記錄在 log（沒有輪詢執行緒可以往上拋），
+是執行中的 run id。
+在指令 handler 裡呼叫 ``stop()``／``wait_idle()`` 會立刻回 ``False``，不會等待自己所屬的 run。工作執行緒的回覆送不出去時只記錄在 log（沒有輪詢執行緒可以往上拋），
 命令不會被重新執行。
 
 bot 閒置時每 ``poll_interval_s``（預設 5 秒、最少 1 秒）輪詢一次，背景命令執行期間改為每

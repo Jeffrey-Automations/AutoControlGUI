@@ -487,7 +487,9 @@ command listed there becomes a stoppable run named ``chatops-<first
 argument>-<id>`` the same way. ``bot.stop(timeout=10.0)`` ends the poll loop,
 stops the running command, waits up to ``timeout`` seconds for its worker and
 returns whether none is left; ``bot.wait_idle(timeout)`` waits without
-stopping anything and ``bot.running_run_id`` names the run in progress. When
+stopping anything and ``bot.running_run_id`` names the run in progress. Called
+from inside a command handler, ``stop()`` and ``wait_idle()`` return ``False``
+at once instead of waiting for the run they belong to. When
 the reply of a worker cannot be posted the failure is logged (the poll thread
 is not there to raise to) and the command is not run again.
 

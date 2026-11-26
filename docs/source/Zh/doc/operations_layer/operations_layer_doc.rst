@@ -186,6 +186,7 @@ token 控制項。Python 伺服器的 ``token`` 屬性仍保留設定的共用 t
   用的是執行器結果 log 的同一條規則，而 **一次性的值** 提供的正好就是被遮蔽的欄位。
   唯一的例外是使用者必須看到的識別碼：``AC_approval_request`` 回傳 ``{token}``，
   那是 maker 交給 checker 的申請編號，結果面板會照樣顯示（log 仍然遮蔽）。
+  一次執行最多保留 200 個一次性的值（``MAX_ONE_TIME_VALUES``），保留最先產生的。
   ``execute_action`` 照舊把每個 token 回傳給腳本；
 - MCP 工具 ``ac_user_add``／``ac_user_remove``／``ac_user_set_role``／
   ``ac_user_rotate_token``／``ac_user_list``；
