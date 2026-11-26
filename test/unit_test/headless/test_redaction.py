@@ -62,6 +62,22 @@ def test_credit_card_regex_detector_handles_spaces():
     assert boxes == [(0, 0, 300, 30)]
 
 
+def test_credit_card_split_into_four_ocr_words_is_masked_as_one_box():
+    detector = regex_detector(DETECTOR_CREDIT_CARD)
+    words = [("4111", (10, 0, 50, 20)), ("1111", (60, 1, 100, 21)),
+             ("1111", (110, 0, 150, 20)), ("1111", (160, 0, 200, 20))]
+    boxes = detector(None, {"ocr": [("Card:", (0, 40, 40, 60))] + words + [("exp", (0, 80, 30, 100))]})
+    assert boxes and all(box == (10, 0, 200, 21) for box in boxes)
+
+
+def test_digit_groups_on_different_lines_or_far_apart_are_not_joined():
+    detector = regex_detector(DETECTOR_CREDIT_CARD)
+    other_lines = [("4111", (0, 0, 40, 20)), ("1111", (50, 0, 90, 20)),
+                   ("1111", (0, 40, 40, 60)), ("1111", (50, 40, 90, 60))]
+    far_apart = [("4111 1111", (0, 100, 90, 120)), ("1111 1111", (900, 100, 990, 120))]
+    assert detector(None, {"ocr": other_lines + far_apart}) == []
+
+
 def test_secure_field_detector_uses_accessibility_tree():
     detector = secure_field_detector()
     boxes = detector(None, {

@@ -56,6 +56,13 @@ _REGEX_BY_DETECTOR: Dict[str, re.Pattern[str]] = {
 }
 
 
+# OCR splits "4111 1111 1111 1111" into four words, none of which matches on
+# its own, so runs of up to this many adjacent tokens on one line are also
+# joined (without spaces) and matched.
+_MAX_RUN_TOKENS = 8
+_Token = Tuple[str, BoundingBox]
+
+
 def regex_detector(name: str) -> DetectorFn:
     """Return a detector that blurs OCR-matched substrings for ``name``.
 
@@ -63,17 +70,75 @@ def regex_detector(name: str) -> DetectorFn:
     — a list of ``(text, bbox)`` tuples. Detectors do not call OCR
     themselves so callers without OCR installed still get the
     region-based and accessibility rules.
+
+    Each token is matched on its own, and so is every run of up to
+    ``_MAX_RUN_TOKENS`` adjacent tokens on one line, joined without spaces;
+    a run's match masks the union of the boxes of the tokens it covers.
     """
     pattern = _REGEX_BY_DETECTOR[name]
 
     def _detect(_image: Any, context: Dict[str, Any]) -> List[BoundingBox]:
-        boxes: List[BoundingBox] = []
-        for text, bbox in context.get("ocr", []) or []:
-            if pattern.search(text or ""):
-                boxes.append(_normalise_bbox(bbox))
+        tokens = [((text or "").strip(), _normalise_bbox(bbox)) for text, bbox in context.get("ocr", []) or []]
+        boxes = [box for text, box in tokens if pattern.search(text)]
+        for run in _adjacent_runs(tokens):
+            boxes.extend(_run_matches(pattern, run))
         return boxes
 
     return _detect
+
+
+def _same_line(a: BoundingBox, b: BoundingBox) -> bool:
+    """Whether two boxes overlap vertically by at least half the shorter one."""
+    overlap = min(a[3], b[3]) - max(a[1], b[1])
+    return overlap * 2 >= min(a[3] - a[1], b[3] - b[1])
+
+
+def _text_lines(tokens: List[_Token]) -> List[List[_Token]]:
+    """Tokens grouped into lines, each ordered left to right."""
+    lines: List[List[_Token]] = []
+    for token in sorted(tokens, key=lambda item: (item[1][1], item[1][0])):
+        line = next((kept for kept in lines if _same_line(kept[0][1], token[1])), None)
+        if line is None:
+            lines.append([token])
+        else:
+            line.append(token)
+    return [sorted(line, key=lambda item: item[1][0]) for line in lines]
+
+
+def _adjacent_runs(tokens: List[_Token]) -> List[List[_Token]]:
+    """Each line's tokens split at gaps wider than two line heights; runs of one token are dropped."""
+    runs: List[List[_Token]] = []
+    for line in _text_lines(tokens):
+        runs.append([line[0]])
+        for previous, token in zip(line, line[1:]):
+            height = max(previous[1][3] - previous[1][1], token[1][3] - token[1][1], 1)
+            if token[1][0] - previous[1][2] > 2 * height:
+                runs.append([])
+            runs[-1].append(token)
+    return [run for run in runs if len(run) > 1]
+
+
+def _run_matches(pattern: "re.Pattern[str]", run: List[_Token]) -> List[BoundingBox]:
+    """The union box of the tokens each match covers, over every window of two or more tokens."""
+    boxes: List[BoundingBox] = []
+    for start in range(len(run)):
+        for end in range(start + 2, min(len(run), start + _MAX_RUN_TOKENS) + 1):
+            window = run[start:end]
+            for match in pattern.finditer("".join(text for text, _ in window)):
+                boxes.append(_covered_box(window, match.span()))
+    return boxes
+
+
+def _covered_box(window: List[_Token], span: Tuple[int, int]) -> BoundingBox:
+    """The union of the boxes of the tokens whose characters ``span`` touches."""
+    covered: List[BoundingBox] = []
+    offset = 0
+    for text, box in window:
+        if offset < span[1] and span[0] < offset + len(text):
+            covered.append(box)
+        offset += len(text)
+    return (min(box[0] for box in covered), min(box[1] for box in covered),
+            max(box[2] for box in covered), max(box[3] for box in covered))
 
 
 def secure_field_detector() -> DetectorFn:
