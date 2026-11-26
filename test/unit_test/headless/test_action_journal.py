@@ -347,3 +347,13 @@ def test_a_record_nested_too_deep_to_parse_is_a_journal_error(tmp_path):
     path.write_bytes(b"[" * 200_000 + bytes([10]))
     with pytest.raises(ActionJournalError):
         read_events(path)
+
+
+def test_a_secret_passed_positionally_is_masked_in_the_journal():
+    from je_auto_control.utils.action_journal.events import ActionEvent
+    from je_auto_control.utils.action_journal.redaction import sanitize_event
+    event = ActionEvent(run_id="r", step_id="s", command="AC_jwt_encode",
+                        parameters={"args": [[{"sub": "me"}, "hunter2-signing-key"]]}, started_at=0.0)
+    record = sanitize_event(event)
+    assert "hunter2-signing-key" not in str(record)
+    assert record["parameters"]["args"][0][0] == {"sub": "me"}

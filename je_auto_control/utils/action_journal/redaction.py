@@ -6,7 +6,7 @@ import math
 import re
 
 from je_auto_control.utils.action_journal.events import ActionEvent
-from je_auto_control.utils.executor.action_redaction import is_sensitive_argument
+from je_auto_control.utils.executor.action_redaction import is_sensitive_argument, positional_parameter_names
 from je_auto_control.utils.logging.secret_scope import scrub_secret_text
 
 _REFERENCE = re.compile(r"(?:\$\{secrets\.[A-Za-z_][A-Za-z0-9_.-]*\}|secret://[A-Za-z_][A-Za-z0-9_.-]*)\Z")
@@ -91,9 +91,10 @@ class _Sanitizer:  # pylint: disable=too-few-public-methods  # reason: one trave
 
     def _mapping_item(self, key: str, item: object, command: str, depth: int) -> object:
         secret = _all_secret(command)
-        positionals = _positionals(item) if secret and key == "args" else None
+        positionals = _positionals(item) if key == "args" else None
         if positionals is not None:
-            return [self._secret_items(positionals, command, depth)]
+            return [self._secret_items(positionals, command, depth) if secret
+                    else self._named_items(positionals, command, depth)]
         if command == "AC_parallel" and key == "branches" and isinstance(item, str):
             return self._encoded_actions(item, command, depth)
         return self.convert(item, command, masked=secret or is_sensitive_argument(command, key), depth=depth)
@@ -109,6 +110,15 @@ class _Sanitizer:  # pylint: disable=too-few-public-methods  # reason: one trave
         if depth > _MAX_DEPTH:
             return self._unsupported("payload_depth_limit")
         return [self.convert(item, command, masked=True, depth=depth + 1) for item in values]
+
+    def _named_items(self, values: list[object] | tuple[object, ...], command: str, depth: int) -> object:
+        """Positional arguments, each masked by the command's parameter name at that position."""
+        if depth > _MAX_DEPTH:
+            return self._unsupported("payload_depth_limit")
+        names = positional_parameter_names(command)
+        return [self.convert(item, command, depth=depth + 1,
+                             masked=index < len(names) and is_sensitive_argument(command, names[index]))
+                for index, item in enumerate(values)]
 
     def _encoded_actions(self, value: str, command: str, depth: int) -> object:
         """Inspect runtime-supported JSON branch strings before persistence, preserving safe source text."""

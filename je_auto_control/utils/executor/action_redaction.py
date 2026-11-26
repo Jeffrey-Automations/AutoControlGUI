@@ -184,13 +184,13 @@ def _redact_argument(command: str, argument: Any) -> Any:
                 for name, item in argument.items()}
     if isinstance(argument, list):
         # A positional list: the same rule, by the name of each position.
-        names = _positional_names(command)
+        names = positional_parameter_names(command)
         return [_MASK if index < len(names) and is_sensitive_argument(command, names[index])
                 else redact_actions(item) for index, item in enumerate(argument)]
     return redact_actions(argument)
 
 
-def _positional_names(command: str) -> Tuple[str, ...]:
+def positional_parameter_names(command: str) -> Tuple[str, ...]:
     """The parameter names of ``command``, in order; empty for one the executor does not know."""
     try:
         # pylint: disable-next=import-outside-toplevel  # reason: the executor imports this module
