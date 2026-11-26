@@ -48,6 +48,7 @@ class DataSourceTab(TranslatableMixin, QWidget):
         self._table = QTableWidget(0, 0)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._loads = TabTask(self)         # reading the file or querying the database
         self._loads.result.connect(self._on_loaded)
         self._loads.error.connect(self._show_error)
@@ -125,16 +126,16 @@ class DataSourceTab(TranslatableMixin, QWidget):
             return
         work = functools.partial(load_rows, source, limit=self._limit.value() or None)
         if not self._loads.start(work):
-            self._status.setText(_t("task_busy"))
+            self._status_text.show("task_busy")
             return
-        self._status.setText(_t("task_running"))
+        self._status_text.show("task_running")
 
     def _show_error(self, error: object) -> None:
-        self._status.setText(_t("ds_error").replace("{error}", str(error)))
+        self._status_text.show("ds_error", error=error)
 
     def _on_loaded(self, rows: List[Dict[str, Any]]) -> None:
         self._render_rows(rows)
-        self._status.setText(_t("ds_row_count").replace("{n}", str(len(rows))))
+        self._status_text.show("ds_row_count", n=len(rows))
 
     def _render_rows(self, rows: List[Dict[str, Any]]) -> None:
         columns: List[str] = []

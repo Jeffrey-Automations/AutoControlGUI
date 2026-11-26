@@ -72,6 +72,7 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         self._result_view = QTextEdit()
         self._result_view.setReadOnly(True)
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._planned_actions: Optional[List[List[Any]]] = None
         self._plans = TabTask(self)
         self._plans.result.connect(self._on_plan_finished)
@@ -139,14 +140,14 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
     def _on_plan(self) -> None:
         description = self._description.toPlainText().strip()
         if not description:
-            self._status.setText(_t("llm_desc_required"))
+            self._status_text.show("llm_desc_required")
             return
         model = self._model.text().strip() or None
         work = functools.partial(_plan, description, model, sorted(executor.known_commands()))
         if not self._plans.start(work, timeout_s=PLAN_DEADLINE_S):
-            self._status.setText(_t("task_busy"))
+            self._status_text.show("task_busy")
             return
-        self._status.setText(_t("llm_planning"))
+        self._status_text.show("llm_planning")
         self._actions_view.clear()
         self._planned_actions = None
 
@@ -155,42 +156,40 @@ class LLMPlannerTab(TranslatableMixin, QWidget):
         self._actions_view.setText(
             json.dumps(actions, indent=2, ensure_ascii=False)
         )
-        self._status.setText(
-            _t("llm_plan_count").replace("{n}", str(len(actions)))
-        )
+        self._status_text.show("llm_plan_count", n=len(actions))
 
     def _on_plan_failed(self, error: object) -> None:
         self._planned_actions = None
         message = _plan_error_text(error)
         if not isinstance(error, TaskTimeout):
             QMessageBox.warning(self, _t("llm_plan_btn"), message)
-        self._status.setText(message)
+        self._status_text.show_rendered(functools.partial(_plan_error_text, error))
 
     def _on_run(self) -> None:
         if not self._planned_actions:
-            self._status.setText(_t("llm_no_plan"))
+            self._status_text.show("llm_no_plan")
             return
         if not self._runs.start_script(
                 functools.partial(_run_plan, copy.deepcopy(self._planned_actions))):
-            self._status.setText(_t("task_busy"))
+            self._status_text.show("task_busy")
             return
-        self._status.setText(_t("llm_running"))
+        self._status_text.show("llm_running")
 
     def _on_stop(self) -> None:
         if self._runs.stop():
-            self._status.setText(_t("task_stopping"))
+            self._status_text.show("task_stopping")
         elif self._plans.stop():
-            self._status.setText(_t("task_stopped"))
+            self._status_text.show("task_stopped")
 
     def _show_run_result(self, record: object) -> None:
         self._result_view.setText(
             json.dumps(record, indent=2, ensure_ascii=False, default=str)
         )
-        self._status.setText(_t("llm_run_done"))
+        self._status_text.show("llm_run_done")
 
     def _show_run_error(self, error: object) -> None:
         if was_stopped(error):
-            self._status.setText(_t("task_stopped"))
+            self._status_text.show("task_stopped")
             return
         QMessageBox.warning(self, _t("llm_run_btn"), str(error))
-        self._status.setText(str(error))
+        self._status_text.show_plain(str(error))

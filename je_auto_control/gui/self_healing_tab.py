@@ -67,6 +67,11 @@ def _read_log(*, clear: bool) -> list[HealEvent]:
     return default_heal_log.list_events(limit=200)
 
 
+def _hit_text(x: int, y: int, method: str) -> str:
+    """The status line for a template found at ``(x, y)`` by ``method``, in the active language."""
+    return _t("self_heal_hit").replace("{x}", str(x)).replace("{y}", str(y)) + f" ({method})"
+
+
 class SelfHealingTab(TranslatableMixin, QWidget):
     """Trigger self-heal attempts and browse the audit log."""
 
@@ -83,6 +88,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         self._threshold.setValue(0.9)
         self._click_check = QCheckBox()
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._status.setTextFormat(Qt.TextFormat.PlainText)
         self._table = QTableWidget(0, len(_COLUMNS))
         self._details = QPlainTextEdit()
@@ -209,7 +215,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         template = self._template_input.text().strip() or None
         description = self._description_input.text().strip() or None
         if template is None and description is None:
-            self._status.setText(_t("self_heal_inputs_required"))
+            self._status_text.show("self_heal_inputs_required")
             return None
         try:
             raw = self._region_input.text().strip()
@@ -217,7 +223,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
             if region is not None and not isinstance(region, list):
                 raise ValueError(_t("self_heal_region_placeholder"))
         except ValueError as error:
-            self._status.setText(f"{_t('self_heal_error')}: {error}")
+            self._status_text.show_joined('self_heal_error', error)
             return None
         return template, description, float(self._threshold.value()), region
 
@@ -233,28 +239,25 @@ class SelfHealingTab(TranslatableMixin, QWidget):
             return
         work = functools.partial(_dispatch, inputs, do_click or self._click_check.isChecked(),
                                  self._verification_input.text().strip())
-        self._status.setText(_t("task_running" if self._task.start(work) else "task_busy"))
+        self._status_text.show("task_running" if self._task.start(work) else "task_busy")
 
     def _on_run_done(self, result: Any) -> None:
         outcome, verified = result
         self._report_outcome(outcome)
         if verified is not None:
-            self._status.setText(_t("self_heal_verification_passed" if verified else "self_heal_verification_failed"))
+            self._status_text.show("self_heal_verification_passed" if verified else "self_heal_verification_failed")
         self.refresh_log()
 
     def _on_run_failed(self, error: object) -> None:
-        self._status.setText(f"{_t('self_heal_error')}: {error}")
+        self._status_text.show_joined('self_heal_error', error)
         self.refresh_log()
 
     def _report_outcome(self, outcome: HealOutcome) -> None:
         if not outcome.found:
-            self._status.setText(_t("self_heal_miss"))
+            self._status_text.show("self_heal_miss")
             return
-        suffix = f" ({outcome.method})"
-        coords = outcome.coordinates or (0, 0)
-        text = _t("self_heal_hit").replace("{x}", str(coords[0])) \
-                                   .replace("{y}", str(coords[1]))
-        self._status.setText(text + suffix)
+        x, y = outcome.coordinates or (0, 0)
+        self._status_text.show_rendered(functools.partial(_hit_text, x, y, outcome.method))
 
     def _on_clear_log(self) -> None:
         reply = QMessageBox.question(
@@ -263,7 +266,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         if reply != QMessageBox.StandardButton.Yes:
             return
         if not self._log.start(functools.partial(_read_log, clear=True)):
-            self._status.setText(_t("task_busy"))
+            self._status_text.show("task_busy")
 
     def refresh_log(self) -> None:
         """Reload the table from the on-disk audit log, read off the GUI thread."""
@@ -275,7 +278,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
             self.refresh_log()
 
     def _on_log_failed(self, error: object) -> None:
-        self._status.setText(f"{_t('self_heal_error')}: {error}")
+        self._status_text.show_joined('self_heal_error', error)
 
     def _show_log(self, events: list[HealEvent]) -> None:
         self._events = events
@@ -307,12 +310,12 @@ class SelfHealingTab(TranslatableMixin, QWidget):
     def _on_source(self) -> None:
         row = self._table.currentRow()
         if not 0 <= row < len(self._events):
-            self._status.setText(_t("self_heal_source_missing"))
+            self._status_text.show("self_heal_source_missing")
             return
         event = self._events[row]
         values = (event.journal_path, event.run_id, event.step_id)
         if not all(isinstance(value, str) and value for value in values):
-            self._status.setText(_t("self_heal_source_missing"))
+            self._status_text.show("self_heal_source_missing")
             return
         self._source.open_source(str(event.journal_path), str(event.run_id), str(event.step_id))
         self._views.setCurrentWidget(self._source)

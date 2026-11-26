@@ -113,6 +113,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setStretchLastSection(True)
         self._count_label = QLabel()
+        self._count_text = self._keyed(self._count_label)
         self._timeline = RunHistoryTimeline()
         self._timeline.run_clicked.connect(self._on_timeline_clicked)
         self._thumb_label = QLabel()
@@ -149,7 +150,8 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         TranslatableMixin.retranslate(self)
         self._apply_table_headers()
         self._repopulate_filter_labels()
-        self._refresh()
+        self._render_runs()             # the rows already listed, in the new language: no new query
+        self._refresh_preview()
         self._journal.retranslate()
     def dispose(self) -> None:
         """Stop the refresh timer, the queries and any journal read; the registry calls it before deleting the tab."""
@@ -248,7 +250,7 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         )
         if reply == QMessageBox.StandardButton.Yes and not self._edits.start(default_history_store.clear,
                                                                               tag="clear"):
-            self._count_label.setText(_t("task_busy"))
+            self._count_text.show("task_busy")
 
     def _on_edit_done(self, result: object) -> None:
         if self._edits.tag == "journals":
@@ -279,15 +281,16 @@ class RunHistoryTab(TranslatableMixin, QWidget):
         if self._queried_source != self._filter.currentData():
             return                  # the filter changed meanwhile: the next query answers for it
         self._records = runs
-        with kept_selection(self._table):       # newest first: each new run moves every row down
-            self._table.setRowCount(len(runs))
-            for row, record in enumerate(runs):
-                self._set_row(row, record)
-        self._count_label.setText(
-            _t("rh_count_label").replace("{n}", str(len(runs))),
-        )
+        self._render_runs()
         self._timeline.set_records(runs)
         self._refresh_preview()
+
+    def _render_runs(self) -> None:
+        with kept_selection(self._table):       # newest first: each new run moves every row down
+            self._table.setRowCount(len(self._records))
+            for row, record in enumerate(self._records):
+                self._set_row(row, record)
+        self._count_text.show("rh_count_label", n=len(self._records))
 
     def _set_row(self, row: int, record: RunRecord) -> None:
         status_key = _STATUS_LABEL_KEYS.get(record.status, record.status)

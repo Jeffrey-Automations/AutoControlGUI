@@ -75,6 +75,7 @@ class ScriptTab(TranslatableMixin, QWidget):
         self.script_editor = QTextEdit()
         self.script_editor.setPlaceholderText('[["AC_type_keyboard", {"keycode": "a"}]]')
         self.script_result_text = QTextEdit()
+        self._result_text = self._keyed(self.script_result_text)
         self.script_result_text.setReadOnly(True)
         layout.addWidget(ResponsiveBox(self._titled_card("script_content", self.script_editor),
                                        self._titled_card("execution_result", self.script_result_text)),
@@ -94,27 +95,27 @@ class ScriptTab(TranslatableMixin, QWidget):
     def _start_script_run(self, work: Callable[[], Any]) -> None:
         """Run ``work`` as this tab's one stoppable script run."""
         if not self._script_runs.start_script(work):
-            self.script_result_text.setText(_t("task_busy"))
+            self._result_text.show("task_busy")
             return
         self._status_key = "task_running"
-        self.script_result_text.setText(_t(self._status_key))
+        self._result_text.show(self._status_key)
 
     def _show_script_result(self, result: object) -> None:
         self._status_key = ""
-        self.script_result_text.setText(json.dumps(result, indent=2, default=str, ensure_ascii=False))
+        self._result_text.show_plain(json.dumps(result, indent=2, default=str, ensure_ascii=False))
 
     def _show_script_error(self, error: object) -> None:
         self._status_key = ""
         if was_stopped(error):
-            self.script_result_text.setText(_t("task_stopped"))
+            self._result_text.show("task_stopped")
             return
-        self.script_result_text.setText(f"Error: {error}")
+        self._result_text.show_plain(f"Error: {error}")
 
     def _stop_script(self) -> None:
         """Ask the running script to stop; it ends at its next checkpoint."""
         if self._script_runs.running:
             self._status_key = "task_stopping"
-            self.script_result_text.setText(_t(self._status_key))
+            self._result_text.show(self._status_key)
             self._script_runs.stop()
 
     def _browse_script(self) -> None:
@@ -131,7 +132,7 @@ class ScriptTab(TranslatableMixin, QWidget):
         self.script_editor.setText(json.dumps(data, indent=2, ensure_ascii=False))
 
     def _load_error(self, error: object) -> None:
-        self.script_result_text.setText(f"Error loading: {error}")
+        self._result_text.show_plain(f"Error loading: {error}")
 
     def _execute_script(self) -> None:
         path = self.script_path_input.text()
@@ -162,7 +163,7 @@ class ScriptTab(TranslatableMixin, QWidget):
     def _on_finished(self) -> None:
         if self._status_key in {"task_running", "task_stopping"}:
             self._status_key = "task_stopped"
-            self.script_result_text.setText(_t(self._status_key))
+            self._result_text.show(self._status_key)
 
     def menu_actions(self) -> list[tuple[str, Callable[[], object]]]:
         """Expose loading, execution and Stop through Actions."""
@@ -174,8 +175,6 @@ class ScriptTab(TranslatableMixin, QWidget):
         """Refresh labels and transient status while preserving output."""
         super().retranslate()
         self.script_history_controls.retranslate()
-        if self._status_key:
-            self.script_result_text.setText(_t(self._status_key))
 
     def dispose(self) -> None:
         """Stop this page's run; its controller discards outcomes after destruction."""

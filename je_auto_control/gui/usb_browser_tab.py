@@ -134,6 +134,7 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
         self._token_input = QLineEdit()
         self._token_input.setEchoMode(QLineEdit.EchoMode.Password)
         self._status_label = QLabel("")
+        self._status = self._keyed(self._status_label)
         self._table = QTableWidget(0, 5)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setSectionResizeMode(
@@ -196,17 +197,17 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
         work = functools.partial(fetch_remote_devices, base_url=self._url_input.text().strip(),
                                  token=self._token_input.text().strip())
         if self._start(work, "fetch"):
-            self._status_label.setText(_t("usb_browser_fetching"))
+            self._status.show("usb_browser_fetching")
 
     def _start(self, work: Callable[[], Any], tag: str) -> bool:
         if self._requests.start(work, tag=tag, timeout_s=REQUEST_DEADLINE_S):
             return True
-        self._status_label.setText(_t("task_busy"))
+        self._status.show("task_busy")
         return False
 
     def _on_stop(self) -> None:
         if self._requests.stop():
-            self._status_label.setText(_t("task_stopped"))
+            self._status.show("task_stopped")
 
     def _show_outcome(self, value: Any) -> None:
         if self._requests.tag == "open":
@@ -215,9 +216,7 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
             self._apply_devices(value)
 
     def _apply_devices(self, devices: List[Dict[str, Any]]) -> None:
-        self._status_label.setText(
-            _t("usb_browser_fetched").format(count=len(devices)),
-        )
+        self._status.show("usb_browser_fetched", count=len(devices))
         self._table.setRowCount(len(devices))
         for row_index, device in enumerate(devices):
             cells = [
@@ -233,11 +232,9 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
 
     def _apply_failure(self, error: object) -> None:
         if isinstance(error, TaskTimeout):
-            self._status_label.setText(_t("task_timed_out"))
+            self._status.show("task_timed_out")
             return
-        self._status_label.setText(
-            _t("usb_browser_fetch_failed").format(error=error),
-        )
+        self._status.show("usb_browser_fetch_failed", error=error)
 
     def _on_open_selected(self) -> None:
         rows = sorted({i.row() for i in self._table.selectedIndexes()})
@@ -267,11 +264,7 @@ class UsbBrowserTab(TranslatableMixin, QWidget):
 
     def _on_local_opened(self, vid: str, pid: str, descriptor: bytes) -> None:
         from je_auto_control.utils.usb.passthrough import describe_descriptor
-        self._status_label.setText(
-            _t("usb_browser_open_loopback").format(
-                vid=vid, pid=pid, hex=describe_descriptor(descriptor),
-            ),
-        )
+        self._status.show("usb_browser_open_loopback", vid=vid, pid=pid, hex=describe_descriptor(descriptor))
 
     def _row_text(self, row: int, col: int) -> str:
         item = self._table.item(row, col)

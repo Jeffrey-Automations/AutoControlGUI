@@ -42,6 +42,7 @@ class VariablesTab(TranslatableMixin, QWidget):
         self._set_value = QLineEdit()
         self._seed_text = QTextEdit()
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._build_layout()
         self._apply_placeholders()
         self._refresh()
@@ -49,8 +50,7 @@ class VariablesTab(TranslatableMixin, QWidget):
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
         self._apply_placeholders()
-        self._update_table_headers()
-        self._refresh()
+        self._update_table_headers()        # the status line re-renders itself: no new listing
 
     def _apply_placeholders(self) -> None:
         self._set_name.setPlaceholderText(_t("vars_name_placeholder"))
@@ -107,9 +107,7 @@ class VariablesTab(TranslatableMixin, QWidget):
             self._table.setItem(row, 0, QTableWidgetItem(str(name)))
             display = self._format_value(value)
             self._table.setItem(row, 1, QTableWidgetItem(display))
-        self._status.setText(
-            _t("vars_count").replace("{n}", str(len(snapshot)))
-        )
+        self._status_text.show("vars_count", n=len(snapshot))
 
     @staticmethod
     def _format_value(value: Any) -> str:
@@ -134,7 +132,7 @@ class VariablesTab(TranslatableMixin, QWidget):
     def _on_set_one(self) -> None:
         name = self._set_name.text().strip()
         if not name:
-            self._status.setText(_t("vars_name_required"))
+            self._status_text.show("vars_name_required")
             return
         executor.variables.set(name, self._coerce_value(self._set_value.text()))
         self._set_name.clear()
@@ -154,19 +152,19 @@ class VariablesTab(TranslatableMixin, QWidget):
     def _on_seed_json(self) -> None:
         text = self._seed_text.toPlainText().strip()
         if not text:
-            self._status.setText(_t("vars_seed_required"))
+            self._status_text.show("vars_seed_required")
             return
         try:
             data = json.loads(text)
         except (ValueError, TypeError) as error:
-            self._status.setText(f"{_t('vars_seed_invalid')}: {error}")
+            self._status_text.show_joined('vars_seed_invalid', error)
             return
         if not isinstance(data, dict):
-            self._status.setText(_t("vars_seed_not_object"))
+            self._status_text.show("vars_seed_not_object")
             return
         try:
             executor.variables.update_many(data)
         except ValueError as error:
-            self._status.setText(f"{_t('vars_seed_invalid')}: {error}")
+            self._status_text.show_joined('vars_seed_invalid', error)
             return
         self._refresh()

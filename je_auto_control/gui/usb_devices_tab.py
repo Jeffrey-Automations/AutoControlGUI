@@ -45,6 +45,7 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
         self._backend_label = QLabel("-")
         self._error_label = QLabel("")
         self._events_label = QLabel("")
+        self._events_text = self._keyed(self._events_label)
         self._refusal = RefusalLabel()
         self._auto_check = QCheckBox()
         self._auto_check.toggled.connect(self._on_auto_toggled)
@@ -153,20 +154,18 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
     def _update_event_summary(self) -> None:
         watcher = default_usb_watcher()
         if not watcher.is_running:
-            self._events_label.setText("")
+            self._events_text.clear()
             return
         events = watcher.recent_events(since=self._last_seen_seq, limit=10)
         if not events:
-            self._events_label.setText(_t("usb_events_idle"))
+            self._events_text.show("usb_events_idle")
             return
         self._last_seen_seq = events[-1]["seq"]
         summary_parts = [
             f"{event['kind']}: {event['device'].get('product') or '?'}"
             for event in events[-3:]
         ]
-        self._events_label.setText(
-            _t("usb_events_recent").format(text=" / ".join(summary_parts)),
-        )
+        self._events_text.show("usb_events_recent", text=" / ".join(summary_parts))
 
 
 class _WatcherHold:

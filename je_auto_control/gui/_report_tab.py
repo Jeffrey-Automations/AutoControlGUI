@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
-from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.generate_report.generate_html_report import generate_html_report
 from je_auto_control.utils.generate_report.generate_json_report import generate_json_report
 from je_auto_control.utils.generate_report.generate_xml_report import generate_xml_report
@@ -43,6 +42,7 @@ class ReportTab(TranslatableMixin, QWidget):
 
         result_card = Card().add(set_role(self._tr(QLabel(), "report_result"), "sectionTitle"))
         self.report_result_text = QTextEdit()
+        self._result_text = self._keyed(self.report_result_text)
         self.report_result_text.setReadOnly(True)
         layout.addWidget(result_card.add(self.report_result_text, stretch=1), stretch=1)
         self._task = TabTask(self)
@@ -79,7 +79,7 @@ class ReportTab(TranslatableMixin, QWidget):
     def _start_report(self, generator: Callable[[str], None], format_name: str) -> None:
         name = self.report_name_input.text() or "autocontrol_report"
         if self._task.start(partial(_write_report, generator, name, format_name)):
-            self.report_result_text.setText(language_wrapper.translate("task_running", "task_running"))
+            self._result_text.show("task_running")
 
     def _gen_html(self) -> None:
         self._start_report(generate_html_report, "HTML")
@@ -91,10 +91,10 @@ class ReportTab(TranslatableMixin, QWidget):
         self._start_report(generate_xml_report, "XML")
 
     def _on_report_result(self, result: str) -> None:
-        self.report_result_text.setText(result)
+        self._result_text.show_plain(result)
 
     def _on_report_error(self, error: object) -> None:
-        self.report_result_text.setText(f"Error: {error}")
+        self._result_text.show_plain(f"Error: {error}")
 
     def dispose(self) -> None:
         """Drop late results; an already-running report write may still finish."""

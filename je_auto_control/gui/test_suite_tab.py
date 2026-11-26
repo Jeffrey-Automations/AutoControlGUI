@@ -81,6 +81,7 @@ class TestSuiteTab(TranslatableMixin, QWidget):
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setStretchLastSection(True)
         self._summary = QLabel()
+        self._summary_text = self._keyed(self._summary)
         self._quarantine = QListWidget()
         self._last_result: Optional[Any] = None
         self._runs = TabTask(self)
@@ -147,14 +148,14 @@ class TestSuiteTab(TranslatableMixin, QWidget):
 
     def _start_file(self, work: Callable[[], Any], tag: str) -> None:
         if not self._files.start(work, tag=tag):
-            self._summary.setText(_t("task_busy"))
+            self._summary_text.show("task_busy")
             return
-        self._summary.setText(_t("task_running"))
+        self._summary_text.show("task_running")
 
     def _on_file_done(self, result: Any) -> None:
         if self._files.tag == "load":
             self._spec.setPlainText(result)
-            self._summary.setText("")
+            self._summary_text.clear()
         elif self._last_result is not None:
             self._render_result(self._last_result)      # the summary again, in place of "running"
 
@@ -162,16 +163,16 @@ class TestSuiteTab(TranslatableMixin, QWidget):
         try:
             spec = self._parse_spec()
         except (ValueError, TypeError) as err:
-            self._summary.setText(_t("suite_error").replace("{error}", str(err)))
+            self._summary_text.show("suite_error", error=err)
             return
         if not self._runs.start_script(functools.partial(_run_suite, spec)):
-            self._summary.setText(_t("task_busy"))
+            self._summary_text.show("task_busy")
             return
-        self._summary.setText(_t("task_running"))
+        self._summary_text.show("task_running")
 
     def _on_stop(self) -> None:
         if self._runs.stop():
-            self._summary.setText(_t("task_stopping"))
+            self._summary_text.show("task_stopping")
 
     def _show_run_result(self, result: Any) -> None:
         self._last_result = result
@@ -179,9 +180,9 @@ class TestSuiteTab(TranslatableMixin, QWidget):
 
     def _show_run_error(self, error: object) -> None:
         if was_stopped(error):
-            self._summary.setText(_t("task_stopped"))
+            self._summary_text.show("task_stopped")
             return
-        self._summary.setText(_t("suite_error").replace("{error}", str(error)))
+        self._summary_text.show("suite_error", error=error)
 
     def _render_result(self, result: TestSuiteResult) -> None:
         self._table.setRowCount(len(result.cases))
@@ -192,13 +193,8 @@ class TestSuiteTab(TranslatableMixin, QWidget):
                 item = QTableWidgetItem(text)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(row, col, item)
-        self._summary.setText(
-            _t("suite_summary")
-            .replace("{passed}", str(result.passed))
-            .replace("{failed}", str(result.failed))
-            .replace("{errored}", str(result.errored))
-            .replace("{skipped}", str(result.skipped)),
-        )
+        self._summary_text.show("suite_summary", passed=result.passed, failed=result.failed,
+                                errored=result.errored, skipped=result.skipped)
 
     def _on_junit(self) -> None:
         if self._last_result is None:
@@ -222,7 +218,7 @@ class TestSuiteTab(TranslatableMixin, QWidget):
     def _refresh_quarantine(self, change: Optional[Callable[[], Any]] = None) -> None:
         """Make ``change`` to the quarantine (when given) and list it again, off the GUI thread."""
         if not self._store.start(functools.partial(_change_quarantine, change)):
-            self._summary.setText(_t("task_busy"))
+            self._summary_text.show("task_busy")
 
     def _show_quarantine(self, entries: list[QuarantineEntry]) -> None:
         self._quarantine.clear()

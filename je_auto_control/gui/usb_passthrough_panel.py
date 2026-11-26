@@ -121,11 +121,13 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         self._acl_ops = TabTask(self)
         self._acl_ops.result.connect(self._acl_done)
         self._acl_ops.error.connect(self._acl_failed)
-        self._acl_outcome: Tuple[str, bool] = ("", False)     # what the running ACL task shows when it returns
+        # What the running ACL task shows when it returns: a key, its fields, and whether to list again.
+        self._acl_outcome: Tuple[str, Dict[str, object], bool] = ("", {}, False)
         self._integrity = TabTask(self, details=False)      # re-reads the file and checks its HMAC
         self._integrity.result.connect(self._show_integrity)
         self._host_badge = _StatusBadge()
         self._viewer_status = QLabel("")
+        self._status = self._keyed(self._viewer_status)
         self._refusal = RefusalLabel()
         self._source_combo = QComboBox()
         self._auto_check = QCheckBox()
@@ -311,7 +313,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
 
     def _show_integrity(self, intact: bool) -> None:
         if not intact:
-            self._viewer_status.setText(_t("usb_share_acl_tampered"))
+            self._status.show("usb_share_acl_tampered")
 
     # --- local devices + ACL ----------------------------------------------
 
@@ -328,7 +330,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
             self._listed = True
 
     def _show_list_error(self, error: object) -> None:
-        self._viewer_status.setText(str(error))
+        self._status.show_plain(str(error))
 
     def _show_local_devices(self, result: UsbEnumerationResult) -> None:
         # Hotplug refreshes the list by itself: Allow / Block must stay on the device that was selected.
@@ -391,11 +393,10 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
             rule = AclRule(vendor_id=vid, product_id=pid, serial=serial,
                            label=f"gui {vid}:{pid}", allow=allow, prompt_on_open=False)
         except ValueError as error:
-            self._viewer_status.setText(str(error))
+            self._status.show_plain(str(error))
             return
         key = "usb_share_allowed" if allow else "usb_share_blocked"
-        self._start_acl(functools.partial(_replace_rule, self._acl, rule),
-                        _t(key).format(vid=vid, pid=pid))
+        self._start_acl(functools.partial(_replace_rule, self._acl, rule), key, {"vid": vid, "pid": pid})
 
     def _export_acl(self) -> None:
         if not self._refusal.allows("AC_usb_acl_export"):
@@ -407,7 +408,7 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         if path:
             self._start_acl(functools.partial(authorized, "AC_usb_acl_export", export_acl_to_file,
                                               self._acl, Path(path)),
-                            _t("usb_share_acl_exported"), refresh=False)
+                            "usb_share_acl_exported", refresh=False)
 
     def _import_acl(self) -> None:
         if not self._refusal.allows("AC_usb_acl_import"):
@@ -418,28 +419,29 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         if path:
             self._start_acl(functools.partial(authorized, "AC_usb_acl_import", import_acl_from_file,
                                               self._acl, Path(path)),
-                            _t("usb_share_acl_imported"))
+                            "usb_share_acl_imported")
 
-    def _start_acl(self, work: Callable[[], Any], done_text: str, *, refresh: bool = True) -> None:
+    def _start_acl(self, work: Callable[[], Any], done_key: str, fields: Optional[Dict[str, object]] = None, *,
+                   refresh: bool = True) -> None:
         """Run one ACL change, export or import off the GUI thread.
 
-        ``done_text`` is shown when it returns, with ``{count}`` filled from
-        its result; with ``refresh`` the local devices are listed again.
+        ``done_key`` is shown when it returns, with ``fields`` and ``{count}``
+        (its result) filled in; with ``refresh`` the local devices are listed again.
         """
         if not self._acl_ops.start(work):
-            self._viewer_status.setText(_t("task_busy"))
+            self._status.show("task_busy")
             return
-        self._acl_outcome = (done_text, refresh)
-        self._viewer_status.setText(_t("task_running"))
+        self._acl_outcome = (done_key, dict(fields or {}), refresh)
+        self._status.show("task_running")
 
     def _acl_done(self, result: object) -> None:
-        text, refresh = self._acl_outcome
-        self._viewer_status.setText(text.replace("{count}", str(result)))
+        key, fields, refresh = self._acl_outcome
+        self._status.show(key, count=result, **fields)
         if refresh:
             self._refresh_local_devices()
 
     def _acl_failed(self, error: object) -> None:
-        self._viewer_status.setText(_t("usb_share_acl_import_failed").format(error=str(error)))
+        self._status.show("usb_share_acl_import_failed", error=str(error))
 
     # --- use (loopback or live WebRTC) -------------------------------------
 
@@ -477,12 +479,10 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         if client is None:
             return
         if self._start(functools.partial(authorized, command, client.list_devices), "shared"):
-            self._viewer_status.setText(_t("usb_share_listing"))
+            self._status.show("usb_share_listing")
 
     def _apply_shared(self, devices: List[Dict[str, Any]]) -> None:
-        self._viewer_status.setText(
-            _t("usb_share_listed").format(count=len(devices)),
-        )
+        self._status.show("usb_share_listed", count=len(devices))
         self._shared_table.setRowCount(len(devices))
         for row, device in enumerate(devices):
             cells = [
@@ -504,16 +504,10 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         pid = self._cell(self._shared_table, row, 1)
         serial = self._cell(self._shared_table, row, 3) or None
         if self._start(functools.partial(_probe_labelled, client, vid, pid, serial), "open"):
-            self._viewer_status.setText(
-                _t("usb_share_opening").format(vid=vid, pid=pid),
-            )
+            self._status.show("usb_share_opening", vid=vid, pid=pid)
 
     def _opened(self, vid: str, pid: str, descriptor: bytes) -> None:
-        self._viewer_status.setText(
-            _t("usb_share_opened").format(
-                vid=vid, pid=pid, hex=describe_descriptor(descriptor),
-            ),
-        )
+        self._status.show("usb_share_opened", vid=vid, pid=pid, hex=describe_descriptor(descriptor))
 
     # --- remote browse (REST) ---------------------------------------------
 
@@ -521,21 +515,21 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
         url = self._remote_url.text().strip()
         token = self._remote_token.text().strip()
         if self._start(functools.partial(fetch_remote_devices, base_url=url, token=token), "remote"):
-            self._viewer_status.setText(_t("usb_browser_fetching"))
+            self._status.show("usb_browser_fetching")
 
     # --- request plumbing --------------------------------------------------
 
     def _start(self, work: Callable[[], Any], tag: str) -> bool:
         if self._requests.start(work, tag=tag, timeout_s=REQUEST_DEADLINE_S):
             return True
-        self._viewer_status.setText(_t("task_busy"))
+        self._status.show("task_busy")
         return False
 
     def _on_stop(self) -> None:
         stopped = self._requests.stop()
         stopped = self._listing.stop() or stopped
         if stopped:
-            self._viewer_status.setText(_t("task_stopped"))
+            self._status.show("task_stopped")
 
     def _show_outcome(self, value: Any) -> None:
         if self._requests.tag == "open":
@@ -545,10 +539,10 @@ class UsbPassthroughPanel(TranslatableMixin, QWidget):
 
     def _show_request_error(self, error: object) -> None:
         if isinstance(error, TaskTimeout):
-            self._viewer_status.setText(_t("task_timed_out"))
+            self._status.show("task_timed_out")
             return
         key = "usb_browser_fetch_failed" if self._requests.tag == "remote" else "usb_share_open_failed"
-        self._viewer_status.setText(_t(key).format(error=error))
+        self._status.show(key, error=error)
 
     # --- helpers -----------------------------------------------------------
 

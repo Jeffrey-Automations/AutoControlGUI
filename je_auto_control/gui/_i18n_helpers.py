@@ -16,8 +16,12 @@ middle of a PySide call that is still walking a list of widgets.
 A text that changes with the widget's state -- a status line, a quality hint --
 is shown through a :class:`KeyedText`, which keeps the catalogue key and its
 fields rather than the rendered string, so the owner's ``retranslate`` can show
-it again in the new language.
+it again in the new language. ``self._keyed(widget)`` makes one that
+:meth:`TranslatableMixin.retranslate` re-renders itself; one made for the owner
+(``self._keyed(self, "setWindowTitle")``) holds it weakly, for the same reason
+as above.
 """
+import weakref
 from typing import Callable, List, Optional, Tuple, TypeVar
 
 from PySide6.QtWidgets import (
@@ -68,8 +72,18 @@ class TranslatableMixin:
         tab_widget.setTabText(index, language_wrapper.translate(key, key))
         self._tr_tabs.append((tab_widget, index, key))
 
+    def _keyed(self, widget: QWidget, setter: str = "setText") -> "KeyedText":
+        """A :class:`KeyedText` for ``widget`` that :meth:`retranslate` shows again in the new language."""
+        text = KeyedText(widget, setter, weak=widget is self)
+        if not hasattr(self, "_tr_keyed"):
+            self._tr_keyed: List[KeyedText] = []
+        self._tr_keyed.append(text)
+        return text
+
     def retranslate(self) -> None:
-        """Re-apply every registered translation key."""
+        """Re-apply every registered translation key and re-render every keyed text."""
+        for text in getattr(self, "_tr_keyed", []):
+            text.retranslate()
         for widget, key, setter in getattr(self, "_tr_registry", []):
             target = self if widget is None else widget
             try:
@@ -87,13 +101,25 @@ class TranslatableMixin:
 class KeyedText:
     """One text of a widget (``setText`` by default), set from a catalogue key so a language switch re-reads it."""
 
-    def __init__(self, widget: QWidget, setter: str = "setText") -> None:
-        self._apply = getattr(widget, setter)
+    def __init__(self, widget: QWidget, setter: str = "setText", *, weak: bool = False) -> None:
+        self._setter = setter
+        self._widget: Callable[[], Optional[QWidget]] = weakref.ref(widget) if weak else (lambda: widget)
         self._render: Optional[Callable[[], str]] = None
+
+    def _apply(self, text: str) -> None:
+        widget = self._widget()
+        if widget is None:
+            raise RuntimeError("the widget is gone")
+        getattr(widget, self._setter)(text)
 
     def show(self, key: str, **fields: object) -> None:
         """Show ``key`` with each ``{field}`` replaced, now and on every :meth:`retranslate`."""
         self.show_rendered(lambda: _fill(language_wrapper.translate(key, key), fields))
+
+    def show_joined(self, key: str, detail: object, sep: str = ": ") -> None:
+        """Show ``key`` translated, then ``sep`` and ``detail`` as it is: a label over data such as an error."""
+        text = str(detail)
+        self.show_rendered(lambda: language_wrapper.translate(key, key) + sep + text)
 
     def show_rendered(self, render: Callable[[], str]) -> None:
         """Show what ``render`` returns, calling it again on every :meth:`retranslate`."""
@@ -104,6 +130,14 @@ class KeyedText:
         """Show ``text`` as it is: data, or a text a later update replaces anyway."""
         self._render = None
         self._apply(text)
+
+    def clear(self) -> None:
+        """Show nothing and forget the key."""
+        self.show_plain("")
+
+    def forget(self) -> None:
+        """Leave the widget as it is and stop re-rendering: something else (a picture, say) replaced the text."""
+        self._render = None
 
     def retranslate(self) -> None:
         """Show the remembered key again in the active language."""

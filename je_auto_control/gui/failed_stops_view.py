@@ -14,6 +14,7 @@ from typing import Callable, Optional
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QAbstractItemView, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
+from je_auto_control.gui._i18n_helpers import KeyedText
 from je_auto_control.gui._stop_custody import StopCustody, stop_custody
 from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._tab_task import TabTask
@@ -45,6 +46,7 @@ class FailedStopsView(QWidget):
         self._hint.setWordWrap(True)
         set_role(self._hint, "hint")
         self._status = QLabel()
+        self._status_text = KeyedText(self._status)
         self._status.setWordWrap(True)
         self._table = QTableWidget(0, len(_COLUMNS))
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -72,6 +74,7 @@ class FailedStopsView(QWidget):
         self._title.setText(_t("failed_stops_title"))
         self._hint.setText(_t("failed_stops_hint"))
         self._table.setHorizontalHeaderLabels([_t(key) for key in _COLUMNS])
+        self._status_text.retranslate()
         self.refresh()
 
     def refresh(self) -> None:
@@ -93,29 +96,29 @@ class FailedStopsView(QWidget):
     def retry_all(self) -> None:
         """Run every held stop again on a worker; a second click while one round runs is refused."""
         if not self._custody.snapshot():
-            self._status.setText(_t("failed_stops_nothing"))
+            self._status_text.show("failed_stops_nothing")
             return
         if self._retries.start(self._custody.retry_all):
-            self._status.setText(_t("failed_stops_retrying"))
+            self._status_text.show("failed_stops_retrying")
         else:
-            self._status.setText(_t("task_busy"))
+            self._status_text.show("task_busy")
 
     def forget_selected(self) -> None:
         """Let go of the selected held stop without running it."""
         item = self._table.item(self._table.currentRow(), 0) if self._table.currentRow() >= 0 else None
         stop_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
         if isinstance(stop_id, int) and self._custody.forget(stop_id):
-            self._status.setText(_t("failed_stops_forgotten"))
+            self._status_text.show("failed_stops_forgotten")
         else:
-            self._status.setText(_t("failed_stops_select_first"))
+            self._status_text.show("failed_stops_select_first")
 
     def _show_retried(self, outcome: object) -> None:
         released, failing = outcome if isinstance(outcome, tuple) else (0, 0)
-        self._status.setText(_t("failed_stops_result").format(released=released, failing=failing))
+        self._status_text.show("failed_stops_result", released=released, failing=failing)
         self.refresh()
 
     def _show_retry_error(self, error: object) -> None:
-        self._status.setText(f"{type(error).__name__}: {error}")
+        self._status_text.show_plain(f"{type(error).__name__}: {error}")
         self.refresh()
 
 

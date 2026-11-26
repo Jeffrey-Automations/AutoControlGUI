@@ -56,6 +56,7 @@ class DeviceMatrixTab(TranslatableMixin, QWidget):
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setStretchLastSection(True)
         self._summary = QLabel()
+        self._summary_text = self._keyed(self._summary)
         self._task: Optional[TaskHandle] = None     # one run at a time
         self._apply_headers()
         self._build_layout()
@@ -104,7 +105,7 @@ class DeviceMatrixTab(TranslatableMixin, QWidget):
             self._show_error(error)
             return
         max_parallel = self._parallel.value()
-        self._summary.setText(_t("dm_running"))
+        self._summary_text.show("dm_running")
         # run_on_devices takes neither a timeout nor a cancel signal, so a
         # cancelled run finishes on its own and its report is dropped.
         self._task = task_controller().submit(
@@ -118,7 +119,7 @@ class DeviceMatrixTab(TranslatableMixin, QWidget):
         self._task = None
 
     def _show_error(self, error: object) -> None:
-        self._summary.setText(_t("dm_error").replace("{error}", str(error)))
+        self._summary_text.show("dm_error", error=error)
 
     def _render(self, report: dict[str, Any]) -> None:
         results = report["results"]
@@ -131,9 +132,4 @@ class DeviceMatrixTab(TranslatableMixin, QWidget):
                 item = QTableWidgetItem(str(text))
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(row, col, item)
-        self._summary.setText(
-            _t("dm_summary")
-            .replace("{passed}", str(report["passed"]))
-            .replace("{failed}", str(report["failed"]))
-            .replace("{total}", str(report["total"])),
-        )
+        self._summary_text.show("dm_summary", passed=report["passed"], failed=report["failed"], total=report["total"])

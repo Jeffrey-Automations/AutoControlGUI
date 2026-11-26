@@ -8,6 +8,7 @@ import json
 
 from PySide6 import QtWidgets
 
+from je_auto_control.gui._i18n_helpers import KeyedText
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.task_controller import TaskController, TaskOutcome
@@ -58,6 +59,7 @@ class AgentTransferView(QtWidgets.QWidget):
         self._notice.setWordWrap(True)
         set_role(self._notice, 'hint')
         self._status = QtWidgets.QLabel()
+        self._status_text = KeyedText(self._status)
         self._status.setWordWrap(True)
         set_role(self._status, 'hint')
         self.setProperty('role', 'bare')
@@ -81,13 +83,14 @@ class AgentTransferView(QtWidgets.QWidget):
         for index in range(self._operation.count()):
             self._operation.setItemText(index, _translate('agent_transfer_op_' + self._operation.itemData(index)))
         self._notice.setText(_translate('agent_transfer_notice'))
+        self._status_text.retranslate()
 
     def invalidate(self, *_args: object) -> None:
         """Reject late replies even when a changed selection is subsequently restored."""
         self._state.generation += 1
         self._state.review = None
         self._result.clear()
-        self._status.clear()
+        self._status_text.clear()
 
     def detach(self) -> None:
         """Abandon GUI delivery; the service retains ownership of already accepted durable work."""
@@ -114,14 +117,14 @@ class AgentTransferView(QtWidgets.QWidget):
             if operation.startswith('create_') and (not isinstance(note, str) or not note.strip()):
                 raise ValueError(_translate('agent_transfer_note_required'))
         except (ValueError, TypeError) as error:
-            self._status.setText(str(error))
+            self._status_text.show_plain(str(error))
             return
         if self._state.handle is not None and self._state.handle.outcome is None:
             return
         self._state.submitted = self._state.generation
         self._state.review = None
         self._result.clear()
-        self._status.clear()
+        self._status_text.clear()
         self._state.handle = self._controller.submit(partial(_request, operation, request), owner=self)
         self._state.handle.finished.connect(self._completed)
 
@@ -130,7 +133,7 @@ class AgentTransferView(QtWidgets.QWidget):
                 or self._state.submitted != self._state.generation):
             return
         if outcome.status != 'ok':
-            self._status.setText(outcome.error or outcome.status)
+            self._status_text.show_plain(outcome.error or outcome.status)
             return
         self._result.setPlainText(json.dumps(outcome.value, ensure_ascii=False, indent=2))
         self._remember_review(outcome.value)
@@ -144,7 +147,7 @@ class AgentTransferView(QtWidgets.QWidget):
     def prepare_approval(self) -> None:
         """Prepare an empty-note create request only from this unchanged view's actual review response."""
         if self._state.closed or self._state.review is None:
-            self._status.setText(_translate('agent_transfer_review_required'))
+            self._status_text.show('agent_transfer_review_required')
             return
         operation, original, reviewed = self._state.review
         request = {'review': reviewed['review'], 'idempotency_key': original.get('idempotency_key', ''), 'note': ''}

@@ -69,6 +69,7 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
         self._threshold.setSingleStep(0.05)
         self._threshold.setValue(0.9)
         self._original, self._replacement = QLabel(), QLabel()
+        self._thumb_texts = (self._keyed(self._original), self._keyed(self._replacement))    # "Loading" until decoded
         self._details = QPlainTextEdit()
         self._details.setReadOnly(True)
         self._status = QLabel()
@@ -232,20 +233,21 @@ class TemplateCandidatePanel(TranslatableMixin, QWidget):
         finally:
             self._updating = False
         self._clear_thumbnails()
-        for label in (self._original, self._replacement):
-            label.setText(language_wrapper.translate("gui_op_loading", "Loading…"))
+        for text in self._thumb_texts:
+            text.show("gui_op_loading")
         self._decoder.submit((preview.original_png, preview.candidate_png), self._thumbnails)
 
     def _thumbnails_decoded(self, shown: int, images: tuple[QImage, QImage]) -> None:
         if shown != self._thumbnails:
             return                          # cleared or replaced while it was decoded
-        for label, image in zip((self._original, self._replacement), images):
+        for label, text, image in zip((self._original, self._replacement), self._thumb_texts, images):
+            text.forget()
             label.setPixmap(QPixmap.fromImage(image))
 
     def _clear_thumbnails(self) -> None:
         self._thumbnails += 1
-        self._original.clear()
-        self._replacement.clear()
+        for text in self._thumb_texts:
+            text.clear()
 
     def _task_failed(self, error: object) -> None:
         self._failed(str(error))

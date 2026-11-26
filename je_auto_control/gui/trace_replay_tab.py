@@ -76,6 +76,7 @@ class TraceReplayTab(TranslatableMixin, QWidget):
         self._slider.setMaximum(0)
         self._slider.valueChanged.connect(self._on_slider_changed)
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._actions_table = QTableWidget(0, len(_ACTION_COLUMNS))
         self._opening = TabTask(self)                  # the manifest and the action log
         self._opening.result.connect(self._install)
@@ -150,13 +151,13 @@ class TraceReplayTab(TranslatableMixin, QWidget):
         if not directory:
             return
         if not self._opening.start(functools.partial(_open_controller, directory)):
-            self._status.setText(_t("task_busy"))
+            self._status_text.show("task_busy")
             return
-        self._status.setText(_t("task_running"))
+        self._status_text.show("task_running")
 
     def _on_open_failed(self, error: object) -> None:
         # A truncated manifest.json used to escape the slot as JSONDecodeError.
-        self._status.setText("")
+        self._status_text.clear()
         QMessageBox.warning(self, _t("trace_open_btn"), str(error))
 
     def _on_first(self) -> None:
@@ -190,12 +191,8 @@ class TraceReplayTab(TranslatableMixin, QWidget):
         self._slider.blockSignals(True)
         self._slider.setValue(state.step)
         self._slider.blockSignals(False)
-        self._status.setText(
-            _t("trace_status")
-            .replace("{step}", str(state.step + 1))
-            .replace("{total}", str(max(state.total_steps, 1)))
-            .replace("{seconds}", f"{state.relative_time_s:.2f}"),
-        )
+        self._status_text.show("trace_status", step=state.step + 1, total=max(state.total_steps, 1),
+                               seconds=f"{state.relative_time_s:.2f}")
         self._render_frame(state)
         self._render_actions(state)
 

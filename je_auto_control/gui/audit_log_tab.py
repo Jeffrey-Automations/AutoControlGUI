@@ -110,6 +110,7 @@ class AuditLogTab(TranslatableMixin, QWidget):
         )
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._verify_status = QLabel()
+        self._verify_text = self._keyed(self._verify_status)
         self._refusal = RefusalLabel()
         self._runs = TabTask(self)          # one log query, verification or clear at a time
         self._runs.result.connect(self._on_result)
@@ -159,7 +160,7 @@ class AuditLogTab(TranslatableMixin, QWidget):
         if not self._refusal.allows(command):
             return False
         if not self._runs.start(work, tag=tag):
-            self._verify_status.setText(_t("task_busy"))
+            self._verify_text.show("task_busy")
             return False
         return True
 
@@ -176,11 +177,11 @@ class AuditLogTab(TranslatableMixin, QWidget):
         elif tag == "verify":
             self._show_verified(outcome)
         else:
-            self._verify_status.setText(_t("audit_clear_done").format(count=outcome))
+            self._verify_text.show("audit_clear_done", count=outcome)
             self._refresh_after = True
 
     def _on_failed(self, error: object) -> None:
-        self._verify_status.setText(str(error))
+        self._verify_text.show_plain(str(error))
 
     def _on_finished(self) -> None:
         if self._refresh_after:
@@ -217,19 +218,13 @@ class AuditLogTab(TranslatableMixin, QWidget):
 
     def _verify(self) -> None:
         if self._start("AC_audit_log_verify", "verify", _verify_work):
-            self._verify_status.setText(_t("task_running"))
+            self._verify_text.show("task_running")
 
     def _show_verified(self, result: Any) -> None:
         if result.ok:
-            self._verify_status.setText(
-                _t("audit_verify_ok").format(total=result.total_rows)
-            )
+            self._verify_text.show("audit_verify_ok", total=result.total_rows)
         else:
-            self._verify_status.setText(
-                _t("audit_verify_broken").format(
-                    row_id=result.broken_at_id, total=result.total_rows,
-                )
-            )
+            self._verify_text.show("audit_verify_broken", row_id=result.broken_at_id, total=result.total_rows)
 
     def _clear(self) -> None:
         if not self._refusal.allows("AC_audit_log_clear"):

@@ -56,6 +56,7 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         self._inspector = QTextEdit()
         self._inspector.setReadOnly(True)
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._scene.node_selected.connect(self._on_node_selected)
         self._files = TabTask(self)         # reading or writing the action file
         self._files.result.connect(self._on_file_done)
@@ -108,9 +109,7 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         self._steps = list(steps)
         self._file_extras = None
         layout = self._scene.load(self._steps)
-        self._status.setText(
-            _t("flow_loaded").replace("{count}", str(len(layout.nodes))),
-        )
+        self._status_text.show("flow_loaded", count=len(layout.nodes))
 
     def steps(self) -> List[Step]:
         return list(self._steps)
@@ -128,7 +127,7 @@ class FlowEditorTab(TranslatableMixin, QWidget):
 
     def _on_save(self) -> None:
         if not self._steps:
-            self._status.setText(_t("flow_empty"))
+            self._status_text.show("flow_empty")
             return
         path, _selected = QFileDialog.getSaveFileName(
             self, _t("flow_save_btn"), "", "JSON (*.json)",
@@ -140,9 +139,9 @@ class FlowEditorTab(TranslatableMixin, QWidget):
 
     def _start_file(self, work: Callable[[], Any], tag: str) -> None:
         if not self._files.start(work, tag=tag):
-            self._status.setText(_t("task_busy"))
+            self._status_text.show("task_busy")
             return
-        self._status.setText(_t("task_running"))
+        self._status_text.show("task_running")
 
     def _on_file_done(self, result: Any) -> None:
         if self._files.tag == "open":
@@ -150,10 +149,10 @@ class FlowEditorTab(TranslatableMixin, QWidget):
             self.load_steps(steps)
             self._file_extras = extras
         else:
-            self._status.setText(_t("flow_saved").replace("{path}", str(result)))
+            self._status_text.show("flow_saved", path=result)
 
     def _on_file_failed(self, error: object) -> None:
-        self._status.setText("")
+        self._status_text.clear()
         key = "flow_open_btn" if self._files.tag == "open" else "flow_save_btn"
         QMessageBox.warning(self, _t(key), str(error))
 

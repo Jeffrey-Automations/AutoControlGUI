@@ -89,6 +89,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._polls.error.connect(self._apply_poll_failure)
         self._refusal = RefusalLabel()
         self._broadcast_status = QLabel()
+        self._broadcast_text = self._keyed(self._broadcast_status)
         self._broadcast_status.setWordWrap(True)
         set_role(self._broadcast_status, "hint")
         self._broadcasts = TabTask(self)       # one broadcast at a time
@@ -204,12 +205,12 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
 
     def _start_edit(self, work: Callable[[], Any], tag: str) -> None:
         if not self._edits.start(work, tag=tag):
-            self._broadcast_status.setText(_t("task_busy"))
+            self._broadcast_text.show("task_busy")
             return
-        self._broadcast_status.setText(_t("task_running"))
+        self._broadcast_text.show("task_running")
 
     def _on_hosts_edited(self, _outcome: object) -> None:
-        self._broadcast_status.setText("")
+        self._broadcast_text.clear()
         if self._edits.tag == "add":
             self._label_input.clear()
             self._url_input.clear()
@@ -217,7 +218,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._refresh_table()
 
     def _on_hosts_edit_failed(self, error: object) -> None:
-        self._broadcast_status.setText("")
+        self._broadcast_text.clear()
         title = _t("admin_add") if self._edits.tag == "add" else _t("admin_remove")
         QMessageBox.warning(self, title, str(error))
         self._refresh_table()
@@ -248,17 +249,17 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
                                  actions=actions,
                                  raise_on_error=True, stop_event=stop)
         if not self._broadcasts.start(work):
-            self._broadcast_status.setText(_t("task_busy"))
+            self._broadcast_text.show("task_busy")
             return
         self._broadcast_stop = stop
-        self._broadcast_status.setText(_t("admin_broadcast_running"))
+        self._broadcast_text.show("admin_broadcast_running")
 
     def _on_broadcast_stop(self) -> None:
         """Skip the hosts not sent to yet; the rows of every host still arrive."""
         if self._broadcast_stop is None or not self._broadcasts.running:
             return
         self._broadcast_stop.set()
-        self._broadcast_status.setText(_t("admin_broadcast_stopping"))
+        self._broadcast_text.show("admin_broadcast_stopping")
 
     def _show_broadcast(self, results: List[Dict[str, Any]]) -> None:
         self._broadcast_stop = None
@@ -266,13 +267,12 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
             json.dumps(results, indent=2, ensure_ascii=False, default=str),
         )
         sent = sum(1 for row in results if row.get("sent"))
-        self._broadcast_status.setText(_t("admin_broadcast_summary").format(
-            sent=sent, total=len(results), skipped=len(results) - sent))
+        self._broadcast_text.show("admin_broadcast_summary", sent=sent, total=len(results), skipped=len(results) - sent)
 
     def _show_broadcast_error(self, error: object) -> None:
         self._broadcast_stop = None
         self._broadcast_output.setPlainText(str(error))
-        self._broadcast_status.setText("")
+        self._broadcast_text.clear()
 
     def _apply_poll_result(self, statuses: List[HostStatus]) -> None:
         self._refresh_table(statuses=statuses)
@@ -352,7 +352,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         refused = refusal("AC_admin_list_hosts")
         if refused is not None:
             self._table.setRowCount(0)
-            self._broadcast_status.setText(refused)
+            self._broadcast_text.show_plain(refused)
             return
         hosts = self._client.list_hosts()
         status_by_label = {s.label: s for s in (statuses or [])}

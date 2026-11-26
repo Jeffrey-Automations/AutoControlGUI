@@ -136,8 +136,10 @@ def test_seeding_variables_is_all_or_nothing(monkeypatch):
         scope.update_many({"a": 1, "": 2})
     assert "a" not in scope
     from je_auto_control.gui import variables_tab as tab
+    from je_auto_control.gui._i18n_helpers import KeyedText
+    status = _Text()
     stub = types.SimpleNamespace(_seed_text=types.SimpleNamespace(toPlainText=lambda: '{"b": 1, "": 2}'),
-                                 _status=_Text(), _refresh=lambda: None)
+                                 _status=status, _status_text=KeyedText(status), _refresh=lambda: None)
     tab.VariablesTab._on_seed_json(stub)
     assert stub._status.value
 

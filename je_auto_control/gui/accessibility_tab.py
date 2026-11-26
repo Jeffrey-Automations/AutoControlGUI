@@ -79,6 +79,7 @@ class AccessibilityTab(TranslatableMixin, QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setStretchLastSection(True)
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._task = TabTask(self)          # one command at a time, off the GUI thread
         self._task.result.connect(self._on_result)
         self._task.error.connect(self._on_error)
@@ -95,14 +96,11 @@ class AccessibilityTab(TranslatableMixin, QWidget):
     def _start(self, tag: str, work: Callable[[], Any]) -> None:
         """Run ``work`` off the GUI thread as the command ``tag``; say so, or that one is still running."""
         self._task.start(work, tag=tag)     # False while busy: the status below is true either way
-        self._status.setText(_t("task_running"))
+        self._status_text.show("task_running")
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
         self._apply_table_headers()
-        self._app_filter.setPlaceholderText(_t("a11y_app_placeholder"))
-        self._window_filter.setPlaceholderText(_t("a11y_window_placeholder"))
-        self._name_filter.setPlaceholderText(_t("a11y_name_placeholder"))
 
     def _apply_table_headers(self) -> None:
         self._table.setHorizontalHeaderLabels([
@@ -116,9 +114,9 @@ class AccessibilityTab(TranslatableMixin, QWidget):
         # only the filter inputs, the element table, and the status line.
         root = QVBoxLayout(self)
         root.setSpacing(12)
-        self._app_filter.setPlaceholderText(_t("a11y_app_placeholder"))
-        self._window_filter.setPlaceholderText(_t("a11y_window_placeholder"))
-        self._name_filter.setPlaceholderText(_t("a11y_name_placeholder"))
+        for field, key in ((self._app_filter, "a11y_app_placeholder"), (self._window_filter, "a11y_window_placeholder"),
+                           (self._name_filter, "a11y_name_placeholder")):
+            self._tr(field, key, "setPlaceholderText")
         filters = flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
             ("a11y_app_label", self._app_filter), ("a11y_window_label", self._window_filter),
             ("a11y_name_label", self._name_filter))))
@@ -150,19 +148,22 @@ class AccessibilityTab(TranslatableMixin, QWidget):
         """GUI thread: the command ``self._task.tag`` answered."""
         tag = self._task.tag
         if tag == _CLICK:
-            self._status.setText("" if value else _t("a11y_click_not_found"))
+            if value:
+                self._status_text.clear()
+            else:
+                self._status_text.show("a11y_click_not_found")
             return
         elements = list(value) if isinstance(value, list) else []
         self._populate(elements)
         if tag == _FOCUSED and not elements:
-            self._status.setText(_t("a11y_no_focus"))
+            self._status_text.show("a11y_no_focus")
             return
-        self._status.setText(_t("a11y_count_label").replace("{n}", str(len(elements))))
+        self._status_text.show("a11y_count_label", n=len(elements))
 
     def _on_error(self, error: object) -> None:
         """GUI thread: the command failed -- typically no accessibility backend on this machine."""
         tag = self._task.tag
-        self._status.setText(str(error))
+        self._status_text.show_plain(str(error))
         if tag == _LIST:
             self._table.setRowCount(0)
         elif tag == _CLICK and isinstance(error, AccessibilityNotAvailableError):
@@ -185,7 +186,7 @@ class AccessibilityTab(TranslatableMixin, QWidget):
     def _click_selected(self) -> None:
         row = self._table.currentRow()
         if row < 0:
-            self._status.setText(_t("a11y_no_selection"))
+            self._status_text.show("a11y_no_selection")
             return
         app = filled_item(self._table, row, 0).text() or None
         role = filled_item(self._table, row, 1).text() or None

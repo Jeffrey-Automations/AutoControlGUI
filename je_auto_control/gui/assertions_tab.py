@@ -47,10 +47,11 @@ class AssertionsTab(TranslatableMixin, QWidget):
         self._xy.setPlaceholderText("100, 200")
         self._rgb = QLineEdit()
         self._rgb.setPlaceholderText("255, 255, 255")
-        self._expect = QCheckBox(_t("assert_expect_present"))
+        self._expect = self._tr(QCheckBox(), "assert_expect_present")
         self._expect.setChecked(True)
-        self._regex = QCheckBox(_t("assert_regex"))
+        self._regex = self._tr(QCheckBox(), "assert_regex")
         self._result = QLabel()
+        self._result_text = self._keyed(self._result)
         self._result.setWordWrap(True)
         self._runs = TabTask(self)
         self._runs.result.connect(self._show_result)
@@ -122,14 +123,14 @@ class AssertionsTab(TranslatableMixin, QWidget):
         # OCR, a template search or a VLM call: off the GUI thread, one at a time.
         if not self._runs.start(functools.partial(_run_assertion, self._request())):
             return
-        self._result.setText(_t("task_running"))
+        self._result_text.show("task_running")
 
     def _show_error(self, error: object) -> None:
-        self._result.setText(f"{_t('assert_failed')}: {error}")
+        self._result_text.show_joined("assert_failed", error)
 
     def _show_result(self, result: Dict[str, Any]) -> None:
-        label = _t("assert_passed") if result["passed"] else _t("assert_failed")
-        self._result.setText(f"{label} — {result['message']}")
+        key = "assert_passed" if result["passed"] else "assert_failed"
+        self._result_text.show_joined(key, result["message"], " — ")
 
 
 def _run_assertion(request: Dict[str, Any]) -> Dict[str, Any]:

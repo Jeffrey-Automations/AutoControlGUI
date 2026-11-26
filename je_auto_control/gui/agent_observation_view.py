@@ -14,6 +14,7 @@ from PySide6.QtGui import QImage, QMouseEvent, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QLabel, QScrollArea, QTableWidget,
                                QTableWidgetItem, QVBoxLayout, QWidget)
 
+from je_auto_control.gui._i18n_helpers import KeyedText
 from je_auto_control.gui._latest_decoder import LatestDecoder
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
@@ -65,6 +66,7 @@ class AgentObservationView(QWidget):
         self._image = _Image()
         self._image.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self._image.picked.connect(self.picked.emit)
+        self._loading = KeyedText(self._image)     # "Loading" until the picture replaces it
         self.setProperty("role", "bare")
         self._notice = QLabel()
         self._notice.setWordWrap(True)
@@ -81,6 +83,7 @@ class AgentObservationView(QWidget):
 
     def retranslate(self) -> None:
         """Translate columns without obtaining a new observation."""
+        self._loading.retranslate()
         self._elements.setHorizontalHeaderLabels([language_wrapper.translate("agent_element_" + name, name)
                                                    for name in ("index", "name", "role", "bounds")])
 
@@ -90,6 +93,7 @@ class AgentObservationView(QWidget):
         self._shown += 1
         self._indices.clear()
         self._elements.setRowCount(0)
+        self._loading.forget()
         self._image.setPixmap(QPixmap())
         self._image.setFixedSize(1, 1)
         self._notice.clear()
@@ -127,7 +131,7 @@ class AgentObservationView(QWidget):
         self._decoder.stop()
 
     def _present_image(self, image: dict[str, Any]) -> None:
-        self._image.setText(language_wrapper.translate("gui_op_loading", "Loading…"))
+        self._loading.show("gui_op_loading")
         self._image.setFixedSize(self._image.sizeHint())
         self._decoder.submit(image, self._shown)
 
@@ -136,13 +140,14 @@ class AgentObservationView(QWidget):
             return
         pixmap = QPixmap.fromImage(image)
         pixmap.setDevicePixelRatio(1.0)
+        self._loading.forget()
         self._image.setPixmap(pixmap)
         self._image.setFixedSize(pixmap.size())
 
     def _image_failed(self, shown: int, error: object) -> None:
         if shown != self._shown:
             return
-        self._image.clear()
+        self._loading.clear()
         self._image.setFixedSize(1, 1)
         if isinstance(error, AgentTaskError):
             self._notice.setText(str(error))

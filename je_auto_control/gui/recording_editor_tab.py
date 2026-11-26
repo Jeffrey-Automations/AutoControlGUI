@@ -58,6 +58,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         self._preview = QTextEdit()
         self._preview.setReadOnly(True)
         self._status = QLabel("")
+        self._status_text = self._keyed(self._status)
         self._done_text = ""                # what the running save or export shows when it returns
         self._trim_start = QLineEdit("0")
         self._trim_end = QLineEdit("")
@@ -209,21 +210,21 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
 
     def _start_file(self, work: Callable[[], Any], tag: str, done_text: str = "") -> None:
         if not self._files.start(work, tag=tag):
-            self._status.setText(_t("task_busy"))
+            self._status_text.show("task_busy")
             return
         self._done_text = done_text
-        self._status.setText(_t("task_running"))
+        self._status_text.show("task_running")
 
     def _on_file_done(self, result: Any) -> None:
         if self._files.tag != "load":
-            self._status.setText(self._done_text)
+            self._status_text.show_plain(self._done_text)
             return
         self._actions = result
         self._undo_stack.clear()  # a freshly loaded recording starts clean
         self._refresh()
 
     def _on_file_failed(self, error: object) -> None:
-        self._status.setText("")
+        self._status_text.clear()
         QMessageBox.warning(self, "Error", str(error))
 
     def _refresh(self) -> None:
@@ -231,7 +232,7 @@ class RecordingEditorTab(TranslatableMixin, QWidget):
         for idx, action in enumerate(self._actions):
             self._list.addItem(f"{idx}: {action[0]}")
         self._preview.setPlainText(json.dumps(self._actions, indent=2, ensure_ascii=False))
-        self._status.setText(f"{len(self._actions)} actions")
+        self._status_text.show_plain(f"{len(self._actions)} actions")
 
     def _apply_trim(self) -> None:
         try:

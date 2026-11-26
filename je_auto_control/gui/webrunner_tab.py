@@ -46,6 +46,7 @@ class WebRunnerTab(TranslatableMixin, QWidget):
         super().__init__(parent)
         self._tr_init()
         self._available_label = QLabel()
+        self._available_text = self._keyed(self._available_label)
         self._url_input = QLineEdit()
         self._browser_input = QComboBox()
         self._browser_input.addItems(["chrome", "firefox", "edge", "safari"])
@@ -63,8 +64,7 @@ class WebRunnerTab(TranslatableMixin, QWidget):
         self.refresh_availability()
 
     def retranslate(self) -> None:
-        TranslatableMixin.retranslate(self)
-        self.refresh_availability()
+        TranslatableMixin.retranslate(self)     # the availability line too, without checking again
 
     # --- layout ----------------------------------------------------
 
@@ -122,7 +122,7 @@ class WebRunnerTab(TranslatableMixin, QWidget):
     def refresh_availability(self) -> None:
         available = is_webrunner_available()
         key = "web_available" if available else "web_unavailable"
-        self._available_label.setText(_t(key))
+        self._available_text.show(key)
         self._available_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse,
         )

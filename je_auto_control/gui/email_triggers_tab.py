@@ -66,6 +66,7 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
         self._mark_seen_check = self._tr(QCheckBox(), "eml_mark_seen")
         self._mark_seen_check.setChecked(True)
         self._status_label = QLabel()
+        self._status_text = self._keyed(self._status_label)
         self._watcher_op = SlowOp(self)
         self._table = QTableWidget(0, 7)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -233,10 +234,10 @@ class EmailTriggersTab(TranslatableMixin, QWidget):
 
     def _refresh(self) -> None:
         if self._watcher_op.busy:
-            self._status_label.setText(_t("gui_op_stopping"))
+            self._status_text.show("gui_op_stopping")
         else:
             running = default_email_trigger_watcher.is_running
-            self._status_label.setText(_t("eml_running") if running else _t("eml_stopped"))
+            self._status_text.show("eml_running" if running else "eml_stopped")
         with kept_selection(self._table):
             self._fill_table()
 
