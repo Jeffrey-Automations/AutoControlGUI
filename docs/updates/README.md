@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-35 | 2026-11-26 | Require authentication on the TCP socket server | #done #security #decide #socket | [2026-11-c](2026-11-c.md) |
 | U-20261126-34 | 2026-11-26 | Let the read-only worker verify desktop tasks | #done #agent #decide | [2026-11-c](2026-11-c.md) |
 | U-20261126-33 | 2026-11-26 | Translate table cells and the GUI strings still written in English | #done #gui #i18n | [2026-11-c](2026-11-c.md) |
 | U-20261126-32 | 2026-11-26 | Make state texts follow a language switch | #done #gui #i18n | [2026-11-c](2026-11-c.md) |
