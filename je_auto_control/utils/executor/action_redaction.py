@@ -70,17 +70,7 @@ def redact_actions(value: Any) -> Any:
 
     Anything that is not an action keeps its shape; nothing is mutated.
     """
-    if isinstance(value, dict):
-        # By name at every depth: only top-level arguments were masked, so
-        # {"smtp": {"password": ...}} and {"headers": {"Authorization": ...}}
-        # reached the log and the run record.
-        return {key: _MASK if str(key).lower() in SENSITIVE_ARGUMENT_NAMES else redact_actions(item)
-                for key, item in value.items()}
-    if not isinstance(value, list):
-        return value
-    if value and isinstance(value[0], str) and value[0].startswith("AC_"):
-        return [value[0], *(_redact_argument(value[0], argument) for argument in value[1:])]
-    return [redact_actions(item) for item in value]
+    return _redact_actions(value, (), None)
 
 
 #: Result fields with a secret-looking name that are identifiers: command -> field names.
@@ -98,6 +88,8 @@ _NO_FIELDS: FrozenSet[str] = frozenset()
 _RECORD_COMMAND = re.compile(r"^(?:execute|dry-run): \['(AC_\w+)'")
 
 FieldPath = Tuple[Union[str, int], ...]
+#: Where a walk notes what it masked, when it is asked to.
+_Found = Optional[List["MaskedField"]]
 
 
 @dataclass(frozen=True)
@@ -125,8 +117,9 @@ def redact_result(command: Optional[str], result: Any, *, show_identifiers: bool
     nothing to hide and is kept. An execution record nested in the result is
     masked per command, and an action list in it as :func:`redact_actions`
     masks one. ``show_identifiers`` keeps the fields :data:`RESULT_IDENTIFIERS`
-    lists for the command readable. Each value masked is appended to ``found``
-    when one is given. ``result`` is not changed.
+    lists for the command readable. Each value masked -- an action's secret
+    argument as well as a field, unless it is empty -- is appended to
+    ``found`` when one is given. ``result`` is not changed.
     """
     visible = RESULT_IDENTIFIERS.get(command or "", _NO_FIELDS) if show_identifiers else _NO_FIELDS
     return _redact_answer(command, result, visible, (), _Walk(show_identifiers, found))
@@ -168,7 +161,8 @@ def _redact_value(value: Any, visible: FrozenSet[str], path: FieldPath, walk: _W
     if not isinstance(value, (list, tuple)):
         return value
     if isinstance(value, list) and value and isinstance(value[0], str) and value[0].startswith("AC_"):
-        return redact_actions(value)  # an action: its arguments, which are not result fields
+        # An action: its arguments are masked by the argument rule, and noted like any field.
+        return _redact_actions(value, path, walk.found)
     return [_redact_value(item, _NO_FIELDS, path + (index,), walk)
             for index, item in enumerate(value)]
 
@@ -188,9 +182,30 @@ def _hide(item: Any, path: FieldPath, walk: _Walk) -> Any:
     """``***`` for a secret field, noted in ``walk.found``; an empty one has nothing to hide."""
     if item is None or (isinstance(item, str) and not item):
         return item
-    if walk.found is not None:
-        walk.found.append(MaskedField(path, item))
+    return _masked(item, path, walk.found)
+
+
+def _masked(item: Any, path: FieldPath, found: _Found) -> str:
+    """``***`` in place of ``item``, noted in ``found`` unless it is empty."""
+    if found is not None and item is not None and not (isinstance(item, str) and not item):
+        found.append(MaskedField(path, item))
     return _MASK
+
+
+def _redact_actions(value: Any, path: FieldPath, found: _Found) -> Any:
+    """:func:`redact_actions` of ``value``, found at ``path``, noting each masked argument in ``found``."""
+    if isinstance(value, dict):
+        # By name at every depth: only top-level arguments were masked, so
+        # {"smtp": {"password": ...}} and {"headers": {"Authorization": ...}}
+        # reached the log and the run record.
+        return {key: _masked(item, path + (key,), found) if str(key).lower() in SENSITIVE_ARGUMENT_NAMES
+                else _redact_actions(item, path + (key,), found) for key, item in value.items()}
+    if not isinstance(value, list):
+        return value
+    if value and isinstance(value[0], str) and value[0].startswith("AC_"):
+        return [value[0], *(_redact_argument(value[0], argument, path + (index,), found)
+                            for index, argument in enumerate(value[1:], start=1))]
+    return [_redact_actions(item, path + (index,), found) for index, item in enumerate(value)]
 
 
 def is_sensitive_argument(command: str, name: str) -> bool:
@@ -201,18 +216,19 @@ def is_sensitive_argument(command: str, name: str) -> bool:
         lowered == "url" and command in _URL_SECRET_COMMANDS)
 
 
-def _redact_argument(command: str, argument: Any) -> Any:
+def _redact_argument(command: str, argument: Any, path: FieldPath, found: _Found) -> Any:
     if command.startswith(_VAULT_COMMAND_PREFIX) or command in _ALL_SECRET_COMMANDS:
-        return _mask(argument)
+        return _mask(argument, path, found)
     if isinstance(argument, dict):
-        return {name: _MASK if is_sensitive_argument(command, name) else redact_actions(item)
-                for name, item in argument.items()}
+        return {name: _masked(item, path + (name,), found) if is_sensitive_argument(command, name)
+                else _redact_actions(item, path + (name,), found) for name, item in argument.items()}
     if isinstance(argument, list):
         # A positional list: the same rule, by the name of each position.
         names = positional_parameter_names(command)
-        return [_MASK if index < len(names) and is_sensitive_argument(command, names[index])
-                else redact_actions(item) for index, item in enumerate(argument)]
-    return redact_actions(argument)
+        return [_masked(item, path + (index,), found)
+                if index < len(names) and is_sensitive_argument(command, names[index])
+                else _redact_actions(item, path + (index,), found) for index, item in enumerate(argument)]
+    return _redact_actions(argument, path, found)
 
 
 def positional_parameter_names(command: str) -> Tuple[str, ...]:
@@ -244,9 +260,9 @@ def describe_action(action: Any) -> str:
     return str(redact_actions(action))
 
 
-def _mask(argument: Any) -> Any:
+def _mask(argument: Any, path: FieldPath, found: _Found) -> Any:
     if isinstance(argument, dict):
-        return dict.fromkeys(argument, _MASK)
+        return {name: _masked(item, path + (name,), found) for name, item in argument.items()}
     if isinstance(argument, list):
-        return [_MASK for _ in argument]
-    return _MASK
+        return [_masked(item, path + (index,), found) for index, item in enumerate(argument)]
+    return _masked(argument, path, found)

@@ -113,8 +113,11 @@ def test_a_record_nested_in_a_result_is_masked_per_command_and_an_action_as_an_a
     assert shown["execute: ['AC_approval_request', {'action': 'x'}]"] == {"token": "req-1"}
     assert shown["execute: ['AC_user_add', {'user_id': 'a'}]"]["token"] == "***"
     assert "hunter2" not in json.dumps(shown)
-    assert [field.value for field in masked_fields(
-        "AC_execute_action", result, show_identifiers=True)] == ["tok-1"]
+    # The action's arguments are masked by the argument rule, and listed with the fields.
+    assert [(field.path, field.value) for field in masked_fields(
+        "AC_execute_action", result, show_identifiers=True)] == [
+        (("execute: ['AC_user_add', {'user_id': 'a'}]", "token"), "tok-1"),
+        (("plan", 1, "name"), "db"), (("plan", 1, "value"), "hunter2")]
 
 
 def test_record_command_reads_the_command_of_a_record_key():
