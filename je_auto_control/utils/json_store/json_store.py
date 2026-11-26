@@ -7,6 +7,8 @@ load/flush logic. Pure standard library; imports no ``PySide6``.
 import copy
 import json
 import os
+import secrets
+import sys
 import tempfile
 import threading
 import time
@@ -183,30 +185,123 @@ _LOCK_STALE_S = 30.0
 def _file_lock(path: Path) -> Iterator[None]:
     """Hold ``<path>.lock`` for the duration; several processes may contend.
 
-    Created with ``O_CREAT | O_EXCL``, which is atomic on every platform. A
-    lock older than ``_LOCK_STALE_S`` was left by a process that died holding
-    it and is taken over; waiting longer than ``_LOCK_WAIT_S`` raises
-    ``TimeoutError``.
+    Created with ``O_CREAT | O_EXCL``, which is atomic on every platform, and
+    holding a random token that names its owner. A lock older than
+    ``_LOCK_STALE_S`` was left by a process that died holding it and is taken
+    over; waiting longer than ``_LOCK_WAIT_S`` raises ``TimeoutError``.
+
+    A lock file is only ever removed under :func:`_lock_guard`, after reading
+    it again: two waiters that both judged one lock stale used to both delete
+    "it" -- the second deleting the fresh lock the first had just created --
+    and a holder that overran the stale limit deleted its successor's lock on
+    release. Now a takeover removes only a lock that is still stale and still
+    holds the token it judged, and a release only a lock holding its own.
     """
     lock = path.with_name(path.name + ".lock")
     lock.parent.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + _LOCK_WAIT_S
-    while True:
-        try:
-            os.close(os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
-            break
-        # Windows reports a lock file that is being deleted as PermissionError.
-        except (FileExistsError, PermissionError):
-            if _lock_is_stale(lock):
-                lock.unlink(missing_ok=True)
+    token = secrets.token_hex(16)
+    while not _create_lock(lock, token):
+        if _lock_is_stale(lock):
+            judged = _lock_owner(lock)
+            if judged is not None:
+                _remove_lock(lock, judged, deadline, only_if_stale=True)
                 continue
-            if time.monotonic() > deadline:
-                raise TimeoutError(f"{lock} is held by another process") from None
-            time.sleep(0.01)
+        if time.monotonic() > deadline:
+            raise TimeoutError(f"{lock} is held by another process")
+        time.sleep(0.01)
     try:
         yield
     finally:
+        try:
+            _remove_lock(lock, token, time.monotonic() + _LOCK_WAIT_S)
+        except TimeoutError:
+            autocontrol_logger.warning("%s not released: its guard stayed busy; it will go stale", lock)
+
+
+def _create_lock(lock: Path, token: str) -> bool:
+    """Create ``lock`` holding ``token``; ``False`` when it already exists."""
+    try:
+        handle_fd = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    # Windows reports a lock file that is being deleted as PermissionError.
+    except (FileExistsError, PermissionError):
+        return False
+    try:
+        os.write(handle_fd, token.encode("ascii"))
+    except OSError:
+        os.close(handle_fd)
+        lock.unlink(missing_ok=True)  # it holds no token: nobody could release it
+        raise
+    os.close(handle_fd)
+    return True
+
+
+def _lock_owner(lock: Path) -> Optional[str]:
+    """The token in ``lock`` (``""`` when it holds none); ``None`` when it cannot be read."""
+    try:
+        return lock.read_text(encoding="ascii", errors="replace")
+    except OSError:
+        return None  # released (or being released) meanwhile; try again
+
+
+def _remove_lock(lock: Path, owner: str, deadline: float, *, only_if_stale: bool = False) -> None:
+    """Remove ``lock`` if it still holds ``owner`` (and, if asked, is still stale)."""
+    with _lock_guard(lock, deadline):
+        if _lock_owner(lock) != owner:
+            return
+        if only_if_stale and not _lock_is_stale(lock):
+            return
         lock.unlink(missing_ok=True)
+
+
+@contextmanager
+def _lock_guard(lock: Path, deadline: float) -> Iterator[None]:
+    """Serialise every removal of ``lock`` across processes.
+
+    An OS lock on the sidecar ``<lock>.guard``, which is never deleted: the
+    operating system drops it when its holder dies, so unlike the lock file
+    it cannot go stale. It is held only for one read and one unlink.
+    """
+    handle_fd = os.open(lock.with_name(lock.name + ".guard"), os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        while not _try_os_lock(handle_fd):
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"{lock}.guard is held by another process")
+            time.sleep(0.005)
+        try:
+            yield
+        finally:
+            _os_unlock(handle_fd)
+    finally:
+        os.close(handle_fd)
+
+
+if sys.platform == "win32":
+    import msvcrt
+
+    def _try_os_lock(handle_fd: int) -> bool:
+        os.lseek(handle_fd, 0, os.SEEK_SET)
+        try:
+            msvcrt.locking(handle_fd, msvcrt.LK_NBLCK, 1)
+        except OSError:  # held by another handle
+            return False
+        return True
+
+    def _os_unlock(handle_fd: int) -> None:
+        os.lseek(handle_fd, 0, os.SEEK_SET)
+        msvcrt.locking(handle_fd, msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+
+    def _try_os_lock(handle_fd: int) -> bool:
+        try:
+            fcntl.flock(handle_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:  # held by another open file description
+            return False
+        return True
+
+    def _os_unlock(handle_fd: int) -> None:
+        fcntl.flock(handle_fd, fcntl.LOCK_UN)
 
 
 def _lock_is_stale(lock: Path) -> bool:

@@ -83,6 +83,53 @@ def test_a_held_lock_times_out(tmp_path, monkeypatch):
         gate.request("deploy")
 
 
+def test_a_waiter_that_judged_a_lock_stale_leaves_the_lock_another_waiter_just_took(tmp_path, monkeypatch):
+    """Two waiters see one stale lock; the first takes it over, the second must not delete that."""
+    monkeypatch.setattr(json_store, "_LOCK_WAIT_S", 0.2)
+    target = tmp_path / "gate.json"
+    lock = tmp_path / "gate.json.lock"
+    lock.write_text("dead-owner", encoding="utf-8")
+    old = time.time() - 3600
+    os.utime(lock, (old, old))
+    real_is_stale = json_store._lock_is_stale
+    raced = []
+
+    def stale_then_taken_over(path):
+        verdict = real_is_stale(path)
+        if verdict and not raced:
+            # Between this waiter's verdict and its takeover, the other waiter
+            # removed the dead lock and created its own, fresh one.
+            path.unlink()
+            path.write_text("other-waiter", encoding="utf-8")
+            raced.append(True)
+        return verdict
+    monkeypatch.setattr(json_store, "_lock_is_stale", stale_then_taken_over)
+    with pytest.raises(TimeoutError):
+        with json_store._file_lock(target):
+            pass
+    assert lock.read_text(encoding="utf-8") == "other-waiter"
+
+
+def test_a_holder_whose_lock_was_taken_over_does_not_release_the_new_owner(tmp_path):
+    target = tmp_path / "gate.json"
+    lock = tmp_path / "gate.json.lock"
+    with json_store._file_lock(target):
+        # It held on past the stale limit; another process took the lock over.
+        lock.unlink()
+        lock.write_text("new-owner", encoding="utf-8")
+    assert lock.read_text(encoding="utf-8") == "new-owner"
+
+
+def test_the_lock_file_names_its_owner(tmp_path):
+    target = tmp_path / "gate.json"
+    with json_store._file_lock(target):
+        first = (tmp_path / "gate.json.lock").read_text(encoding="utf-8")
+    with json_store._file_lock(target):
+        second = (tmp_path / "gate.json.lock").read_text(encoding="utf-8")
+    assert first and second and first != second
+    assert not (tmp_path / "gate.json.lock").exists()
+
+
 def test_without_a_path_the_state_stays_in_memory():
     gate = ApprovalGate()
     token = gate.request("deploy", requester="maker")
