@@ -16,6 +16,9 @@ class _ChallengeHandler(http.server.BaseHTTPRequestHandler):
 
     server_version = "AutoControlACME/1.0"
     sys_version = ""
+    # Bound every read. This server faces the internet: without a timeout each
+    # connection that sends nothing held a thread for ever.
+    timeout = 30.0
 
     # ``tokens`` is injected by HttpChallengeServer via the server attr.
     def do_GET(self) -> None:  # noqa: N802 BaseHTTPRequestHandler protocol
