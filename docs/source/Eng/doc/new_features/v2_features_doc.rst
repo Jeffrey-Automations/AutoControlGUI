@@ -473,8 +473,8 @@ reply is ``run stopped.``. ``/stop`` asks the chat-started runs to stop;
 
 The Slack adapter (``SlackBot``) runs ``/run`` on a worker thread and keeps
 polling while it lasts, so **a** ``/stop`` **posted to the channel ends the
-bot's own run**: it is read at the next poll (``poll_interval_s``, 5 s by
-default, 1 s at least), answered ``stop requested: <run-id>``, and the run
+bot's own run**: it is read at the next poll, answered
+``stop requested: <run-id>``, and the run
 then answers in its own thread ``run stopped. (stopped from chat by <user>)``
 -- always in that order. The reply to ``/run`` therefore arrives when the
 script ends, not before the next message is read. One ``/run`` executes at a
@@ -490,6 +490,16 @@ returns whether none is left; ``bot.wait_idle(timeout)`` waits without
 stopping anything and ``bot.running_run_id`` names the run in progress. When
 the reply of a worker cannot be posted the failure is logged (the poll thread
 is not there to raise to) and the command is not run again.
+
+The bot polls every ``poll_interval_s`` (5 s by default, 1 s at least) when
+idle and every ``run_poll_interval_s`` (1 s by default; finite, above 0 and at
+most ``poll_interval_s``, else ``SlackError``) while a background command runs,
+so a ``/stop`` lands within about a second. The fast interval applies from the
+wait right after the run starts, also when the loop was already in an idle
+wait, and the idle one comes back once the run ends; ``stop()`` ends a wait at
+once. When Slack answers ``429`` with ``Retry-After``, no poll is made until
+that delay (at most an hour) has passed, whichever interval is in force; a
+``429`` without one falls back to the error back-off.
 
 The bot never replays the channel's history. With no ``last_seen_ts`` given
 and none saved, its first poll only records the newest message as its

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- `SlackBot` polls every `run_poll_interval_s` (new, 1 s by default; finite, > 0 and at most
+  `poll_interval_s`) while a `/run` is going, so a `/stop` lands within about a second; idle it keeps
+  `poll_interval_s` (5 s). A Slack `429` with `Retry-After` now holds every poll back until it passes.
+
 - A stop now also ends adb commands, the USB and Wayland capture tools, mobile device calls and
   find-element waits, `AC_wait_for_port`, `AC_send_email`, `AC_feature_match`, each agent model call,
   `AC_assert_audio` / `AC_assert_video` and admin poll / broadcast. A device session stopped mid-call is
