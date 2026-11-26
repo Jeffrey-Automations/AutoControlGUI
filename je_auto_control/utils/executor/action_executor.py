@@ -35,6 +35,7 @@ from je_auto_control.utils.executor.flags import as_bool as _as_bool
 from je_auto_control.utils.executor.adapter_args import finite_float as _finite, json_list as _json_list
 from je_auto_control.utils.executor.dispatch import dispatch_checkpoint
 from je_auto_control.utils.executor.containment import call_contained
+from je_auto_control.utils.executor.named_registry import NamedRegistry
 from je_auto_control.utils.agent_runtime.commands import COMMANDS as AGENT_TASK_COMMANDS
 from je_auto_control.utils.executor.flow_control import (
     BLOCK_COMMANDS, LoopBreak, LoopContinue, MacroDepthExceeded,
@@ -3990,12 +3991,12 @@ def _rate_limit(name: str, rate: float = 1.0, capacity: float = 1.0,
             "wait": round(bucket.time_until_available(float(n)), 4)}
 
 
-_BULKHEADS: Dict[str, Any] = {}
-_IDEMPOTENCY_STORES: Dict[str, Any] = {}
-_DEDUP_WINDOWS: Dict[str, Any] = {}
-_SEQUENCE_TRACKERS: Dict[str, Any] = {}
-_VERSIONED_STORES: Dict[str, Any] = {}
-_OUTBOXES: Dict[str, Any] = {}
+_BULKHEADS = NamedRegistry("bulkhead", "AC_bulkhead_run")
+_IDEMPOTENCY_STORES = NamedRegistry("idempotency store", "AC_idempotency_begin / _complete / _release")
+_DEDUP_WINDOWS = NamedRegistry("dedup window", "AC_dedup_check")
+_SEQUENCE_TRACKERS = NamedRegistry("sequence tracker", "AC_sequence_observe")
+_VERSIONED_STORES = NamedRegistry("versioned store", "AC_cas_put / AC_cas_get")
+_OUTBOXES = NamedRegistry("outbox", "AC_outbox_enqueue / AC_outbox_pending")
 
 
 def _outbox_enqueue(name: str, event: Any) -> Dict[str, Any]:
