@@ -80,3 +80,62 @@ def test_single_dispatch_of_a_loop_signal_is_a_framework_error(name):
     from je_auto_control.utils.executor.action_executor import Executor
     with pytest.raises(AutoControlActionException, match="outside a loop"):
         Executor().execute_one(name)
+
+
+# --- an agent payload is expanded once, by the runtime -----------------------
+
+_FETCHED = "${secrets.PRIVATE}"   # text a flow read from OCR, HTTP or a file
+
+
+def _payload_capture():
+    received = []
+
+    def submit(spec, idempotency_key=None):
+        received.append(spec)
+
+    def lookup(idempotency_key, spec=None):
+        received.append(spec)
+
+    def act(task_id, action):
+        received.append(action)
+
+    def manage(operation, request=None):
+        received.append(request)
+    return received, {"AC_agent_task_submit": submit, "AC_agent_task_lookup": lookup,
+                      "AC_agent_task_act": act, "AC_agent_dag": manage, "AC_agent_trigger": manage,
+                      "AC_agent_skill": manage, "AC_agent_task_recovery": manage}
+
+
+@pytest.mark.parametrize("command, arguments, payload", [
+    ("AC_agent_task_submit", "spec", {"actions": [{"tool": "AC_type_keyboard", "arguments": {"text": "${fetched}"}}],
+                                      "success_criteria": [{"kind": "file_exists", "path": "${event.key}.json"}]}),
+    ("AC_agent_task_lookup", "spec", {"actions": [{"tool": "AC_type_keyboard", "arguments": {"text": "${fetched}"}}]}),
+    ("AC_agent_task_act", "action", {"tool": "AC_type_keyboard", "arguments": {"text": "${fetched}"}}),
+    ("AC_agent_dag", "request", {"nodes": [{"spec": {"inputs": {"text": "${fetched}"}}}]}),
+    ("AC_agent_trigger", "request", {"spec": {"inputs": {"text": "${fetched}"}}}),
+    ("AC_agent_skill", "request", {"spec": {"inputs": {"text": "${fetched}"}}}),
+    ("AC_agent_task_recovery", "request", {"spec": {"inputs": {"text": "${fetched}"}}}),
+])
+def test_an_agent_payload_reaches_the_runtime_unexpanded(command, arguments, payload, monkeypatch):
+    """The runtime expands a task's placeholders against its own inputs, when each action runs.
+
+    Expanded at dispatch as well, a variable holding fetched text that
+    contained ``${secrets.NAME}`` was resolved on the second pass, and a
+    placeholder meant for the task's inputs (``${event.key}``) was refused
+    at dispatch as an unknown variable.
+    """
+    from je_auto_control.utils.executor.action_executor import Executor
+    from je_auto_control.utils.secrets import default_secret_manager
+    vault = []
+    monkeypatch.setattr(default_secret_manager, "get", lambda name: vault.append(name) or "private")
+    received, handlers = _payload_capture()
+    executor = Executor()
+    executor.event_dict = handlers
+    executor.variables.set("fetched", _FETCHED)
+    named = {"task_id": "t1", "operation": "register", "idempotency_key": "k1", arguments: payload}
+    signature = {"AC_agent_task_submit": ("spec",), "AC_agent_task_lookup": ("idempotency_key", "spec"),
+                 "AC_agent_task_act": ("task_id", "action")}.get(command, ("operation", "request"))
+    executor.execute_one(command, {name: named[name] for name in signature})
+    executor._execute_event([command, [named[name] for name in signature]])   # positional as well
+    assert received == [payload, payload]
+    assert vault == []

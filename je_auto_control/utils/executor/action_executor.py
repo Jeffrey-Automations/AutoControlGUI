@@ -7318,6 +7318,14 @@ class Executor:
         "AC_run_suite": frozenset({"spec"}),
         "AC_replay_trace": frozenset({"trace"}),
         "AC_run_dag": frozenset({"definition"}),
+        # The agent runtime expands a task's placeholders against the task's own
+        # inputs as each action runs; a template a trigger, skill, recovery or
+        # DAG submits later is expanded then too.
+        "AC_agent_task_submit": frozenset({"spec"}),
+        "AC_agent_task_lookup": frozenset({"spec"}),  # digested like the submitted spec
+        "AC_agent_task_act": frozenset({"action"}),
+        **{name: frozenset({"request"}) for name in (
+            "AC_agent_dag", "AC_agent_trigger", "AC_agent_skill", "AC_agent_task_recovery")},
         **{name: frozenset({"actions"}) for name in (
             "AC_circuit_call", "AC_bulkhead_run", "AC_run_resumable",
             "AC_run_device_matrix", "AC_observe_add", "AC_voice_register",
