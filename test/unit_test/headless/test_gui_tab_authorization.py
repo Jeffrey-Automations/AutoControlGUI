@@ -20,10 +20,11 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageB
 
 from headless._qt_settle import pump_until  # noqa: E402
 from je_auto_control.gui import (  # noqa: E402
-    admin_console_tab, audit_log_tab, plugins_tab, rbac_users_panel, rest_api_tab, secrets_tab, usb_devices_tab,
-    usb_passthrough_panel, webhooks_tab,
+    admin_console_tab, audit_log_tab, inspector_tab, plugins_tab, rbac_users_panel, rest_api_tab, secrets_tab,
+    usb_devices_tab, usb_passthrough_panel, webhooks_tab,
 )
 from je_auto_control.gui._authorize import RefusalLabel, refusal  # noqa: E402
+from je_auto_control.gui.remote_desktop import connection_screen, host_panel  # noqa: E402
 from je_auto_control.utils.rbac import AuthorizationContext, Role, authorization_scope  # noqa: E402
 from je_auto_control.utils.rbac.policy import COMMAND_CAPABILITIES  # noqa: E402
 
@@ -362,12 +363,62 @@ def test_the_usb_sharing_panel_refuses_a_viewer(monkeypatch, tmp_path, slot, com
     _dispose(panel)
 
 
+# --- remote desktop hosts and the WebRTC inspector ----------------------------------------------------------
+
+@pytest.mark.parametrize("build, slot, command", [
+    (host_panel._HostPanel, "_start", "AC_start_remote_host"),
+    (host_panel._HostPanel, "_stop", "AC_stop_remote_host"),
+    (connection_screen.QuickConnectScreen, "_start_hosting", "AC_start_remote_host"),
+    (connection_screen.QuickConnectScreen, "_stop_hosting", "AC_stop_remote_host"),
+], ids=["host-start", "host-stop", "quick-start", "quick-stop"])
+def test_the_remote_desktop_host_panels_refuse_a_viewer(build, slot, command):
+    panel = build()
+    with _viewer():
+        getattr(panel, slot)()
+    assert not panel._host_op.busy
+    _assert_refused(panel, command)
+    _dispose(panel)
+
+
+@pytest.mark.parametrize("slot, command", [
+    ("_on_generate_offer", "AC_start_webrtc_host"), ("_on_publish_via_server", "AC_start_webrtc_host"),
+    ("_on_stop", "AC_stop_webrtc_host"),
+])
+def test_the_webrtc_host_panel_refuses_a_viewer(slot, command):
+    pytest.importorskip("av")
+    pytest.importorskip("aiortc")
+    from je_auto_control.gui.remote_desktop.webrtc_panel import _WebRTCHostPanel
+    panel = _WebRTCHostPanel()
+    panel._token_edit.setText("tok")
+    with _viewer():
+        getattr(panel, slot)()
+    assert panel._multi_host is None
+    assert command in panel._status_label.text()
+    _dispose(panel)
+
+
+def test_the_inspector_shows_a_refusal_instead_of_samples(monkeypatch):
+    inspector = _Recorder()
+    monkeypatch.setattr(inspector_tab, "default_webrtc_inspector", lambda: inspector)
+    inspector.summary = lambda: inspector.calls.append("summary") or {
+        "sample_count": 0, "window_seconds": 1, "metrics": {}}
+    inspector.recent = lambda count: inspector.calls.append("recent") or []
+    tab = inspector_tab.InspectorTab()
+    inspector.calls.clear()
+    with _viewer():
+        tab._refresh()
+    assert inspector.calls == []
+    assert "AC_inspector_summary" in tab._summary_label.text()
+    _dispose(tab)
+
+
 # --- every tab names what it needs, for the page banner -----------------------------------------------------
 
 @pytest.mark.parametrize("cls", [
     secrets_tab.SecretsTab, plugins_tab.PluginsTab, webhooks_tab.WebhooksTab, rest_api_tab.RestApiTab,
     rbac_users_panel.RbacUsersPanel, admin_console_tab.AdminConsoleTab, audit_log_tab.AuditLogTab,
-    usb_devices_tab.UsbDevicesTab, usb_passthrough_panel.UsbPassthroughPanel,
+    usb_devices_tab.UsbDevicesTab, usb_passthrough_panel.UsbPassthroughPanel, inspector_tab.InspectorTab,
+    host_panel._HostPanel, connection_screen.QuickConnectScreen,
 ])
 def test_each_tab_declares_its_required_commands(cls):
     required = getattr(cls, "REQUIRED_COMMANDS", ())

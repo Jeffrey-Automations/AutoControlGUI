@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import as_plain, decoded_image
 from je_auto_control.gui._secret_field import SecretField
@@ -85,6 +86,9 @@ _APPROVAL_TIMEOUT_S = 60.0
 
 class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
     """AnyDesk-style single-screen entry point for Remote Desktop."""
+
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_start_remote_host", "AC_stop_remote_host")
 
     _STATUS_INTERVAL_MS = 1000
 
@@ -213,6 +217,8 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         root = QVBoxLayout(self)
         root.setSpacing(12)
         # The two halves sit side by side on a wide window and stack on a narrow one.
+        self._refusal = RefusalLabel()
+        root.addWidget(self._refusal)
         root.addWidget(ResponsiveBox(self._build_host_section(), self._build_viewer_section(),
                                      stretches=(1, 1)), stretch=1)
 
@@ -311,6 +317,8 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
         self._host_token.setText(secrets.token_urlsafe(24))
 
     def _start_hosting(self) -> None:
+        if not self._refusal.allows("AC_start_remote_host"):
+            return
         token = self._host_token.text().strip()
         if not token:
             self._generate_token()
@@ -398,6 +406,8 @@ class QuickConnectScreen(_RecentConnectionsMixin, TranslatableMixin, QWidget):
 
     def _stop_hosting(self) -> None:
         # Stops the host the badge shows, whoever started it; see _HostPanel._stop.
+        if not self._refusal.allows("AC_stop_remote_host"):
+            return
         if self._host_op.run(functools.partial(stop_host, self._owner), on_done=self._on_host_changed,
                              on_error=self._on_host_stop_failed, retain_failure=True):
             self._host_pending = "gui_op_stopping"

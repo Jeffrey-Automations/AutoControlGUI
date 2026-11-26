@@ -40,6 +40,18 @@ def authorized(command: str, work: Callable[..., Any], *args: Any, **kwargs: Any
     return work(*args, **kwargs)
 
 
+def refused_on(label: QLabel, *commands: str) -> bool:
+    """Whether one of ``commands`` is refused; if so the reason goes on ``label`` and on the page's banner."""
+    reason = refusal(*commands)
+    if reason is None:
+        return False
+    label.setText(reason)
+    banner = page_banner(label)
+    if banner is not None:
+        banner.show_refusal(reason)
+    return True
+
+
 class RefusalLabel(QLabel):
     """A line in a tab that says why its last privileged command was refused; hidden while none was."""
 
@@ -52,14 +64,11 @@ class RefusalLabel(QLabel):
 
     def allows(self, *commands: str) -> bool:
         """Whether the current caller may run every one of ``commands``; a refusal is shown, never raised."""
-        reason = refusal(*commands)
-        self.setText(reason or "")
-        self.setHidden(reason is None)
-        if reason is not None:
-            banner = page_banner(self)
-            if banner is not None:
-                banner.show_refusal(reason)
-        return reason is None
+        refused = refused_on(self, *commands)
+        if not refused:
+            self.setText("")
+        self.setHidden(not refused)
+        return not refused
 
 
-__all__ = ["RefusalLabel", "authorized", "refusal"]
+__all__ = ["RefusalLabel", "authorized", "refusal", "refused_on"]

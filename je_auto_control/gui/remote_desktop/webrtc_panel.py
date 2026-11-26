@@ -94,6 +94,9 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
                        _HostConnectionMixin):
     """Host: stream this machine's screen and accept viewer input."""
 
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_start_webrtc_host", "AC_stop_webrtc_host")
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()

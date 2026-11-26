@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import decoded_image
@@ -39,6 +40,9 @@ from je_auto_control.utils.remote_desktop.registry import (
 
 class _HostPanel(TranslatableMixin, QWidget):
     """Start / stop the singleton host and show what is being streamed."""
+
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_start_remote_host", "AC_stop_remote_host", "AC_start_ws_host", "AC_stop_ws_host")
 
     _PREVIEW_INTERVAL_MS = 250  # 4 fps preview is enough to confirm liveness
 
@@ -135,6 +139,8 @@ class _HostPanel(TranslatableMixin, QWidget):
         set_role(warning, "warning")
         self._tr(warning, "rd_host_security_warning")
         root.addWidget(warning)
+        self._refusal = RefusalLabel()
+        root.addWidget(self._refusal)
 
         root.addWidget(self._build_card())
         root.addWidget(self._build_basics())
@@ -290,6 +296,9 @@ class _HostPanel(TranslatableMixin, QWidget):
     def _start(self) -> None:
         if self._host_op.busy:          # a start or stop is still out; a second click is ignored
             return
+        transport = self._transport.currentText()
+        if not self._refusal.allows("AC_start_ws_host" if transport == "WebSocket" else "AC_start_remote_host"):
+            return
         token = self._token.text().strip()
         if not token:
             self._generate_token()
@@ -299,7 +308,6 @@ class _HostPanel(TranslatableMixin, QWidget):
         except (OSError, ValueError) as error:
             QMessageBox.warning(self, _t("rd_host_start"), str(error))
             return
-        transport = self._transport.currentText()
         host_cls = (WebSocketDesktopHost if transport == "WebSocket"
                     else RemoteDesktopHost)
         bind = self._bind.text().strip() or "127.0.0.1"
@@ -342,6 +350,9 @@ class _HostPanel(TranslatableMixin, QWidget):
         # that one: a visible "running" with a Stop that does nothing would be
         # worse on a remote-access surface. Its owner is told.
         if self._host_op.busy:          # a second click while the first is still stopping
+            return
+        # Either transport's host may be the one running; both commands need the same capability.
+        if not self._refusal.allows("AC_stop_remote_host", "AC_stop_ws_host"):
             return
         self._pending_key = "gui_op_stopping"
         self._host_op.run(functools.partial(stop_host, self._owner), on_done=self._on_stopped,

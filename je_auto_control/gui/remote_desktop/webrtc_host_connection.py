@@ -23,6 +23,7 @@ from je_auto_control.gui.remote_desktop._helpers import (
 from je_auto_control.gui.remote_desktop.webrtc_workers import (
     HostPublishLoopWorker, generate_host_id, retire_worker,
 )
+from je_auto_control.gui._authorize import refused_on
 from je_auto_control.gui._qt_typed import as_plain
 from je_auto_control.gui._slow_op import app_stop_queue, hold_failed_stop, stop_each
 from je_auto_control.gui._weak_call import weak_slot
@@ -121,6 +122,8 @@ class _HostConnectionMixin(_HostPanelPart):
         self._host_id_edit.setText(generate_host_id())
 
     def _on_publish_via_server(self) -> None:
+        if refused_on(self._status_label, "AC_start_webrtc_host"):
+            return
         if not self._validate_required_fields(needs_server=True):
             return
         self._stop_host_if_any()
@@ -189,6 +192,8 @@ class _HostConnectionMixin(_HostPanelPart):
         self._status_label.setText(_t("rd_webrtc_status_idle"))
 
     def _on_generate_offer(self) -> None:
+        if refused_on(self._status_label, "AC_start_webrtc_host"):
+            return
         token = self._token_edit.text().strip()
         if not token:
             QMessageBox.warning(self, "WebRTC", _t("rd_webrtc_token_required"))
@@ -266,6 +271,8 @@ class _HostConnectionMixin(_HostPanelPart):
             self._manual_session_id = None  # consumed; next Generate creates new session
 
     def _on_stop(self) -> None:
+        if refused_on(self._status_label, "AC_stop_webrtc_host"):
+            return
         self._stop_host_if_any()
         self._show_idle()
         self._signals.session_count.emit(0)
