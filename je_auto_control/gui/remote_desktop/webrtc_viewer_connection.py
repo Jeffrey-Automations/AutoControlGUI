@@ -73,6 +73,10 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
     # Owned by the files and media groups; stopped here with the session.
     _sync_engine: Optional[FolderSyncEngine]
     _recorder: Optional[SessionRecorderT]
+    # One token per viewer built: its state callbacks carry it, so a stopped or
+    # replaced viewer's late states are dropped, and a drop is counted once.
+    _viewer_episode: object
+    _reconnect_counted_for: object
 
     def _on_connect_via_server(self) -> None:
         if not self._validate_required_fields(needs_server=True):
@@ -218,13 +222,14 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         return True
 
     def _build_viewer(self, token: str) -> WebRTCDesktopViewerT:
+        episode = self._viewer_episode = object()
         viewer = WebRTCDesktopViewer(
             token=token,
             config=_read_webrtc_config(self),
             viewer_id=self._viewer_id,
             on_frame=ViewFrames(self._view.callback("_on_frame_image"),
                                 self._view.getter(lambda owner: owner._recorder, None)),
-            on_state_change=self._view.callback("_on_state"),
+            on_state_change=self._view.tagged("_on_viewer_state", episode),
             on_auth_result=self._view.callback("_on_auth"),
         )
         bind_folder_receipts(viewer, self._view.getter(lambda owner: owner._viewer, None),
@@ -261,6 +266,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         if self._viewer is not None:
             stops.append(self._viewer.stop)
             self._viewer = None
+            self._viewer_episode = None         # its late "disconnected"/"failed" no longer count
         if stops:
             self._stops.retire(functools.partial(stop_each, *stops))
 
@@ -286,10 +292,18 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         else:
             self._stop_stats_polling()
 
+    def _on_viewer_state(self, episode: object, state: str) -> None:
+        """Pass on a state of the current viewer only; a stopped or replaced viewer's late states are dropped."""
+        if episode is self._viewer_episode:
+            self._on_state(state)
+
     def _maybe_schedule_auto_reconnect(self) -> None:
         if (not self._auto_reconnect_check.isChecked()
                 or self._user_initiated_disconnect):
             return
+        episode = self._viewer_episode
+        if episode is not None and episode is self._reconnect_counted_for:
+            return      # one drop reports "disconnected" then "failed": it uses one attempt
         max_attempts = int(self._reconnect_max_spin.value())
         base_delay_s = int(self._reconnect_delay_spin.value())
         if self._auto_reconnect_attempts >= max_attempts:
@@ -300,6 +314,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
                 or not self._token_edit.text().strip()):
             return
         self._auto_reconnect_attempts += 1
+        self._reconnect_counted_for = episode
         delay_ms = min(
             60000, 1000 * base_delay_s * (2 ** (self._auto_reconnect_attempts - 1)),
         )

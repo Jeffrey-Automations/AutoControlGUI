@@ -135,6 +135,7 @@ class _ViewerPanelPart(_PanelPart):
     _on_send_cad: Callable[[], None]
     _on_send_file: Callable[[], None]
     _on_stop: Callable[[], None]
+    _on_state: Callable[[str], None]
     _on_sync_browse: Callable[[], None]
     _on_toggle_mic: Callable[[bool], None]
     _on_toggle_pen: Callable[[bool], None]

@@ -152,6 +152,52 @@ def test_stop_cancels_a_pending_reconnect(monkeypatch, qapp):
     assert reconnects == []
 
 
+class _FakeViewer:
+    """Stands in for ``WebRTCDesktopViewer``: keeps the callbacks the panel hands it."""
+
+    authenticated = False
+
+    def __init__(self, **kwargs):
+        self.callbacks = kwargs
+
+    def set_file_received_callback(self, callback):
+        self.file = callback
+
+    def set_inbox_listing_callback(self, callback):
+        self.listing = callback
+
+    def set_inbox_op_result_callback(self, callback):
+        self.operation = callback
+
+    def stop(self):
+        """Nothing to close."""
+
+
+def test_one_drop_uses_one_reconnect_attempt(monkeypatch, qapp):
+    from je_auto_control.gui.remote_desktop import webrtc_viewer_connection
+    monkeypatch.setattr(webrtc_viewer_connection, "WebRTCDesktopViewer", _FakeViewer)
+    monkeypatch.setattr(webrtc_panel._WebRTCViewerPanel, "_on_connect_via_server", lambda self: None)
+    panel = webrtc_panel._WebRTCViewerPanel()
+    panel._auto_reconnect_check.setChecked(True)
+    panel._server_edit.setText("http://127.0.0.1:9")  # NOSONAR never contacted
+    panel._host_id_edit.setText("123456789")
+    panel._token_edit.setText("tok")
+    panel._reconnect_delay_spin.value = lambda: 0
+    first = panel._viewer = panel._build_viewer("tok")
+    first.callbacks["on_state_change"]("disconnected")
+    first.callbacks["on_state_change"]("failed")      # the same drop, reported twice
+    qapp.processEvents()
+    assert panel._auto_reconnect_attempts == 1
+    second = panel._viewer = panel._build_viewer("tok")
+    first.callbacks["on_state_change"]("failed")      # the replaced viewer's late state
+    qapp.processEvents()
+    assert panel._auto_reconnect_attempts == 1
+    second.callbacks["on_state_change"]("failed")     # the reconnected session drops: a new attempt
+    qapp.processEvents()
+    assert panel._auto_reconnect_attempts == 2
+    assert panel._status_label.text() == _t("rd_webrtc_reconnecting").format(n=2, max=panel._reconnect_max_spin.value())
+
+
 def test_a_new_window_opens_with_the_pen_already_on():
     panel = webrtc_panel._WebRTCViewerPanel()
     panel._pen_btn.setChecked(True)

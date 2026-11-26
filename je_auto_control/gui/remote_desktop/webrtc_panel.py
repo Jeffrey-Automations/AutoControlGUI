@@ -280,6 +280,8 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
         self._stats_poller: Optional[StatsPoller] = None
         self._sync_engine: Optional["FolderSyncEngine"] = None
         self._auto_reconnect_attempts = 0
+        self._viewer_episode: object = None
+        self._reconnect_counted_for: object = None
         self._user_initiated_disconnect = False
         # One timer, so Stop can cancel a reconnect that is waiting out its
         # back-off: a singleShot could not be, and reconnected after Stop.
