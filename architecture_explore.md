@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,623 |
-| 程式碼總行數 | 253,053 |
+| 程式碼總行數 | 253,078 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -517,13 +517,13 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 61,076 行。
+> 14 個套件、約 61,101 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,268 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 33,754 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 33,779 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 178 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1056,7 +1056,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（33,754 行／242 檔）
+#### `utils/agent_runtime/`（33,779 行／242 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -1184,7 +1184,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `presence_x11.py` | 185 | X11 physical presence: XInput2 raw events from real devices, never from XTEST, plus logind lock state. |
 | `presence_worker.py` | 88 | Fixed contained source child; bootstrap and endpoint ownership precede observation. |
 | `readonly_target.py` | 157 | Fresh isolated completion observations with live scope checks and permanent no-input helper contracts. |
-| `readonly_worker.py` | 71 | Permanently read-only owned helper: observation never upgrades to native input or task execution. |
+| `readonly_worker.py` | 96 | Permanently read-only owned helper: observation never upgrades to native input or task execution. |
 | `receipts.py` | 84 | Owner-reviewed uncertain outcomes and per-row workflow reports without blind replay. |
 | `recovery_authorization.py` | 99 | Review replacement origin ceilings for explicitly reauthorized successor tasks. |
 | `remote_effect.py` | 75 | Bracket trusted SDK calls with durable host ACKs and explicit remote settlement evidence. |
@@ -1641,8 +1641,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,076 | 114,510 |
-| **總計** | **1,611** | **252,308** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,076 | 114,535 |
+| **總計** | **1,611** | **252,333** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

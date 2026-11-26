@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Agent runtime: a desktop task can be verified by a permanent read-only completion reader; the
+  read-only helper takes no presence binding and refuses one.
+
 - GUI: translated table and list cells follow a language switch, and 58 message-box titles,
   validation messages and result lines that were hard-coded English are translated.
 

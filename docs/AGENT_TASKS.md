@@ -399,6 +399,8 @@ fabricated trial. GUI Actions prepare the request without recording or publishin
 
 If a validation trial is stopped after all its actions are confirmed, `accept` also accepts an optional
 `completion_task_id` naming a separately reviewed and successfully finished permanent read-only child.
+A desktop task can be verified this way: the read-only helper configures a desktop scope without a
+presence binding because it cannot send input, and it refuses a presence lease.
 Keep `task_id` equal to the original real validation trial. Its candidate/spec hash/pin must match;
 the reader must have exact derived criteria, confirmed retirement and private admission plus a real
 recovery chain (at most sixteen read-only links). Caller, source/effect owners and actual reviewer stay

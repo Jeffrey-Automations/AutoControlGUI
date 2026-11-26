@@ -153,8 +153,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
     並影響每個使用者（包括 `AC_if_image_found` 的 else 分支）。`AC_generate_sop`（`actions`）與 `AC_generate_code`（`source`）執行時就展開，
     `${secrets.X}` 會以明文寫進產出的檔案與結果、迴圈變數則報 Unknown variable；加進 `_DEFERRED_COMMAND_KEYS` 可解，但 `${var}` 就不再代換，而 `source` 有時是靠代換的路徑。
     `AC_resolve_ref` 拒絕 `secret://`，卻把可能是祕密的 `env://` 值放進記錄的結果。
-- **`DECIDE`（agent_runtime 審查）**：`ReadOnlyWorker` 無法設定任何桌面任務（基底 worker 要求在場綁定，而主機刻意不傳），桌面唯讀完成驗證目前完全不能用；
-  修法是一處覆寫，但等於移除一個拒絕條件。
 - **遠端與 USB 審查留下的（U-20261126-17）**：`DECIDE`：未驗證的連線最多占一個 `max_clients` 名額 60 秒；H.264 over TCP 只留最新封包，慢的觀看者會掉 P-frame。
   USB 直通斷線後，仍在後端裡的傳輸執行緒會跑到後端逾時（最長 60 秒）才結束；全程序同時最多 `WorkerLimits.max_abandoned`（預設 16）條，超過時新的 OPEN／RESUME 被拒（U-20261126-29）。
 - **簽章分離擋不住能寫檔的人**：能執行寫檔指令（shell、檔案類指令）的人仍能換掉公鑰檔本身，保護那個檔是作業系統權限的事；
