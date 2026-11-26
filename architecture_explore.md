@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,615 |
-| 程式碼總行數 | 249,293 |
+| 程式碼總行數 | 249,528 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1508 |
@@ -293,7 +293,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 19,747 行。
+> 25 個套件、約 19,776 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -309,7 +309,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/flow_debugger/` | 166 | action list 的單步除錯器與追蹤器 |
 | `utils/input_macro/` | 490 | 定時輸入事件：錄製結果的整形（`timeline`／`InputRecorder`，Windows 與 macOS 共用）、重播與宣告式輸入序列 DSL |
 | `utils/json/` | 99 | action JSON 檔讀寫與正規化格式化（`fmt --check` 的後端） |
-| `utils/json_store/` | 311 | JSON 字典檔持久化的共用小工具（內部管線） |
+| `utils/json_store/` | 340 | JSON 字典檔持久化的共用小工具（內部管線） |
 | `utils/loop_guard/` | 158 | 機械式卡死迴圈偵測（agent loop 用） |
 | `utils/plugin_loader/` | 147 | 掃描外部 Python 外掛目錄並註冊其 `AC_` callable |
 | `utils/plugin_sdk/` | 80 | 外掛 SDK：透過 entry points 發佈／載入第三方 `AC_*` 指令 |
@@ -563,12 +563,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.11 伺服器、網路協定與外部整合
 
-> 24 個套件、約 7,873 行。
+> 24 個套件、約 8,074 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/acme_v2/` | 632 | 完整 ACME v2 用戶端（RFC 8555），不依賴 certbot |
-| `utils/chatops/` | 949 | Chat-ops bot：接收 Slack／Discord／webhook 的 slash 指令並路由到動作 |
+| `utils/chatops/` | 1,055 | Chat-ops bot：接收 Slack／Discord／webhook 的 slash 指令並路由到動作 |
 | `utils/cookie_jar/` | 203 | RFC 6265 cookie jar |
 | `utils/email_send/` | 118 | SMTP 寄信（email 觸發器的發送端搭檔） |
 | `utils/events/` | 106 | 對外 CloudEvents 發送（執行生命週期事件） |
@@ -583,7 +583,7 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/notify/` | 108 | 跨平台桌面通知 |
 | `utils/notify_channels/` | 105 | 對外聊天／webhook 通知（Slack／Discord／Teams／raw） |
 | `utils/otp/` | 37 | TOTP 一次性密碼產生（自動化 2FA 登入） |
-| `utils/outbox/` | 113 | 交易式 outbox，保證至少一次的事件投遞 |
+| `utils/outbox/` | 208 | 交易式 outbox，保證至少一次的事件投遞 |
 | `utils/pytest_plugin/` | 283 | pytest 外掛 + BDD step library（`pytest11` entry point） |
 | `utils/rest_api/` | 2,251 | 純標準庫 REST 前端：路由、Bearer 驗證、限流、Prometheus 指標、OpenAPI 3.1 產生 |
 | `utils/socket_server/` | 169 | 執行 action JSON 的執行緒式 TCP 指令伺服器（預設綁 127.0.0.1） |
@@ -686,12 +686,12 @@ socket server 有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.15 韌性、流量控制與設定
 
-> 14 個套件、約 2,204 行。
+> 14 個套件、約 2,209 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/artifact_store/` | 148 | S3 相容產出物儲存（報表／截圖／錄影） |
-| `utils/assets/` | 203 | 環境範圍的型別化資產／設定儲存（UiPath Assets 風格） |
+| `utils/assets/` | 208 | 環境範圍的型別化資產／設定儲存（UiPath Assets 風格） |
 | `utils/bulkhead/` | 141 | Bulkhead 併發隔離 + 伺服器限流標頭解析 |
 | `utils/chaos/` | 153 | 決定性混沌實驗（穩態假說 + 故障注入） |
 | `utils/dedup_window/` | 72 | 時間視窗內的訊息去重 |
@@ -1637,8 +1637,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 113,537 |
-| **總計** | **1,603** | **248,548** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,075 | 113,772 |
+| **總計** | **1,603** | **248,783** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

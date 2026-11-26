@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-20 | 2026-11-26 | Stop Slack replays and bound outbox and asset store damage | #done #decision #chatops #storage | [2026-11-c](2026-11-c.md) |
 | U-20261126-19 | 2026-11-26 | Fix three CI test failures after the review | #ci #test | [2026-11-c](2026-11-c.md) |
 | U-20261126-18 | 2026-11-26 | Review and fix the agent runtime | #review #fix #agent #stop | [2026-11-c](2026-11-c.md) |
 | U-20261126-17 | 2026-11-26 | Review and fix remote desktop and USB | #review #fix #remote-desktop #usb #security | [2026-11-c](2026-11-c.md) |

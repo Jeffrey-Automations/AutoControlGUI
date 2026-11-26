@@ -425,6 +425,12 @@ Slack adapter（``SlackBot``）把 ``/run`` 放到工作執行緒上執行，執
 是執行中的 run id。工作執行緒的回覆送不出去時只記錄在 log（沒有輪詢執行緒可以往上拋），
 命令不會被重新執行。
 
+bot 不會重播頻道歷史。沒有給 ``last_seen_ts`` 也沒有存檔時，第一次輪詢只把最新一則訊息記為起點，
+不執行任何命令。位置在每則訊息的命令執行**之前**存到 ``state_path``（預設
+``~/.je_auto_control/chatops/slack_<頻道>.json``，原子寫入，POSIX 上權限 0600），所以重啟會從它之後接續，
+當機也不會讓同一個命令執行兩次；位置存不進去時命令不會執行。損壞的狀態檔會改名為 ``.corrupt-<時間>``，
+bot 從最新一則訊息開始。
+
 ``/screenshot [name]`` 寫進 context 的 ``screenshot_dir``
 （預設為暫存目錄下的 ``je_auto_control_chatops``），給的名稱只保留檔名。
 Slack adapter 走套件的 HTTP client，所以出站政策同樣適用。

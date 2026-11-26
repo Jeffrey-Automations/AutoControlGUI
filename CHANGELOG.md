@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+- `SlackBot` never runs commands already in the channel history: a first start
+  records the newest message and runs nothing, and the position is saved
+  (`state_path`, default `~/.je_auto_control/chatops/`) before each command
+  runs. Tests or callers that relied on the first poll running old messages
+  must pass `last_seen_ts`.
+- `Outbox` keeps at most 1,000 sent entries and none older than 7 days
+  (`max_sent`, `max_sent_age_s`); sent entries gain an optional `sent_at`.
+  Files stay readable in both directions.
+- A damaged asset store file is moved aside as `<name>.corrupt-<time>` and the
+  call raises `JsonStoreDamagedError`, instead of being erased by the next `set()`.
+
 - Windows: arrow, navigation, right Ctrl and AltGr keys are sent as extended keys, a refused
   cursor move raises `AutoControlMouseException`, and `AC_check_key_is_press` reports only keys
   that are down now. A single-colour template is refused as not found. `enumerate_monitors`

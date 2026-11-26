@@ -491,6 +491,15 @@ stopping anything and ``bot.running_run_id`` names the run in progress. When
 the reply of a worker cannot be posted the failure is logged (the poll thread
 is not there to raise to) and the command is not run again.
 
+The bot never replays the channel's history. With no ``last_seen_ts`` given
+and none saved, its first poll only records the newest message as its
+starting point and runs nothing. The position is saved to ``state_path``
+(default ``~/.je_auto_control/chatops/slack_<channel>.json``, written
+atomically, 0600 on POSIX) **before** each message's command runs, so a
+restart resumes after it and a crash cannot run a command twice; if the
+position cannot be saved the command is not run. A damaged state file is
+moved aside as ``.corrupt-<time>`` and the bot starts from the newest message.
+
 ``/screenshot`` writes into the
 context's ``screenshot_dir`` (default: ``je_auto_control_chatops`` in the
 temp directory) and keeps only the file name it is given. The Slack
