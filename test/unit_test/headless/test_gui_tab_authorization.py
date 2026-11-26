@@ -429,6 +429,26 @@ def test_the_agent_tasks_tab_refuses_a_viewer_the_runtime_itself(monkeypatch, op
     _dispose(tab)
 
 
+# --- diagnostics --------------------------------------------------------------------------------------------
+
+def test_the_capability_probe_refuses_a_viewer_and_runs_without_rbac(monkeypatch):
+    from je_auto_control.gui import diagnostics_tab
+    probed = []
+    real_probe = diagnostics_tab.probe_capabilities
+    monkeypatch.setattr(diagnostics_tab, "probe_capabilities",
+                        lambda context: probed.append(context) or real_probe(context))
+    tab = diagnostics_tab.DiagnosticsTab()
+    shown = []
+    monkeypatch.setattr(tab._capability_view, "set_snapshot", shown.append)
+    with _viewer():
+        tab._probe_capabilities()
+    _assert_refused(tab, "AC_probe_capabilities", probed + shown)
+    tab._probe_capabilities()                       # outside an RBAC scope nothing is refused
+    assert len(probed) == 1 and len(shown) == 1
+    assert tab._refusal.isHidden()
+    _dispose(tab)
+
+
 # --- every tab names what it needs, for the page banner -----------------------------------------------------
 
 @pytest.mark.parametrize("cls", [

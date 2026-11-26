@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
@@ -69,7 +70,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
     """Run :func:`run_diagnostics` and render the results."""
 
     #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
-    REQUIRED_COMMANDS = ("AC_diagnose",)
+    REQUIRED_COMMANDS = ("AC_diagnose", "AC_probe_capabilities")
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -88,6 +89,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         self._progress_label = QLabel()
         self._progress_label.setWordWrap(True)
         self._capability_view = CapabilityView()
+        self._refusal = RefusalLabel()          # why the last capability probe was refused
         self._mcp_discovery = MCPDiscoveryView()
         self._failed_stops = FailedStopsView()
         self._table = QTableWidget(0, 4)
@@ -105,6 +107,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         root = QVBoxLayout(self)
         root.setSpacing(12)
         root.addWidget(self._capability_view)
+        root.addWidget(self._refusal)
         set_role(self._progress_label, "hint")
         results = Card().add(self._summary_label).add(self._progress_label).add(self._table, stretch=1)
         root.addWidget(results, stretch=1)
@@ -149,6 +152,9 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         self._progress_label.setVisible(True)
 
     def _probe_capabilities(self) -> None:
+        """Show the capability snapshot, as ``AC_probe_capabilities`` would; a refusal is shown in the tab."""
+        if not self._refusal.allows("AC_probe_capabilities"):
+            return
         snapshot = probe_capabilities(BackendContext.current())
         self._capability_view.set_snapshot(snapshot)
 
