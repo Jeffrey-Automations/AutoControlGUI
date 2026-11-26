@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- USB passthrough serves each session on its own worker threads, one ordered lane per
+  claim, instead of on the shared WebRTC event loop: a slow transfer no longer stalls
+  other sessions. A session's queue is bounded (`frame_budget`); a frame over it is
+  refused with the protocol's ERROR frame.
+
 - `SlackBot` never runs commands already in the channel history: a first start
   records the newest message and runs nothing, and the position is saved
   (`state_path`, default `~/.je_auto_control/chatops/`) before each command

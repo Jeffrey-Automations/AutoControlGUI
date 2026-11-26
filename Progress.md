@@ -161,11 +161,11 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
   `http_cassette` 以 `want_bytes=True` 錄製時 `save()` 失敗且內容未遮蔽。
 - **`DECIDE`（agent_runtime 審查）**：`ReadOnlyWorker` 無法設定任何桌面任務（基底 worker 要求在場綁定，而主機刻意不傳），桌面唯讀完成驗證目前完全不能用；
   修法是一處覆寫，但等於移除一個拒絕條件。
-- **遠端與 USB 審查留下的（U-20261126-17）**：`DECIDE`：USB `handle_frame` 跑在共用的 WebRTC 事件迴圈上，一次傳輸（最長 60 秒）凍住所有工作階段；
-  未驗證的連線最多占一個 `max_clients` 名額 60 秒；H.264 over TCP 只留最新封包，慢的觀看者會掉 P-frame。
+- **遠端與 USB 審查留下的（U-20261126-17）**：`DECIDE`：未驗證的連線最多占一個 `max_clients` 名額 60 秒；H.264 over TCP 只留最新封包，慢的觀看者會掉 P-frame。
   `TODO`：`broadcast_chat`／剪貼簿／`send_file_to_viewers` 仍會被停止讀取的觀看者卡住；MultiViewerHost 的 `PeerStopPending` 退休不會重試且擋住新工作階段；
   relay 的交握逾時是每次讀取、交握執行緒無上限；systemd／launchd 產生器沒有跳脫路徑；turn_config 以預設權限寫入祕密；
   config outbox 前面堆滿 `conflict` 會餓死後面的編輯，回條從不修剪。
+  USB 直通斷線後，仍在後端裡的傳輸執行緒會跑到後端逾時（最長 60 秒）才結束；一直重連的觀看者每個斷掉的工作階段最多可占 max_claims + 1 條這種執行緒。
 - **agent_runtime 審查留下的（U-20261126-18）**：Linux／macOS presence listener 在 `accept` 的對端身分失敗會撤銷整個 listener（Windows 版已修）；
   `windows_image_trust` 接受 FILE_ADD_SUBDIRECTORY，磁碟根目錄下的映像旁可放 `.exe.local`；`task_recovery._check_scope` 允許審核者拿掉 `resume_conditions`；
   八份以上損壞的待發布報告仍會占滿每次 `flush`；`stop_all` 回傳前仍等 DAG 鎖（輸入已先停）。
