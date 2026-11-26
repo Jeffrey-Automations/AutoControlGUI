@@ -1584,6 +1584,12 @@ english_word_dict = {
     "rd_port_label": _PORT_LABEL,
     "rd_fps_label": "FPS:",
     "rd_quality_label": "JPEG quality:",
+    "rd_max_pending_label": "Max authenticating:",
+    "rd_max_pending_tooltip": (
+        "Connections still authenticating at once; more are refused. They never take a viewer slot."),
+    "rd_auth_timeout_label": "Auth timeout (s):",
+    "rd_auth_timeout_tooltip": (
+        "Seconds a connection has to authenticate, TLS and WebSocket upgrade included (at most 60)."),
     "rd_host_start": "Start host",
     "rd_host_stop": _STOP_HOST,
     "rd_host_status_running": "Running on port {port} — {n} viewer(s)",

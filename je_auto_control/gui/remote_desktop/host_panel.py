@@ -6,8 +6,8 @@ from typing import Any, Optional
 from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QImage
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
-    QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
+    QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from je_auto_control.gui._authorize import RefusalLabel
@@ -31,6 +31,9 @@ from je_auto_control.utils.remote_desktop import (
 )
 from je_auto_control.utils.remote_desktop.audio import (
     AudioCaptureConfig, is_audio_backend_available,
+)
+from je_auto_control.utils.remote_desktop.host_admission import (
+    DEFAULT_AUTH_TIMEOUT_S, DEFAULT_MAX_PENDING_HANDSHAKES,
 )
 from je_auto_control.utils.remote_desktop.host_id import format_host_id
 from je_auto_control.utils.remote_desktop.registry import (
@@ -82,6 +85,16 @@ class _HostPanel(TranslatableMixin, QWidget):
         self._quality = QSpinBox()
         self._quality.setRange(1, 95)
         self._quality.setValue(70)
+        # Connections still authenticating, and how long each has (the host
+        # refuses a deadline over 60 s, so the field does too).
+        self._max_pending = QSpinBox()
+        self._max_pending.setRange(1, 64)
+        self._max_pending.setValue(DEFAULT_MAX_PENDING_HANDSHAKES)
+        self._auth_timeout = QDoubleSpinBox()
+        self._auth_timeout.setRange(1.0, 60.0)
+        self._auth_timeout.setDecimals(1)
+        self._auth_timeout.setSingleStep(1.0)
+        self._auth_timeout.setValue(DEFAULT_AUTH_TIMEOUT_S)
         self._tls_cert = QLineEdit()
         self._tls_key = QLineEdit()
         self._enable_audio = QCheckBox()
@@ -224,7 +237,10 @@ class _HostPanel(TranslatableMixin, QWidget):
             form.addRow(self._tr(QLabel(), label_key), row)
         adv_layout.addLayout(form)
         adv_layout.addLayout(flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
-            ("rd_fps_label", self._fps), ("rd_quality_label", self._quality)))))
+            ("rd_fps_label", self._fps), ("rd_quality_label", self._quality),
+            ("rd_max_pending_label", self._max_pending), ("rd_auth_timeout_label", self._auth_timeout)))))
+        self._tr(self._max_pending, "rd_max_pending_tooltip", setter="setToolTip")
+        self._tr(self._auth_timeout, "rd_auth_timeout_tooltip", setter="setToolTip")
         adv_layout.addWidget(self._tr(self._enable_audio, "rd_enable_audio"))
         advanced.set_body_layout(adv_layout)
         return advanced
@@ -322,6 +338,8 @@ class _HostPanel(TranslatableMixin, QWidget):
             port=self._port.value(),
             fps=float(self._fps.value()),
             quality=self._quality.value(),
+            max_pending_handshakes=self._max_pending.value(),
+            auth_timeout=float(self._auth_timeout.value()),
             ssl_context=None,
             audio_config=AudioCaptureConfig(
                 enabled=self._audio_available and self._enable_audio.isChecked(),

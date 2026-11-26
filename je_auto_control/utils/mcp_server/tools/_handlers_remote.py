@@ -13,13 +13,16 @@ def remote_host_start(token: str, bind: str = "127.0.0.1",
                       port: int = 0, fps: float = 10.0,
                       quality: int = 70,
                       max_clients: int = 4,
-                      host_id: Optional[str] = None) -> Dict[str, Any]:
+                      host_id: Optional[str] = None,
+                      max_pending_handshakes: int = 8,
+                      auth_timeout: float = 10.0) -> Dict[str, Any]:
     """Start the singleton TCP host (or restart if one is running)."""
     from je_auto_control.utils.remote_desktop.registry import registry
     return registry.start_host(
         token=token, bind=bind, port=int(port),
         fps=float(fps), quality=int(quality),
         max_clients=int(max_clients), host_id=host_id,
+        max_pending_handshakes=max_pending_handshakes, auth_timeout=auth_timeout,
     )
 
 

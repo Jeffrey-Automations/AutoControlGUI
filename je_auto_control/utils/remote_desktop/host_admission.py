@@ -9,6 +9,7 @@ host's ``max_clients`` viewer slots. Before this, a connection that never
 answered held a viewer slot for up to 60 s, so a few silent sockets locked
 every real viewer out.
 """
+import math
 import socket
 import threading
 import time
@@ -37,16 +38,22 @@ _MIN_READ_TIMEOUT_S = 0.05
 _ACCEPT_RETRY_S = 0.1
 
 
-def validate_admission_args(max_pending_handshakes: int, auth_timeout: float) -> None:
-    """Refuse a pending cap below one, or a deadline outside ``(0, 60]`` seconds.
+def validate_admission_args(max_pending_handshakes: Any, auth_timeout: Any) -> Tuple[int, float]:
+    """Check both admission settings and return them as ``(int, float)``.
 
-    The upper bound is the host's whole-handshake watchdog: a longer
-    pending deadline would loosen it rather than tighten it.
+    The cap is a whole number of at least one; the deadline a finite number
+    of seconds in ``(0, 60]``. The upper bound is the host's whole-handshake
+    watchdog: a longer pending deadline would loosen it rather than tighten
+    it. Booleans, strings and fractional caps are refused rather than
+    coerced, because these values arrive from JSON action files and MCP calls.
     """
-    if int(max_pending_handshakes) < 1:
-        raise ValueError("max_pending_handshakes must be at least 1")
-    if not 0 < float(auth_timeout) <= _AUTH_TIMEOUT_S:
-        raise ValueError(f"auth_timeout must be in (0, {_AUTH_TIMEOUT_S:g}] seconds")
+    if (isinstance(max_pending_handshakes, bool) or not isinstance(max_pending_handshakes, (int, float))
+            or not float(max_pending_handshakes).is_integer() or max_pending_handshakes < 1):
+        raise ValueError(f"max_pending_handshakes must be a whole number >= 1, got {max_pending_handshakes!r}")
+    if (isinstance(auth_timeout, bool) or not isinstance(auth_timeout, (int, float))
+            or not math.isfinite(auth_timeout) or not 0 < auth_timeout <= _AUTH_TIMEOUT_S):
+        raise ValueError(f"auth_timeout must be in (0, {_AUTH_TIMEOUT_S:g}] seconds, got {auth_timeout!r}")
+    return int(max_pending_handshakes), float(auth_timeout)
 
 
 def close_socket(sock: socket.socket) -> None:

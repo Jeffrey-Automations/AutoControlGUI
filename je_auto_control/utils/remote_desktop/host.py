@@ -141,7 +141,7 @@ class RemoteDesktopHost(ConnectionAdmissionMixin, FrameProductionMixin):
             auth_timeout: float = DEFAULT_AUTH_TIMEOUT_S,
             ) -> None:
         _validate_host_args(token, fps, int(quality))
-        validate_admission_args(max_pending_handshakes, auth_timeout)
+        max_pending_handshakes, auth_timeout = validate_admission_args(max_pending_handshakes, auth_timeout)
         if audio_config is None:
             audio_config = AudioCaptureConfig()
         # Phase 2.1: pick a specific monitor by index if requested and

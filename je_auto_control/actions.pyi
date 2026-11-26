@@ -3382,6 +3382,8 @@ def AC_start_remote_host(
     quality: int = ...,
     region: List[int] | None = ...,
     max_clients: int = ...,
+    max_pending_handshakes: int = ...,
+    auth_timeout: float = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: start the singleton remote-desktop host."""
 
@@ -3399,6 +3401,8 @@ def AC_start_ws_host(
     quality: int = ...,
     region: List[int] | None = ...,
     max_clients: int = ...,
+    max_pending_handshakes: int = ...,
+    auth_timeout: float = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: start the singleton WebSocket-transport host."""
 

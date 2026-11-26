@@ -8181,6 +8181,14 @@ def remote_desktop_tools() -> List[MCPTool]:
                 "max_clients": {"type": "integer"},
                 "host_id": {"type": "string",
                             "description": "Optional 9-digit ID; auto-generated when omitted"},
+                "max_pending_handshakes": {
+                    "type": "integer", "minimum": 1,
+                    "description": "Connections still authenticating at once; more are "
+                                   "refused at accept (default 8)"},
+                "auth_timeout": {
+                    "type": "number", "exclusiveMinimum": 0, "maximum": 60,
+                    "description": "Seconds a connection has to authenticate, TLS "
+                                   "included (default 10)"},
             }, required=["token"]),
             handler=h_remote.remote_host_start,
             annotations=DESTRUCTIVE,

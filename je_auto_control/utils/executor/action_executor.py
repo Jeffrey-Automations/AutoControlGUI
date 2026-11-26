@@ -1223,12 +1223,15 @@ def _remote_start_host(token: str,
                        fps: float = 10.0,
                        quality: int = 70,
                        region: Optional[List[int]] = None,
-                       max_clients: int = 4) -> Dict[str, Any]:
+                       max_clients: int = 4,
+                       max_pending_handshakes: int = 8,
+                       auth_timeout: float = 10.0) -> Dict[str, Any]:
     """Executor adapter: start the singleton remote-desktop host."""
     return remote_desktop_registry.start_host(
         token=token, bind=bind, port=int(port),
         fps=float(fps), quality=int(quality),
         region=region, max_clients=int(max_clients),
+        max_pending_handshakes=max_pending_handshakes, auth_timeout=auth_timeout,
     )
 
 
@@ -1268,12 +1271,15 @@ def _ws_start_host(token: str,
                    fps: float = 10.0,
                    quality: int = 70,
                    region: Optional[List[int]] = None,
-                   max_clients: int = 4) -> Dict[str, Any]:
+                   max_clients: int = 4,
+                   max_pending_handshakes: int = 8,
+                   auth_timeout: float = 10.0) -> Dict[str, Any]:
     """Executor adapter: start the singleton WebSocket-transport host."""
     return remote_desktop_registry.start_ws_host(
         token=token, bind=bind, port=int(port),
         fps=float(fps), quality=int(quality),
         region=region, max_clients=int(max_clients),
+        max_pending_handshakes=max_pending_handshakes, auth_timeout=auth_timeout,
     )
 
 
