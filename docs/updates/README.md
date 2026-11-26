@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261126-22 | 2026-11-26 | Authorize, mask and move older GUI work off the GUI thread | #done #decision #gui #rbac | [2026-11-c](2026-11-c.md) |
 | U-20261126-21 | 2026-11-26 | Serve USB passthrough off the WebRTC event loop | #done #decision #usb #concurrency | [2026-11-c](2026-11-c.md) |
 | U-20261126-20 | 2026-11-26 | Stop Slack replays and bound outbox and asset store damage | #done #decision #chatops #storage | [2026-11-c](2026-11-c.md) |
 | U-20261126-19 | 2026-11-26 | Fix three CI test failures after the review | #ci #test | [2026-11-c](2026-11-c.md) |

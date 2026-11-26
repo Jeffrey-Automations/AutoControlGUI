@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- GUI: under RBAC the older tabs (secrets, webhooks, plugins, REST, admin console,
+  audit log, USB, remote-desktop host panels, agent tasks) check the role before a
+  privileged command and show a refusal in the tab. Token and secret fields are masked
+  with a Show toggle; the Quick Connect approval dialog denies on Enter or Escape.
+  Vault, plugin, config bundle, audit log, Data Source and Trace Replay work runs off
+  the GUI thread.
+
 - USB passthrough serves each session on its own worker threads, one ordered lane per
   claim, instead of on the shared WebRTC event loop: a slow transfer no longer stalls
   other sessions. A session's queue is bounded (`frame_budget`); a frame over it is
