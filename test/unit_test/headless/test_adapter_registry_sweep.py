@@ -71,6 +71,9 @@ _NEEDS_MORE_THAN_THE_CONTRACT = {
     # Needs an interaction recorded into the cassette first; a fresh one
     # misses by design.
     "ac_http_replay",
+    # Needs a template image that exists: a missing one is unusable input
+    # (ImageSearchInputException), not an anchor that was not found.
+    "ac_anchor_click",
 }
 
 

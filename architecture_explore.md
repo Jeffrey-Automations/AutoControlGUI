@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,632 |
-| 程式碼總行數 | 254,726 |
+| 程式碼總行數 | 254,724 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1515 |
@@ -296,7 +296,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 20,375 行。
+> 25 個套件、約 20,373 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -308,7 +308,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/decision_table/` | 112 | DMN 風格決策表：規則 + 命中策略，把分支外部化 |
 | `utils/deterministic/` | 116 | 決定性執行控制：固定亂數種子 + 凍結時鐘 |
 | `utils/action_journal/` | 866 | 結構化動作日誌：schema v1、寫入前遮罩、跨行程排序／尾端復原、executor 明確 scope 擷取與本機 parallel／DAG parent 傳遞；門面、AC／MCP、Script Builder 與 CLI 擷取／有界查閱；observer／路徑政策隨巢狀根與 workers 保留，Run History 查閱與手動 history 關聯共用相同來源。 |
-| `utils/executor/` | 11,256 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
+| `utils/executor/` | 11,254 | **核心**。`Executor` 指令分派表（774 個 `AC_*`）、參數插值、乾跑、逐步 callback；`flow_control` 提供 34 個區塊指令（迴圈／分支／try／巨集／變數） |
 | `utils/flow_debugger/` | 166 | action list 的單步除錯器與追蹤器 |
 | `utils/input_macro/` | 490 | 定時輸入事件：錄製結果的整形（`timeline`／`InputRecorder`，Windows 與 macOS 共用）、重播與宣告式輸入序列 DSL |
 | `utils/json/` | 99 | action JSON 檔讀寫與正規化格式化（`fmt --check` 的後端） |
@@ -755,7 +755,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `windows_window.py` | 65 | Query a specified HWND's current owner and child windows without activation or input. |
 | `windows_native.py` | 113 | Typed Win32 query/read bindings and caller-sized memory information layouts. |
 
-#### `utils/executor/`（11,256 行）— 執行核心
+#### `utils/executor/`（11,254 行）— 執行核心
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -770,8 +770,8 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `flags.py` | 19 | 旗標讀取 `as_bool`：依拼法（`"true"`／`"yes"`／`"on"`／`"1"`）而非 Python 真值判斷，所以 JSON、CLI、MCP 傳來的 `"false"` 是關；所有 adapter 與流程指令共用。 |
 | `registrant_authority.py` | 97 | 存下的動作清單只在註冊者與目前呼叫端都允許時執行：`registrant_and_caller()` 以 command guard 逐步檢查語音指令與 macro 的每一步（含巢狀與 `AC_parallel` 分支）；`define_macro()` 拒絕一個身分重新定義另一個身分的 macro（受信任的本機程式碼除外）。 |
 | `named_registry.py` | 78 | `AC_cas_*`／`AC_dedup_check`／`AC_idempotency_*`／`AC_bulkhead_run`／`AC_sequence_observe`／`AC_outbox_*` 背後的全程序具名表，各自最多 `MAX_REGISTRY_NAMES`（1,024）個名稱；新名稱超過上限拋 `RegistryFullError`，既有名稱照常運作，永不淘汰。 |
-| `document_commands.py` | 52 | `AC_generate_sop`／`AC_generate_code` 的 adapter：寫出的文件保留機密參照，已知 `${var}` 照常代換，`${secrets.*}` 與尚未綁定的名稱照原樣保留。 |
-| `ref_commands.py` | 62 | `AC_resolve_ref`／`AC_resolve_refs` 的 adapter：回傳參照的值，但 `env://` 的值登記到本次執行的機密遮罩，不以明文進日誌、journal 與 MCP 稽核。 |
+| `document_commands.py` | 51 | `AC_generate_sop`／`AC_generate_code` 的 adapter：寫出的文件保留機密參照，已知 `${var}` 照常代換，`${secrets.*}` 與尚未綁定的名稱照原樣保留。 |
+| `ref_commands.py` | 61 | `AC_resolve_ref`／`AC_resolve_refs` 的 adapter：回傳參照的值，但 `env://` 的值登記到本次執行的機密遮罩，不以明文進日誌、journal 與 MCP 稽核。 |
 
 #### `utils/mcp_server/`（22,576 行，823 個工具）— 最大子系統
 
@@ -1649,7 +1649,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `gui/` | 171 | 46,421 |
 | `utils/mcp_server/` | 63 | 22,576 |
 | `utils/remote_desktop/` | 79 | 17,946 |
-| `utils/executor/` | 17 | 11,256 |
+| `utils/executor/` | 17 | 11,254 |
 | `utils/usb/` | 22 | 5,558 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,215 |
 | `utils/accessibility/` | 17 | 3,524 |
@@ -1667,7 +1667,7 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `autocontrol-lsp/` | 8 | 744 |
 | `utils/hotkey/` | 7 | 879 |
 | 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,154 |
-| **總計** | **1,620** | **253,977** |
+| **總計** | **1,620** | **253,975** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
