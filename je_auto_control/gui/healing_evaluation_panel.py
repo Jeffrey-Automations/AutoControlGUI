@@ -1,6 +1,7 @@
 """Fixed-frame version summaries, failure cases and provenance inside Self-Healing."""
 from __future__ import annotations
 
+import functools
 import json
 from dataclasses import asdict
 from typing import Callable, Optional
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._authorize import authorized
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.responsive import fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -84,6 +86,8 @@ class HealingEvaluationPanel(TranslatableMixin, QWidget):
         self._task = TabTask(self)
         self._task.result.connect(self._completed)
         self._task.error.connect(self._failed)
+        self._exports = TabTask(self, details=False)    # writing the JSON or HTML report
+        self._exports.error.connect(self._failed)
         self._report: Optional[HealingComparison] = None
         self._path = QLineEdit()
         self._summary, self._cases = _table(_SUMMARY), _table(_CASES)
@@ -172,8 +176,9 @@ class HealingEvaluationPanel(TranslatableMixin, QWidget):
 
     @Slot()
     def cancel(self) -> None:
-        """Request stop without blocking the GUI or publishing partial results."""
+        """Request stop without blocking the GUI or publishing partial results; an export's outcome is dropped."""
         self._task.stop()
+        self._exports.stop()
 
     def _failed(self, error: object) -> None:
         self._set_status("error", str(error))
@@ -212,12 +217,17 @@ class HealingEvaluationPanel(TranslatableMixin, QWidget):
             return
         path, _filter = QFileDialog.getSaveFileName(self, _t("export_" + suffix),
                                                    f"locator-comparison.{suffix}", f"*.{suffix}")
-        if path:
-            try:
-                authorize_command("AC_self_heal_evaluate")
-                write_healing_report(self._report, path)
-            except (AutoControlException, OSError) as error:
-                self._set_status("error", str(error))
+        if not path:
+            return
+        try:
+            authorize_command("AC_self_heal_evaluate")
+        except AutoControlException as error:
+            self._set_status("error", str(error))
+            return
+        # Written off the GUI thread, as the caller who asked; a failure is shown in the status line.
+        work = functools.partial(authorized, "AC_self_heal_evaluate", write_healing_report, self._report, path)
+        if not self._exports.start(work):
+            self._set_status("busy")
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802  # reason: Qt override name
         """Cancel cooperatively while worker ownership protects a closing panel."""
