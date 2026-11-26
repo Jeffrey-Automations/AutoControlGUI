@@ -67,6 +67,8 @@ def test_a_file_that_is_not_an_action_list_is_refused_and_the_recording_kept(qap
     tab._actions = [["AC_x"]]
     tab._path_input.setText(str(path))
     tab._load()
+    from headless._qt_settle import settle
+    assert settle(tab._files, "task")               # read off the GUI thread
     assert len(warned) == 1
     assert _names(tab) == ["AC_x"]
     tab.deleteLater()

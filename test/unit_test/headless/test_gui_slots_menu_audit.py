@@ -244,6 +244,7 @@ def test_a_dag_file_that_is_not_utf8_is_reported(monkeypatch, tmp_path):
     monkeypatch.setattr(module.QFileDialog, "getOpenFileName", lambda *_args: (str(path), ""))
     tab = module.DagTab()
     tab._on_load()
+    assert settle(tab._loading, "task")             # read off the GUI thread
     assert "utf-8" in tab._status_label.text()
     tab.deleteLater()
 

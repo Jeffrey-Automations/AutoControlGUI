@@ -70,8 +70,10 @@ def test_the_recording_editor_shows_a_malformed_file(qapp, tmp_path, monkeypatch
     bad.write_text("{not json", encoding="utf-8")
     tab._path_input.setText(str(bad))  # noqa: SLF001
     tab._load()  # noqa: SLF001
+    assert settle(tab._files, "task")  # noqa: SLF001  # read off the GUI thread
     tab._path_input.setText(str(tmp_path / "missing.json"))  # noqa: SLF001
     tab._load()  # noqa: SLF001
+    assert settle(tab._files, "task")  # noqa: SLF001
     assert len(boxes.shown) == 2
     tab.deleteLater()
 

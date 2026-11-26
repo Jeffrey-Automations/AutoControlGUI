@@ -3,8 +3,11 @@
 Round-trips to the same JSON action format the list-based Script
 Builder uses, so the two views stay compatible. The list editor is
 still the place to edit complex nested branches; this tab is a clear
-visual map of what the script will do.
+visual map of what the script will do. Open reads, and Save writes, the
+file as a tab task, one at a time; closing the tab drops one still out.
 """
+import copy
+import functools
 import json
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -14,7 +17,9 @@ from PySide6.QtWidgets import (
     QSplitter, QTextEdit, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.flow_editor.scene import FlowGraphScene
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
@@ -23,11 +28,16 @@ from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
 from je_auto_control.gui.script_builder.step_model import (
     Step, load_action_file, save_action_file,
 )
-from je_auto_control.utils.exception.exceptions import AutoControlException
 
 
 def _t(key: str) -> str:
     return language_wrapper.translate(key, key)
+
+
+def _save(path: str, steps: List[Step], extras: Optional[Dict[str, Any]]) -> str:
+    """Worker thread: write the action file; return the path written."""
+    save_action_file(path, steps, extras)
+    return path
 
 
 class FlowEditorTab(TranslatableMixin, QWidget):
@@ -47,7 +57,14 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         self._inspector.setReadOnly(True)
         self._status = QLabel()
         self._scene.node_selected.connect(self._on_node_selected)
+        self._files = TabTask(self)         # reading or writing the action file
+        self._files.result.connect(self._on_file_done)
+        self._files.error.connect(self._on_file_failed)
         self._build_layout()
+
+    def dispose(self) -> None:
+        """Drop an open or save still out (the write itself runs to its end). Safe to call twice."""
+        release_resources(self)
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
@@ -104,17 +121,10 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         path, _selected = QFileDialog.getOpenFileName(
             self, _t("flow_open_btn"), "", "JSON (*.json);;All (*)",
         )
-        if not path:
-            return
-        # Through the Script Builder's reader: a file saved with a BOM (Notepad)
-        # did not open here, and Save dropped a wrapped file's other keys.
-        try:
-            steps, extras = load_action_file(path)
-        except (AutoControlException, OSError, ValueError, TypeError) as error:
-            QMessageBox.warning(self, _t("flow_open_btn"), str(error))
-            return
-        self.load_steps(steps)
-        self._file_extras = extras
+        if path:
+            # Through the Script Builder's reader: a file saved with a BOM (Notepad)
+            # did not open here, and Save dropped a wrapped file's other keys.
+            self._start_file(functools.partial(load_action_file, path), "open")
 
     def _on_save(self) -> None:
         if not self._steps:
@@ -123,16 +133,29 @@ class FlowEditorTab(TranslatableMixin, QWidget):
         path, _selected = QFileDialog.getSaveFileName(
             self, _t("flow_save_btn"), "", "JSON (*.json)",
         )
-        if not path:
+        if path:
+            # A copy: the worker must not see steps the GUI changes meanwhile.
+            work = functools.partial(_save, path, copy.deepcopy(self._steps), copy.deepcopy(self._file_extras))
+            self._start_file(work, "save")
+
+    def _start_file(self, work: Callable[[], Any], tag: str) -> None:
+        if not self._files.start(work, tag=tag):
+            self._status.setText(_t("task_busy"))
             return
-        try:
-            save_action_file(path, self._steps, self._file_extras)
-        except (AutoControlException, OSError, ValueError, TypeError) as error:
-            QMessageBox.warning(self, _t("flow_save_btn"), str(error))
-            return
-        self._status.setText(
-            _t("flow_saved").replace("{path}", str(path)),
-        )
+        self._status.setText(_t("task_running"))
+
+    def _on_file_done(self, result: Any) -> None:
+        if self._files.tag == "open":
+            steps, extras = result
+            self.load_steps(steps)
+            self._file_extras = extras
+        else:
+            self._status.setText(_t("flow_saved").replace("{path}", str(result)))
+
+    def _on_file_failed(self, error: object) -> None:
+        self._status.setText("")
+        key = "flow_open_btn" if self._files.tag == "open" else "flow_save_btn"
+        QMessageBox.warning(self, _t(key), str(error))
 
     def _on_zoom_in(self) -> None:
         self._view.scale(1.2, 1.2)

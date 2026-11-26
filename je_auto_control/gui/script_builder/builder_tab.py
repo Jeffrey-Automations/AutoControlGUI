@@ -1,7 +1,8 @@
 """Composite widget that ties the step tree and form into a Script Builder tab.
 
 Run executes the steps off the GUI thread as a stoppable executor run, one at
-a time; Stop ends it at its next checkpoint.
+a time; Stop ends it at its next checkpoint. Load and Save read and write the
+action file as a tab task of their own, one at a time.
 
 Every secret-named field of a result (a freshly issued token, at any depth,
 whatever the command) is masked in the result pane. The run reports each
@@ -12,6 +13,7 @@ once: the tab forgets them as it opens the dialog, when the next run starts
 and when it is disposed. A run that was stopped or failed still offers what
 it had issued by then.
 """
+import copy
 import functools
 from contextlib import nullcontext
 import json
@@ -65,6 +67,18 @@ def _run_actions(actions: List[Any], collector: OneTimeCollector,
         return execute_action(actions, result_callback=collector.note)
 
 
+def _save_file(path: str, steps: List[Any], extras: Optional[Dict[str, Any]]) -> str:
+    """Worker thread: write the action file; return the path written."""
+    save_action_file(path, steps, extras)
+    return path
+
+
+def _load_file(path: str) -> tuple[str, List[Any], Optional[Dict[str, Any]]]:
+    """Worker thread: ``(path, steps, extras)`` of the action file at ``path``."""
+    steps, extras = load_action_file(path)
+    return path, steps, extras
+
+
 def _button_group(buttons: Sequence[QWidget]) -> QWidget:
     """A bare container whose buttons wrap onto further lines when the row is too narrow."""
     group = QWidget()
@@ -102,6 +116,9 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
         self._runs = TabTask(self)
         self._runs.result.connect(self._show_run_result)
         self._runs.error.connect(self._show_run_error)
+        self._files = TabTask(self)         # Load / Save: the action file is read or written
+        self._files.result.connect(self._on_file_done)
+        self._files.error.connect(self._on_file_failed)
         self._build_layout()
         self._wire_signals()
 
@@ -250,14 +267,32 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
         path, _ = QFileDialog.getSaveFileName(
             self, _t("sb_dialog_save"), "", "JSON (*.json)",
         )
-        if not path:
+        if path:
+            # A copy: the worker must not see steps the editor changes meanwhile.
+            self._start_file(functools.partial(_save_file, path, copy.deepcopy(self._tree.root_steps()),
+                                               copy.deepcopy(self._file_extras)), "save")
+
+    def _start_file(self, work: Callable[[], Any], tag: str) -> None:
+        if not self._files.start(work, tag=tag):
+            self._result.setPlainText(_t("task_busy"))
             return
-        try:
-            save_action_file(path, self._tree.root_steps(), self._file_extras)
-            self._source_path = path
-            self._result.setPlainText(f"Saved: {path}")
-        except (AutoControlException, OSError, ValueError, TypeError) as error:
-            QMessageBox.warning(self, "Error", str(error))
+        self._result.setPlainText(_t("task_running"))
+
+    def _on_file_done(self, result: Any) -> None:
+        if self._files.tag == "save":
+            self._source_path = result
+            self._result.setPlainText(f"Saved: {result}")
+            return
+        path, steps, extras = result
+        self._file_extras = extras
+        self._source_path = path
+        self._tree.load_steps(steps)
+        self._form.load_step(None)
+        self._result.setPlainText(f"Loaded: {path}")
+
+    def _on_file_failed(self, error: object) -> None:
+        self._result.setPlainText("")
+        QMessageBox.warning(self, "Error", str(error))
 
     def import_sync_script(self, actions: list[object], source_path: str) -> None:
         """Explicitly replace editor data with one validated loaded native snapshot, without dispatching it."""
@@ -273,16 +308,8 @@ class ScriptBuilderTab(TranslatableMixin, QWidget):
         path, _ = QFileDialog.getOpenFileName(
             self, _t("sb_dialog_load"), "", "JSON (*.json)",
         )
-        if not path:
-            return
-        try:
-            steps, self._file_extras = load_action_file(path)
-            self._source_path = path
-            self._tree.load_steps(steps)
-            self._form.load_step(None)
-            self._result.setPlainText(f"Loaded: {path}")
-        except (AutoControlException, OSError, ValueError, TypeError) as error:
-            QMessageBox.warning(self, "Error", str(error))
+        if path:
+            self._start_file(functools.partial(_load_file, path), "load")
 
     def _on_run(self) -> None:
         try:
