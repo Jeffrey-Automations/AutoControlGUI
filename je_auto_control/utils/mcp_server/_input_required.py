@@ -104,7 +104,9 @@ class RequestStateSigner:
         return True
 
     def _verified_claims(self, state: Any) -> Optional[Dict[str, Any]]:
-        if not isinstance(state, str) or state.count(".") != 1:
+        # Every state this signer issues is ASCII; any other text is a forgery,
+        # and the MAC below cannot encode it.
+        if not isinstance(state, str) or not state.isascii() or state.count(".") != 1:
             return None
         payload, mac = state.split(".")
         if not hmac.compare_digest(mac.encode("ascii", "replace"),
