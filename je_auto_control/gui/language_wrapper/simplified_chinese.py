@@ -1410,6 +1410,7 @@ simplified_chinese_word_dict = {
     "rd_quick_bad_target": "格式应为 host:port（port 为 1-65535）。",
     "rd_quick_hosting": "运行中 port {port} — {n} 个观看者",
     "rd_quick_not_hosting": "未开启",
+    "rd_quick_host_displaced": "此画面开启的主机已在别处被停止或取代。",
     "rd_quick_connected": "已连线",
     "rd_quick_disconnected": "未连线",
     "rd_quick_approval_title": "有人要连线",

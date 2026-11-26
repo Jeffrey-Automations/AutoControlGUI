@@ -1551,6 +1551,7 @@ english_word_dict = {
     "rd_quick_bad_target": "Expected host:port (port must be 1-65535).",
     "rd_quick_hosting": "Hosting on port {port} — {n} viewer(s)",
     "rd_quick_not_hosting": "Not hosting",
+    "rd_quick_host_displaced": "The host this screen started was stopped or replaced elsewhere.",
     "rd_quick_connected": "Connected",
     "rd_quick_disconnected": "Disconnected",
     "rd_quick_approval_title": "Incoming viewer",

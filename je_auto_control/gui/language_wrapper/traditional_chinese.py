@@ -1418,6 +1418,7 @@ traditional_chinese_word_dict = {
     "rd_quick_bad_target": "格式應為 host:port（port 為 1-65535）。",
     "rd_quick_hosting": "運行中 port {port} — {n} 個觀看者",
     "rd_quick_not_hosting": "未開啟",
+    "rd_quick_host_displaced": "此畫面開啟的主機已在別處被停止或取代。",
     "rd_quick_connected": "已連線",
     "rd_quick_disconnected": "未連線",
     "rd_quick_approval_title": "有人要連線",

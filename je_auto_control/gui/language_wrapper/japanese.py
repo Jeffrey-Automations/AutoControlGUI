@@ -1449,6 +1449,7 @@ japanese_word_dict = {
     "rd_quick_bad_target": "host:port 形式で入力してください（port は 1-65535）。",
     "rd_quick_hosting": "ポート {port} で稼働中 — {n} 人接続中",
     "rd_quick_not_hosting": "停止中",
+    "rd_quick_host_displaced": "この画面で開始したホストは、別の場所で停止または置き換えられました。",
     "rd_quick_connected": "接続済み",
     "rd_quick_disconnected": "未接続",
     "rd_quick_approval_title": "接続要求",
