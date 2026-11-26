@@ -164,6 +164,7 @@ class TaskEvidence:
         self.ensure(task_id)
         journal = self.cache.file(task_id, _JOURNAL_NAME)
         self.cache.file(task_id, 'journal.jsonl.lock')
+        self.cache.file(task_id, 'journal.jsonl.lock.guard')
         status: EventStatus = "incomplete"
         if finished:
             status = "ok" if receipt["status"] == "confirmed" else "error"
@@ -235,7 +236,8 @@ class TaskEvidence:
 def _owned_artifact(path: Path) -> bool:
     if path.is_symlink() or not path.is_file():
         return False
-    return path.name in {_JOURNAL_NAME, "journal.jsonl.lock", "report.json"} or (
+    # The journal's lock file and the never-deleted guard beside it (json_store's file lock).
+    return path.name in {_JOURNAL_NAME, "journal.jsonl.lock", "journal.jsonl.lock.guard", "report.json"} or (
         re.fullmatch(r"[0-9a-f]{32}\.jpg", path.name) is not None)
 
 

@@ -59,7 +59,7 @@ class EvidenceCache:
 
     def file(self, task_id: str, name: str) -> Path:
         """Reject redirected, nonregular or multiply linked current artifact files."""
-        if name not in {'journal.jsonl', 'journal.jsonl.lock', 'report.json'} and re.fullmatch(
+        if name not in {'journal.jsonl', 'journal.jsonl.lock', 'journal.jsonl.lock.guard', 'report.json'} and re.fullmatch(
                 '[0-9a-f]{32}\\.jpg', name) is None:
             raise AgentTaskError('invalid task artifact filename')
         path = self.directory(task_id) / name
