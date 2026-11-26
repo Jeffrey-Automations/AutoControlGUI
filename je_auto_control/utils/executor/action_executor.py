@@ -1608,7 +1608,7 @@ def _usb_recent_events(since: int = 0,
 
 def _usb_passthrough_enable(enabled: bool = True) -> Dict[str, Any]:
     from je_auto_control.utils.usb.passthrough import commands
-    return commands.passthrough_enable(enabled)
+    return commands.passthrough_enable(_as_bool(enabled))
 
 
 def _usb_passthrough_status() -> Dict[str, Any]:
@@ -1626,8 +1626,8 @@ def _usb_acl_add(vendor_id: str, product_id: str,
                  prompt_on_open: bool = False, label: str = "") -> Dict[str, Any]:
     from je_auto_control.utils.usb.passthrough import commands
     return commands.acl_add(
-        vendor_id, product_id, serial=serial, allow=allow,
-        prompt_on_open=prompt_on_open, label=label,
+        vendor_id, product_id, serial=serial, allow=_as_bool(allow),
+        prompt_on_open=_as_bool(prompt_on_open), label=label,
     )
 
 
@@ -1649,7 +1649,7 @@ def _usb_acl_export(path: str) -> Dict[str, Any]:
 
 def _usb_acl_import(path: str, replace: bool = False) -> Dict[str, Any]:
     from je_auto_control.utils.usb.passthrough import commands
-    return commands.acl_import(path, replace=replace)
+    return commands.acl_import(path, replace=_as_bool(replace))
 
 
 def _usb_loopback_list() -> Dict[str, Any]:
@@ -2571,7 +2571,7 @@ def _assert_visual(golden_path: str, region: Optional[List[int]] = None,
     from je_auto_control.utils.visual_regression import (
         compare_to_golden, take_golden,
     )
-    if create_if_missing and not os.path.exists(
+    if _as_bool(create_if_missing) and not os.path.exists(
             os.path.expanduser(str(golden_path))):
         take_golden(golden_path, region=region)
         return {"created": True, "matched": True, "golden": str(golden_path)}
@@ -2584,7 +2584,7 @@ def _assert_visual(golden_path: str, region: Optional[List[int]] = None,
             "differing_pixels": result.differing_pixels,
             "total_pixels": result.total_pixels,
             "tolerance_pct": result.tolerance_pct}
-    if not result.matched and raise_on_fail:
+    if not result.matched and _as_bool(raise_on_fail):
         raise AutoControlAssertionException(result.summary)
     return data
 
@@ -5419,7 +5419,7 @@ def _soft_assert(checks: Any, raise_on_fail: Any = False) -> Dict[str, Any]:
         ok = _eval_check(op, check.get("value"), check.get("expected"))
         soft.check(ok, check.get("message", "")
                    or f"{check.get('value')!r} {op} {check.get('expected')!r}")
-    if raise_on_fail:
+    if _as_bool(raise_on_fail):
         soft.assert_all()
     return {"ok": not soft.failures, "passed": soft.passed,
             "failures": soft.failures}
@@ -6822,7 +6822,7 @@ def _fuzzy_ratio(left: Any, right: Any,
                  ignore_case: bool = True) -> Dict[str, Any]:
     """Adapter: similarity score (0..1) between two values."""
     from je_auto_control.utils.fuzzy import fuzzy_ratio
-    return {"score": fuzzy_ratio(left, right, ignore_case=ignore_case)}
+    return {"score": fuzzy_ratio(left, right, ignore_case=_as_bool(ignore_case))}
 
 
 def _fuzzy_best_match(query: Any, choices: Any, score_cutoff: float = 0.0,
@@ -6830,7 +6830,7 @@ def _fuzzy_best_match(query: Any, choices: Any, score_cutoff: float = 0.0,
     """Adapter: best fuzzy match from choices, or a null match."""
     from je_auto_control.utils.fuzzy import fuzzy_best_match
     best = fuzzy_best_match(query, _coerce_list(choices),
-                            score_cutoff=score_cutoff, ignore_case=ignore_case)
+                            score_cutoff=score_cutoff, ignore_case=_as_bool(ignore_case))
     if best is None:
         return {"match": None, "score": 0.0, "index": -1}
     return {"match": best[0], "score": best[1], "index": best[2]}
@@ -6841,7 +6841,7 @@ def _fuzzy_dedupe(items: Any, threshold: float = 0.9,
     """Adapter: drop near-duplicate items, keeping the first of each cluster."""
     from je_auto_control.utils.fuzzy import fuzzy_dedupe
     return {"unique": fuzzy_dedupe(_coerce_list(items), threshold=threshold,
-                                   ignore_case=ignore_case)}
+                                   ignore_case=_as_bool(ignore_case))}
 
 
 def _s3_upload(local_path: str, key: Optional[str] = None) -> Dict[str, Any]:
@@ -8459,7 +8459,7 @@ class Executor:
         # AC_try body it ran non-strict and its failures never reached catch.
         # A top-level call always sees False -- the finally below restores it.
         inherited = getattr(_STRICT_BODIES, "value", False)
-        raise_on_error = _as_bool(raise_on_error) or inherited
+        raise_on_error, dry_run = _as_bool(raise_on_error) or inherited, _as_bool(dry_run)
         _STRICT_BODIES.value = raise_on_error
         running = getattr(_RUNNING, "value", None)
         _RUNNING.value = self
