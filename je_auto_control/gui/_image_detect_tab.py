@@ -14,7 +14,8 @@ from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui._validators import double_validator
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
-from je_auto_control.gui.selector import crop_template_to_file
+from je_auto_control.gui.selector.region_selector import open_region_selector
+from je_auto_control.gui.selector.template_cropper import save_region_template
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.wrapper.auto_control_image import locate_all_image, locate_image_center, locate_and_click
 from je_auto_control.wrapper.auto_control_mouse import mouse_keys_table
@@ -41,6 +42,12 @@ def _detect(request: _Detection) -> str:
         return f"Found {len(matches)} matches:\n{matches}"
     point = locate_and_click(request.path, request.button, request.threshold, request.draw)
     return f"Clicked at: {point}"
+
+
+def _save_template(save_path: str, region: tuple[int, int, int, int]) -> str:
+    """Worker thread: grab ``region`` and write it to ``save_path``; the line the tab shows."""
+    saved = save_region_template(save_path, region)
+    return f"Template saved: {save_path} region={saved}"
 
 
 class ImageDetectionTab(TranslatableMixin, QWidget):
@@ -70,7 +77,7 @@ class ImageDetectionTab(TranslatableMixin, QWidget):
         layout.addWidget(result_card.add(self.detect_result_text, stretch=1), stretch=1)
         self._status_key = ""
         self._task = TabTask(self)
-        self._task.result.connect(self._on_result)
+        self._task.result.connect(self._on_task_result)
         self._task.error.connect(self._on_error)
         self._task.finished.connect(self._on_finished)
 
@@ -94,12 +101,14 @@ class ImageDetectionTab(TranslatableMixin, QWidget):
         if not save_path:
             return
         try:
-            region = crop_template_to_file(save_path, self)
-            if region is not None:
-                self.img_path_input.setText(save_path)
-                self._on_result(f"Template saved: {save_path} region={region}")
+            region = open_region_selector(self)     # the operator drags here, on the GUI thread
         except (AutoControlException, OSError, ValueError, RuntimeError) as error:
             QMessageBox.warning(self, "Error", str(error))
+            return
+        # The screen grab and the PNG write run off the GUI thread; the path is set once it is written.
+        if region is not None and self._task.start(partial(_save_template, save_path, region), tag=save_path):
+            self._status_key = "task_running"
+            self.detect_result_text.setText(_t(self._status_key))
 
     def _start(self, operation: Literal["center", "all", "click"]) -> None:
         if self._task.running:
@@ -134,6 +143,11 @@ class ImageDetectionTab(TranslatableMixin, QWidget):
             self._status_key = "task_stopping"
             self.detect_result_text.setText(_t(self._status_key))
             self._task.stop()
+
+    def _on_task_result(self, result: str) -> None:
+        if self._task.tag:                  # a crop: its tag is the template it wrote
+            self.img_path_input.setText(self._task.tag)
+        self._on_result(result)
 
     def _on_result(self, result: str) -> None:
         self._status_key = ""

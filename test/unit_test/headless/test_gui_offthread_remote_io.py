@@ -1,7 +1,8 @@
-"""TLS material no longer holds the GUI thread.
+"""TLS material, trust-list writes, audit queries and template crops no longer hold the GUI thread.
 
 Offscreen Qt against fakes: each blocking call -- reading the CA store or a
-certificate chain -- is replaced by one that waits on a gate,
+certificate chain, recording a trusted viewer, querying the audit database,
+grabbing the screen for a template -- is replaced by one that waits on a gate,
 so the test sees the slot return first and the outcome arrive later, on the
 GUI thread. No dialog is executed, no window shown and no screen read.
 """
@@ -9,6 +10,7 @@ import os
 import ssl
 import threading
 import time
+import types
 
 import pytest
 
@@ -17,7 +19,7 @@ pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
-from headless._qt_settle import deleting, settle, settle_op  # noqa: E402
+from headless._qt_settle import deleting, pump_until, settle, settle_op  # noqa: E402
 from je_auto_control.gui.remote_desktop import connection_screen, host_panel, viewer_panel  # noqa: E402
 from je_auto_control.utils.remote_desktop.connect_coordinator import parse_target  # noqa: E402
 from je_auto_control.utils.remote_desktop.registry import registry  # noqa: E402
@@ -230,3 +232,185 @@ def test_only_one_of_certificate_and_key_is_refused_before_anything_runs(qapp, m
     assert not gate.threads
     assert len(qapp.warnings) == 1
     panel.dispose()
+
+
+# --- accept and trust a pending WebRTC viewer -----------------------------------------------------------------
+
+def _trusting_panel(monkeypatch, gate):
+    pytest.importorskip("av")
+    pytest.importorskip("aiortc")
+    from je_auto_control.gui.remote_desktop import webrtc_panel
+
+    class Dialog:
+        AcceptAndTrust, AcceptOnce = 2, 1
+
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def exec(self):
+            return None
+
+        def choice(self):
+            return Dialog.AcceptAndTrust
+
+    monkeypatch.setattr(webrtc_panel, "PendingViewerDialog", Dialog)
+    panel = webrtc_panel._WebRTCHostPanel()
+    panel._multi_host = types.SimpleNamespace(trust_pending_viewer=gate, session_count=lambda: 1)
+    counts = []
+    panel._signals.session_count.connect(counts.append)
+    return panel, counts
+
+
+def test_accept_and_trust_records_the_viewer_off_the_gui_thread(qapp, monkeypatch):
+    gate = _Gate()
+    panel, counts = _trusting_panel(monkeypatch, gate)
+    _returns_at_once(panel._on_pending_viewer, "session-1", "viewer")
+    assert gate.entered.wait(_WAIT)
+    assert not panel._trusted_list.isEnabled()          # disabled until the call returns
+    assert counts == []
+    gate.release.set()
+    assert pump_until(panel._trusted_list.isEnabled)
+    assert gate.off_gui_thread()
+    assert counts == [1]
+    panel.deleteLater()
+
+
+def test_a_session_gone_before_the_trust_was_recorded_is_not_an_error(qapp, monkeypatch):
+    gate = _Gate(error=KeyError("session-1"))
+    panel, counts = _trusting_panel(monkeypatch, gate)
+    panel._on_pending_viewer("session-1", "viewer")
+    gate.release.set()
+    assert pump_until(panel._trusted_list.isEnabled)
+    assert counts == []
+    assert qapp.warnings == []
+    panel.deleteLater()
+
+
+# --- the audit log dialog -------------------------------------------------------------------------------------
+
+class _AuditLog:
+    def __init__(self, gate) -> None:
+        self.gate = gate
+        self.asked: list = []
+
+    def query(self, **kwargs):
+        self.asked.append(kwargs)
+        return self.gate()
+
+
+_ROW = {"ts": "2026-11-26T10:00:00+00:00", "event_type": "auth_ok", "host_id": "h", "viewer_id": "v",
+        "detail": "remote_ip=127.0.0.1"}
+
+
+def test_the_audit_log_is_opened_and_queried_off_the_gui_thread(qapp):
+    from je_auto_control.gui.remote_desktop.webrtc_dialogs import AuditLogDialog
+    gate = _Gate(result=[_ROW])
+    log = _AuditLog(gate)
+    opened = []
+
+    def open_log():
+        opened.append(threading.get_ident())
+        return log
+
+    started = time.monotonic()
+    dialog = AuditLogDialog(open_log)
+    assert time.monotonic() - started < 5.0, "the dialog held the GUI thread"
+    assert gate.entered.wait(_WAIT)
+    assert not dialog._refresh_btn.isEnabled()
+    assert dialog._status.text()                        # the loading text
+    gate.release.set()
+    assert pump_until(lambda: dialog._table.rowCount() == 1)
+    assert pump_until(dialog._refresh_btn.isEnabled)
+    assert dialog._table.item(0, 1).text() == "auth_ok"
+    assert dialog._status.text() == ""
+    assert opened and opened[0] != threading.get_ident()
+    assert gate.off_gui_thread()
+    assert log.asked == [{"event_type": None, "host_id": None, "limit": 500}]
+    dialog.deleteLater()
+
+
+def test_an_audit_query_that_fails_is_shown_in_the_dialog(qapp):
+    from je_auto_control.gui.remote_desktop.webrtc_dialogs import AuditLogDialog
+    from je_auto_control.utils.remote_desktop.audit_log import AuditLogError
+    gate = _Gate(error=AuditLogError("database is locked"))
+    gate.release.set()
+    dialog = AuditLogDialog(_AuditLog(gate))
+    assert pump_until(lambda: "locked" in dialog._status.text())
+    assert pump_until(dialog._refresh_btn.isEnabled)
+    assert dialog._table.rowCount() == 0
+    dialog.deleteLater()
+
+
+def test_closing_the_audit_dialog_drops_the_query_still_out(qapp):
+    from je_auto_control.gui.remote_desktop.webrtc_dialogs import AuditLogDialog
+    gate = _Gate(result=[_ROW])
+    dialog = AuditLogDialog(_AuditLog(gate))
+    assert gate.entered.wait(_WAIT)
+    dialog.done(0)
+    gate.release.set()
+    assert pump_until(lambda: not dialog._task.running)
+    time.sleep(0.05)
+    qapp.processEvents()
+    assert dialog._table.rowCount() == 0
+    dialog.deleteLater()
+
+
+# --- the image detection tab's template crop ------------------------------------------------------------------
+
+def _crop_tab(monkeypatch, tmp_path, gate):
+    import numpy as np
+    from je_auto_control.gui import _image_detect_tab as module
+    from je_auto_control.gui.selector import region_selector, template_cropper
+    target = tmp_path / "template.png"
+    picked = []
+    monkeypatch.setattr(module.QFileDialog, "getSaveFileName", lambda *args: (str(target), "PNG"))
+    monkeypatch.setattr(region_selector, "pick_region_blocking",
+                        lambda *_args: picked.append(threading.get_ident()) or (1, 2, 4, 4))
+    gate.result = np.zeros((4, 4, 3), np.uint8)
+    monkeypatch.setattr(template_cropper, "_capture_region", gate)
+    return module.ImageDetectionTab(), target, picked
+
+
+def test_the_template_is_grabbed_and_written_off_the_gui_thread(qapp, monkeypatch, tmp_path):
+    gate = _Gate()
+    tab, target, picked = _crop_tab(monkeypatch, tmp_path, gate)
+    _returns_at_once(tab._crop_template)
+    assert gate.entered.wait(_WAIT)
+    assert picked == [threading.get_ident()]            # the region is picked on the GUI thread
+    assert tab._task.running
+    assert tab.img_path_input.text() == ""
+    gate.release.set()
+    assert pump_until(lambda: not tab._task.running)
+    assert gate.off_gui_thread()
+    assert target.is_file()
+    assert tab.img_path_input.text() == str(target)
+    assert "Template saved" in tab.detect_result_text.toPlainText()
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_a_template_grab_that_fails_is_shown_in_the_tab(qapp, monkeypatch, tmp_path):
+    gate = _Gate(error=OSError("no screen to grab"))
+    tab, target, _picked = _crop_tab(monkeypatch, tmp_path, gate)
+    gate.release.set()
+    tab._crop_template()
+    assert pump_until(lambda: not tab._task.running)
+    assert not target.exists()
+    assert tab.img_path_input.text() == ""
+    assert "no screen to grab" in tab.detect_result_text.toPlainText()
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_dispose_drops_the_crop_still_out(qapp, monkeypatch, tmp_path):
+    gate = _Gate()
+    tab, _target, _picked = _crop_tab(monkeypatch, tmp_path, gate)
+    tab._crop_template()
+    assert gate.entered.wait(_WAIT)
+    tab.dispose()
+    gate.release.set()
+    assert pump_until(lambda: not tab._task.running)
+    time.sleep(0.05)
+    qapp.processEvents()
+    assert tab.img_path_input.text() == ""
+    tab.deleteLater()

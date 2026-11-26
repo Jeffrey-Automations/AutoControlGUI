@@ -17,6 +17,7 @@ and the config reader they share are in ``webrtc_panel_common``.
 """
 from __future__ import annotations
 
+import functools
 import logging
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -50,7 +51,7 @@ from je_auto_control.gui.remote_desktop.webrtc_dialogs import (
 from je_auto_control.gui.remote_desktop.webrtc_workers import (
     HostPublishLoopWorker, ViewerAnswerPushWorker, ViewerSignalingWorker,
 )
-from je_auto_control.gui.tab_task_controller import TaskHandle
+from je_auto_control.gui.tab_task_controller import CancellationToken, TaskHandle, task_controller
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop import (
     default_address_book,
@@ -112,6 +113,7 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         self._answer_task: Optional[TaskHandle] = None     # the answer being applied, off-thread
         self._file_task: Optional[TaskHandle] = None       # the file push in progress, off-thread
         self._trust_task: Optional[TaskHandle] = None      # a trust-list write, import or export, off-thread
+        self._admissions = 0                # accept-and-trust answers still recording the viewer, off-thread
         self._stops = StopQueue(self)
         self._stops.drained.connect(self._on_stops_drained)
         self._stopping_sessions: set[str] = set()
@@ -219,11 +221,11 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         host = self._multi_host
         if host is None:
             return
+        if choice == PendingViewerDialog.AcceptAndTrust:
+            self._admit_and_trust(host, session_id)
+            return
         try:
-            if choice == PendingViewerDialog.AcceptAndTrust:
-                host.trust_pending_viewer(session_id)
-                self._refresh_trusted_list()
-            elif choice == PendingViewerDialog.AcceptOnce:
+            if choice == PendingViewerDialog.AcceptOnce:
                 host.approve_pending_viewer(session_id)
             else:
                 host.reject_pending_viewer(session_id)
@@ -231,6 +233,36 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
             # Session may have been torn down between prompt and decision.
             return
         self._signals.session_count.emit(host.session_count())
+
+    def _admit_and_trust(self, host: MultiViewerHostT, session_id: str) -> None:
+        """Answer "accept and trust" on a worker: recording the viewer writes the trust-list file.
+
+        The whole ``trust_pending_viewer`` call goes there unsplit, so the
+        viewer is admitted by that call alone, after its write, exactly as
+        when it ran here. The trusted list is disabled until it returns.
+        """
+        self._admissions += 1
+        self._trusted_list.setEnabled(False)
+        task = task_controller().submit(functools.partial(_trust_and_admit, host, session_id), owner=self)
+        task.result.connect(self._on_viewer_admitted)
+        task.error.connect(self._on_admission_failed)
+        task.finished.connect(self._on_admission_done)
+
+    def _on_viewer_admitted(self, _outcome: object = None) -> None:
+        host = self._multi_host
+        if host is not None:                # stopped while the trust was being recorded
+            self._signals.session_count.emit(host.session_count())
+
+    def _on_admission_failed(self, error: object) -> None:
+        # KeyError: the session was torn down between the prompt and the answer.
+        if not isinstance(error, KeyError):
+            autocontrol_logger.warning("accept and trust viewer: %r", error)
+
+    def _on_admission_done(self) -> None:
+        self._admissions = max(0, self._admissions - 1)
+        if self._admissions == 0:
+            self._trusted_list.setEnabled(True)
+        self._refresh_trusted_list()
 
     def _set_hosting(self, hosting: bool) -> None:
         if self._tray is not None:
@@ -455,6 +487,11 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
         if self._sync_engine is not None or _turned_off(self._sync_btn):
             self._sync_btn.setText(_t("rd_webrtc_sync_stop" if self._sync_engine is not None else "gui_op_stopping"))
         self._pen_btn.setText(_t("rd_webrtc_pen_on" if self._pen_btn.isChecked() else "rd_webrtc_pen_off"))
+
+
+def _trust_and_admit(host: MultiViewerHostT, session_id: str, _token: CancellationToken) -> None:
+    """Worker thread: record the pending viewer as trusted and admit it (one backend call)."""
+    host.trust_pending_viewer(session_id)
 
 
 __all__ = ["_PanelSignals", "_WebRTCHostPanel", "_WebRTCViewerPanel"]

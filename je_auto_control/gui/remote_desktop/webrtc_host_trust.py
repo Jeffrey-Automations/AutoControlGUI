@@ -42,7 +42,8 @@ class _HostTrustMixin(_HostPanelPart):
         from je_auto_control.utils.remote_desktop.audit_log import (
             default_audit_log,
         )
-        AuditLogDialog(default_audit_log(), parent=self).exec()
+        # Opening the log creates its database: the dialog does that on its query's worker.
+        AuditLogDialog(default_audit_log, parent=self).exec()
 
     def _on_push_file(self) -> None:
         if self._multi_host is None or self._multi_host.session_count() == 0:

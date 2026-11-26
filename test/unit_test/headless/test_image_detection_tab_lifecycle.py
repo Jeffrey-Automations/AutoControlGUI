@@ -30,7 +30,8 @@ def fakes(monkeypatch):
     monkeypatch.setattr(module, "locate_image_center", lambda *args: (calls.center.append(args) or (3, 4)))
     monkeypatch.setattr(module, "locate_all_image", lambda *args: (calls.all.append(args) or [[1, 2, 5, 6]]))
     monkeypatch.setattr(module, "locate_and_click", lambda *args: (calls.click.append(args) or (3, 4)))
-    monkeypatch.setattr(module, "crop_template_to_file", lambda *args: (calls.crop.append(args) or (1, 2, 3, 4)))
+    monkeypatch.setattr(module, "open_region_selector", lambda *args: (1, 2, 3, 4))
+    monkeypatch.setattr(module, "save_region_template", lambda *args: (calls.crop.append(args) or args[1]))
     monkeypatch.setattr(module.QFileDialog, "getOpenFileName",
                         lambda *args: (calls.dialogs.append(True) or ("chosen.png", "PNG")))
     monkeypatch.setattr(module.QFileDialog, "getSaveFileName",
@@ -77,7 +78,9 @@ def test_actions_keep_detection_and_click_separate_with_local_button(app, fakes)
         actions["browse"]()
         assert page.img_path_input.text() == "chosen.png"
         actions["crop_template"]()
+        assert pump_until(lambda: not page._task.running)       # the grab and the write ran off the GUI thread
         assert page.img_path_input.text() == "crop.png"
+        assert fakes.crop == [("crop.png", (1, 2, 3, 4))]
         page.threshold_input.setText("0.65")
         page.draw_check.setChecked(True)
         page.mouse_button_combo.setCurrentText("mouse_right")

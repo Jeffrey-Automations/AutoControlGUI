@@ -7,7 +7,8 @@ every dialog from one place.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Optional
+import functools
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QCloseEvent, QDragEnterEvent, QDragMoveEvent, QDropEvent, QKeyEvent
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._slow_op import app_stop_queue
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
@@ -335,23 +337,38 @@ class RemoteFilesTable(QTableWidget):
 
 
 class AuditLogDialog(QDialog):
-    """Browse the SQLite audit log with filter on event_type / host_id."""
+    """Browse the SQLite audit log with filter on event_type / host_id; each query runs off the GUI thread.
 
-    def __init__(self, audit_log: AuditLog, parent: Optional[QWidget] = None) -> None:
+    ``audit_log`` may also be a function that opens the log (``default_audit_log``):
+    it is then called on the query's worker too, since opening it creates the
+    database. Refresh is disabled while a query is out, and closing the dialog
+    drops a query that has not answered.
+    """
+
+    def __init__(self, audit_log: Union[AuditLog, Callable[[], AuditLog]],
+                 parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._log = audit_log
+        self._task = TabTask(self, details=False)
+        self._task.result.connect(self._show_rows)
+        self._task.error.connect(self._show_error)
+        self._task.finished.connect(self._query_done)
         self.setWindowTitle(_t("rd_webrtc_audit_title"))
         self.setMinimumSize(820, 380)
         layout = QVBoxLayout(self)
         self._type_edit = QLineEdit()
         self._type_edit.setPlaceholderText(_t("rd_webrtc_audit_filter_type_ph"))
         self._host_edit = QLineEdit()
-        refresh_btn = QPushButton(_t("rd_webrtc_audit_refresh"))
-        refresh_btn.clicked.connect(self._refresh)
+        self._refresh_btn = QPushButton(_t("rd_webrtc_audit_refresh"))
+        self._refresh_btn.clicked.connect(self._refresh)
         layout.addLayout(flow_of(
             field_pair(QLabel(_t("rd_webrtc_audit_filter_type")), self._type_edit),
             field_pair(QLabel(_t("rd_webrtc_audit_filter_host")), self._host_edit),
-            refresh_btn))
+            self._refresh_btn))
+        self._status = QLabel()
+        self._status.setTextFormat(Qt.TextFormat.PlainText)
+        set_role(self._status, "hint")
+        layout.addWidget(self._status)
         self._table = QTableWidget(0, 5)
         self._table.setHorizontalHeaderLabels([
             _t("rd_webrtc_audit_col_ts"),
@@ -376,12 +393,26 @@ class AuditLogDialog(QDialog):
         self._refresh()
 
     def _refresh(self) -> None:
+        query = functools.partial(_query_audit_log, self._log, self._type_edit.text().strip() or None,
+                                  self._host_edit.text().strip() or None)
+        if self._task.start(query):
+            self._refresh_btn.setEnabled(False)
+            self._status.setText(_t("gui_op_loading"))
+
+    def _query_done(self) -> None:
+        self._refresh_btn.setEnabled(True)
+
+    def _show_error(self, error: object) -> None:
+        self._status.setText(str(error))
+
+    def done(self, result: int) -> None:
+        """Close the dialog; a query still out is dropped, not shown in a closed dialog."""
+        self._task.stop()
+        super().done(result)
+
+    def _show_rows(self, rows: list[dict[str, Any]]) -> None:
         from datetime import datetime
-        rows = self._log.query(
-            event_type=self._type_edit.text().strip() or None,
-            host_id=self._host_edit.text().strip() or None,
-            limit=500,
-        )
+        self._status.clear()
         self._table.setRowCount(len(rows))
         for r, entry in enumerate(rows):
             ts = entry.get("ts", "")
@@ -400,6 +431,13 @@ class AuditLogDialog(QDialog):
             ]
             for c, text in enumerate(cells):
                 self._table.setItem(r, c, QTableWidgetItem(text))
+
+
+def _query_audit_log(source: Union[AuditLog, Callable[[], AuditLog]], event_type: Optional[str],
+                     host_id: Optional[str]) -> list[dict[str, Any]]:
+    """Worker thread: open the log if ``source`` is its opener, then read the newest 500 matching rows."""
+    audit_log = source() if callable(source) else source
+    return audit_log.query(event_type=event_type, host_id=host_id, limit=500)
 
 
 class LanBrowseDialog(QDialog):
