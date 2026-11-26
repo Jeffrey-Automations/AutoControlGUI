@@ -49,6 +49,14 @@ _POLL_S = 0.02
 _Result = TypeVar("_Result")
 
 
+def _stop_checkpoint() -> None:
+    """Raise if the caller's stoppable run was stopped or its cancellation scope cancelled."""
+    from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+    from je_auto_control.utils.executor.run_control import checkpoint
+    cancellation_checkpoint()
+    checkpoint()
+
+
 class DeviceError(AutoControlException, RuntimeError):
     """Base of every error a mobile device session raises."""
 
@@ -426,9 +434,14 @@ class DeviceSession:
 
         A call that outlives the timeout leaves the device in a state nobody
         observed, so the session is closed rather than left to send the next
-        step on top of it.
+        step on top of it. A stop of the stoppable run the caller is in, or a
+        cancellation of its scope, ends the wait the same way: the call runs
+        on in the background, its result is discarded, the session is closed
+        for the same reason, and ``ExecutionStopped`` / ``CancelledError``
+        propagates.
         """
         self.check_usable()
+        _stop_checkpoint()
         budget = float(timeout_s) if timeout_s is not None else float(self._context.timeout_s)
         call = _Call(function)
         threading.Thread(target=call.run, name=f"device-{self._context.name}",
@@ -438,6 +451,7 @@ class DeviceSession:
             if self._cancel.is_set():
                 raise DeviceCancelledError(
                     f"{operation} on {self._context.name}: session cancelled")
+            self._stop_unless_running(operation)
             if monotonic() >= deadline:
                 self._break(f"{operation} did not finish within {budget:g}s")
                 raise DeviceTimeoutError(
@@ -446,6 +460,14 @@ class DeviceSession:
         if call.error is not None:
             raise call.error
         return call.result
+
+    def _stop_unless_running(self, operation: str) -> None:
+        """Raise a requested stop; the call still running leaves the device unobserved."""
+        try:
+            _stop_checkpoint()
+        except BaseException:
+            self._break(f"{operation} was still running when the run was stopped")
+            raise
 
     def check_usable(self) -> None:
         """Raise unless the session can still send operations."""
