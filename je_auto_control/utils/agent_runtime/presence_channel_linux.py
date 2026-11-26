@@ -11,9 +11,9 @@ import socket
 import sys
 import threading
 import time
-from typing import Any, Generic, Iterator, TypeVar
+from typing import Any, Callable, Generic, Iterator, Protocol, TypeVar
 
-from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+from je_auto_control.utils.agent_runtime.errors import AgentTaskError, PresencePeerRefused
 from je_auto_control.utils.agent_runtime.presence_endpoint_linux import LinuxEndpoint, _EndpointCheck, _EndpointFiles
 from je_auto_control.utils.agent_runtime.presence_frames import encode_frame
 from je_auto_control.utils.agent_runtime.presence_messages_linux import _configure, _receive
@@ -23,6 +23,14 @@ from je_auto_control.utils.agent_runtime.presence_peer_linux import (
 
 
 _R = TypeVar('_R', '_ChannelResources', '_ListenerResources')
+
+
+class _Retirable(Protocol):
+    def close(self) -> None:
+        """Retire the channel."""
+
+
+_C = TypeVar('_C', bound=_Retirable)
 
 
 @dataclass(frozen=True)
@@ -262,6 +270,44 @@ def _connect(connection: socket.socket, address: str, deadline: float, cancel: t
             raise AgentTaskError('Linux endpoint connection failed')
 
 
+def _accepted(owner: _Owner[Any], deadline: float, cancel: threading.Event | None) -> socket.socket:
+    with owner.operation(deadline, cancel) as resources:
+        while True:
+            owner.ready(resources.connection, deadline, cancel)
+            try:
+                connection, _address = resources.connection.accept()
+                return connection
+            except (BlockingIOError, InterruptedError, ConnectionAbortedError):
+                continue  # nothing to accept yet, or a connector that left before it was accepted
+
+
+def accept_channel(owner: _Owner[Any], deadline: float, cancel: threading.Event | None,
+                   capture: Callable[[socket.socket], _C]) -> _C:
+    """Accept under the listener's lease, then authenticate the connector outside it.
+
+    A connector whose identity cannot be retained, or that left before it was retained, fails
+    only its own connection with :class:`PresencePeerRefused`, and the listener keeps accepting. A
+    connection whose socket could not be confirmed retired still revokes the listener as
+    unconfirmed, and the original deadline and cancellation still bound the whole accept.
+    """
+    connection = _accepted(owner, deadline, cancel)
+    try:
+        channel = capture(connection)
+    except _RetirementUnconfirmed:
+        # pylint: disable=protected-access  # reason: the lease owner's revocation is this module's own
+        owner._revoke(unconfirmed=True)
+        owner._retire_idle()
+        raise
+    except (AgentTaskError, OSError, UnicodeError):
+        raise PresencePeerRefused('physical presence connector was refused; the listener stays open') from None
+    try:
+        owner.check(deadline, cancel)
+    except BaseException:
+        channel.close()
+        raise
+    return channel
+
+
 class LinuxChannel:
     """One exact socket and original peer, with authenticated packet delivery.
 
@@ -404,24 +450,8 @@ class LinuxListener:
             return resources.connection.fileno()
 
     def accept(self, *, timeout: float, cancel: threading.Event | None = None) -> LinuxChannel:
-        """Accept one channel and bind its retained peer to that exact socket."""
-        deadline = _deadline(timeout)
-        channel = None
-        try:
-            with self._owner.operation(deadline, cancel) as resources:
-                while True:
-                    self._owner.ready(resources.connection, deadline, cancel)
-                    try:
-                        connection, _address = resources.connection.accept()
-                        break
-                    except (BlockingIOError, InterruptedError):
-                        continue
-                channel = _capture(connection)
-            result, channel = channel, None
-            return result
-        finally:
-            if channel is not None:
-                channel.close()
+        """Accept one channel and bind its retained peer to that exact socket; see :func:`accept_channel`."""
+        return accept_channel(self._owner, _deadline(timeout), cancel, _capture)
 
     def close(self, *, timeout: float = 0.25) -> None:
         """Revoke pending accepts and retire only listener resources and owned paths."""

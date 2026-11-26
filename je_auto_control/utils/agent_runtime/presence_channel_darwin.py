@@ -23,7 +23,7 @@ from typing import Any
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.presence_channel_linux import (
-    _Owner, _budget, _close_socket, _deadline,
+    _Owner, _budget, _close_socket, _deadline, accept_channel,
 )
 from je_auto_control.utils.agent_runtime.presence_endpoint_darwin import (
     DarwinEndpoint, DarwinEndpointCheck, DarwinEndpointFiles,
@@ -85,6 +85,7 @@ class _ListenerResources:
 def _capture(connection: socket.socket) -> DarwinChannel:
     peer = None
     try:
+        connection.set_inheritable(False)  # an accepted socket; already so for one this process connected
         _configure(connection)
         peer = retain_connected_peer(connection)
         channel = object.__new__(DarwinChannel)
@@ -290,25 +291,8 @@ class DarwinListener:
             return resources.connection.fileno()
 
     def accept(self, *, timeout: float, cancel: threading.Event | None = None) -> DarwinChannel:
-        """Accept one channel and bind its retained peer to that exact socket."""
-        deadline = _deadline(timeout)
-        channel = None
-        try:
-            with self._owner.operation(deadline, cancel) as resources:
-                while True:
-                    self._owner.ready(resources.connection, deadline, cancel)
-                    try:
-                        connection, _address = resources.connection.accept()
-                        break
-                    except (BlockingIOError, InterruptedError):
-                        continue
-                connection.set_inheritable(False)
-                channel = _capture(connection)
-            result, channel = channel, None
-            return result
-        finally:
-            if channel is not None:
-                channel.close()
+        """Accept one channel and bind its retained peer to that exact socket; see ``accept_channel``."""
+        return accept_channel(self._owner, _deadline(timeout), cancel, _capture)
 
     def close(self, *, timeout: float = 0.25) -> None:
         """Revoke pending accepts and retire only listener resources and owned paths."""
