@@ -117,7 +117,6 @@ U-20261009-18 的每一個裝置面呼叫都只對假的 ADB／uiautomator2／WD
 
 `TODO` — U-20261009-27、-28、-34、-36、-38、-40 之後還開著的
 
-- **Windows UIA 後端的執行緒模型**已對真的 COM 驗過（U-20261113-01；U-20261121-17 再驗：讀取在呼叫者執行緒與 walker 上都可用、stop 能叫醒等待中的 `AC_wait_for_focus_change`、`system_volume` 的 Core Audio 改經同一條 apartment 路徑，主執行緒與 worker 執行緒皆可讀）。`comtypes` 已宣告為 `accessibility` extra，`windows-uia.yml` 已在 Windows runner 以真 COM 跑過（3 項通過）。
 - **Script Builder 的一次性值**（`WIP`，桌面驗收）：對話框從未在真的螢幕上顯示過，真的系統剪貼簿（`QClipboard.clear()`／`text()`）在測試裡是假物件；要等桌面沒有其他程式在用時驗收。
 - **stop 的實機驗收**（`WIP`／外部服務）：能停止與刻意不中斷的範圍見 executor 文件「Stopping a run」（U-20261126-41、-43）。
   `AC_handle_file_dialog`、`AC_wait_until_app_idle`、`AC_wait_for_composition_commit`、`AC_wait_for_unlock` 與行動裝置的 `wait_for_app` 只對假探針測過（桌面與裝置驗收）；
