@@ -412,6 +412,23 @@ def test_the_inspector_shows_a_refusal_instead_of_samples(monkeypatch):
     _dispose(tab)
 
 
+# --- agent runtime ------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("operation, command", [
+    ("start", "AC_agent_runtime_start"), ("stop", "AC_agent_runtime_stop"), ("target", "AC_agent_target"),
+])
+def test_the_agent_tasks_tab_refuses_a_viewer_the_runtime_itself(monkeypatch, operation, command):
+    from je_auto_control.gui import agent_tasks_tab
+    submitted = []
+    tab = agent_tasks_tab.AgentTasksTab()
+    monkeypatch.setattr(tab._controller, "submit", lambda *args, **kwargs: submitted.append(args))
+    with _viewer():
+        tab._dispatch(operation, {"operation": "list", "request": {}})
+    assert submitted == [] and tab._handle is None
+    assert command in tab._status.text()
+    _dispose(tab)
+
+
 # --- every tab names what it needs, for the page banner -----------------------------------------------------
 
 @pytest.mark.parametrize("cls", [
