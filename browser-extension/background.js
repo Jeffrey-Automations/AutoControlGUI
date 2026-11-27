@@ -116,8 +116,24 @@ function recordEvent(state, message) {
     return saveState(state).then(() => ({ ok: true }));
 }
 
+// Every command — start, stop, reset, an event, and the reads too — runs
+// its load -> change -> save as one link of this chain. Two quick events
+// therefore never both read the same old action list (the later write
+// dropping the earlier action), and an event still being written when
+// Stop arrives finishes before Stop reads the state, so it cannot put
+// ``recording: true`` back afterwards.
+let queueTail = Promise.resolve();
+
+function serialised(task) {
+    const result = queueTail.then(task);
+    // A failed link still answers its own caller with the error; the
+    // chain itself carries on so one bad write does not stall the rest.
+    queueTail = result.then(() => undefined, () => undefined);
+    return result;
+}
+
 function dispatch(message) {
-    return loadState().then((state) => {
+    return serialised(() => loadState().then((state) => {
         switch (message?.command) {
             case "start":
                 return startRecording(message);
@@ -137,7 +153,7 @@ function dispatch(message) {
             default:
                 return { ok: false, reason: "unknown command" };
         }
-    });
+    }));
 }
 
 function replyWithError(sendResponse, error) {

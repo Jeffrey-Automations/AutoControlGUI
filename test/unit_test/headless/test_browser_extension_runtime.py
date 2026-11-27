@@ -56,3 +56,75 @@ def test_content_script_announces_the_page_on_load(harness):
     assert harness.value("__ext.outbox") == [
         {"command": "event", "event": {"type": "navigate", "url": "https://example.test/login"}},
     ]
+
+
+# === R07: one write queue ================================================
+
+def _finish_storage(harness) -> None:
+    """Let reads finish as soon as they can and writes finish newest first, until storage is idle.
+
+    That order is the one that loses work when two messages overlap: both read
+    the same old state, and the older write lands last.
+    """
+    for _ in range(100):
+        kinds = harness.pending()
+        if not kinds:
+            return
+        harness.complete(kinds.index("get") if "get" in kinds else len(kinds) - 1)
+    raise AssertionError("storage never went idle")
+
+
+def _recorded_selectors(harness) -> list:
+    return [action[1]["params"]["element_name"] for action in harness.stored_state()["actions"]
+            if action[0] == "AC_web_run"]
+
+
+def test_two_quick_events_are_both_kept(recorder):
+    recorder.request(_START)
+    recorder.manual_storage()
+    first = recorder.send(_click("#first"), _TAB)
+    second = recorder.send(_click("#second"), _TAB)
+    _finish_storage(recorder)
+    assert recorder.reply(first) == {"ok": True}
+    assert recorder.reply(second) == {"ok": True}
+    assert _recorded_selectors(recorder) == ["#first", "#second"]
+
+
+def test_stop_wins_over_an_event_still_being_written(recorder):
+    recorder.request(_START)
+    recorder.manual_storage()
+    early = recorder.send(_click("#early"), _TAB)
+    stop = recorder.send({"command": "stop"})
+    late = recorder.send(_click("#late"), _TAB)
+    _finish_storage(recorder)
+    assert recorder.reply(early) == {"ok": True}
+    assert recorder.reply(stop)["ok"] is True
+    assert recorder.reply(late) == {"ok": False, "reason": "not recording"}
+    state = recorder.stored_state()
+    assert state["recording"] is False
+    assert _recorded_selectors(recorder) == ["#early"]
+
+
+def test_reset_is_not_undone_by_an_event_queued_before_it(recorder):
+    recorder.request(_START)
+    recorder.manual_storage()
+    recorder.send(_click("#before-reset"), _TAB)
+    reset = recorder.send({"command": "reset"})
+    _finish_storage(recorder)
+    assert recorder.reply(reset) == {"ok": True}
+    state = recorder.stored_state()
+    assert state["recording"] is False
+    assert state["actions"] == []
+
+
+def test_start_after_stop_begins_a_new_recording(recorder):
+    recorder.request(_START)
+    recorder.manual_storage()
+    recorder.send(_click("#old"), _TAB)
+    recorder.send({"command": "stop"})
+    recorder.send(_START)
+    fresh = recorder.send(_click("#new"), _TAB)
+    _finish_storage(recorder)
+    assert recorder.reply(fresh) == {"ok": True}
+    assert recorder.stored_state()["recording"] is True
+    assert _recorded_selectors(recorder) == ["#new"]

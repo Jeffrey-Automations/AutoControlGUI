@@ -213,7 +213,8 @@ class ExtensionHarness:
         self.run('__ext.mode = "manual"')
 
     def pending(self) -> list:
-        """The kinds (``get`` / ``set``) of the storage operations still waiting, oldest first."""
+        """The kinds (``get`` / ``set``) of the storage operations waiting once queued jobs have run, oldest first."""
+        self.drain()
         return self.value("__ext.pending.map(function (op) { return op.kind; })")
 
     def complete(self, index: int) -> None:
