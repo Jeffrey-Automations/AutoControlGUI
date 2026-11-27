@@ -9,6 +9,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+/* Tests substitute an I/O double by defining GJ_PREAD before including this file. */
+#ifndef GJ_PREAD
+#define GJ_PREAD pread
+#endif
+
 static const char *const slot_names[2] = {"journal.a", "journal.b"};
 typedef enum { SLOT_ABSENT, SLOT_INVALID, SLOT_VALID } slot_state;
 
@@ -48,6 +53,23 @@ static bool trusted(const struct stat *status, uid_t administrator, bool directo
         status->st_uid == administrator && !(status->st_mode & (S_IWGRP | S_IWOTH));
 }
 
+/* Reads up to `size` bytes from offset 0, retrying EINTR and partial transfers. Returns
+ * the bytes read, fewer only at end of file, or -1 when the read itself failed. */
+static ssize_t read_whole(int number, void *buffer, size_t size) {
+    size_t total = 0;
+    while (total < size) {
+        ssize_t count = GJ_PREAD(number, (char *)buffer + total, size - total, (off_t)total);
+        if (count < 0 && errno == EINTR) continue;
+        if (count < 0) return -1;
+        if (count == 0) break;
+        total += (size_t)count;
+    }
+    return (ssize_t)total;
+}
+
+/* A slot that is absent, short or fails validation is a torn or corrupt record, which
+ * recovery may pass over. A slot that cannot be read is not: it may hold the newest
+ * record, so the read fails with GJ_ERROR_IO and the journal never commits over it. */
 static slot_state read_slot(const gj_journal *journal, int slot, gj_record *record, gj_error *error) {
     int number = openat(journal->directory, slot_names[slot], O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (number < 0) {
@@ -57,9 +79,10 @@ static slot_state read_slot(const gj_journal *journal, int slot, gj_record *reco
     }
     struct stat status;
     ssize_t count = -1;
-    if (fstat(number, &status) == 0 && trusted(&status, journal->administrator, false))
-        count = pread(number, record, sizeof(*record), 0);
-    else *error = GJ_ERROR_PERMISSIONS;
+    if (fstat(number, &status) == 0 && trusted(&status, journal->administrator, false)) {
+        count = read_whole(number, record, sizeof(*record));
+        if (count < 0) *error = GJ_ERROR_IO;
+    } else *error = GJ_ERROR_PERMISSIONS;
     close(number);
     return count == (ssize_t)sizeof(*record) && record_valid(record) ? SLOT_VALID : SLOT_INVALID;
 }
