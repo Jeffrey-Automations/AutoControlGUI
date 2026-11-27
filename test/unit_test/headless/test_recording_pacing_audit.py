@@ -101,3 +101,16 @@ def test_ios_find_uses_the_element_it_waited_for(monkeypatch):
     monkeypatch.setattr(ios_find, "_build_query", lambda *_args: _Query())
     device = type("Device", (), {"handle": object()})()
     assert ios_find.find_element(name="OK", device=device) == (10, 20, 40, 60)
+
+
+def test_a_resolution_from_an_action_file_is_used_as_integers(tmp_path, monkeypatch):
+    """``["4", "2"]`` passed the check, then ``cv2.resize`` failed on the recording thread."""
+    import numpy as np
+    from je_auto_control.utils.cv2_utils import screenshot
+    thread = screen_record.ScreenRecordThread(str(tmp_path / "out.avi"), "MJPG", 10, ["64", "48"])
+    try:
+        monkeypatch.setattr(screenshot, "pil_screenshot",
+                            lambda: np.zeros((100, 100, 3), dtype=np.uint8))
+        assert thread._grab().shape == (48, 64, 3)  # noqa: SLF001
+    finally:
+        thread.video_writer.release()

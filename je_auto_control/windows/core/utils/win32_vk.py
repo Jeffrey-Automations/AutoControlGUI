@@ -39,6 +39,12 @@ windows keyboard virtual keycode
 """
 
 WIN32_EventF_EXTENDEDKEY: int = 0x0001
+#: Keys a keyboard reports as extended: page up/down, end, home, arrows, insert,
+#: delete, both Windows keys, apps, keypad divide, NumLock, right Ctrl, right Alt.
+WIN32_EXTENDED_VIRTUAL_KEYS: frozenset[int] = frozenset({
+    0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
+    0x2D, 0x2E, 0x5B, 0x5C, 0x5D, 0x6F, 0x90, 0xA3, 0xA5,
+})
 WIN32_EventF_KEYUP: int = 0x0002
 WIN32_EventF_UNICODE: int = 0x0004
 WIN32_EventF_SCANCODE: int = 0x0008

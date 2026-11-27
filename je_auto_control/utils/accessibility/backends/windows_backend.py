@@ -21,6 +21,7 @@ from je_auto_control.utils.accessibility.backends.base import (
 from je_auto_control.utils.accessibility.element import (
     AccessibilityElement, AccessibilityNotAvailableError, element_matches,
 )
+from je_auto_control.utils.accessibility.walker import begin_act
 from je_auto_control.utils.accessibility.backends.windows_automation import (
     _CLSID_CUIAUTOMATION, _CLSID_CUIAUTOMATION8, PerThread, _create_automation, _is_available,
     _process_name, enter_apartment,
@@ -85,6 +86,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
     """UIAutomation-based flat element listing."""
 
     name = "windows-uia"
+    gates_writes = True
     #: One automation object per calling thread: a COM object is used where it was created.
     _automation = PerThread()
 
@@ -260,42 +262,18 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
 
     def set_value(self, value: str, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
                   automation_id: _Opt = None) -> bool:
-        raw = self._find_raw(name, role, app_name, automation_id)
-        pattern = self._pattern(raw, _UIA_VALUE_PATTERN_ID,
-                                "IUIAutomationValuePattern") if raw else None
-        if pattern is None:
-            return False
-        try:
-            pattern.SetValue(str(value))
-            return True
-        except _UIA_ERRORS:
-            return False
+        return self._invoke_pattern_method(name, role, app_name, automation_id, _UIA_VALUE_PATTERN_ID,
+                                           "IUIAutomationValuePattern", lambda p: p.SetValue(str(value)))
 
     def invoke(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
                automation_id: _Opt = None) -> bool:
-        raw = self._find_raw(name, role, app_name, automation_id)
-        pattern = self._pattern(raw, _UIA_INVOKE_PATTERN_ID,
-                                "IUIAutomationInvokePattern") if raw else None
-        if pattern is None:
-            return False
-        try:
-            pattern.Invoke()
-            return True
-        except _UIA_ERRORS:
-            return False
+        return self._invoke_pattern_method(name, role, app_name, automation_id, _UIA_INVOKE_PATTERN_ID,
+                                           "IUIAutomationInvokePattern", lambda p: p.Invoke())
 
     def toggle(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
                automation_id: _Opt = None) -> bool:
-        raw = self._find_raw(name, role, app_name, automation_id)
-        pattern = self._pattern(raw, _UIA_TOGGLE_PATTERN_ID,
-                                "IUIAutomationTogglePattern") if raw else None
-        if pattern is None:
-            return False
-        try:
-            pattern.Toggle()
-            return True
-        except _UIA_ERRORS:
-            return False
+        return self._invoke_pattern_method(name, role, app_name, automation_id, _UIA_TOGGLE_PATTERN_ID,
+                                           "IUIAutomationTogglePattern", lambda p: p.Toggle())
 
     def read_table(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
                    automation_id: _Opt = None) -> List[List[str]]:
@@ -315,9 +293,14 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
                                pattern_id: int, interface_name: str, action: Callable[[Any], Any]) -> bool:
         """Find a control, query a pattern, run ``action(pattern)`` → bool."""
         raw = self._find_raw(name, role, app_name, automation_id)
+        return self._act_on(raw, pattern_id, interface_name, action)
+
+    def _act_on(self, raw: Any, pattern_id: int, interface_name: str, action: Callable[[Any], Any]) -> bool:
+        """Query a pattern on a found element, pass the stop gate, run ``action(pattern)`` → bool."""
         pattern = self._pattern(raw, pattern_id, interface_name) if raw else None
         if pattern is None:
             return False
+        begin_act()   # the last point a stop can still prevent the act
         try:
             action(pattern)
             return True
@@ -469,7 +452,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
                                 ) if raw else None
         if pattern is None:
             return None
-        return _read_legacy(pattern)
+        return _read_legacy(pattern, hide_value=is_password(raw))
 
     def legacy_default_action(self, name: _Opt = None, role: _Opt = None, app_name: _Opt = None,
                               automation_id: _Opt = None) -> bool:
@@ -602,7 +585,7 @@ class WindowsAccessibilityBackend(AccessibilityBackend):
     def _text_pattern(self, name: _Opt, role: _Opt, app_name: _Opt, automation_id: _Opt) -> Any:
         """Find a control and return its IUIAutomationTextPattern, or None."""
         raw = self._find_raw(name, role, app_name, automation_id)
-        if not raw:
+        if not raw or is_password(raw):     # as get_value: a password's text never leaves
             return None
         return self._pattern(raw, _UIA_TEXT_PATTERN_ID,
                              "IUIAutomationTextPattern")

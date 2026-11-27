@@ -23,12 +23,14 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 
@@ -96,8 +98,15 @@ def write_default_config(path: Optional[Path] = None) -> Path:
     return target
 
 
-def run_daemon(config: HostServiceConfig) -> None:
-    """Block forever: publish offer → wait for answer → accept → loop."""
+def run_daemon(config: HostServiceConfig,
+               stopped: Optional[Callable[[], bool]] = None) -> None:
+    """Block until ``stopped()``: publish offer → wait for answer → accept → loop.
+
+    Without ``stopped`` only Ctrl-C ends it. The Windows service needs the
+    other way: its stop request set a flag nothing read, so the service sat
+    in STOP_PENDING until the process was killed.
+    """
+    halted = stopped or (lambda: False)
     from je_auto_control.utils.remote_desktop import default_trust_list
     from je_auto_control.utils.remote_desktop.multi_viewer import MultiViewerHost
     from je_auto_control.utils.remote_desktop.webrtc_transport import WebRTCConfig
@@ -116,20 +125,30 @@ def run_daemon(config: HostServiceConfig) -> None:
         "host_service: daemon up; host_id=%s server=%s",
         config.host_id, config.server_url,
     )
-    while True:
+    while not halted():
         try:
-            _serve_one_viewer(multi, config)
-            time.sleep(config.poll_interval_s)
+            _serve_one_viewer(multi, config, halted)
+            _pause(config.poll_interval_s, halted)
         except KeyboardInterrupt:
-            autocontrol_logger.info("host_service: shutting down")
-            multi.stop_all()
-            return
+            break
         except Exception as error:  # noqa: BLE001  # reason: a daemon must survive ANY transient error (signaling/aiortc/av/ValueError) and retry, not exit the loop
+            if halted():
+                break
             autocontrol_logger.warning("host_service loop: %r", error)
-            time.sleep(min(30.0, config.poll_interval_s * 5))
+            _pause(min(30.0, config.poll_interval_s * 5), halted)
+    autocontrol_logger.info("host_service: shutting down")
+    multi.stop_all()
 
 
-def _serve_one_viewer(multi: Any, config: HostServiceConfig) -> None:
+def _pause(seconds: float, halted: Callable[[], bool]) -> None:
+    """Sleep ``seconds``, or less once ``halted()``."""
+    deadline = time.monotonic() + seconds
+    while not halted() and time.monotonic() < deadline:
+        time.sleep(min(0.5, max(0.0, deadline - time.monotonic())))
+
+
+def _serve_one_viewer(multi: Any, config: HostServiceConfig,
+                      halted: Optional[Callable[[], bool]] = None) -> None:
     """Publish one offer, wait for its answer, and connect the viewer.
 
     Any failure after the offer exists stops that session before the error
@@ -148,6 +167,7 @@ def _serve_one_viewer(multi: Any, config: HostServiceConfig) -> None:
             config.server_url, config.host_id,
             secret=config.server_secret,
             timeout_s=300.0,
+            cancelled=halted,
         )
         multi.accept_session_answer(session_id, answer)
     except BaseException:
@@ -162,8 +182,45 @@ def _serve_one_viewer(multi: Any, config: HostServiceConfig) -> None:
 # --- service installation helpers ----------------------------------------
 
 
+class ServiceUnitError(AutoControlException, ValueError):
+    """A path cannot be written into a launchd plist or systemd unit."""
+
+
+# Never valid in either file: lone surrogates (an undecodable POSIX filename)
+# cannot be written as UTF-8, and XML 1.0 has no form for the rest.
+_NEVER_REPRESENTABLE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
+# A systemd line also ends at a newline; tabs and DEL are refused rather
+# than relying on C escapes inside the quoted word.
+_SYSTEMD_UNREPRESENTABLE = re.compile("[\x00-\x1f\x7f\ud800-\udfff\ufffe\uffff]")
+
+
+def _checked(value: object, what: str, pattern: re.Pattern[str]) -> str:
+    """``str(value)``, or :class:`ServiceUnitError` when it holds a character the format cannot."""
+    text = str(value)
+    bad = pattern.search(text)
+    if bad is not None:
+        raise ServiceUnitError(f"the {what} {text!r} holds {bad.group()!r}, which this file format cannot hold")
+    return text
+
+
+def _plist_text(value: object, what: str) -> str:
+    """Escape ``value`` for a plist ``<string>``; a carriage return is kept as a reference."""
+    text = _checked(value, what, _NEVER_REPRESENTABLE)
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\r", "&#13;")
+
+
+def _systemd_word(value: object, what: str) -> str:
+    """Quote ``value`` as one ExecStart word: C escapes, then ``%%`` specifiers and ``$$`` variables."""
+    text = _checked(value, what, _SYSTEMD_UNREPRESENTABLE)
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
+    return f'"{escaped}"'
+
+
 def _generate_launchd_plist(config_path: Path, output_path: Path) -> None:
-    python = sys.executable
+    """Write a launchd plist for the host service; :class:`ServiceUnitError` writes nothing."""
+    python = _plist_text(sys.executable, "Python interpreter path")
+    config = _plist_text(config_path, "config path")
+    logs = _plist_text(f"{Path.home()}/Library/Logs", "log directory")
     plist = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -178,16 +235,16 @@ def _generate_launchd_plist(config_path: Path, output_path: Path) -> None:
         <string>je_auto_control.utils.remote_desktop.host_service</string>
         <string>run</string>
         <string>--config</string>
-        <string>{config_path}</string>
+        <string>{config}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>{Path.home()}/Library/Logs/je_auto_control_host.log</string>
+    <string>{logs}/je_auto_control_host.log</string>
     <key>StandardErrorPath</key>
-    <string>{Path.home()}/Library/Logs/je_auto_control_host.err</string>
+    <string>{logs}/je_auto_control_host.err</string>
 </dict>
 </plist>
 """
@@ -195,14 +252,16 @@ def _generate_launchd_plist(config_path: Path, output_path: Path) -> None:
 
 
 def _generate_systemd_unit(config_path: Path, output_path: Path) -> None:
-    python = sys.executable
+    """Write a systemd user unit for the host service; :class:`ServiceUnitError` writes nothing."""
+    python = _systemd_word(sys.executable, "Python interpreter path")
+    config = _systemd_word(config_path, "config path")
     unit = f"""[Unit]
 Description=AutoControl WebRTC remote-desktop host
 After=network.target
 
 [Service]
 Type=simple
-ExecStart={python} -m je_auto_control.utils.remote_desktop.host_service run --config {config_path}
+ExecStart={python} -m je_auto_control.utils.remote_desktop.host_service run --config {config}
 Restart=on-failure
 RestartSec=5
 
@@ -422,7 +481,7 @@ if sys.platform == "win32":  # pragma: no cover - Windows-only
                 except (OSError, ValueError):
                     logging.exception("config load failed")
                     return
-                run_daemon(config)
+                run_daemon(config, lambda: not self._running)
     except ImportError:
         _WindowsService = None  # type: ignore[misc, assignment]
 else:
@@ -513,7 +572,11 @@ def _cmd_install_windows_service(args: argparse.Namespace) -> int:
 
 
 def _cmd_generate_launchd(args: argparse.Namespace) -> int:
-    _generate_launchd_plist(args.config or _default_config_path(), args.output)
+    try:
+        _generate_launchd_plist(args.config or _default_config_path(), args.output)
+    except ServiceUnitError as error:
+        print(f"Cannot write launchd plist: {error}", file=sys.stderr)
+        return 2
     print(f"Wrote launchd plist: {args.output}")
     print("Activate with:")
     print(f"  cp {args.output} ~/Library/LaunchAgents/")
@@ -522,7 +585,11 @@ def _cmd_generate_launchd(args: argparse.Namespace) -> int:
 
 
 def _cmd_generate_systemd(args: argparse.Namespace) -> int:
-    _generate_systemd_unit(args.config or _default_config_path(), args.output)
+    try:
+        _generate_systemd_unit(args.config or _default_config_path(), args.output)
+    except ServiceUnitError as error:
+        print(f"Cannot write systemd unit: {error}", file=sys.stderr)
+        return 2
     print(f"Wrote systemd unit: {args.output}")
     print("Activate with:")
     print(f"  mkdir -p ~/.config/systemd/user && cp {args.output} "

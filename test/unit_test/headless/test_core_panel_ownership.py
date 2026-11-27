@@ -101,7 +101,7 @@ def test_late_record_load_cannot_update_reopened_panel(monkeypatch):
         finally:
             exited.set()
 
-    monkeypatch.setattr(recording, "read_action_json", read)
+    monkeypatch.setattr(recording, "read_executable_action_json", read)
     monkeypatch.setattr(recording.QFileDialog, "getOpenFileName", lambda *args: ("fake.json", ""))
     entry = TabEntry("record", "record", recording.RecordTab)
     registry = TabRegistry([entry])

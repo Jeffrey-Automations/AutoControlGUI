@@ -1,6 +1,8 @@
 """Managed batches pin the whole graph and claim before any possible task delivery."""
 import pytest
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from unittest.mock import Mock
 
@@ -222,3 +224,101 @@ def test_nested_managed_operation_is_refused_before_batch_client_contact(monkeyp
     with pytest.raises(AgentTaskError, match="cannot coordinate"):
         run_dag(definition, batch_id="registered-batch")
     client.assert_not_called()
+
+
+def test_an_unreadable_batch_cannot_keep_emergency_stop_from_cancelling_tasks(runtime):
+    value = runtime.batches.control("register", {"definition": graph()})
+    runtime.batches.control("begin", {"batch_id": value["batch_id"], "definition": graph(), "max_parallel": 4})
+    with runtime.store.connection(write=True) as connection:
+        connection.execute("UPDATE agent_dag_batches SET graph_hash='changed' WHERE id=?", (value["batch_id"],))
+    queued = runtime.submit(task()["spec"]).task_id
+    result = runtime.stop_all()
+    assert runtime.get(queued).state == "cancelled"
+    assert result["requested"] == 1
+    assert result["cleanup_errors"] == [{"batch_id": value["batch_id"], "error": "AgentTaskError"}]
+
+
+def until(condition, attempts=500):
+    for _attempt in range(attempts):
+        if condition():
+            return
+        threading.Event().wait(0.01)
+    raise AssertionError("condition was not reached")
+
+
+def begun(runtime):
+    value = runtime.batches.control("register", {"definition": graph()})
+    started = runtime.batches.control("begin", {"batch_id": value["batch_id"], "definition": graph(),
+                                               "max_parallel": 4})
+    return value["batch_id"], started["attempt"]
+
+
+def test_emergency_stop_returns_without_waiting_for_a_batch_operation(runtime):
+    # It used to wait here for the batch lock, although input had already stopped.
+    batch, attempt = begun(runtime)
+    running = runtime.submit(task()["spec"]).task_id
+    owned, release, admitted = threading.Event(), threading.Event(), []
+
+    def slow_operation():
+        with runtime._lock("dag:" + batch):
+            owned.set()
+            assert release.wait(10)
+            admitted.append(runtime.submit(task()["spec"]).task_id)  # a task the operation admits as it ends
+
+    with ThreadPoolExecutor(max_workers=3) as workers:
+        operation = workers.submit(slow_operation)
+        try:
+            assert owned.wait(5)
+            result = workers.submit(runtime.stop_all).result(timeout=5)  # while the operation still runs
+            assert runtime._token(running).is_cancelled and runtime.get(running).state == "cancelled"
+            assert result["requested"] == 1 and result["batch_fence_pending"] == [batch]
+            claim = workers.submit(runtime.batches.control, "claim",
+                                   {"batch_id": batch, "attempt": attempt, "node_id": "a"})
+        finally:
+            release.set()
+        operation.result(timeout=5)
+        with pytest.raises(AgentTaskError):
+            claim.result(timeout=5)  # refused by the pending fence or by the pause that followed it
+    until(lambda: admitted and runtime.get(admitted[0]).state == "cancelled")
+    described = runtime.batches.control("get", {"batch_id": batch})
+    assert described["state"] == "waiting_review"
+    assert all(node["phase"] == "pending" for node in described["nodes"])
+
+
+def test_a_batch_whose_stop_is_pending_refuses_progress_but_not_reads(runtime):
+    from je_auto_control.utils.agent_runtime.runtime_stop import mark_fencing, unmark_fencing
+    batch, attempt = begun(runtime)
+    claim = {"batch_id": batch, "attempt": attempt, "node_id": "a"}
+    mark_fencing(runtime, batch)
+    with pytest.raises(AgentTaskError, match="being stopped"):
+        runtime.batches.control("claim", claim)
+    assert runtime.batches.control("get", {"batch_id": batch})["state"] == "running"
+    unmark_fencing(runtime, batch)
+    runtime.batches.control("claim", claim)
+
+
+def test_a_background_fence_failure_is_reported_by_the_next_stop(runtime):
+    from je_auto_control.utils.agent_runtime import runtime_stop
+    batch, _attempt = begun(runtime)
+    owned, release = threading.Event(), threading.Event()
+
+    def slow_operation():
+        with runtime._lock("dag:" + batch):
+            owned.set()
+            assert release.wait(10)
+            with runtime.store.connection(write=True) as connection:  # the batch turns unreadable meanwhile
+                connection.execute("UPDATE agent_dag_batches SET graph_hash='changed' WHERE id=?", (batch,))
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        operation = workers.submit(slow_operation)
+        try:
+            assert owned.wait(5)
+            assert workers.submit(runtime.stop_all).result(timeout=5)["cleanup_errors"] == []
+        finally:
+            release.set()
+        operation.result(timeout=5)
+    until(lambda: runtime_stop._fences(runtime).errors)  # the background pause has failed
+    failure = {"batch_id": batch, "error": "AgentTaskError"}
+    # This stop's own attempt on the still-running batch fails too, then the earlier failure is reported.
+    assert runtime.stop_all()["cleanup_errors"] == [failure, failure]
+    assert runtime.stop_all()["cleanup_errors"] == [failure]  # reported once

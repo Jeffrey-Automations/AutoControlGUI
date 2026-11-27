@@ -64,14 +64,33 @@ OpenAI agent 請使用 `export_openai_tools(only=[...])` 提供聚焦工具集�
 
 | 介面 | 啟動方式 | 說明 |
 |---|---|---|
-| **MCP 伺服器** | `je_auto_control_mcp`（stdio）或 `AC_start_mcp_http_server` | 820 個工具，供 Claude Desktop／Claude Code／自訂 tool loop 使用：完整的 `ac_*` 工具介面，以及常用 GUI 操作的短名稱 alias。除了以 `initialize` 握手的各版協定，也支援無狀態的 MCP 2026-07-28。Bearer 驗證、TLS、稽核記錄、限流、外掛熱重載、CI 假後端。 |
+| **MCP 伺服器** | `je_auto_control_mcp`（stdio）或 `AC_start_mcp_http_server` | 823 個工具，供 Claude Desktop／Claude Code／自訂 tool loop 使用：完整的 `ac_*` 工具介面，以及常用 GUI 操作的短名稱 alias。除了以 `initialize` 握手的各版協定，也支援無狀態的 MCP 2026-07-28。Bearer 驗證、TLS、稽核記錄、限流、外掛熱重載、CI 假後端。 |
 | **REST API** | `je_auto_control start-rest` | Bearer token、逐 IP 限流與鎖定、SQLite 稽核 hook、`/metrics`、`/openapi.json`、`/docs` Swagger UI、`/dashboard`。 |
-| **TCP socket 伺服器** | `je_auto_control start-server` | 以換行分隔的 JSON 動作清單。預設綁 `127.0.0.1`。 |
+| **TCP socket 伺服器** | `je_auto_control start-server` | 先以 `AUTH <token>` 握手（見下文），再送以換行分隔的 JSON 動作清單。預設綁 `127.0.0.1`。 |
 | **pytest 外掛** | 安裝後自動生效 | 提供 fixture 與供 pytest-bdd／behave 使用的 Gherkin step library。 |
 | **語言伺服器** | `python -m autocontrol_lsp.server` | 為 `AC_*` 動作 JSON 提供補全與診斷，指令清單直接取自執行期的指令表。 |
 | **遠端桌面** | `RemoteDesktopHost` 或 GUI | TCP、WebSocket 或 WebRTC；TOTP、信任清單、TURN 設定、檔案／剪貼簿／音訊同步。 |
 
 除非明確指定，所有伺服器都綁在 `127.0.0.1`。
+
+**TCP socket 伺服器驗證。** 每條連線的第一行必須是 `AUTH <token>`；伺服器回 `AUTH_OK`，之後照舊讀一條指令。沒有先驗證就送出的指令（包括 `quit_server`）會以 `authentication required` 拒絕，不會執行。
+
+- **伺服器 token**（RBAC 關閉）：`start_autocontrol_socket_server(token=...)`／`--token`，否則 `JE_AUTOCONTROL_SOCKET_TOKEN`，再否則隨機產生 `secrets.token_urlsafe(32)`。它以原子方式寫入 `~/.je_auto_control/socket_server_<port>.token`（可用 `--token-file`／`token_path` 改路徑），只有擁有者能讀（POSIX 為 0600，Windows 為只列目前使用者的存取清單），伺服器關閉時刪除。CLI 只印路徑，不印 token。
+- **RBAC 開啟**（`JE_AUTOCONTROL_RBAC_USERS`）：只接受使用者的 token；伺服器 token 會被拒，也不寫檔。每個指令以該使用者的角色執行：動作清單需要 `drive_input`，執行前整份檢查；巢狀動作檔由執行器檢查；`quit_server` 需要 `manage_hosts`。
+- **限制：** 10 秒內必須完成驗證；每條連線錯 3 次 token 即關閉；失敗嘗試依客戶端位址限流（一分鐘內失敗 8 次後，錯誤 token 會收到 `too many failed attempts`；正確 token 永遠不會被鎖住）。
+- **關閉驗證：** `--no-auth`／`require_auth=False` 保留不驗證的協定，並記錄警告：任何連得到伺服器的程序都能執行任何指令。
+
+客戶端輔助函式會替你讀 token：
+
+```python
+import je_auto_control as ac
+
+print(ac.send_socket_command([["AC_screen_size"]], port=9938))  # token 檔，或 JE_AUTOCONTROL_SOCKET_TOKEN
+ac.send_socket_command("quit_server", port=9938, token="<RBAC 下某位 admin 的 token>")
+```
+
+自行開 socket 的客戶端可用 `read_socket_token(port)` 與 `authenticate_connection(connection, stream, token)`。既有客戶端必須先送 `AUTH <token>` 並在讀回覆前讀掉 `AUTH_OK` 那一行，或改以 `--no-auth` 啟動伺服器。
+**HTTP 上的 resource 訂閱。** 在 MCP 的 HTTP 傳輸上，握手時代的 `resources/subscribe` 屬於送出它的 session：請帶上 `initialize` 回傳的 `Mcp-Session-Id`，並開啟該 session 常駐的 `GET` 串流（`Accept: text/event-stream`）來接收 `notifications/resources/updated`。每個 session 各自持有訂閱；session 沒有開著串流時到達的更新會被丟棄；結束 session（`DELETE`、閒置清除或被擠出）會釋放它們。沒有 session 的請求沒有可送達的串流，所以 `resources/subscribe` 以 JSON-RPC 錯誤 `-32600` 拒絕，而不是回 `{}`。無狀態 2026-07-28 的用戶端使用 `subscriptions/listen`；stdio 傳輸不變。
 
 MCP 視窗狀態工具 `ac_window_minimize`、`ac_window_maximize` 與 `ac_window_restore` 在後端接受要求時回傳視窗 handle，遭拒時回覆 `isError: true`（包括 handle 失效或啟用請求被拒）。Win32 原始 `ShowWindow` 的先前可見性由後端正規化處理。
 
@@ -84,6 +103,8 @@ REST GUI 在使用者存放檔啟用時顯示 RBAC 模式並停用共用 token �
 RBAC viewer 不會取得列管的敏感讀取工具，即使 MCP `readOnlyHint` 為 true：剪貼簿／歷史、本機文件／資料／SQL 與 dotenv 讀取、參照解析、認證資料產生、持久存放區讀取、對外檢查、麥克風擷取與外部 VLM 請求都需要 operator／admin。斷言容器的 spec 也可能讀取這些資源，因此同樣需要 operator。螢幕觀察與純輸入解析維持既有分類。`ac_realize_item`、`ac_idempotency_begin` 與 `ac_rate_limit` 會改變狀態，已從 `--read-only` 模式排除。
 
 間隔／cron 排程、觸發器、熱鍵、watchdog 規則、webhook、e-mail 觸發器與 observer 回呼會保留註冊者身分。每次觸發重新檢查來源使用者檔與角色；已刪除的使用者、無法使用的來源檔與 viewer 不能執行背景工作。啟動 daemon 不會改變既有工作的擁有者。擁有者資訊不保存 RBAC bearer token；未帶 `store_path` 的明確 Python `AuthorizationContext` 保留角色快照，未在 RBAC 下註冊的工作會清除 worker 原有身分。observer／watchdog 回呼使用獨立變數範圍，watchdog 動作失敗不會算成成功排除彈窗。巢狀回呼會保留呼叫端的失敗計數；webhook 擁有者被撤銷權限時回應 HTTP 403 與 `fired: false`。
+
+語音指令與 macro 也是存下的動作清單，但由其他人觸發。`AC_voice_register` 與 `AC_define_macro`（以及 `ac_voice_register`）會記下註冊者；`AC_voice_dispatch`／`AC_call_macro`（以及 `ac_voice_dispatch`）執行每個步驟時，包含巢狀內容與 `AC_parallel` 分支，都要求註冊者與目前呼叫端同時具備該步驟需要的權限。被拒絕的步驟記為 `AuthorizationError`，清單其餘部分照一般失敗步驟的規則繼續。來自使用者檔的註冊者會在觸發時重新讀取，所以已刪除的使用者註冊的指令不再執行。executor 的 macro 表由所有伺服器共用，因此每個身分只能重新定義自己的 macro；受信任的本機程式碼（沒有 RBAC 範圍）可以重新定義任何 macro，它定義的 macro 也不能被使用者取代。匿名 MCP session 本來就以 `mcp:<session>` operator 身分執行，所以即使 RBAC 關閉，它們的語音指令與 macro 在 GUI 或 Python 觸發時仍受 operator 限制，重新連線的 session 也不能重新定義前一個 session 的 macro。RBAC 關閉且沒有 MCP session 時行為不變。
 
 ### 遠端桌面的線路協定
 
@@ -125,4 +146,4 @@ RemoteDesktopHost(token="tok", ip_allowlist=["10.0.0.0/8", "192.168.1.100"])
 
 ---
 
-內部 presence 傳輸可透過主機與 helper 的私有設定傳遞受管 Linux 來源端點。租約與端點一併固定，公開任務選項不能指定該端點。標準桌面准入仍限 Windows；Linux socket 實跑及原生桌面驗收仍未完成。
+內部 presence 傳輸可透過主機與 helper 的私有設定傳遞受管 Linux 或 macOS 來源端點。租約與端點一併固定，公開任務選項不能指定該端點。標準桌面准入仍限 Windows；Linux socket 實跑、CI 方格以外的 macOS 及原生桌面驗收仍未完成。

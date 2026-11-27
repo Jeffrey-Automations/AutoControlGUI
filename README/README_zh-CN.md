@@ -37,6 +37,8 @@ python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 - 通过 MCP 连接 AI 客户端，或通过 REST 与 Python 整合。
 - 在可选 GUI 中使用录制、调度与远程桌面工具。
 
+TCP socket 服务器（`je_auto_control start-server`，端口 9938）现在需要验证。每条连接先发送 `AUTH <token>`，收到 `AUTH_OK` 后指令才会执行。token 依次取 `--token`、`JE_AUTOCONTROL_SOCKET_TOKEN`，都没有则随机生成，并以仅所有者可读的方式写入 `~/.je_auto_control/socket_server_<port>.token`（`--token-file` 可改），服务器停止时删除。RBAC 下只接受用户的 token：执行动作需要 `drive_input`，`quit_server` 需要 `manage_hosts`。每条连接有 10 秒与 3 次机会，失败按地址限流。`ac.send_socket_command([["AC_screen_size"]])` 会替你读取 token 并完成验证。现有客户端必须先发送 `AUTH` 那一行，或以 `--no-auth` 启动服务器；后者会记录警告：此时任何本机进程都能执行任何指令。详见[整合说明](../docs/guides/zh-CN/integrations.md)。独立的 driver（`autocontrol_driver/`）不再以预先编好的二进制文件放在 repo 里：Driver workflow 用 Nuitka 构建（Windows 上是一个没有控制台窗口的 `AutoControlDriver.exe`，Linux 上是一个 `AutoControlDriver` 二进制文件），确认它会拒绝没有 token 的指令，并附在每个 GitHub release；本机可用 `python autocontrol_driver/build_driver.py` 构建。
+
 图像检测分页在后台执行匹配，并有自己的鼠标按键选择。
 Actions 菜单可停止待完成的搜索；关闭分页会丢弃延迟结果，重新打开会重置输入字段。
 取消可阻止后续移动与点击步骤，但无法中断已进入的原生调用。
@@ -48,6 +50,8 @@ Actions 菜单可停止待完成的搜索；关闭分页会丢弃延迟结果，
 View → 执行详情（Ctrl+Shift+D）可展开右侧详情。诊断分页会提供实际进度、停止、结果与错误状态，其他在后台执行工作的分页（模型请求、USB 列举、广播、DAG 执行、日志读取）也会：执行中、停止中，然后是完成、已取消或错误，工作有回报进度时一并显示。尚未执行过工作的分页会明确显示没有详情。后台停止失败时（页面放开的连接、录制或主机）会被保留而不只记录日志：诊断分页列出每一个及其错误，Actions › 重试失败的停止 会以排入时的权限再次执行。切换或关闭分页会断开其更新。嵌入程序可将 TabRegistry 传入 WorkspaceShell；AutoControlGUIWidget(parent) 仍可使用。
 
 每个分页开头都有标题与一行用途说明，控件按用途分组在卡片上；复选框与单选按钮以主题强调色绘制，深色主题下也看得清楚。控件会随窗口缩小，不再撑宽页面：下拉菜单不再以最长项目决定宽度，表单字段放不下时标签移到字段上方，长说明会自动换行。空的表格、列表或树状清单会显示「暂无内容。」，直到第一笔数据出现，不再只显示空白格线。页面标题下方的横幅会说明该页上次执行失败（下次执行时清除），GUI 在 RBAC 范围内执行时也会说明当前角色无法执行该页的哪些指令；横幅附有关闭链接。窗口会依宽度重新排列：1,200 px 以上，导航与执行详情并排在分页两侧；较窄时详情改为覆盖在分页上的抽屉；800 px 以下导航缩成窄图标栏，按其菜单按钮或 Ctrl+K 以抽屉打开功能列表（Escape 或点击旁边即关闭）。因宽度隐藏导航不会改动已保存的偏好。
+
+在 RBAC 范围内，每个分页执行特权指令前都会像 executor 一样检查角色，被拒时在分页中说明原因；未启用 RBAC 时行为不变。远程桌面、Quick Connect、WebRTC 与 REST 页面的 token 与密码栏默认遮蔽，可切换显示。Quick Connect 核准对话框按 Enter 或 Escape 都是拒绝。密码库指令、插件加载、设置导出入、审计记录读取、数据源加载与 Trace Replay 帧都在后台线程进行，Trace Replay 也会拒绝录制文件夹以外的帧文件。DAG、Flow、Script Builder 与录制编辑器、执行记录、测试套件、自我修复、REST 用户面板、USB ACL、管理控制台，以及远程桌面的信任列表、通讯录与已知主机，其文件与存储操作也都在后台执行；分页会显示忙碌状态，错误就地报告。远程桌面画面与结果图片在各视图自己的线程解码（只解最新一帧），TLS 证书在连接或启动的工作线程加载。
 
 WebRTC 统计轮询在后台启动，停止后会丢弃延迟到达的样本。
 
@@ -77,15 +81,25 @@ Wayland NORMAL 输入通过受管理的子进程执行 libei 与 portal 调用�
 
 关闭 Remote Desktop 会释放页面；重新打开会创建新控件，不自动接回共享连接。Registry 的 TCP／WebSocket 连接仍可供脚本使用；页面拥有的 WebRTC 连接与音频在后台停止。待处理批准会拒绝，延迟回调会丢弃。正在发送的文件传输会在页面关闭、连接被放掉或上传取消时于下一个区块停止，主机会丢弃未完成的文件（TCP、WebSocket 与 WebRTC 皆同）。
 
+远程桌面主机（TCP 与 WebSocket）不再让还在验证的连接占用 `max_clients` 的 viewer 名额。`max_pending_handshakes`（默认 8）限制同时验证中的连接数，超过的在 accept 时就拒绝。`auth_timeout`（默认 10 秒，最多 60）涵盖 TLS、WebSocket 升级与 challenge-response，所以不说话的连接 10 秒后就被断开，不再占着名额最多 60 秒。连接要等身份验证通过才占用 viewer 名额；若在验证途中名额被占满，该 viewer 会收到 `AUTH_FAIL "host full"`。两个设置都可用于 `RemoteDesktopHost`、registry 的 `start_host`／`start_ws_host`、`AC_start_remote_host`、`AC_start_ws_host`、`ac_remote_host_start` 与主机分页的高级区。落后的 H.264 viewer 现在会跳到新的关键帧，不再解码参考帧已丢失的 P-frame；主机会向编码器请求该关键帧，整个主机每秒最多一次。JPEG 串流不变。
+
 WebRTC host/viewer 的 `stop()` 最多等待三秒完成软件清理。`PeerStopPending` 保留同一个尚未完成的操作；显式重试只会继续等待。`PeerStopFailed` 保留清理失败的资源供显式重试，成功前禁止重新启动。Multi-viewer host 保留失败的 session 与共享来源。`FolderSyncEngine.stop_confirmed()` 在原工作线程仍存活时返回 `False`。这些结果不代表原生设备已释放；页面销毁后的恢复仍需持久资源保管与重试整合。
 
 主机文件请求会保留原发送工作，直到工作线程退出，重复停止也不会提前释放所有权。停止会通知取消并等待原工作；无法中断的后端操作仍可能让停止保持待完成。
 
 MCP 只读标记不授予 viewer 访问权限。已审查的实时画面与调用者数据运算使用 `read_screen`；文件、设备数据及未知工具需要 `read_data`。别名共用标准名称的权限，较强的明确设置优先。提供图像来源、从环境变量读取配置字段或规划打开本地文件时需要 `read_data`。Anchor locator 的 accessibility／OCR 允许观察实时画面，图像模板需要 `read_data`，VLM 请求需要 `drive_input`。只读调用拒绝捕获产物及 VLM 分支，目录排除可自选 ADB 可执行文件的工具。MCP CI annotations 只返回格式化文本，不写入 stdout。未经审查的 plugin 与 WebRunner 初始化工具不列入只读目录，等待依赖版本的单独审查。
 
-MCP 的 `tools/call` 以可停止的执行进行，列为 `mcp-…`。`notifications/cancelled` 会停掉它：`ac_execute_actions` 的动作列表在下一个动作前停下，`ac_wait_for_image`／`ac_wait_for_pixel` 在轮询中途醒来；该次调用以 `-32800` 回复。`ac_stop_execution` 与其他停止请求以同样方式结束它，报告为工具错误。已经进入后端的单个指令仍会先执行完；例外的是捕获输出的 shell 指令（`ac_shell`、`AC_shell_to_var`），它的进程树会被结束；HTTP 请求（`AC_http_request`、`ac_http_request` 与其他走共用 HTTP client 的调用），它的 socket 会被关闭；以及一次模板匹配或 OCR，调用不再等它（原生运算在后台跑完、结果丢弃）；这些调用都随即结束。
+MCP 的 `tools/call` 以可停止的执行进行，列为 `mcp-…`。`notifications/cancelled` 会停掉它：`ac_execute_actions` 的动作列表在下一个动作前停下，`ac_wait_for_image`／`ac_wait_for_pixel` 在轮询中途醒来；该次调用以 `-32800` 回复。`ac_stop_execution` 与其他停止请求以同样方式结束它，报告为工具错误。已经进入后端的单个指令仍会先执行完；例外的是捕获输出的 shell 指令（`ac_shell`、`AC_shell_to_var`），它的进程树会被结束；HTTP 请求（`AC_http_request`、`ac_http_request` 与其他走共用 HTTP client 的调用），它的 socket 会被关闭；以及一次模板匹配、OCR、VLM 定位请求或只读无障碍树遍历，调用不再等它（原生运算或请求在后台跑完、结果丢弃）；这些调用都随即结束。单个手势内的节奏等待也会醒来：`click_mouse` 连点之间的间隔、补间拖拽的每步与稳定停顿（按键在光标停下的位置松开），以及拟人移动与拟人打字的每步、每键延迟。
+
+图像搜索无法使用输入时抛出 `ImageSearchInputException`：模板不存在或读不出、模板是单一颜色、阈值超出 0–1、是 NaN 或不是数字，或 OpenCV 无法匹配的图像。`ImageNotFoundException` 现在只表示搜索跑过、模板不在画面上。两者是兄弟而非父子，所以 `AC_assert_image` 加 `present: false`、`AC_wait_image_gone` 与 `AC_if_image_found` 的 `else` 分支遇到写错的模板路径会失败，不再通过；使用这种模板的图像触发器会被停用并记录，观察者规则、状态机守卫与 anchor locator 则会抛出异常。原本捕获 `ImageNotFoundException` 来处理错误路径的代码，必须同时捕获 `ImageSearchInputException`。
+
+命令抛出框架家族以外的错误（`cv2.error`、`sqlite3.Error`、插件自定义的异常类）时，不再中止整个动作列表：它被记录为该动作的失败，包装成 `AutoControlForeignException`（原异常是它的 `original` 与 `__cause__`），`AC_try`、`AC_retry`、`AC_loop` 与 `AC_parallel` 都把它当作普通的失败动作。`raise_on_error=True` 时抛出的是这个包装。从不收纳的有：断言失败（`AutoControlAssertionException` 与插件自己的 `AssertionError`）、`AC_break`／`AC_continue`、停止请求、取消、`KeyboardInterrupt` 与 `SystemExit`。
+
+在 MCP 的 HTTP 传输上，`resources/subscribe` 属于发送它的 session（`initialize` 返回的 `Mcp-Session-Id`），`notifications/resources/updated` 经该 session 常驻的 `GET` 流送达；没有流打开时到达的更新会被丢弃。结束 session 会释放它的订阅。没有 session 的请求没有可送达的流，会以 `-32600` 拒绝。stdio 传输不变。
 
 REST 主机数据读取与对应 MCP 权限一致：调度、远程 session、USB passthrough 状态、loopback／remote 设备列表及诊断需要 `read_data`。对应已注册的状态命令、`AC_probe_capabilities` 与 `AC_diagnose` 会在运行提供者之前检查权限。只读标记不授予 viewer 访问权；operator／admin 仍可使用。USB 枚举／事件、保留的 inspector 统计与进程 metrics 也需要 `read_data`；`AC_list_usb_devices`、`AC_usb_recent_events`、`AC_inspector_recent`、`AC_inspector_summary` 同样检查此权限。Dashboard 各面板分别显示缺少的权限并清除旧数据；session 刷新成功后也会清除先前的错误状态。未列入权限表的 executor 命令仍属于另一项审查范围。
+
+语音命令（`AC_voice_register`）与 macro（`AC_define_macro`）保留注册者的权限：触发或调用时，每个步骤必须注册者与当前调用端都有权执行才会执行，因此保存的动作列表不会借用 admin 的权限，也不会在 GUI 或 Python 触发时不经检查就执行。只有 macro 的所有者或受信任的本机代码可以重新定义它。匿名 MCP session 以受限的 operator 身份执行，所以即使 RBAC 关闭也适用；没有 RBAC 且不经 MCP 时行为不变。每个具名 executor registry（`AC_cas_put`、`AC_dedup_check`、`AC_idempotency_begin`、`AC_bulkhead_run`、`AC_sequence_observe`、`AC_outbox_enqueue` 背后的 store、window、bulkhead、tracker 与 outbox）最多保存 1,024 个名称（`MAX_REGISTRY_NAMES`）：已有名称照常运作，新名称会抛出 `RegistryFullError`，名称只在进程结束时释放。`AC_generate_sop` 与 `AC_generate_code` 会替换已知的 `${var}`，但 `${secrets.NAME}` 与尚未绑定的名称（例如循环变量）按原样写出。`AC_resolve_ref`／`AC_resolve_refs` 获取的 `env://` 值仍返回给调用端，但在该次运行剩余的期间，日志、journal 与 MCP 审计中都会遮罩，记录的结果与 Script Builder 结果窗格也会遮罩。
 
 主机只读模式对外部提供的目录及后续注册应用相同限制，接收请求及重新核对身份后的调用都检查混合用途参数。MCP 配置的失败截图需要可写入的工具及重新核对后具输入操作权限的调用者；只读调用与 viewer 不会触发截图。这不表示所有依赖包或诊断读取均无初始化副作用。
 
@@ -121,11 +135,17 @@ MultiViewerHost 可返回含原始 session 清理对象的 offer，延后清理�
 判定须有对应操作的确认回执，以及同一资源所有者在接受后取得的新 SCM 查询。
 通过只表示 SCM 报告该状态，不证明原子完成、健康或桌面无干扰。这些工具名称仅属于
 adapter 范围，不是全局 executor 指令。现有任务 API 与 GUI JSON 编辑器可传递此条件。
-主机审阅的 `service` profile 固定 `config_path`、`config_sha256` 及 ASCII `service_key`。
+主机审阅的 `service` profile 固定 `config_path`、`config_sha256` 及 `service_key`。
+非 ASCII 的键以 Windows 本身的 NT upcase 表做大小写折叠，不用 Python 的大小写映射，
+因此 SCM 视为同一服务的各种写法共用同一把锁。
 固定 worker 核对部署的服务与操作上限后才接受任务范围。注册、重载与 probe 不读取部署文件
 或访问 SCM；原生验收仍待完成。
 所有固定路径（各 profile 的 `config_path` 及部署指定的映像文件）都必须是本机磁盘路径：
 UNC 共享、`\\.\pipe\` 名称、`\\?\` 设备路径与 `..` 片段一律拒绝，注册 profile 不能让主机把凭据发送到其他机器。
+browser profile 也可声明主机审阅的 `semantic_fields`：最多 64 条 `{name, selector, frame?, property}`，property 为 `text`、`value` 或 `visible`。之后每次浏览器观察都会附上共用 observation report 格式的 `semantic_report`。来源绑定受管浏览器 context，新 session 即为新的目标生命周期；元素不存在报告 `not_found`，SDK 拒绝读回的值（密码、隐藏、文件或 `data-secret` 字段）报告 `protected`，读取期间换页则整个来源为 `inconsistent_snapshot`。捕获编号与时间不列入，页面未变时动作前的指纹保持相同。selector 必须唯一，因为 SDK 遇到不唯一的 selector 会让 session 退休。DOM 读取没有 revision，保持 best-effort；实际浏览器验收仍待完成。
+`android` 目标 profile（设置 `serial`、`physical_id`、`package`，可选 `adb_port`、`user`、`idle_seconds`；单一 app；工具 `AC_android_tap`／`AC_android_swipe`／`AC_android_key`）经设备端 helper 操作一台设备，helper 须已安装并运行。真机验收仍待完成。
+Wayland portal 拒绝或撤销后，`reset_native_input()`（`AC_reset_native_input`、`ac_reset_native_input`、Diagnostics → Actions）会退休缓存的输入会话，让下一次输入重新请求同意；它本身不请求任何授权。
+iOS 模拟器可用 `use_ios_simulator(udid)`（`AC_ios_use_simulator`）把安装、文件、剪贴板与录屏改经 `xcrun simctl`；`list_ios_simulators()` 列出已启动的模拟器。
 fixture 映像执行前，租约还会拒绝其他账户能更改的位置：从磁盘根目录往下的每一层都必须是实体目录
 （不能是 junction 或 symlink），且只有 SYSTEM、Administrators、TrustedInstaller 与当前用户能改名、删除、
 改 ACL 或新增文件；租约文件的最终路径也必须等于配置的路径。请把 fixture 部署在 `%LOCALAPPDATA%` 这类受保护目录；

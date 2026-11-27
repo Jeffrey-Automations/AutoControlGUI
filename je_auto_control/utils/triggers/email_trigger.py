@@ -27,6 +27,7 @@ from email.message import EmailMessage
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set
 
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+from je_auto_control.utils.executor.run_control import ExecutionStopped
 from je_auto_control.utils.json.json_file import read_executable_action_json
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.run_history.context import HistoryBinding, bound_history
@@ -36,7 +37,7 @@ from je_auto_control.utils.run_history.artifact_manager import (
     capture_error_snapshot,
 )
 from je_auto_control.utils.run_history.run_outcome import (
-    RunOutcome, finish_history_run, run_counting_failures,
+    RunOutcome, finish_history_run, raise_if_run_interrupted, run_counting_failures,
 )
 from je_auto_control.utils.run_history.history_store import (
     SOURCE_TRIGGER, STATUS_ERROR as STATUS_ERROR, STATUS_OK as STATUS_OK, default_history_store,
@@ -374,8 +375,22 @@ class EmailTriggerWatcher:
         for trigger in self.list_triggers():
             if trigger.enabled:
                 cancellation_checkpoint()
-                fired += self._poll_one(trigger)
+                fired += self._poll_contained(trigger)
         return fired
+
+    def _poll_contained(self, trigger: EmailTrigger) -> int:
+        """Poll one trigger; a fault in it must not keep the others from being polled.
+
+        Non-ASCII search criteria, say, raise ``UnicodeEncodeError`` inside imaplib.
+        """
+        try:
+            return self._poll_one(trigger)
+        except ExecutionStopped:
+            raise
+        except Exception as error:  # noqa: BLE001  # reason: recorded on the trigger, as the polling thread does
+            raise_if_run_interrupted(error)
+            self._record_connect_error(trigger, error)
+            return 0
 
     def _poll_one(self, trigger: EmailTrigger) -> int:
         try:

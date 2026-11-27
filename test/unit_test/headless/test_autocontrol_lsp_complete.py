@@ -145,6 +145,57 @@ def test_diagnostics_warns_on_params_not_dict():
     assert any("must be an object" in d["message"] for d in diags)
 
 
+# === Diagnostics against the executor's own contract =====================
+
+_KEYWORD_DIR = Path(__file__).resolve().parents[3] / "AutoControl" / "keyword"
+
+
+@pytest.mark.parametrize("example", ["keyword1.json", "keyword2.json"])
+def test_diagnostics_accept_the_project_keyword_examples(example):
+    """Positional list arguments and flow commands such as AC_sleep run fine."""
+    from autocontrol_lsp.server.diagnostics import diagnostics_for
+    text = (_KEYWORD_DIR / example).read_text(encoding="utf-8")
+    assert diagnostics_for(text) == []
+
+
+def test_command_list_is_the_executors_complete_command_set():
+    """Flow commands live outside ``event_dict`` but the executor runs them."""
+    from autocontrol_lsp.server.commands import known_action_names
+    from je_auto_control.utils.executor.action_executor import executor
+    expected = {name for name in executor.known_commands()
+                if name.startswith("AC_")}
+    names = set(known_action_names())
+    assert names == expected
+    assert {"AC_sleep", "AC_loop", "AC_if_var"} <= names - set(executor.event_dict)
+
+
+def test_completion_and_hover_cover_flow_commands():
+    from autocontrol_lsp.server.handlers import handle_completion, handle_hover
+    labels = {item["label"] for item in handle_completion({})["items"]}
+    assert {"AC_sleep", "AC_loop"} <= labels
+    assert handle_hover({"word": "AC_sleep"})
+
+
+def test_diagnostics_accept_positional_list_params():
+    from autocontrol_lsp.server.diagnostics import diagnostics_for
+    assert diagnostics_for('[["AC_set_mouse_position", [10, 20]]]') == []
+
+
+def test_diagnostics_flow_command_takes_an_object_only():
+    """The executor raises "requires a dict of arguments" for a block's list."""
+    from autocontrol_lsp.server.diagnostics import diagnostics_for
+    assert diagnostics_for('[["AC_sleep", {"seconds": 1}]]') == []
+    diags = diagnostics_for('[["AC_sleep", [1]]]')
+    assert len(diags) == 1
+    assert "flow command AC_sleep must be an object" in diags[0]["message"]
+
+
+def test_diagnostics_accept_the_auto_control_wrapper():
+    from autocontrol_lsp.server.diagnostics import diagnostics_for
+    assert diagnostics_for('{"auto_control": [["AC_screenshot"]]}') == []
+    assert diagnostics_for('{"auto_control": {}}')
+
+
 # === Hover via document store ============================================
 
 def test_hover_resolves_word_from_position():
@@ -230,7 +281,7 @@ def test_server_publishes_diagnostics_on_did_open():
         _encode_request("initialize", 1) +
         _encode_request("textDocument/didOpen", None, {
             "textDocument": {
-                "uri": "file:///x.json",
+                "uri": "file:///work/x.ac.json",
                 "languageId": "json",
                 "version": 1,
                 "text": "[\"not a list of lists\"]",
@@ -243,7 +294,7 @@ def test_server_publishes_diagnostics_on_did_open():
     publishes = [m for m in messages
                  if m.get("method") == "textDocument/publishDiagnostics"]
     assert publishes
-    assert publishes[0]["params"]["uri"] == "file:///x.json"
+    assert publishes[0]["params"]["uri"] == "file:///work/x.ac.json"
     assert publishes[0]["params"]["diagnostics"]
 
 

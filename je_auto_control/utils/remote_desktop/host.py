@@ -6,7 +6,7 @@ import threading
 import time
 from functools import partial
 from types import TracebackType
-from typing import Any, Callable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop.media_retirement import MediaRetirementError
@@ -39,12 +39,18 @@ from je_auto_control.utils.remote_desktop.resume_tokens import (
 from je_auto_control.utils.remote_desktop.video_codec import (
     CodecProvider, JpegPassthrough,
 )
+from je_auto_control.utils.remote_desktop.delta_frames import (
+    DeltaFrameHistory, KeyframeRequests, history_for_codec,
+)
 from je_auto_control.utils.remote_desktop.transport import (
     MessageChannel, TcpMessageChannel,
 )
 from je_auto_control.utils.remote_desktop.host_access import (
-    PendingViewerCallback, _AUTH_TIMEOUT_S, _candidate_totp_codes,
-    _compile_ip_allowlist, _ip_in_allowlist,
+    PendingViewerCallback, _candidate_totp_codes, _compile_ip_allowlist,
+)
+from je_auto_control.utils.remote_desktop.host_admission import (
+    DEFAULT_AUTH_TIMEOUT_S, DEFAULT_MAX_PENDING_HANDSHAKES,
+    ConnectionAdmissionMixin, PendingAdmission, validate_admission_args,
 )
 from je_auto_control.utils.remote_desktop.host_capture import (
     CursorProvider, FrameProductionMixin, FrameProvider,
@@ -56,6 +62,20 @@ from je_auto_control.utils.remote_desktop.host_client import (
 )
 
 InputDispatcher = Callable[[Mapping[str, Any]], Any]
+
+
+def _send_message(msg_type: MessageType, payload: bytes, channel: MessageChannel) -> None:
+    """Send one message; the viewer's sender thread handles a broken channel."""
+    channel.send_typed(msg_type, payload)
+
+
+def _send_file_logged(address: Tuple[Any, ...], source_path: str, dest_path: str,
+                      on_progress: Optional[ProgressCallback], channel: MessageChannel) -> None:
+    """Stream one file to one viewer; a failure is logged and keeps the viewer connected."""
+    try:
+        send_file(channel, source_path, dest_path, on_progress=on_progress)
+    except (OSError, FileTransferError) as error:
+        autocontrol_logger.info("remote_desktop file send to %s failed: %r", address, error)
 # accept() 的輪詢間隔，用來定期檢查 _shutdown 旗標。
 # How long accept() blocks before re-checking the _shutdown flag.
 _ACCEPT_POLL_TIMEOUT_S = 0.5
@@ -74,24 +94,21 @@ def _validate_host_args(token: str, fps: float, quality: int) -> None:
         raise ValueError("quality must be in [1, 95]")
 
 
-#: Connections being handshaken at once; beyond this new ones are closed.
-_MAX_HANDSHAKES = 32
-
-
-def _close_quietly(sock: socket.socket) -> None:
-    try:
-        sock.close()
-    except OSError:
-        pass
-
-
-class RemoteDesktopHost(FrameProductionMixin):
+class RemoteDesktopHost(ConnectionAdmissionMixin, FrameProductionMixin):
     """Stream the screen to authenticated viewers and apply their input.
 
     The instance owns three kinds of threads: one accept loop, one
     capture loop, and a sender + receiver pair per connected viewer.
     Public methods are thread-safe; ``start()`` is idempotent and
     ``stop()`` can be called from any thread.
+
+    A connection that has not yet proved its credentials does not take one
+    of the ``max_clients`` viewer slots: at most ``max_pending_handshakes``
+    (default 8) connections may be authenticating at once, more are closed
+    at accept, and each must authenticate within ``auth_timeout`` seconds
+    (default 10, at most 60) of being accepted, TLS and WebSocket upgrade
+    included. The host's approval callback then has the rest of the
+    60-second handshake bound, while the viewer holds a viewer slot.
     """
 
     def __init__(
@@ -120,8 +137,11 @@ class RemoteDesktopHost(FrameProductionMixin):
             on_chat: Optional[Callable[[str, str], None]] = None,
             totp_secret: Optional[str] = None,
             codec_provider: Optional[CodecProvider] = None,
+            max_pending_handshakes: int = DEFAULT_MAX_PENDING_HANDSHAKES,
+            auth_timeout: float = DEFAULT_AUTH_TIMEOUT_S,
             ) -> None:
         _validate_host_args(token, fps, int(quality))
+        max_pending_handshakes, auth_timeout = validate_admission_args(max_pending_handshakes, auth_timeout)
         if audio_config is None:
             audio_config = AudioCaptureConfig()
         # Phase 2.1: pick a specific monitor by index if requested and
@@ -180,6 +200,12 @@ class RemoteDesktopHost(FrameProductionMixin):
         self._codec_provider: CodecProvider = (
             codec_provider if codec_provider is not None else JpegPassthrough()
         )
+        # A delta codec's P-frames need the frames before them: such a stream
+        # keeps a short backlog, and a viewer that falls further behind waits
+        # for a keyframe (asked for, rate-limited) instead of decoding garbage.
+        self._delta_history: Optional[DeltaFrameHistory] = history_for_codec(
+            self._codec_provider.name)
+        self._keyframe_requests = KeyframeRequests()
         self._listen_sock: Optional[socket.socket] = None
         self._accept_thread: Optional[threading.Thread] = None
         self._capture_thread: Optional[threading.Thread] = None
@@ -195,7 +221,12 @@ class RemoteDesktopHost(FrameProductionMixin):
         self._lifecycle_lock = threading.RLock()
         self._clients: List[_ClientHandler] = []
         self._clients_lock = threading.Lock()
-        self._handshake_slots = threading.BoundedSemaphore(_MAX_HANDSHAKES)
+        # Connections accepted but not yet authenticated, each with its run's
+        # stop event; they hold a pending slot, never a viewer slot.
+        self._pending: Dict[PendingAdmission, threading.Event] = {}
+        self._max_pending_handshakes = int(max_pending_handshakes)
+        self._auth_timeout = float(auth_timeout)
+        self._handshake_slots = threading.BoundedSemaphore(self._max_pending_handshakes)
         self._frame_cond = threading.Condition()
         self._latest_frame: Optional[bytes] = None
         self._latest_seq = 0
@@ -249,6 +280,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         # outlived stop()'s join would see it cleared and resume beside
         # the new run.
         self._shutdown = threading.Event()
+        self._resume_store.clear()   # a restart invalidates what the last run issued
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((self._bind, self._requested_port))
@@ -299,13 +331,7 @@ class RemoteDesktopHost(FrameProductionMixin):
         self._listen_sock = None
         with self._frame_cond:
             self._frame_cond.notify_all()
-        with self._clients_lock:
-            clients = list(self._clients)
-            self._clients.clear()
-        for client in clients:
-            client.stop()
-        if self._file_receiver is not None:
-            self._file_receiver.abort_all("host stopped")
+        self._stop_connections()
         for thread in (self._accept_thread, self._capture_thread,
                        self._cursor_thread):
             # is_alive() also guards the not-yet-started case: start() assigns
@@ -321,6 +347,20 @@ class RemoteDesktopHost(FrameProductionMixin):
         if audio_error is not None:
             raise_caused_run_interruption(audio_error)
             raise audio_error
+
+    def _stop_connections(self) -> None:
+        """Close every connection still authenticating, stop every viewer, abort their uploads."""
+        with self._clients_lock:
+            clients = list(self._clients)
+            self._clients.clear()
+            pending = list(self._pending)
+            self._pending.clear()
+        for admission in pending:
+            admission.abort()
+        for client in clients:
+            client.stop()
+        if self._file_receiver is not None:
+            self._file_receiver.abort_all("host stopped")
 
     def _start_audio_capture(self) -> None:
         """Open the audio input stream when audio capture is enabled."""
@@ -396,26 +436,23 @@ class RemoteDesktopHost(FrameProductionMixin):
         return self._broadcast_clipboard_payload(
             encode_image(png_bytes), "image", bytes(png_bytes), automatic)
 
+    def _live_clients(self) -> List[_ClientHandler]:
+        """Snapshot the authenticated viewers that are still connected."""
+        with self._clients_lock:
+            return [c for c in self._clients
+                    if c.authenticated and not c._shutdown.is_set()]
+
     def _broadcast_clipboard_payload(self, payload: bytes, kind: str, data: Any,
                                      automatic: bool) -> int:
-        with self._clients_lock:
-            clients = [c for c in self._clients
-                       if c.authenticated and not c._shutdown.is_set()]
+        """Queue a CLIPBOARD on each viewer's own sender; returns how many took it."""
         sent = 0
-        for client in clients:
+        for client in self._live_clients():
             # One guard per viewer: what viewer A sent still goes to viewer B.
             if automatic and not client.clipboard_guard.should_send(kind, data):
                 continue
-            try:
-                client._channel.send_typed(MessageType.CLIPBOARD, payload)
+            if client.push_outgoing("clipboard", partial(_send_message, MessageType.CLIPBOARD, payload)):
                 client.clipboard_guard.note_sent(kind, data)
                 sent += 1
-            except OSError as error:
-                autocontrol_logger.info(
-                    "remote_desktop clipboard send to %s failed: %r",
-                    client.address, error,
-                )
-                client.stop()
         return sent
 
     def set_file_receiver(self, receiver: FileReceiver) -> None:
@@ -434,23 +471,17 @@ class RemoteDesktopHost(FrameProductionMixin):
         ``dest_path`` is relative to each viewer's download directory: a
         viewer refuses an absolute path or one that leaves that directory.
 
-        Returns the number of viewers the transfer was attempted on.
-        Each viewer gets its own ``transfer_id`` so progress callbacks
-        can be demultiplexed in the GUI.
+        Returns the number of viewers the transfer was queued for. Each
+        viewer's copy runs on that viewer's own sender thread, so one that
+        stopped reading holds only itself, and ``on_progress`` is called
+        from those threads. Each viewer gets its own ``transfer_id`` so
+        progress callbacks can be demultiplexed in the GUI.
         """
-        with self._clients_lock:
-            clients = [c for c in self._clients
-                       if c.authenticated and not c._shutdown.is_set()]
-        for client in clients:
-            try:
-                send_file(client._channel, source_path, dest_path,
-                          on_progress=on_progress)
-            except (OSError, FileTransferError) as error:
-                autocontrol_logger.info(
-                    "remote_desktop file send to %s failed: %r",
-                    client.address, error,
-                )
-        return len(clients)
+        queued = 0
+        for client in self._live_clients():
+            job = partial(_send_file_logged, client.address, source_path, dest_path, on_progress)
+            queued += client.push_outgoing("file", job)
+        return queued
 
     def _try_consume_resume(self, nonce: bytes,
                             payload: bytes) -> Optional[str]:
@@ -461,10 +492,11 @@ class RemoteDesktopHost(FrameProductionMixin):
         store signed this nonce — caller then falls back to the normal
         ``_verify_token`` path.
         """
-        for token, perm in self._resume_store.list_active().items():
+        for token in self._resume_store.list_active():
             if verify_response(token, nonce, payload):
-                self._resume_store.remove(token)
-                return perm
+                # consume() decides: of two connections that both got here
+                # with one token, only the one that removes it resumes.
+                return self._resume_store.consume(token)
         return None
 
     def _verify_token(self, nonce: bytes, payload: bytes) -> bool:
@@ -525,133 +557,17 @@ class RemoteDesktopHost(FrameProductionMixin):
     def broadcast_chat(self, text: str, sender: str = "host") -> int:
         """Phase 5.2: send a chat message to every connected viewer.
 
-        Returns the number of viewers the message was *attempted* on.
-        Per-client errors are logged but do not abort the broadcast.
+        Returns the number of viewers the message was queued for, each on
+        that viewer's own sender thread: a viewer that stopped reading, or
+        whose bounded queue is full, does not hold the others.
         """
         if not isinstance(text, str) or not text:
             return 0
         payload = json.dumps(
             {"sender": sender, "text": text, "ts": time.time()},
         ).encode("utf-8")
-        with self._clients_lock:
-            clients = [c for c in self._clients
-                       if c.authenticated and not c._shutdown.is_set()]
-        sent = 0
-        for client in clients:
-            try:
-                client._channel.send_typed(MessageType.CHAT, payload)
-                sent += 1
-            except OSError as error:
-                autocontrol_logger.info(
-                    "remote_desktop chat send to %s failed: %r",
-                    client.address, error,
-                )
-        return sent
-
-    def _ip_allowed(self, address: Tuple[Any, ...]) -> bool:
-        """Apply the Phase 4.3 allowlist; log + reject silently otherwise."""
-        peer_ip = address[0] if address else ""
-        if _ip_in_allowlist(self._ip_allowlist, peer_ip):
-            return True
-        autocontrol_logger.info(
-            "remote_desktop blocked %s by ip_allowlist", peer_ip,
-        )
-        return False
-
-    def _open_channel(self, client_sock: socket.socket,
-                      address: Tuple[Any, ...]) -> Optional[MessageChannel]:
-        """TLS-wrap + WS/TCP handshake. Closes the socket on failure."""
-        wrapped = self._maybe_wrap_tls(client_sock, address)
-        if wrapped is None:
-            return None
-        try:
-            return self._build_channel(wrapped, address)
-        except (OSError, RuntimeError) as error:
-            autocontrol_logger.info(
-                "remote_desktop channel handshake from %s failed: %r",
-                address, error,
-            )
-            try:
-                wrapped.close()
-            except OSError:
-                pass
-            return None
-
-    def _accept_loop(self, stop: threading.Event) -> None:
-        # The timeout is set by start() on the owning thread, before the socket
-        # is published: calling settimeout() here would race a concurrent
-        # stop() closing it and raise WSAENOTSOCK outside any handler.
-        listen = self._listen_sock
-        if listen is None:
-            return
-        while not stop.is_set():
-            try:
-                client_sock, address = listen.accept()
-            except socket.timeout:
-                continue
-            except OSError:
-                return
-            if not self._ip_allowed(address):
-                _close_quietly(client_sock)
-                continue
-            # The TLS handshake, the WS upgrade and authentication each wait
-            # up to _AUTH_TIMEOUT_S *per read*, and ran here, on the one
-            # accept thread: a peer sending a byte just inside each timeout
-            # kept every other viewer from connecting. Each connection now
-            # gets its own thread, and a bounded number of them at once.
-            if not self._handshake_slots.acquire(blocking=False):
-                autocontrol_logger.info(
-                    "remote_desktop dropping %s: too many handshakes in progress",
-                    address,
-                )
-                _close_quietly(client_sock)
-                continue
-            threading.Thread(
-                target=self._handshake, args=(client_sock, address, stop),
-                name="rd-handshake", daemon=True,
-            ).start()
-
-    def _handshake(self, client_sock: socket.socket, address: Tuple[Any, ...],
-                   stop: threading.Event) -> None:
-        """Open the channel, register the client, then authenticate it."""
-        try:
-            channel = self._open_channel(client_sock, address)
-            if channel is None:
-                return
-            handler = _ClientHandler(self, channel, address)
-            if self._register_client(handler, address, stop):
-                handler.start()
-        finally:
-            self._handshake_slots.release()
-
-    def _register_client(self, handler: "_ClientHandler", address: Tuple[Any, ...],
-                         stop: threading.Event) -> bool:
-        """Add ``handler`` to the client table unless stopped or full."""
-        # Prune handlers whose viewer already disconnected *before* the
-        # capacity check below. Otherwise a client table filled with
-        # max_clients dead handlers rejects every new connection forever.
-        self._reap_dead_clients()
-        with self._clients_lock:
-            # Re-check under the lock: a stop() during the handshake sets
-            # _shutdown and then snapshots and clears _clients under this same
-            # lock, so a handler registered after that would never be stopped
-            # -- a viewer dispatching input to a host the operator stopped.
-            if stop.is_set():
-                autocontrol_logger.info(
-                    "remote_desktop dropping %s: host stopped during "
-                    "handshake", address,
-                )
-                handler._close()
-                return False
-            if len(self._clients) >= self._max_clients:
-                autocontrol_logger.info(
-                    "remote_desktop dropping %s: max_clients reached",
-                    address,
-                )
-                handler._close()
-                return False
-            self._clients.append(handler)
-        return True
+        job = partial(_send_message, MessageType.CHAT, payload)
+        return sum(client.push_outgoing("chat", job) for client in self._live_clients())
 
     def _build_channel(self, sock: socket.socket,
                        address: Tuple[Any, ...]) -> MessageChannel:
@@ -662,34 +578,6 @@ class RemoteDesktopHost(FrameProductionMixin):
     def _transport_name(self) -> str:
         """Identifier passed to approval callbacks. WS host overrides."""
         return "tcp"
-
-    def _maybe_wrap_tls(self, client_sock: socket.socket,
-                        address: Tuple[Any, ...]) -> Optional[socket.socket]:
-        """Return a TLS-wrapped socket when an ssl_context is configured."""
-        if self._ssl_context is None:
-            return client_sock
-        try:
-            client_sock.settimeout(_AUTH_TIMEOUT_S)
-            wrapped = self._ssl_context.wrap_socket(
-                client_sock, server_side=True,
-            )
-            wrapped.settimeout(None)
-            return wrapped
-        except OSError as error:
-            autocontrol_logger.info(
-                "remote_desktop TLS handshake from %s failed: %r",
-                address, error,
-            )
-            try:
-                client_sock.close()
-            except OSError:
-                pass
-            return None
-
-    def _reap_dead_clients(self) -> None:
-        with self._clients_lock:
-            self._clients = [c for c in self._clients
-                             if not c._shutdown.is_set()]
 
     # context manager ----------------------------------------------------
 

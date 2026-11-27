@@ -58,3 +58,37 @@ def test_a_successful_attempt_keeps_its_session(monkeypatch):
     host_service._serve_one_viewer(multi, _config())
     assert multi.accepted == [("sid-1", "answer")]
     assert multi.stopped == []
+
+
+def test_the_daemon_ends_when_it_is_asked_to_stop(monkeypatch):
+    """SvcStop set a flag nothing read: the service stayed STOP_PENDING until it was killed."""
+    import threading
+    from concurrent.futures import CancelledError
+    from je_auto_control.utils.remote_desktop import multi_viewer
+    stop = threading.Event()
+    waited = []
+
+    class _Daemon(_Multi):
+        def __init__(self, **_kwargs):
+            super().__init__()
+            built.append(self)
+
+        def stop_all(self):
+            self.stopped.append("all")
+
+    def wait_for_answer(*_args, cancelled=None, **_kwargs):
+        waited.append(cancelled)
+        stop.set()
+        assert cancelled()
+        raise CancelledError()
+
+    built = []
+    monkeypatch.setattr(multi_viewer, "MultiViewerHost", _Daemon)
+    monkeypatch.setattr(signaling_client, "push_offer", lambda *a, **k: None)
+    monkeypatch.setattr(signaling_client, "wait_for_answer", wait_for_answer)
+    daemon = threading.Thread(target=host_service.run_daemon, args=(_config(), stop.is_set), daemon=True)
+    daemon.start()
+    daemon.join(timeout=5.0)
+    assert not daemon.is_alive()
+    assert len(waited) == 1
+    assert built[0].stopped == ["sid-1", "all"]

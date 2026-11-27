@@ -17,7 +17,7 @@ from je_auto_control.utils.exception.exceptions import (
 from je_auto_control.utils.executor.flags import as_bool
 from je_auto_control.utils.executor.run_control import (
     ExecutionStopped, bound_stop_token, checkpoint, current_stop_token, pause,
-    shielded, stoppable_run,
+    shield_depth, shielded, stoppable_run,
 )
 from je_auto_control.utils.executor.flow_data_commands import (
     exec_assert_db, exec_assert_duration, exec_assert_var, exec_http_to_var,
@@ -29,6 +29,7 @@ from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.rbac.authorization import authorization_scope, current_authorization
 from je_auto_control.utils.action_journal.capture import bound_journal, current_journal
 from je_auto_control.utils.executor.dispatch import bound_command_guards, capture_command_guards
+from je_auto_control.utils.executor.registrant_authority import define_macro, macro_authority, registrant_and_caller
 from je_auto_control.utils.executor.result_hook import bound_branch_hook, capture_branch_hook
 from je_auto_control.utils.exception.cancellation import cancellation_scope, current_cancellation_token
 from je_auto_control.utils.logging.secret_scope import bound_secret_scope, current_secret_scope
@@ -212,7 +213,7 @@ def exec_while_image(executor: Any, args: Mapping[str, Any]) -> int:
 # the body are recoverable too.
 _TRY_CATCHABLE = (
     AutoControlException, OSError, RuntimeError, ArithmeticError,
-    AttributeError, TypeError, ValueError, LookupError,
+    AttributeError, TypeError, ValueError, LookupError, ImportError,
 )
 
 
@@ -500,7 +501,7 @@ class _ParallelRun:
         self._task_operation = current_operation()
         self._origin = current_origin()
         # Branch threads do not inherit the run's stop token or result hook either.
-        self._stop_token = current_stop_token()
+        self._stop_token, self._shield = current_stop_token(), shield_depth()
         self._result_hook = capture_branch_hook()
         self._stopped: Optional[ExecutionStopped] = None
         self.results: list[Any] = [None] * len(branches)
@@ -540,7 +541,7 @@ class _ParallelRun:
                   bound_secret_scope(self._secret_scope), bound_history(self._history),
                   bound_command_guards(self._command_guards), cancellation_scope(self._cancellation),
                   operation_scope(self._task_operation), origin_scope(self._origin),
-                  bound_stop_token(self._stop_token), bound_branch_hook(self._result_hook, index)):
+                  bound_stop_token(self._stop_token, self._shield), bound_branch_hook(self._result_hook, index)):
                 self.results[index] = self._branch_executor().execute_action(
                     branch, raise_on_error=self._strict, _validated=True)
             self._failures[index] = self._module.recorded_failures()
@@ -616,14 +617,14 @@ _MACRO_DEPTH = threading.local()
 
 
 def exec_define_macro(executor: Any, args: Mapping[str, Any]) -> Dict[str, Any]:
-    """Register a named, parameterised macro for later ``AC_call_macro``."""
+    """Register a named, parameterised macro for later ``AC_call_macro``, owned by the caller."""
     name = args["name"]
     raw_params = args.get("params") or []
     if isinstance(raw_params, str):
         params = [part.strip() for part in raw_params.split(",") if part.strip()]
     else:
         params = [str(part) for part in raw_params]
-    executor.macros[name] = {"params": params, "body": args.get("body") or []}
+    define_macro(executor.macros, name, params, args.get("body") or [])
     return {"defined": name, "params": params}
 
 
@@ -631,7 +632,8 @@ def exec_call_macro(executor: Any, args: Mapping[str, Any]) -> Any:
     """Invoke a macro registered by ``AC_define_macro``, binding call args.
 
     Each parameter is bound into the executor's variable scope before the
-    macro body runs, so the body reads ``${param}`` as usual.
+    macro body runs, so the body reads ``${param}`` as usual. Each step must be
+    allowed for both the macro's definer and the caller.
     """
     name = args["name"]
     macro = executor.macros.get(name)
@@ -655,7 +657,8 @@ def exec_call_macro(executor: Any, args: Mapping[str, Any]) -> Any:
         executor.variables.set(param, raw_args.get(param))
     _MACRO_DEPTH.value = depth + 1
     try:
-        return _run_branch(executor, macro["body"])
+        with registrant_and_caller(macro_authority(macro), f"macro {name!r}"):
+            return _run_branch(executor, macro["body"])
     finally:
         _MACRO_DEPTH.value = depth
         _restore_params(executor.variables, macro["params"], saved)

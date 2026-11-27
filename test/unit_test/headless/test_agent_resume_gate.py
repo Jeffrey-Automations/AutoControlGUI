@@ -131,3 +131,31 @@ def test_a_recovery_reviewer_may_add_resume_conditions_but_not_change_the_source
     _check_scope(template, {**template, "resume_conditions": [SIGNED_IN]})
     with pytest.raises(AgentTaskError, match="preserve source scope"):
         _check_scope(template, {**template, "success_criteria": [{"kind": "actions_complete"}]})
+
+
+def test_a_recovery_reviewer_may_not_drop_or_weaken_the_source_resume_conditions():
+    from je_auto_control.utils.agent_runtime.task_recovery import _check_scope
+    window = {"kind": "screen", "spec": {"text_present": "Order 42"}}
+    template = spec(resume_conditions=[SIGNED_IN, window]).to_dict()
+    _check_scope(template, {**template, "resume_conditions": [window, SIGNED_IN]})  # order is not strength
+    _check_scope(template, {**template, "resume_conditions": [SIGNED_IN, window, {"kind": "file_exists",
+                                                                                  "path": "draft.txt"}]})
+    without = {key: value for key, value in template.items() if key != "resume_conditions"}
+    weakened = {"kind": "screen", "spec": {"text_present": "Signed"}}
+    for reviewed in (without, {**template, "resume_conditions": []}, {**template, "resume_conditions": [window]},
+                     {**template, "resume_conditions": [weakened, window]}):
+        with pytest.raises(AgentTaskError, match="keep every source resume condition"):
+            _check_scope(template, reviewed)
+
+
+def test_browser_helper_reads_a_declared_resume_condition(monkeypatch):
+    from je_auto_control.utils.agent_runtime import browser_verification
+    from je_auto_control.utils.agent_runtime.browser_target import BrowserTarget
+    clause = {"kind": "browser", "operation": "visible", "selector": "#account", "value": True}
+    target = BrowserTarget()
+    target._session = object()
+    target._spec = spec(resume_conditions=[clause])
+    monkeypatch.setattr(browser_verification, "evaluate_browser_clause", lambda *_args: True)
+    assert target.verify_browser(dict(clause)) is True
+    with pytest.raises(AgentTaskError, match="outside the owned task"):
+        target.verify_browser({**clause, "selector": "#other"})

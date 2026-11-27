@@ -214,7 +214,8 @@ surface, each of which needs the ``manage_users`` capability:
   uses, and **One-time values** offers exactly the fields that were masked.
   The one exemption is an identifier the person has to read:
   ``AC_approval_request`` answers ``{token}``, the request id the maker hands
-  to the checker, which the pane shows (the log still masks it).
+  to the checker, which the pane shows (the log still masks it). A run keeps at
+  most 200 one-time values (``MAX_ONE_TIME_VALUES``), the first ones it produced.
   ``execute_action`` still returns every token to a script, as before;
 - the MCP tools ``ac_user_add`` / ``ac_user_remove`` / ``ac_user_set_role`` /
   ``ac_user_rotate_token`` / ``ac_user_list``;

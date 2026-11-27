@@ -17,7 +17,10 @@ command answered: a field whose name is in :data:`SENSITIVE_ARGUMENT_NAMES`
 is masked wherever it sits in the result, whatever the command. The executor
 uses it for its result log and the Script Builder for its result pane, and
 :func:`masked_fields` lists exactly what it masked, which is what the builder
-offers once.
+offers once. A few commands answer a secret under an ordinary name;
+:data:`RESULT_SECRETS` lists those fields, masked the same way
+(``AC_resolve_ref``'s ``value`` and ``AC_resolve_refs``'s ``resolved``, which
+may hold an ``env://`` credential).
 
 Generated secret or identifier. A value is a secret when holding it is enough
 to act: a bearer token (``AC_user_add``, ``AC_user_rotate_token``,
@@ -31,10 +34,12 @@ hands to the checker. The exemption is honoured only where a person is
 reading their own run (``show_identifiers=True``, the builder's result pane);
 the log masks an identifier like any other ``token``.
 """
+import functools
+import inspect
 import re
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, FrozenSet, List, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, FrozenSet, List, Mapping, Optional, Tuple, Union
 
 _VAULT_COMMAND_PREFIX = "AC_secret_"
 #: Commands outside the vault whose every argument is a secret.
@@ -65,17 +70,7 @@ def redact_actions(value: Any) -> Any:
 
     Anything that is not an action keeps its shape; nothing is mutated.
     """
-    if isinstance(value, dict):
-        # By name at every depth: only top-level arguments were masked, so
-        # {"smtp": {"password": ...}} and {"headers": {"Authorization": ...}}
-        # reached the log and the run record.
-        return {key: _MASK if str(key).lower() in SENSITIVE_ARGUMENT_NAMES else redact_actions(item)
-                for key, item in value.items()}
-    if not isinstance(value, list):
-        return value
-    if value and isinstance(value[0], str) and value[0].startswith("AC_"):
-        return [value[0], *(_redact_argument(value[0], argument) for argument in value[1:])]
-    return [redact_actions(item) for item in value]
+    return _redact_actions(value, (), None)
 
 
 #: Result fields with a secret-looking name that are identifiers: command -> field names.
@@ -83,11 +78,18 @@ RESULT_IDENTIFIERS: Mapping[str, FrozenSet[str]] = MappingProxyType({
     # The request id the maker gives the checker, who must be somebody else.
     "AC_approval_request": frozenset({"token"}),
 })
+#: Result fields with an ordinary name that hold a secret: command -> field names.
+RESULT_SECRETS: Mapping[str, FrozenSet[str]] = MappingProxyType({
+    "AC_resolve_ref": frozenset({"value"}),
+    "AC_resolve_refs": frozenset({"resolved"}),
+})
 _NO_FIELDS: FrozenSet[str] = frozenset()
 # A record key is "execute: " + str(action); the command is its first element.
 _RECORD_COMMAND = re.compile(r"^(?:execute|dry-run): \['(AC_\w+)'")
 
 FieldPath = Tuple[Union[str, int], ...]
+#: Where a walk notes what it masked, when it is asked to.
+_Found = Optional[List["MaskedField"]]
 
 
 @dataclass(frozen=True)
@@ -115,11 +117,12 @@ def redact_result(command: Optional[str], result: Any, *, show_identifiers: bool
     nothing to hide and is kept. An execution record nested in the result is
     masked per command, and an action list in it as :func:`redact_actions`
     masks one. ``show_identifiers`` keeps the fields :data:`RESULT_IDENTIFIERS`
-    lists for the command readable. Each value masked is appended to ``found``
-    when one is given. ``result`` is not changed.
+    lists for the command readable. Each value masked -- an action's secret
+    argument as well as a field, unless it is empty -- is appended to
+    ``found`` when one is given. ``result`` is not changed.
     """
     visible = RESULT_IDENTIFIERS.get(command or "", _NO_FIELDS) if show_identifiers else _NO_FIELDS
-    return _redact_value(result, visible, (), _Walk(show_identifiers, found))
+    return _redact_answer(command, result, visible, (), _Walk(show_identifiers, found))
 
 
 def masked_fields(command: Optional[str], result: Any, *,
@@ -140,6 +143,17 @@ class _Walk:
         self.found = found
 
 
+def _redact_answer(command: Optional[str], value: Any, visible: FrozenSet[str], path: FieldPath,
+                   walk: _Walk) -> Any:
+    """What ``command`` answered: its :data:`RESULT_SECRETS` fields masked, the rest by name."""
+    secret = RESULT_SECRETS.get(command or "", _NO_FIELDS)
+    if not secret or not isinstance(value, dict):
+        return _redact_value(value, visible, path, walk)
+    return {key: _hide(item, path + (key,), walk) if key in secret
+            else _redact_field(key, item, visible, path + (key,), walk)
+            for key, item in value.items()}
+
+
 def _redact_value(value: Any, visible: FrozenSet[str], path: FieldPath, walk: _Walk) -> Any:
     if isinstance(value, dict):
         return {key: _redact_field(key, item, visible, path + (key,), walk)
@@ -147,7 +161,8 @@ def _redact_value(value: Any, visible: FrozenSet[str], path: FieldPath, walk: _W
     if not isinstance(value, (list, tuple)):
         return value
     if isinstance(value, list) and value and isinstance(value[0], str) and value[0].startswith("AC_"):
-        return redact_actions(value)  # an action: its arguments, which are not result fields
+        # An action: its arguments are masked by the argument rule, and noted like any field.
+        return _redact_actions(value, path, walk.found)
     return [_redact_value(item, _NO_FIELDS, path + (index,), walk)
             for index, item in enumerate(value)]
 
@@ -156,14 +171,41 @@ def _redact_field(key: Any, item: Any, visible: FrozenSet[str], path: FieldPath,
     nested = record_command(key)
     if nested is not None:  # a record inside the result: its own command's rule applies
         shown = RESULT_IDENTIFIERS.get(nested, _NO_FIELDS) if walk.show_identifiers else _NO_FIELDS
-        return _redact_value(item, shown, path, walk)
+        return _redact_answer(nested, item, shown, path, walk)
     name = str(key).lower()
-    empty = item is None or (isinstance(item, str) and not item)
-    if name not in SENSITIVE_ARGUMENT_NAMES or name in visible or empty:
+    if name not in SENSITIVE_ARGUMENT_NAMES or name in visible:
         return _redact_value(item, _NO_FIELDS, path, walk)
-    if walk.found is not None:
-        walk.found.append(MaskedField(path, item))
+    return _hide(item, path, walk)
+
+
+def _hide(item: Any, path: FieldPath, walk: _Walk) -> Any:
+    """``***`` for a secret field, noted in ``walk.found``; an empty one has nothing to hide."""
+    if item is None or (isinstance(item, str) and not item):
+        return item
+    return _masked(item, path, walk.found)
+
+
+def _masked(item: Any, path: FieldPath, found: _Found) -> str:
+    """``***`` in place of ``item``, noted in ``found`` unless it is empty."""
+    if found is not None and item is not None and not (isinstance(item, str) and not item):
+        found.append(MaskedField(path, item))
     return _MASK
+
+
+def _redact_actions(value: Any, path: FieldPath, found: _Found) -> Any:
+    """:func:`redact_actions` of ``value``, found at ``path``, noting each masked argument in ``found``."""
+    if isinstance(value, dict):
+        # By name at every depth: only top-level arguments were masked, so
+        # {"smtp": {"password": ...}} and {"headers": {"Authorization": ...}}
+        # reached the log and the run record.
+        return {key: _masked(item, path + (key,), found) if str(key).lower() in SENSITIVE_ARGUMENT_NAMES
+                else _redact_actions(item, path + (key,), found) for key, item in value.items()}
+    if not isinstance(value, list):
+        return value
+    if value and isinstance(value[0], str) and value[0].startswith("AC_"):
+        return [value[0], *(_redact_argument(value[0], argument, path + (index,), found)
+                            for index, argument in enumerate(value[1:], start=1))]
+    return [_redact_actions(item, path + (index,), found) for index, item in enumerate(value)]
 
 
 def is_sensitive_argument(command: str, name: str) -> bool:
@@ -174,13 +216,43 @@ def is_sensitive_argument(command: str, name: str) -> bool:
         lowered == "url" and command in _URL_SECRET_COMMANDS)
 
 
-def _redact_argument(command: str, argument: Any) -> Any:
+def _redact_argument(command: str, argument: Any, path: FieldPath, found: _Found) -> Any:
     if command.startswith(_VAULT_COMMAND_PREFIX) or command in _ALL_SECRET_COMMANDS:
-        return _mask(argument)
+        return _mask(argument, path, found)
     if isinstance(argument, dict):
-        return {name: _MASK if is_sensitive_argument(command, name) else redact_actions(item)
-                for name, item in argument.items()}
-    return redact_actions(argument)
+        return {name: _masked(item, path + (name,), found) if is_sensitive_argument(command, name)
+                else _redact_actions(item, path + (name,), found) for name, item in argument.items()}
+    if isinstance(argument, list):
+        # A positional list: the same rule, by the name of each position.
+        names = positional_parameter_names(command)
+        return [_masked(item, path + (index,), found)
+                if index < len(names) and is_sensitive_argument(command, names[index])
+                else _redact_actions(item, path + (index,), found) for index, item in enumerate(argument)]
+    return _redact_actions(argument, path, found)
+
+
+def positional_parameter_names(command: str) -> Tuple[str, ...]:
+    """The parameter names of ``command``, in order; empty for one the executor does not know."""
+    try:
+        # pylint: disable-next=import-outside-toplevel  # reason: the executor imports this module
+        from je_auto_control.utils.executor.action_executor import executor
+    except ImportError:  # the executor is still loading, so it has run nothing
+        return ()
+    target = executor.event_dict.get(command)
+    try:
+        return _parameter_names(target)
+    except TypeError:  # an unhashable callable: not cached
+        return _parameter_names.__wrapped__(target)
+
+
+@functools.lru_cache(maxsize=4096)
+def _parameter_names(target: Optional[Callable[..., Any]]) -> Tuple[str, ...]:
+    if target is None:
+        return ()
+    try:
+        return tuple(inspect.signature(target).parameters)
+    except (TypeError, ValueError):  # no signature to read
+        return ()
 
 
 def describe_action(action: Any) -> str:
@@ -188,9 +260,9 @@ def describe_action(action: Any) -> str:
     return str(redact_actions(action))
 
 
-def _mask(argument: Any) -> Any:
+def _mask(argument: Any, path: FieldPath, found: _Found) -> Any:
     if isinstance(argument, dict):
-        return dict.fromkeys(argument, _MASK)
+        return {name: _masked(item, path + (name,), found) for name, item in argument.items()}
     if isinstance(argument, list):
-        return [_MASK for _ in argument]
-    return _MASK
+        return [_masked(item, path + (index,), found) for index, item in enumerate(argument)]
+    return _masked(argument, path, found)

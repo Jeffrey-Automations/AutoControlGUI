@@ -473,8 +473,8 @@ reply is ``run stopped.``. ``/stop`` asks the chat-started runs to stop;
 
 The Slack adapter (``SlackBot``) runs ``/run`` on a worker thread and keeps
 polling while it lasts, so **a** ``/stop`` **posted to the channel ends the
-bot's own run**: it is read at the next poll (``poll_interval_s``, 5 s by
-default, 1 s at least), answered ``stop requested: <run-id>``, and the run
+bot's own run**: it is read at the next poll, answered
+``stop requested: <run-id>``, and the run
 then answers in its own thread ``run stopped. (stopped from chat by <user>)``
 -- always in that order. The reply to ``/run`` therefore arrives when the
 script ends, not before the next message is read. One ``/run`` executes at a
@@ -487,9 +487,30 @@ command listed there becomes a stoppable run named ``chatops-<first
 argument>-<id>`` the same way. ``bot.stop(timeout=10.0)`` ends the poll loop,
 stops the running command, waits up to ``timeout`` seconds for its worker and
 returns whether none is left; ``bot.wait_idle(timeout)`` waits without
-stopping anything and ``bot.running_run_id`` names the run in progress. When
+stopping anything and ``bot.running_run_id`` names the run in progress. Called
+from inside a command handler, ``stop()`` and ``wait_idle()`` return ``False``
+at once instead of waiting for the run they belong to. When
 the reply of a worker cannot be posted the failure is logged (the poll thread
 is not there to raise to) and the command is not run again.
+
+The bot polls every ``poll_interval_s`` (5 s by default, 1 s at least) when
+idle and every ``run_poll_interval_s`` (1 s by default; finite, above 0 and at
+most ``poll_interval_s``, else ``SlackError``) while a background command runs,
+so a ``/stop`` lands within about a second. The fast interval applies from the
+wait right after the run starts, also when the loop was already in an idle
+wait, and the idle one comes back once the run ends; ``stop()`` ends a wait at
+once. When Slack answers ``429`` with ``Retry-After``, no poll is made until
+that delay (at most an hour) has passed, whichever interval is in force; a
+``429`` without one falls back to the error back-off.
+
+The bot never replays the channel's history. With no ``last_seen_ts`` given
+and none saved, its first poll only records the newest message as its
+starting point and runs nothing. The position is saved to ``state_path``
+(default ``~/.je_auto_control/chatops/slack_<channel>.json``, written
+atomically, 0600 on POSIX) **before** each message's command runs, so a
+restart resumes after it and a crash cannot run a command twice; if the
+position cannot be saved the command is not run. A damaged state file is
+moved aside as ``.corrupt-<time>`` and the bot starts from the newest message.
 
 ``/screenshot`` writes into the
 context's ``screenshot_dir`` (default: ``je_auto_control_chatops`` in the
@@ -573,6 +594,12 @@ active keyboard/absolute-pointer/button/scroll families. Partial grants remain
 unverified; paused families and removed required devices report paused/revoked.
 XWayland is always ``desktop_wide=False``; other scope flags
 remain limited by grants/regions and do not verify every monitor.
+
+After a ``needs_permission``, ``revoked`` or ``failed`` input state, ``reset_native_input()`` (also
+``AC_reset_native_input``, ``ac_reset_native_input`` and **Diagnostics → Actions → Reset the native
+input session**) retires the cached Wayland input session and the recorded refusal, then returns the
+refreshed snapshot. It requests nothing itself; the next real input operation may open a new portal
+session and its consent dialog. It needs ``drive_input`` and does nothing outside Wayland.
 
 Contexts detach facts and allow owner-supplied inert observations without granting
 authority. AC/MCP accept no supplied observations; default live results omit
@@ -727,7 +754,16 @@ exposes three commands::
 
 REST URL + bearer token come from VS Code settings
 (``autocontrolLsp.rest.url`` / ``autocontrolLsp.rest.token``) with
-``$AC_TOKEN`` as a fallback.
+``$AC_TOKEN`` as a fallback. The screenshot command sends ``GET /screenshot``
+and opens the returned PNG.
+
+Only action files are diagnosed: files matching ``autocontrolLsp.actionFiles``
+(``**/*.ac.json`` and ``**/actions/**/*.json`` by default; reload the window after
+changing it). Other LSP clients pass the same globs as
+``initializationOptions.actionFiles``. Diagnostics and completion use the
+executor's full command set, flow commands included, and accept a positional
+list of arguments where the executor does; columns are UTF-16, as the protocol
+defines, so hover and edits stay right on lines with emoji.
 
 
 Browser extension recorder
@@ -739,6 +775,15 @@ and exports them as an AutoControl JSON action file driveable by
 ``AC_web_*`` / ``WR_*``. CSS selectors fall back to
 ``data-testid`` / ``data-cy`` / ``name`` / ``nth-of-type`` paths,
 mirroring how production-style locators are typically picked.
+
+Recording follows only the tab where Start was pressed, across its
+navigations, and ends when that tab closes; Start is refused without an
+active tab. A sensitive field (``type=password``, an autocomplete hint
+such as ``current-password`` / ``one-time-code`` / ``cc-*``, or a name
+or id like ``password`` / ``otp`` / ``cvv`` / ``pin``) is never read: it
+is recorded as ``${secrets.NAME}``, the field's name, id or hint with
+other characters turned into ``_`` (``password`` when it has none), so
+store a vault entry under that name before replaying.
 
 
 pytest plugin + Gherkin BDD

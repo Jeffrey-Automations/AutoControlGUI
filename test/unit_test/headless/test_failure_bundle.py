@@ -53,3 +53,25 @@ def test_context_manager_bundles_and_reraises(tmp_path):
     with pytest.raises(RuntimeError, match="boom"), bundling:
         raise RuntimeError("boom")
     assert output.is_file()
+
+
+@pytest.mark.parametrize("context", [
+    {"path": "\udcff.txt"}, {"a": 1, 2: "b"}, {("t", 1): "tuple key", "z": 1},
+])
+def test_context_json_cannot_hold_as_is_does_not_lose_the_bundle(tmp_path, context):
+    """An undecodable file name or mixed key types raised before anything was written."""
+    target = tmp_path / "failure.zip"
+    create_failure_bundle(target, error="boom", context=context,
+                          options=FailureBundleOptions(screenshot=False, diagnostics=False))
+    with zipfile.ZipFile(target) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+    assert manifest["error"] == "boom"
+    assert len(manifest["context"]) == len(context)
+
+
+def test_an_undecodable_name_reads_back_unchanged(tmp_path):
+    target = tmp_path / "failure.zip"
+    create_failure_bundle(target, context={"path": "\udcff.txt"},
+                          options=FailureBundleOptions(screenshot=False, diagnostics=False))
+    with zipfile.ZipFile(target) as archive:
+        assert json.loads(archive.read("manifest.json"))["context"] == {"path": "\udcff.txt"}

@@ -251,6 +251,8 @@ Python、AC、MCP、REST、CLI 與 Agent 任務面板共用提交、觀察、動
 技能經 WorkQueue 派送；本機推論使用明確設定的 Ollama 模型，不下載、不重新導向或切換外部服務。
 關閉面板後已提交工作仍由服務擁有。原生平台驗收與其餘流程列在 ``Progress.md``；
 完整契約見 ``docs/AGENT_TASKS.md``。
+任務 spec、動作與 DAG／trigger／skill／recovery 請求中的 ``${...}`` 留給 runtime，
+以任務自己的 ``inputs`` 展開；呼叫端的值請透過 ``spec.inputs`` 傳入。
 
 ``agent-task readiness``（``agent_runtime_readiness``、``AC_agent_runtime_readiness``）被動回報桌面、
 真人在場來源、Android、iOS、瀏覽器與本機模型尚缺的條件：``unsupported``、``missing_dependency``、
@@ -344,7 +346,7 @@ Agent 任務介面將任務範圍、工作流程設定、觸發器、技能及�
 
 AgentHumanReview 表示未儲存內容或未知對話框需人工審閱；包含外部觀察請求都會記錄 waiting_user 並釋放輸入控制權，明確恢復後仍會重新檢查。Windows 依原生對話框／停用擁有者及英中日已知未儲存文字判定。Workspace 也會拒絕標題首尾帶星號的文件，並可在視窗設定加入 unsaved_selector 與 unsaved_value，於改變排列前檢查應用特有指示；不宣稱能推斷所有程式的未儲存狀態。標準檔案對話框沿用 AC_handle_file_dialog 執行器，受管 driver 只接受唯一精確標題、相同 PID、已確認前景，以及授權根目錄內的絕對路徑。UIA 控制項須屬於實際指定的根視窗，同 PID 的其他視窗也會拒絕。模擬原生與本機 HTTP 測試已有覆蓋，實際平台驗收仍未驗證。
 
-主機目標以 AgentTargetProfile 與 manage_agent_target（AC_agent_target，register/get/disable/enable/probe）設定。名稱及設定固定不可替換，目前可設定 desktop／files／browser／fixture／uia_fixture／service adapter，未實作類型會被拒絕；瀏覽器可使用主機審閱的 helper_python。任務固定主機設定摘要，不能擴大工具、應用、根目錄或網路來源。啟停狀態會跨重啟保存並於分派時檢查；停用會要求暫停及清理，重新啟用仍須明確恢復任務。list_agent_targets／AC_agent_target_list／CLI agent-task targets 只提供被動資訊，readiness=not_probed、native_evidence=not_recorded；完整設定需要 manage_hosts。CLI agent-task target 及 GUI「主機目標」頁使用同一服務。匿名有效 MCP 工具 session 的直接及舊式包裝呼叫都以 operator 權限執行；MCP 主機管理需要已驗證的管理員，可信任的直接 Python 呼叫維持原行為。fixture profile 只接受 config_path／config_sha256 與 AC_fixture_set_state，不能授予根目錄或桌面應用。固定隔離 worker 的 bootstrap／configure 均須符合部署綁定；註冊不取得資源。明確呼叫 fixture probe 時，會由獨立背景 helper 檢查固定的靜態產物，並具備 bootstrap／檢查時限、即時管理權限核對及可重試的關閉所有權。成功回報 static_artifacts_ready、fixture_execution=not_run 與 native_evidence=not_recorded，不證明已載入程式碼可信。原生 fixture 執行仍暫停。瀏覽器自動化統一由 WebRunner（je_web_runner）提供，本機開發來源為 D:/Codes/WebRunner；browser profile 使用受管 je_web_runner SDK 契約，依賴診斷不代表原生可用。
+主機目標以 AgentTargetProfile 與 manage_agent_target（AC_agent_target，register/get/disable/enable/probe）設定。名稱及設定固定不可替換，目前可設定 desktop／files／browser／fixture／uia_fixture／service／android adapter，未實作類型會被拒絕；瀏覽器可使用主機審閱的 helper_python。任務固定主機設定摘要，不能擴大工具、應用、根目錄或網路來源。啟停狀態會跨重啟保存並於分派時檢查；停用會要求暫停及清理，重新啟用仍須明確恢復任務。list_agent_targets／AC_agent_target_list／CLI agent-task targets 只提供被動資訊，readiness=not_probed、native_evidence=not_recorded；完整設定需要 manage_hosts。CLI agent-task target 及 GUI「主機目標」頁使用同一服務。匿名有效 MCP 工具 session 的直接及舊式包裝呼叫都以 operator 權限執行；MCP 主機管理需要已驗證的管理員，可信任的直接 Python 呼叫維持原行為。fixture profile 只接受 config_path／config_sha256 與 AC_fixture_set_state，不能授予根目錄或桌面應用。固定隔離 worker 的 bootstrap／configure 均須符合部署綁定；註冊不取得資源。明確呼叫 fixture probe 時，會由獨立背景 helper 檢查固定的靜態產物，並具備 bootstrap／檢查時限、即時管理權限核對及可重試的關閉所有權。成功回報 static_artifacts_ready、fixture_execution=not_run 與 native_evidence=not_recorded，不證明已載入程式碼可信。原生 fixture 執行仍暫停。瀏覽器自動化統一由 WebRunner（je_web_runner）提供，本機開發來源為 D:/Codes/WebRunner；browser profile 使用受管 je_web_runner SDK 契約，依賴診斷不代表原生可用。
 
 既有瀏覽器自動化（包含 open_path(URL) 與 AC_open_path）統一交由 WebRunner，Python 套件名稱為 je_web_runner。URL 計畫的 backend 現為 je_web_runner，原本比較 webbrowser 描述值的呼叫端需改用新值；函式介面與本機檔案開啟維持相容。實際 URL 執行需要設定的 WebRunner 專案，缺少時傳出 WebRunnerBridgeError，不改用 OS 瀏覽器。本機開發來源為 D:/Codes/WebRunner；純計畫及注入 opener 測試不需要該套件。協定支援由 WebRunner 與其選用的瀏覽器決定。既有瀏覽器 GUI／MCP／AC 及錄製的 WR_* 動作都使用同一橋接。
 
@@ -586,6 +588,7 @@ MCP／REST、``agent-task target probe request.json`` 或 GUI 主機目標的診
 擁有權或啟動瀏覽器。結果可顯示 ``python_dependencies_ready``；瀏覽器啟動及原生證據仍明確保持
 ``not_probed``／``not_recorded``。``last_probe`` 僅為記憶體中的具時間診斷快照，不授予任務權限，
 也不啟用停用的目標。桌面／裝置的原生診斷仍待完成。
+browser profile 也可宣告主機審閱的 ``semantic_fields``：最多 64 筆 ``{name, selector, frame?, property}``，property 為 ``text``、``value`` 或 ``visible``。之後每次瀏覽器觀察都會附上共用 observation report 格式的 ``semantic_report``。來源綁定受管瀏覽器 context，新 session 即為新的目標生命週期；元素不存在回報 ``not_found``，SDK 拒絕讀回的值（密碼、隱藏、檔案或 ``data-secret`` 欄位）回報 ``protected``，讀取期間換頁則整個來源為 ``inconsistent_snapshot``。擷取編號與時間不列入，頁面未變時動作前的指紋維持相同。selector 必須唯一，因為 SDK 遇到不唯一的 selector 會讓 session 退休。DOM 讀取沒有 revision，維持 best-effort；實際瀏覽器驗收仍待完成。
 已準備的隔離環境安裝兩個功能工作樹建置的 wheel；共用環境與正式工作樹保持原狀。正式服務
 設定及實際瀏覽器驗收仍分開追蹤；所有瀏覽器自動化仍統一由 WebRunner（``je_web_runner``）提供。
 
@@ -683,8 +686,10 @@ Android 原生輸入與安全證據
 重新核對帳號權限、期限與真人接回。只有相符裝置／世代、輸入已釋放且遠端待送佇列清空的
 可信證據，才可送出並確認 end；shell 返回或 Android 階段不能提供這項證明。缺少／錯誤 ACK、
 撤權、逾時、晚到回覆及清理失敗都不重播、更換 helper 或代送桌面釋放。結束自有 helper 後，
-未知遠端副作用仍保留隔離。可信裝置控制來源、WDA adapter、profile 與共用使用者介面
-仍待接合；模擬 SDK 測試不代表真機就緒。
+未知遠端副作用仍保留隔離。內部 WDA adapter（``IosRemoteAdapter``）只讀前景 app 的 metadata，
+沒有 ``IosControlProvider`` 時拒絕就緒；WebDriverAgent 沒有裝置端防護，所以租約必須自帶
+``dispatch``，沒有主機端備援寫入路徑。目前尚無 iOS provider。iOS 可信裝置控制來源、profile 與
+共用使用者介面仍待接合；模擬 SDK 測試不代表真機就緒。
 
 Android checked SDK 派送
 ----------------------------------------------------------------------
@@ -692,7 +697,9 @@ Android checked SDK 派送
 內部 ``AndroidRemoteAdapter`` 接合 session 與自有 worker，要求固定套件及有限工具集；沒有
 明確的 ``AndroidControlProvider`` 時，在連 ADB 前就拒絕就緒。Provider 須獨立證明真人活動／
 閒置、按住輸入及全域監看器審閱，並在裝置端阻止接回、取消或到期後的舊寫入。主機 lock、
-context manager 或本機 helper 結束不能提供這項保證；不提供預設來源、受管 profile 或真機就緒宣告。
+context manager 或本機 helper 結束不能提供這項保證；不提供預設來源或真機就緒宣告。
+``android`` 主機 profile 經裝置端 helper 操作一台裝置。設定只接受 ``serial``、``physical_id``、``package``，以及可選的 ``adb_port``（5037）、``user``（0）、``idle_seconds``（60）；``apps`` 必須正好是該套件，工具限於 ``AC_android_tap``、``AC_android_swipe``、``AC_android_key``（文字輸入沒有 helper 命令）。factory 以本直譯器加 ``-I`` 啟動固定的 ``android_worker``：選定審閱過的 ADB 端點、啟動 ``getevent`` 實體輸入來源，並以 ``HelperControlProvider`` 提供 remote worker。它不在裝置上安裝或啟動任何東西：helper APK 須已安裝並執行（``am instrument -w je.autocontrol.helper/.HelperInstrumentation``），否則就緒失敗。真機驗收仍待完成。
+``HelperControlProvider`` 是第一個這樣的 provider：經 ADB ``localabstract:`` socket 與裝置端 helper（``native/android_helper``）通訊，每次租約都把裝置圍到新的 epoch，以 helper 的 ``begin`` 送出命令（租約的 ``dispatch``），不再用 ``adb shell input``，並以 helper 對該命令 ID、boot 與 epoch 的回報結算。實體輸入來源是 ``getevent``：注入的輸入不經 evdev，所以那裡出現任何事件都會再次圍起裝置並回報接回；就緒要求該串流正常且在閒置期間（預設 60 秒）內安靜。``AC_android_text`` 沒有 helper 命令，在此路徑維持不支援。CI 以模擬器驅動 helper；尚未接入受管 profile，真機驗收仍暫緩。
 
 動作須有新的原生 metadata 觀察；準備時重讀身分／路由／安全，拒絕變動證據並消耗這次觀察。
 主機端 ``AndroidCommandLease`` 綁定 checked proposal、新隨機命令 ID 與 epoch。Worker 持久化
@@ -1029,7 +1036,9 @@ wheel 與原始碼發行套件包含 REST Dashboard 和 Swagger 的 HTML、CSS�
 判定須有對應操作的確認回條，以及同一資源擁有者在接受後取得的新 SCM 查詢。
 通過只表示 SCM 回報該狀態，不證明原子完成、健康或桌面不干擾。這些工具名稱只屬於
 adapter 範圍，不是全域 executor 指令。既有任務 API 與 GUI JSON 編輯器可傳遞此條件。
-主機審閱的 ``service`` profile 固定 ``config_path``、``config_sha256`` 及 ASCII ``service_key``。
+主機審閱的 ``service`` profile 固定 ``config_path``、``config_sha256`` 及 ``service_key``。
+非 ASCII 的鍵以 Windows 本身的 NT upcase 表做大小寫折疊，不用 Python 的大小寫對應，
+因此 SCM 視為同一服務的各種寫法共用同一把鎖。
 固定 worker 核對部署的服務與操作上限後才接受任務範圍。註冊、重載與 probe 不讀取部署檔
 或存取 SCM；原生驗收仍待完成。
 所有固定路徑（各 profile 的 ``config_path`` 及部署指定的映像檔）都必須是本機磁碟路徑：

@@ -1,4 +1,5 @@
 """Shared helpers for the remote-desktop GUI panels."""
+import functools
 import inspect
 import ssl
 import weakref
@@ -55,13 +56,19 @@ for _i in range(1, 13):
 
 
 def _key_event_to_ac(event: QKeyEvent) -> Optional[str]:
-    """Return the AC keycode for ``event``, or ``None`` if unmappable."""
+    """Return the AC keycode for ``event``, or ``None`` if unmappable.
+
+    With Ctrl held the text of a letter is a control character (Ctrl+C is
+    ``\\x03``), so the key itself is sent: as typed text it did nothing on the host.
+    """
     mapped = _QT_KEY_TO_AC.get(Qt.Key(event.key()))
     if mapped is not None:
         return mapped
     text = event.text()
     if len(text) == 1 and text.isprintable():
         return text
+    if 0x21 <= event.key() <= 0x7e:         # Qt's codes for the printable ASCII keys
+        return chr(event.key()).lower()
     return None
 
 
@@ -109,6 +116,8 @@ def wire_remote_input(window: Any, send: Callable[[dict[str, Any]], None]) -> No
 def _read_import_entries(path: str, key: str) -> list[dict[str, Any]]:
     """The object entries of an exported JSON file: ``{key: [...]}`` or a bare list.
 
+    It reads the file, so the panels call it on a worker, never in a slot.
+
     Raises ``OSError`` or ``ValueError`` for a file that cannot be read or has
     another shape. A binary file raised ``UnicodeDecodeError``, ``{key: 5}`` a
     ``TypeError`` and deep nesting ``RecursionError`` out of the import slots.
@@ -125,14 +134,37 @@ def _read_import_entries(path: str, key: str) -> list[dict[str, Any]]:
     return [entry for entry in entries if isinstance(entry, dict)]
 
 
+def _write_json_file(path: str, data: Any) -> None:
+    """Worker thread: write ``data`` to ``path`` as indented UTF-8 JSON (an export)."""
+    import json
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2, ensure_ascii=False)
+
+
 def _build_verifying_client_context() -> ssl.SSLContext:
-    """TLS client context with full hostname + cert verification enabled."""
+    """TLS client context with full hostname + cert verification enabled.
+
+    It trusts nothing yet: reading the system's CA store can take seconds, so
+    a connect hands :func:`load_default_trust` to its worker, which runs it
+    before the viewer dials.
+    """
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-    ctx.load_default_certs()
     ctx.check_hostname = True
     ctx.verify_mode = ssl.CERT_REQUIRED
     return ctx
+
+
+def load_default_trust(ctx: ssl.SSLContext) -> None:
+    """Worker thread: load the system's CA certificates into a context from :func:`_build_verifying_client_context`."""
+    ctx.load_default_certs()
+
+
+def trust_loader(ctx: Optional[ssl.SSLContext]) -> Optional[Callable[[], None]]:
+    """What a connect's worker runs before dialling with ``ctx``: the CA load a verifying context needs, or nothing."""
+    if ctx is None or ctx.verify_mode != ssl.CERT_REQUIRED:
+        return None
+    return functools.partial(load_default_trust, ctx)
 
 
 def _build_insecure_client_context() -> ssl.SSLContext:

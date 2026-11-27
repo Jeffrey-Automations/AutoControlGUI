@@ -176,3 +176,17 @@ def test_facade_exports_smart_wait_api():
     for name in ("WaitOutcome", "wait_until_pixel_changes",
                   "wait_until_region_idle", "wait_until_screen_stable"):
         assert hasattr(ac, name)
+
+
+def test_a_port_probe_is_given_no_more_than_the_time_left():
+    """The timeout is documented as a hard cap, but one connect could take connect_timeout_s past it."""
+    from je_auto_control.utils.smart_waits.waits import wait_until_port
+    given = []
+
+    def connector(_host, _port, timeout):
+        given.append(timeout)
+        return False
+
+    wait_until_port("example.invalid", 80, timeout_s=0.2, poll_interval_s=0.05,
+                    connect_timeout_s=30.0, connector=connector)
+    assert given and max(given) <= 0.2 + 1e-6  # the time left, computed from a clock reading

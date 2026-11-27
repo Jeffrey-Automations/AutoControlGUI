@@ -101,3 +101,31 @@ def test_a_failing_callback_keeps_the_trigger_result():
         assert callback_executor.callback_function("AC__audit_answer", callback) == 42
     finally:
         callback_executor.event_dict.pop("AC__audit_answer", None)
+
+
+def _raises(error):
+    def locate(*args, **kwargs):
+        raise error
+    return locate
+
+
+def test_a_stop_inside_a_watched_search_is_not_a_vanish(monkeypatch):
+    """The stop was read as "absent": the watch fired ``vanish`` and the run went on."""
+    import pytest
+    from je_auto_control.utils.executor.run_control import ExecutionStopped
+    from je_auto_control.utils.mcp_server.context import OperationCancelledError
+    from je_auto_control.utils.observer import observer as module
+    from je_auto_control.utils.ocr import ocr_engine
+    from je_auto_control.wrapper import auto_control_image, auto_control_screen
+    predicates = {
+        "image": (auto_control_image, "locate_image_center", module.image_predicate("ok.png")),
+        "text": (ocr_engine, "locate_text_center", module.text_predicate("OK")),
+        "pixel": (auto_control_screen, "get_pixel", module.pixel_predicate(1, 2)),
+    }
+    for owner, name, predicate in predicates.values():
+        for error in (ExecutionStopped("stopped"), OperationCancelledError("r1")):
+            monkeypatch.setattr(owner, name, _raises(error))
+            with pytest.raises(type(error)):
+                predicate()
+        monkeypatch.setattr(owner, name, _raises(ValueError("not there")))
+        assert predicate() is None

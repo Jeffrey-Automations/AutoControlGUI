@@ -42,7 +42,9 @@ class VLMTab(TranslatableMixin, QWidget):
         self._description = QLineEdit()
         self._model = QLineEdit()
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._last_result = QLabel()
+        self._last_result_text = self._keyed(self._last_result)
         self._task = TabTask(self)          # one model request at a time, off the GUI thread
         self._task.result.connect(self._show_outcome)
         self._task.error.connect(self._show_task_error)
@@ -93,7 +95,7 @@ class VLMTab(TranslatableMixin, QWidget):
     def _collect_inputs(self) -> Optional[Tuple[str, Optional[str]]]:
         description = self._description.text().strip()
         if not description:
-            self._status.setText(_t("vlm_desc_required"))
+            self._status_text.show("vlm_desc_required")
             return None
         model = self._model.text().strip() or None
         return description, model
@@ -101,13 +103,13 @@ class VLMTab(TranslatableMixin, QWidget):
     def _run_off_gui_thread(self, call: Callable[[], object], tag: str) -> None:
         """The VLM round trip (network, seconds) froze the window on the GUI thread."""
         if not self._task.start(call, tag=tag, timeout_s=REQUEST_DEADLINE_S):
-            self._status.setText(_t("task_busy"))
+            self._status_text.show("task_busy")
             return
-        self._status.setText(_t("task_running"))
+        self._status_text.show("task_running")
 
     def _on_stop(self) -> None:
         if self._task.stop():
-            self._status.setText(_t("task_stopped"))
+            self._status_text.show("task_stopped")
 
     def _show_outcome(self, value: object) -> None:
         # The task hands back whatever the call returned: a bool from
@@ -119,9 +121,9 @@ class VLMTab(TranslatableMixin, QWidget):
 
     def _show_task_error(self, error: object) -> None:
         if isinstance(error, TaskTimeout):
-            self._status.setText(_t("task_timed_out"))
+            self._status_text.show("task_timed_out")
             return
-        self._status.setText(f"{_t('vlm_error')}: {error}")
+        self._status_text.show_joined('vlm_error', error)
 
     def _on_locate(self) -> None:
         inputs = self._collect_inputs()
@@ -132,14 +134,11 @@ class VLMTab(TranslatableMixin, QWidget):
 
     def _show_located(self, coords: Optional[Sequence[int]]) -> None:
         if coords is None:
-            self._status.setText(_t("vlm_not_found"))
-            self._last_result.setText("")
+            self._status_text.show("vlm_not_found")
+            self._last_result_text.clear()
             return
-        self._last_result.setText(
-            _t("vlm_result").replace("{x}", str(coords[0]))
-                             .replace("{y}", str(coords[1])),
-        )
-        self._status.setText(_t("vlm_ok"))
+        self._last_result_text.show("vlm_result", x=coords[0], y=coords[1])
+        self._status_text.show("vlm_ok")
 
     def _on_click(self) -> None:
         inputs = self._collect_inputs()
@@ -149,4 +148,4 @@ class VLMTab(TranslatableMixin, QWidget):
         self._run_off_gui_thread(functools.partial(click_by_description, description, model=model), "click")
 
     def _show_clicked(self, ok: bool) -> None:
-        self._status.setText(_t("vlm_ok") if ok else _t("vlm_not_found"))
+        self._status_text.show("vlm_ok" if ok else "vlm_not_found")

@@ -10,18 +10,27 @@ already-recognised *text*. A real microphone/Vosk recogniser is supplied as a
 ``recognizer`` callable to :meth:`VoiceRouter.listen_once`, which keeps the
 routing logic fully unit-testable without audio or any speech dependency. Imports
 no ``PySide6``.
+
+A command keeps the authority of whoever registered it: when it is dispatched,
+each step runs only if both that registrant and the dispatching caller may run
+it (:mod:`je_auto_control.utils.executor.registrant_authority`).
 """
 import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
+from je_auto_control.utils.executor.registrant_authority import registrant_and_caller
+from je_auto_control.utils.rbac.deferred import DeferredAuthorization
+
 
 @dataclass
 class VoiceCommand:
-    """A trigger phrase and the action list it runs."""
+    """A trigger phrase, the action list it runs, and who registered it."""
 
     phrase: str
     actions: List[Any] = field(default_factory=list)
+    authority: DeferredAuthorization = field(
+        default_factory=DeferredAuthorization.capture, repr=False, compare=False)
 
 
 class VoiceRouter:
@@ -37,7 +46,7 @@ class VoiceRouter:
         self._lock = threading.Lock()
 
     def register(self, phrase: str, actions: List[Any]) -> None:
-        """Register (or replace) the command for ``phrase``."""
+        """Register (or replace) the command for ``phrase``, as the current caller."""
         with self._lock:
             self._commands = [c for c in self._commands if c.phrase != phrase] + [
                 VoiceCommand(phrase, list(actions))]
@@ -73,8 +82,9 @@ class VoiceRouter:
         if command is None:
             return {"matched": False, "phrase": None, "result": None}
         run = runner or _default_runner
-        return {"matched": True, "phrase": command.phrase,
-                "result": run(command.actions)}
+        with registrant_and_caller(command.authority, f"voice command {command.phrase!r}"):
+            result = run(command.actions)
+        return {"matched": True, "phrase": command.phrase, "result": result}
 
     def listen_once(self, recognizer: Callable[[], str],
                     runner: Optional[Callable[[List[Any]], Any]] = None

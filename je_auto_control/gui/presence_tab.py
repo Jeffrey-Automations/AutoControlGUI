@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._weak_call import weak_slot
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
@@ -47,6 +48,7 @@ class PresenceTab(TranslatableMixin, QWidget):
         self._registry = default_presence_registry()
         self._table = QTableWidget(0, len(_COLUMNS))
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._build_layout()
         self._registry_changed.connect(self.refresh)
         # Listener fires on every change; the timer is a belt-and-braces
@@ -72,7 +74,7 @@ class PresenceTab(TranslatableMixin, QWidget):
         release_resources(self, functools.partial(self._registry.remove_listener, self._registry_listener))
 
     def retranslate(self) -> None:
-        TranslatableMixin.retranslate(self)
+        TranslatableMixin.retranslate(self)     # the count line too: no new listing
         self._apply_translations()
 
     # --- layout ----------------------------------------------------
@@ -108,12 +110,13 @@ class PresenceTab(TranslatableMixin, QWidget):
 
     def refresh(self) -> None:
         rows = self._registry.list()
-        self._table.setRowCount(len(rows))
-        for index, row in enumerate(rows):
-            self._populate_row(index, row)
-        self._status.setText(
-            _t("presence_count").replace("{count}", str(len(rows))),
-        )
+        # A viewer who leaves moves the rows below up: Kick and the role
+        # commands then went to whoever had taken the selected row.
+        with kept_selection(self._table):
+            self._table.setRowCount(len(rows))
+            for index, row in enumerate(rows):
+                self._populate_row(index, row)
+        self._status_text.show("presence_count", count=len(rows))
 
     def _populate_row(self, index: int, row: ViewerPresence) -> None:
         cursor = (f"({row.cursor_x}, {row.cursor_y})"
@@ -136,7 +139,7 @@ class PresenceTab(TranslatableMixin, QWidget):
     def _selected_viewer_id(self) -> Optional[str]:
         row = self._table.currentRow()
         if row < 0:
-            self._status.setText(_t("presence_no_selection"))
+            self._status_text.show("presence_no_selection")
             return None
         item = self._table.item(row, 0)
         if item is None:
@@ -156,7 +159,7 @@ class PresenceTab(TranslatableMixin, QWidget):
         try:
             self._registry.update_role(viewer_id, role)
         except PresenceError as error:
-            self._status.setText(f"{_t('presence_error')}: {error}")
+            self._status_text.show_joined('presence_error', error)
             return
         self.refresh()
 

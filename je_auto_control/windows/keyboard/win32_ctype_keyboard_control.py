@@ -12,8 +12,20 @@ from je_auto_control.windows.core.utils.win32_ctype_input import Keyboard
 from je_auto_control.windows.core.utils.win32_ctype_input import KeyboardInput
 from je_auto_control.windows.core.utils.win32_ctype_input import SendInput
 from je_auto_control.windows.core.utils.win32_ctype_input import ctypes
+from je_auto_control.windows.core.utils.win32_vk import WIN32_EXTENDED_VIRTUAL_KEYS
+from je_auto_control.windows.core.utils.win32_vk import WIN32_EventF_EXTENDEDKEY
 from je_auto_control.windows.core.utils.win32_vk import WIN32_EventF_KEYUP
 from je_auto_control.windows.core.utils.win32_vk import WIN32_EventF_UNICODE
+
+
+def _extended_flag(keycode: int) -> int:
+    """``KEYEVENTF_EXTENDEDKEY`` for the keys a keyboard reports as extended, else 0.
+
+    Their scan code alone is the numeric keypad's: an arrow sent without the
+    flag is keypad 4 / 6 / 8 / 2, and Shift plus one of those selects nothing
+    while NumLock is on; right Ctrl and AltGr arrive as the left keys.
+    """
+    return WIN32_EventF_EXTENDEDKEY if keycode in WIN32_EXTENDED_VIRTUAL_KEYS else 0
 
 
 def press_key(keycode: int) -> None:
@@ -23,7 +35,7 @@ def press_key(keycode: int) -> None:
 
     :param keycode: 鍵盤虛擬鍵碼 Virtual key code
     """
-    keyboard = Input(type=Keyboard, ki=KeyboardInput(wVk=keycode))
+    keyboard = Input(type=Keyboard, ki=KeyboardInput(wVk=keycode, dwFlags=_extended_flag(keycode)))
     SendInput(1, ctypes.byref(keyboard), ctypes.sizeof(keyboard))
 
 
@@ -34,7 +46,8 @@ def release_key(keycode: int) -> None:
 
     :param keycode: 鍵盤虛擬鍵碼 Virtual key code
     """
-    keyboard = Input(type=Keyboard, ki=KeyboardInput(wVk=keycode, dwFlags=WIN32_EventF_KEYUP))
+    keyboard = Input(type=Keyboard, ki=KeyboardInput(
+        wVk=keycode, dwFlags=_extended_flag(keycode) | WIN32_EventF_KEYUP))
     SendInput(1, ctypes.byref(keyboard), ctypes.sizeof(keyboard))
 
 

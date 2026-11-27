@@ -21,7 +21,7 @@ from je_auto_control.utils.agent_runtime.presence_platform import (
 )
 from je_auto_control.utils.agent_runtime.presence_worker import SourceProcess
 from je_auto_control.utils.agent_runtime.parent_watch import start_parent_watch
-from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
+from je_auto_control.utils.agent_runtime.presence_endpoint_wire import endpoint_from_wire, endpoint_to_wire
 
 
 @dataclass

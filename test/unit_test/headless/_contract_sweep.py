@@ -93,7 +93,20 @@ def _sample_value(spec: Dict[str, Any], name: str, depth: int = 0) -> Any:
                 for key, sub in properties.items()}
     if kind == "string":
         return _STRING_FORMATS.get(spec.get("format"), f"value-for-{name}")
+    if kind in ("integer", "number"):
+        return _bounded(spec, _SCALARS[kind])
     return _SCALARS.get(kind, f"value-for-{name}")
+
+
+def _bounded(spec: Dict[str, Any], sample: Any) -> Any:
+    """The generic sample, or the middle of the declared range when the sample falls outside it."""
+    low, high = spec.get("minimum"), spec.get("maximum")
+    if (low is None or sample >= low) and (high is None or sample <= high):
+        return sample
+    if low is not None and high is not None:
+        middle = (low + high) / 2
+        return int(middle) if isinstance(sample, int) else middle
+    return low if low is not None else high
 
 
 # === Reading a value out of a declared type =================================

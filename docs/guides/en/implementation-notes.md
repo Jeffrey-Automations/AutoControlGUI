@@ -287,7 +287,7 @@ even returned input does not certify remote input retirement or task completion.
 The internal owned remote SDK worker now checks exact task/owner scope, refreshed authority and physical
 takeover; parent monitoring starts before the trusted host factory. Calls require a durable begin ACK,
 then matching device/epoch settlement before an end ACK. Missing proof keeps effects quarantined.
-Trusted device-control providers, the WDA adapter and managed profile wiring remain required.
+The helper-backed `HelperControlProvider` (helper `begin`/`settle`, a fresh epoch per lease, `getevent` as the physical source) is the Android device-control provider. The WDA adapter (`IosRemoteAdapter`) is in place but needs an iOS provider that does not exist yet. Android has a host profile kind (`android`) that runs the helper-backed worker.
 The command compiler reads the three native focus fields in one labeled extraction, accepting their
 six possible orders while refusing missing/duplicate/empty fields. Pre/post identity and input-security
 checks remain, and action deadlines are unchanged. Owned POSIX fixtures avoid extra Git Bash reader
@@ -636,12 +636,22 @@ Physical-activity sources now exist for X11 and macOS. X11 counts XInput2 raw ev
 devices, never from XTEST slaves, and reads `Active`/`LockedHint` from logind: without logind or
 `XDG_SESSION_ID` the seat counts as locked. macOS uses a listen-only session event tap (it needs the
 Accessibility permission). An event counts as injected only when a process posted it from a non-HID
-source state, so a doubt keeps a task waiting rather than letting it take over. Wayland has no
-trusted source. On Linux the presence broker, worker and server now run over this transport: the owned
+source state, so a doubt keeps a task waiting rather than letting it take over. On Wayland, where a
+client sees no global input, the source reads the kernel's evdev devices directly (input-group read
+access) and ignores only devices under `/devices/virtual/input/`, which is where `uinput` injectors such as
+`ydotool` create theirs; Bluetooth keyboards and mice (`uhid`) stay in, and libei input never reaches evdev.
+One physical device that cannot be read refuses the source, and a device plugged in or removed, or a
+dropped-event marker, counts as activity: missing activity is never read as idleness. A virtual (`uinput`) keyboard or
+pointer other than `ydotoold`'s refuses it, because a key remapper that grabs devices (keyd, input-remapper) needs one;
+so does a key the kernel reports down without an event. Motion on a device grabbed without such output, as a virtual
+machine's evdev passthrough can do, is not detected. On Linux the presence broker, worker and server now run over this transport: the owned
 worker binds a fresh private endpoint and reports it in its bootstrap reply, the broker adopts only that
-endpoint, and connecting pins the listener to the process it names before the presence challenge. macOS has
-no presence transport yet, and the runtime still refuses non-Windows shared desktop tasks until native
-acceptance. This transport is not full Linux application or native input acceptance.
+endpoint, and connecting pins the listener to the process it names before the presence challenge. macOS
+uses the same flow over its own transport: a 0700 directory under the per-user temporary directory, a
+length-prefixed Unix stream socket, the connector named by its audit token and retained by a kqueue exit
+watch with the boot-unique `p_uniqueid` as its birth. macOS has no per-message credentials, so the
+connector is authenticated once per connection and checked alive before each delivery. The runtime still
+refuses non-Windows shared desktop tasks until native acceptance. This transport is not full Linux application or native input acceptance.
 
 [![PyPI](https://img.shields.io/pypi/v/je_auto_control)](https://pypi.org/project/je_auto_control/)
 [![Python](https://img.shields.io/pypi/pyversions/je_auto_control)](https://pypi.org/project/je_auto_control/)

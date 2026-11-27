@@ -14,7 +14,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Tuple
 
-from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.exception.exceptions import AutoControlException, ImageSearchInputException
 from je_auto_control.utils.json.json_file import read_executable_action_json
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.run_history.context import HistoryBinding, bound_history
@@ -69,9 +69,13 @@ class ImageAppearsTrigger(_TriggerBase):
         # AutoControlException) whenever the template is absent — the *normal*
         # case on most polls. Without the base in this tuple the exception
         # escaped to _is_fired_safely, which disables the trigger for good on
-        # the first poll where the image isn't on screen yet.
+        # the first poll where the image isn't on screen yet. A template the
+        # search cannot use is not that case: it can never fire, so it escapes
+        # to _is_fired_safely, which logs it and disables the trigger.
         try:
             result = locate_image_center(self.image_path, self.threshold, False)
+        except ImageSearchInputException:
+            raise
         except (OSError, RuntimeError, ValueError, AutoControlException):
             return False
         return result is not None

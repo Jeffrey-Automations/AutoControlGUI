@@ -4,7 +4,7 @@ from typing import Optional
 
 from PySide6.QtCore import QPoint, QRect, Qt, Signal
 from PySide6.QtGui import (
-    QColor, QDragEnterEvent, QDropEvent, QImage, QKeyEvent, QMouseEvent,
+    QColor, QDragEnterEvent, QDropEvent, QFocusEvent, QImage, QKeyEvent, QMouseEvent,
     QPaintEvent, QPainter, QPen, QWheelEvent,
 )
 from PySide6.QtWidgets import QSizePolicy, QWidget
@@ -37,6 +37,10 @@ class _FrameDisplay(QWidget):
         self._image: Optional[QImage] = None
         self._pen_mode = False
         self._pen_drawing = False
+        # What the host was told is down; each gets its release even when the
+        # pointer leaves the frame or the focus goes elsewhere first.
+        self._held_buttons: set[str] = set()
+        self._held_keys: set[str] = set()
         # Remote host cursor position in *host* screen coords. ``None``
         # while no CURSOR message has been received yet; the overlay is
         # then suppressed so we don't draw a stale arrow over the frame.
@@ -170,10 +174,15 @@ class _FrameDisplay(QWidget):
             return
         button = _qt_button_name(event.button())
         if button is not None:
+            self._held_buttons.add(button)
             self.mouse_pressed.emit(*coords, button)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
-        coords = self._to_remote(event.position().toPoint())
+        button = _qt_button_name(event.button())
+        pos = event.position().toPoint()
+        coords = self._to_remote(pos)
+        if coords is None and (self._pen_drawing or button in self._held_buttons):
+            coords = self._to_remote(self._clamped(pos))     # dragged out of the frame: still a release
         if coords is None:
             return
         if self._pen_mode:
@@ -181,9 +190,14 @@ class _FrameDisplay(QWidget):
                 self.annotation_event.emit("end", coords[0], coords[1])
             self._pen_drawing = False
             return
-        button = _qt_button_name(event.button())
         if button is not None:
+            self._held_buttons.discard(button)
             self.mouse_released.emit(*coords, button)
+
+    def _clamped(self, pos: QPoint) -> QPoint:
+        """The point of the painted frame nearest to ``pos``."""
+        rect = self._fit_rect()
+        return QPoint(max(rect.left(), min(pos.x(), rect.right())), max(rect.top(), min(pos.y(), rect.bottom())))
 
     def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802
         coords = self._to_remote(event.position().toPoint())
@@ -198,6 +212,7 @@ class _FrameDisplay(QWidget):
             return
         keycode = _key_event_to_ac(event)
         if keycode is not None:
+            self._held_keys.add(keycode)
             self.key_pressed.emit(keycode)
             return
         text = event.text()
@@ -209,7 +224,15 @@ class _FrameDisplay(QWidget):
             return
         keycode = _key_event_to_ac(event)
         if keycode is not None:
+            self._held_keys.discard(keycode)
             self.key_released.emit(keycode)
+
+    def focusOutEvent(self, event: QFocusEvent) -> None:  # noqa: N802
+        """Release what is still held: after Alt+Tab the release goes to another window, and the host kept Alt down."""
+        held, self._held_keys = sorted(self._held_keys), set()
+        for keycode in held:
+            self.key_released.emit(keycode)
+        super().focusOutEvent(event)
 
     # --- drag-and-drop --------------------------------------------------
 

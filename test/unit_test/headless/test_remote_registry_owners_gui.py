@@ -241,6 +241,45 @@ def test_a_panel_reconnecting_keeps_its_window():
     assert tab._status.text() != _t("rd_viewer_displaced")
 
 
+class _ReportingViewer(_Viewer):
+    """Reports its socket closing through ``on_error``, as a receiver can when another owner closes it."""
+
+    def disconnect(self, timeout=2.0):
+        if self.connected:
+            self.kwargs["on_error"](ConnectionResetError("connection closed by the peer"))
+        super().disconnect(timeout)
+
+
+def test_a_superseded_quick_connect_says_why_and_pops_no_warning(qapp, monkeypatch):
+    """Its window only closed; and the dying session's error opened a warning on top."""
+    monkeypatch.setattr(connection_screen, "RemoteDesktopViewer", _ReportingViewer)
+    screen = _quick()
+    _tab()                                            # the viewer tab takes the seat
+    assert pump_until(lambda: _idle(screen))
+    qapp.processEvents()
+    assert qapp.messages == [], "being replaced is not an error"
+    assert screen._notice.text() == _t("rd_viewer_displaced")
+    assert screen._notice.isVisibleTo(screen)
+    screen._dispatch_target(parse_target("desk:5555"), "tok")
+    settle(screen)
+    assert not screen._notice.isVisibleTo(screen), "a new connect clears the notice"
+    screen._own_viewer().kwargs["on_error"](OSError("the host went away"))
+    assert pump_until(lambda: bool(qapp.messages))
+    assert qapp.messages == ["the host went away"], "a live session's own error still warns"
+
+
+def test_quick_connect_says_when_another_panel_replaced_its_host(qapp):
+    screen = connection_screen.QuickConnectScreen()
+    screen._start_hosting()
+    assert settle_op(screen._host_op)
+    _host_tab()
+    assert pump_until(lambda: screen._notice.text() == _t("rd_quick_host_displaced"))
+    assert qapp.messages == []
+    screen._start_hosting()
+    assert not screen._notice.isVisibleTo(screen)
+    assert settle_op(screen._host_op)
+
+
 def test_a_late_notice_about_an_old_session_does_not_close_the_new_one():
     tab = _tab()
     tab._on_displaced(SLOT_VIEWER, SCRIPT_OWNER)      # queued before the reconnect, delivered after
@@ -301,6 +340,7 @@ def test_a_frame_delivered_before_the_connect_result_is_shown_when_the_window_op
     panel = viewer_panel._ViewerPanel()
     assert panel._screen_window is None
     panel._on_frame_main(bytes(buffer.data()))          # the frame's queued signal ran first
+    assert pump_until(lambda: panel._early_frame is not None)     # decoded off the GUI thread
     viewer = _Viewer()
     viewer.connected = True
     panel._on_connected(viewer)                         # then the connect task's result

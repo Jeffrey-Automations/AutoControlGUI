@@ -83,3 +83,41 @@ Parameters
    * - ``draw_image``
      - bool
      - If ``True``, marks the detected area on the returned image.
+
+Not Found versus Unusable Input
+===============================
+
+``ImageNotFoundException`` means the search ran and the template is not on
+screen. An input the search cannot run on raises ``ImageSearchInputException``
+instead:
+
+* a template file that does not exist or cannot be decoded;
+* a single-colour template, which would score a perfect match everywhere;
+* a ``detect_threshold`` outside ``0``-``1``, NaN, or not a number;
+* an image OpenCV cannot match (an unsupported colour layout or pixel type).
+
+The two are siblings under ``AutoControlException``, not parent and child, so
+a handler for "not found" never catches a typo in the template path:
+
+.. code-block:: python
+
+   from je_auto_control import (
+       ImageNotFoundException, ImageSearchInputException, locate_image_center,
+   )
+
+   try:
+       locate_image_center("save_button.png", detect_threshold=0.9)
+   except ImageNotFoundException:
+       print("not on screen")
+   except ImageSearchInputException as error:
+       print(f"fix the template or threshold: {error}")
+
+Absence checks therefore fail on unusable input instead of passing:
+``AC_assert_image`` with ``present: false`` fails ("the template could not be
+used"), ``AC_wait_image_gone`` and ``ac_wait_for_image`` raise rather than
+wait, and ``AC_if_image_found`` records a failure rather than running its
+``else`` branch. An image trigger with such a template is disabled and logged;
+observer rules, state-machine ``if_image_found`` guards and anchor locators
+raise. Self-healing still falls back to its VLM step and reports why the
+template failed. Device frames (``DeviceFrame.locate_image``) follow the same
+split.

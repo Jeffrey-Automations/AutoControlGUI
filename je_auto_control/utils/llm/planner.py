@@ -12,6 +12,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
 from je_auto_control.utils.executor.action_schema import validate_actions
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.llm.backends import (
     LLMBackend, LLMNotAvailableError, get_backend,
 )
@@ -62,8 +63,8 @@ def plan_actions(description: str,
     if not allowed:
         raise ValueError("known_commands must list at least one command")
     prompt = _build_user_prompt(description, allowed, examples)
-    raw = bound.complete(prompt, system=_SYSTEM_PROMPT, model=model,
-                         max_tokens=max_tokens)
+    # A stop ends the wait for the model; the request finishes in the background and is discarded.
+    raw = stoppable_call(bound.complete, prompt, system=_SYSTEM_PROMPT, model=model, max_tokens=max_tokens)
     actions = _parse_actions(raw)
     validate_actions(actions, allowed)
     return actions

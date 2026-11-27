@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+from je_auto_control.utils.agent_runtime import AgentTaskError
 from .test_agent_runtime import managed as managed, specification
 
 
@@ -42,3 +43,58 @@ def test_completion_between_stop_read_and_write_preserves_terminal_evidence(mana
     assert result.verification == completed.verification
     assert result.metadata["input_released"] is True
     assert target.calls == ["AC_increment"]
+
+
+def test_cancel_during_resume_is_not_overwritten_by_the_requeue(managed, monkeypatch):
+    runtime, _target = managed
+    task = runtime.submit(specification()).task_id
+    runtime.observe(task)
+    assert runtime.pause(task).state == "paused"
+    original = runtime.store.actions
+    cancelled = []
+
+    def interleaved(identifier):
+        if not cancelled:
+            with ThreadPoolExecutor(max_workers=1) as worker:
+                cancelled.append(worker.submit(runtime.cancel, task).result(timeout=5).state)
+        return original(identifier)
+
+    monkeypatch.setattr(runtime.store, "actions", interleaved)
+    with pytest.raises(AgentTaskError, match="stopped again"):
+        runtime.resume(task)
+    runtime.maintain()
+    assert cancelled == ["cancelling"]
+    assert runtime.get(task).state == "cancelled"
+
+
+@pytest.mark.parametrize("operation,settled", [("pause", "paused"), ("cancel", "cancelled")])
+def test_stop_between_failed_dispatch_check_and_review_is_kept(managed, monkeypatch, operation, settled):
+    runtime, target = managed
+    task = runtime.submit(specification()).task_id
+    frame = runtime.observe(task)
+
+    token = runtime._token(task)
+    stopped = []
+
+    class StoppedAfterCheck:
+        """The token is read before the stop arrives, as a concurrent request can do."""
+
+        @property
+        def is_cancelled(self):
+            if not stopped:
+                with ThreadPoolExecutor(max_workers=1) as worker:
+                    stopped.append(worker.submit(getattr(runtime, operation), task).result(timeout=5).state)
+            return False
+
+        def __getattr__(self, name):
+            return getattr(token, name)
+
+    def failing(_name, _arguments):
+        runtime._tokens[task] = StoppedAfterCheck()
+        raise AgentTaskError("unknown effect")
+
+    monkeypatch.setattr(target, "perform", failing)
+    with pytest.raises(AgentTaskError, match="unknown effect"):
+        runtime.act(task, {"tool": "AC_increment", "observation_id": frame.observation_id})
+    assert stopped == ["pausing" if operation == "pause" else "cancelling"]
+    assert runtime.get(task).state == settled

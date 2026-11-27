@@ -1,9 +1,12 @@
 """Tests for the LLM action planner (no real LLM calls)."""
+import threading
+import time
 from typing import Optional
 
 import pytest
 
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
+from je_auto_control.utils.executor.run_control import ExecutionStopped, stoppable_run
 from je_auto_control.utils.llm.backends.base import LLMBackend
 from je_auto_control.utils.llm.planner import (
     LLMNotAvailableError, LLMPlanError, plan_actions, run_from_description,
@@ -143,3 +146,30 @@ def test_planner_passes_model_through_to_backend():
     except LLMPlanError:
         pass
     assert backend.last_model == "claude-sonnet-4-6"
+
+
+class _BlockedBackend(_StubBackend):
+    """A configured backend whose request does not return until the test lets it."""
+
+    def __init__(self) -> None:
+        super().__init__('[["AC_click_mouse", {}]]')
+        self.entered, self.release = threading.Event(), threading.Event()
+
+    def complete(self, prompt: str, system=None, model=None, max_tokens: int = 2048) -> str:
+        self.entered.set()
+        self.release.wait(10)
+        return self.response
+
+
+def test_a_stop_ends_the_wait_for_the_planner_request():
+    backend = _BlockedBackend()
+    started = time.monotonic()
+    try:
+        with pytest.raises(ExecutionStopped):
+            with stoppable_run() as token:
+                threading.Thread(target=lambda: backend.entered.wait(5) and token.stop(), daemon=True).start()
+                plan_actions("click", _KNOWN, backend=backend)
+        assert backend.entered.is_set()
+        assert time.monotonic() - started < 5
+    finally:
+        backend.release.set()

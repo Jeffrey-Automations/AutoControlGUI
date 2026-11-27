@@ -28,6 +28,7 @@ def baseline():
     struct.pack_into("<H", raw, OPTIONAL, 0x20B)
     for offset, value in ((16, 0x1000), (32, 0x1000), (36, 512), (56, 0x3000), (60, 512), (108, 16)):
         struct.pack_into("<I", raw, OPTIONAL + offset, value)
+    struct.pack_into("<Q", raw, OPTIONAL + 24, 0x140000000)
     struct.pack_into("<II", raw, OPTIONAL + 112 + 5 * 8, 0x2000, 12)
     for offset, virtual, rva, size, pointer, flags in (
             (TABLE, 16, 0x1000, 512, 512, 0x60000020),
@@ -103,6 +104,7 @@ class Provider:
         self.base = base
         self.memory = bytearray(0x3000)
         self.memory[:512] = raw[:512]
+        struct.pack_into("<Q", self.memory, OPTIONAL + 24, base)  # the loader writes the real base here
         self.memory[0x1000:0x1200] = raw[512:1024]
         self.memory[0x2000:0x2200] = raw[1024:1536]
         struct.pack_into("<I", self.memory, 0x2100, 17)
@@ -154,6 +156,24 @@ def test_real_reader_matches_pinned_ranges_after_rebasing(base):
     assert isinstance(result, Observation) and dict(result.fields) == {"value": 17}
     assert result.bytes_read == 4628 and provider.closed == 1
     assert provider.reads[:2] == [(base, 512), (base + 0x1000, 4096)]
+
+
+@pytest.mark.parametrize("value", [0x140000000, BASE + 0x10000, 0])
+def test_a_loaded_image_base_other_than_the_measured_base_is_refused(value):
+    raw = baseline()
+    provider = Provider(raw)
+    struct.pack_into("<Q", provider.memory, OPTIONAL + 24, value)
+    result = observed(provider, plan(raw))
+    assert result.reason is FailureReason.UNSUPPORTED
+    assert len(provider.reads) == 1 and provider.closed == 1
+
+
+def test_only_the_image_base_field_may_differ_from_the_file():
+    raw = baseline()
+    for offset in (OPTIONAL + 23, OPTIONAL + 32):
+        provider = Provider(raw)
+        provider.memory[offset] ^= 1
+        assert observed(provider, plan(raw)).reason is FailureReason.UNSUPPORTED
 
 
 def test_same_identity_and_file_with_changed_code_never_decodes_state():
@@ -222,7 +242,8 @@ def test_plan_cannot_be_constructed_or_replaced_to_omit_coverage():
     with pytest.raises(MemoryObservationError):
         replace(original, ranges=())
     with pytest.raises(MemoryObservationError):
-        ImageCodePlan("fixture", "1", original.image_sha256, original.image_size, original.ranges[:1])
+        ImageCodePlan("fixture", "1", original.image_sha256, original.image_size, original.ranges[:1],
+                      original.base)
 
 
 def test_equal_labels_cannot_bind_a_different_image_pin():

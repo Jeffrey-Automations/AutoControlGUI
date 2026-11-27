@@ -110,7 +110,7 @@ def command_session(platform: str, device_id: Optional[str] = None, *,
         return
     session = open_device(DeviceContext(
         platform, device_id or "", adb_path=adb_path or None,
-        timeout_s=float(timeout_s) if timeout_s else DEFAULT_TIMEOUT_S))
+        timeout_s=DEFAULT_TIMEOUT_S if timeout_s is None else timeout_s))
     try:
         yield session
     finally:
@@ -188,7 +188,7 @@ def _heal_on_frame(frame: Any, template_path: Optional[str], description: Option
     session cannot hand it a frame; this is the same order against the frame.
     """
     from je_auto_control.utils.exception.exceptions import (
-        AutoControlException, ImageNotFoundException,
+        AutoControlException, ImageNotFoundException, ImageSearchInputException,
     )
     from je_auto_control.utils.self_healing.locator import (
         METHOD_IMAGE, METHOD_MISS, METHOD_VLM, HealOutcome,
@@ -200,7 +200,9 @@ def _heal_on_frame(frame: Any, template_path: Optional[str], description: Option
     if template_path:
         try:
             x, y = frame.locate_image(template_path, float(detect_threshold))
-        except ImageNotFoundException as error:
+        except (ImageNotFoundException, ImageSearchInputException) as error:
+            # Either way the template gave no point: fall back to the VLM, as
+            # the desktop self-heal does, and report why in the outcome.
             image_error = str(error)
         else:
             return HealOutcome(found=True, coordinates=(int(x), int(y)), method=METHOD_IMAGE,
@@ -461,6 +463,11 @@ _LEGACY: Tuple[MobileCommand, ...] = (
             _IOS_SELECTOR, "ui_tree", handwritten_mcp=True),
     _legacy("AC_ios_dump_source", "Dump Source", "The XCUITest page source as XML.",
             (_URL,), "ui_tree", read_only=True, handwritten_mcp=True),
+    _legacy("AC_ios_list_simulators", "List Simulators", "Booted iOS Simulators from xcrun simctl.",
+            (), PURPOSE_DEVICE_INFO, api="list_ios_simulators", read_only=True),
+    _legacy("AC_ios_use_simulator", "Use Simulator",
+            "Route install, files, pasteboard and recording through xcrun simctl for one Simulator "
+            "(an empty UDID removes it).", (Param("udid"),), PURPOSE_DEVICE_INFO, api="use_ios_simulator"),
 )
 
 

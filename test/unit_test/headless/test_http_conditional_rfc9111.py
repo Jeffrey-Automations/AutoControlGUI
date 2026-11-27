@@ -50,3 +50,11 @@ def test_a_repeated_directive_keeps_its_first_value():
                                               ("OK", False)])
 def test_is_not_modified_answers_for_any_status(status, expected):
     assert is_not_modified({"status": status}) is expected
+
+
+def test_an_absurdly_long_age_header_is_capped():
+    """int() refuses more than 4300 digits, so a server's header raised ValueError."""
+    validators = store_validators({"headers": {"Age": "9" * 5000, "Cache-Control": "max-age=60"}})
+    assert validators["age"] == 2 ** 31
+    assert is_fresh(validators, 0) is False
+    assert store_validators({"headers": {"Age": "000000000000000000000050"}})["age"] == 50

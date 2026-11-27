@@ -73,3 +73,13 @@ def test_watcher_start_requires_existing_directory(tmp_path):
     else:
         watcher.stop(timeout=0.5)
         raise AssertionError("expected NotADirectoryError")
+
+
+def test_the_plugin_watcher_skips_a_file_that_resolves_outside(tmp_path, monkeypatch):
+    (tmp_path / "evil.py").write_text("def AC_evil(): return 1", encoding="utf-8")
+    from je_auto_control.utils.plugin_loader import plugin_loader
+    server = MCPServer(tools=[])
+    monkeypatch.setattr(plugin_loader, "_inside", lambda root, path: False)
+    watcher = PluginWatcher(server, str(tmp_path))
+    watcher.poll_once()
+    assert server._tools == {}

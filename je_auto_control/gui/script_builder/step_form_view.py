@@ -71,7 +71,7 @@ class StepFormView(QWidget):
             return
         spec = COMMAND_SPECS.get(step.command)
         if spec is None:
-            self._title.setText(f"Unknown command: {step.command}")
+            self._title.setText(_t("sb_unknown_command").replace("{command}", step.command))
             return
         self._title.setText(f"{spec.label}  ({spec.command})")
         if step.args is not None:
@@ -167,7 +167,7 @@ class StepFormView(QWidget):
         return editor
 
     def _browse_file(self, target: QLineEdit) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Select file")
+        path, _ = QFileDialog.getOpenFileName(self, _t("sb_dialog_select_file"))
         if path:
             target.setText(path)
 
@@ -201,6 +201,8 @@ class StepFormView(QWidget):
                 # in an int field): keep this field's existing param instead of
                 # aborting the whole commit, which would freeze every edit.
                 continue
+            if _left_alone(editor, field_spec, value, self._step.params):
+                continue
             if value is None and field_spec.optional:
                 # An emptied optional field means "no value" — drop the key
                 # rather than leaving the previous one behind.
@@ -209,6 +211,20 @@ class StepFormView(QWidget):
             new_params[field_spec.name] = value
         self._step.params = new_params
         self.step_changed.emit()
+
+
+def _left_alone(editor: QWidget, spec: FieldSpec, value: Any, params: Dict[str, Any]) -> bool:
+    """Whether an optional check box or choice still shows what "not given" looks like.
+
+    Neither can be empty, so editing any other field wrote ``False`` or the
+    first choice for a parameter the step does not have -- ``read_only: false``
+    for a server that the environment had made read-only.
+    """
+    if not spec.optional or spec.default is not None or spec.name in params:
+        return False
+    if isinstance(editor, QCheckBox):
+        return value is False
+    return isinstance(editor, QComboBox) and editor.currentIndex() <= 0
 
 
 def _file_edit(editor: QWidget) -> Optional[QLineEdit]:

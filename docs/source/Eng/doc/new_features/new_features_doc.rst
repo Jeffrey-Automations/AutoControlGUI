@@ -1277,7 +1277,7 @@ registry the GUI uses. The tools live under a new
 ``ac_remote_host_start``
    Start (or restart) the singleton TCP host with ``token``,
    ``bind``, ``port``, ``fps``, ``quality``, ``max_clients``,
-   ``host_id``. Returns
+   ``host_id``, ``max_pending_handshakes``, ``auth_timeout``. Returns
    ``{running, port, host_id, connected_clients}``.
 
 ``ac_remote_host_stop``
@@ -1997,3 +1997,51 @@ handshake phase or denied approval. The host can admit an immediate replacement 
 while rejection logging or socket cleanup is pending. This preserves the existing
 wire payloads and the separate bound on pending handshakes; it does not admit failed
 viewers or increase ``max_clients`` for active clients.
+
+
+Connections still authenticating, and H.264 for slow viewers
+----------------------------------------------------------------
+
+A TCP or WebSocket connection is *pending* from accept until it proves its
+credentials (token, share code, TOTP-bound token or resume token). Pending
+connections no longer take one of the ``max_clients`` viewer slots, so a few
+silent sockets cannot lock real viewers out:
+
+* ``max_pending_handshakes`` (default ``8``) caps the connections still
+  authenticating at once; more are closed at accept.
+* ``auth_timeout`` (default ``10`` seconds, at most ``60``) is one deadline for
+  the TLS handshake, the WebSocket upgrade and the challenge-response together.
+  A connection that does not authenticate in time is closed, even one that
+  sends a byte at a time. A silent connection is therefore dropped after 10 s,
+  where it used to hold a viewer slot for up to 60 s.
+* A connection takes a ``max_clients`` slot only once its credentials verify.
+  The approval callback keeps the existing 60-second bound for the whole
+  handshake while the viewer holds that slot. A full host still closes a new
+  connection before the challenge; if the slots fill while a connection is
+  authenticating, its viewer receives ``AUTH_FAIL "host full"``.
+
+Both settings are accepted by ``RemoteDesktopHost`` / ``WebSocketDesktopHost``,
+``registry.start_host`` / ``start_ws_host``, the ``AC_start_remote_host`` /
+``AC_start_ws_host`` commands, the ``ac_remote_host_start`` MCP tool, and the
+Remote Desktop host tab's *Advanced* section (*Max authenticating*, *Auth
+timeout (s)*). A boolean, a string, a fractional cap, or a deadline outside
+``(0, 60]`` raises ``ValueError``; the registry checks before it stops the
+running host::
+
+   from je_auto_control import RemoteDesktopHost
+   host = RemoteDesktopHost(token="tok", max_pending_handshakes=4, auth_timeout=5.0)
+
+   ["AC_start_remote_host", {"token": "tok", "max_pending_handshakes": 4, "auth_timeout": 5}]
+
+An H.264 (or HEVC) stream over TCP used to send each viewer only the newest
+packet, so a viewer that fell behind skipped P-frames and its decoder showed
+corrupted video until the next keyframe. The host now keeps a shared backlog
+of 8 packets and feeds each viewer from it in order. A viewer that has to drop
+a frame -- it fell further behind than the backlog, or a packet was over the
+payload cap -- is sent nothing until the next keyframe, then resumes from it;
+it never receives a P-frame whose reference it missed. A new viewer starts at
+the newest keyframe still in the backlog. A viewer waiting this way asks the
+encoder for a keyframe, at most one request per second for the whole host;
+``H264CodecProvider`` honours it with an IDR (``CodecProvider.request_keyframe``),
+and the capture loop encodes a requested keyframe even when the screen has not
+changed. JPEG streams are unchanged: a slow viewer still gets the newest frame.

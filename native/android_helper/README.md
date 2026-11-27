@@ -7,10 +7,15 @@ request id, the device's boot and the epoch it ran under, with input released an
 left queued. A host-side lock, an `adb shell` return code or a local process exit proves none of
 that. This helper is the device side of that contract.
 
-Status: **stage 2 of 4.** The fence ledger and protocol handler (`core/`, JVM unit tests) and the
+Status: **stage 4 of 4.** The fence ledger and protocol handler (`core/`, JVM unit tests) and the
 instrumentation app (`app/`, built into a debug APK) are built in CI
-(`.github/workflows/android-helper.yml`). The host provider and emulator tests follow; nothing here
-is wired into the runtime yet, and real-device acceptance stays deferred.
+(`.github/workflows/android-helper.yml`). The host side is `HelperControlProvider`
+(`je_auto_control/utils/agent_runtime/android_helper_provider.py`), with `AndroidHelperClient` speaking this
+protocol over ADB's `localabstract:` socket (no `adb forward` is created) and `GeteventSource` as the
+physical-input source. The CI `emulator` job runs `emulator_check.py` against an x86_64 emulator: boot
+identity, a tap settled `completed` with input released, a stale epoch refused, a long swipe fenced, and
+injected input (helper or `adb shell input`) absent from `getevent` while an emulator-forwarded key is
+present. No managed profile wires the provider in yet, and real-device acceptance stays deferred.
 
 ## Protocol (version 1)
 
@@ -35,6 +40,10 @@ there is no request that moves the epoch back.
   `ProtocolHandler`, which turns one decoded request into one reply and accepts only the closed,
   bounded `tap`, `swipe` and `key` command shapes; no Android dependency, so both are tested on the JVM.
   `queue_empty` is true only when nothing is queued **and** nothing is still injecting.
+  Commands are fenced by a generation that never repeats, so fencing back to a retired epoch value
+  cannot revive a command still injecting under it. `PointerGesture` runs a tap or swipe and fails it
+  on the first refused DOWN, MOVE or UP, cancelling the pointer where it got to; `ClientLoop` serves
+  one client at a time and treats a client's I/O error as that client's alone.
 - `app/` — the instrumentation: `HelperServer` serves the abstract socket to a shell or root peer only
   (an abstract socket has no file permissions, so any app could otherwise connect) and bounds each line;
   `Injector` is the only writer and, between events, releases what it pressed once a fence overtakes it.

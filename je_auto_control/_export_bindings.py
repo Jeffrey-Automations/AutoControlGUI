@@ -2,8 +2,9 @@
 from je_auto_control._lazy_exports import AttributeBinding, ExportBinding, ModuleBinding
 
 
-PUBLIC_ORDER_SHA256 = 'c109d2a2016c994303368885f610e9332773cd0d5694404d4400efd976fd4266'
+PUBLIC_ORDER_SHA256 = 'a30d779009f1d0e1c496942ec466541732b4dc3dbfc7e6cf0736219e5e0f0120'
 
+_IOS_SIMCTL = 'je_auto_control.ios.simctl'
 _LINUX_WAYLAND_GLOBAL_SHORTCUTS = 'je_auto_control.linux_wayland.global_shortcuts'
 _LINUX_WAYLAND_INPUT_EVENTS = 'je_auto_control.linux_wayland.input_events'
 _UTILS_A11Y_AUDIT = 'je_auto_control.utils.a11y_audit'
@@ -106,6 +107,7 @@ _UTILS_EVENTS = 'je_auto_control.utils.events'
 _UTILS_EXCEPTION_CANCELLATION = 'je_auto_control.utils.exception.cancellation'
 _UTILS_EXCEPTION_EXCEPTIONS = 'je_auto_control.utils.exception.exceptions'
 _UTILS_EXECUTOR_ACTION_EXECUTOR = 'je_auto_control.utils.executor.action_executor'
+_UTILS_EXECUTOR_NAMED_REGISTRY = 'je_auto_control.utils.executor.named_registry'
 _UTILS_EXECUTOR_RUN_CONTROL = 'je_auto_control.utils.executor.run_control'
 _UTILS_EXPECT_POLL = 'je_auto_control.utils.expect_poll'
 _UTILS_FAILURE_HOOKS = 'je_auto_control.utils.failure_hooks'
@@ -262,6 +264,7 @@ _UTILS_SKILL_LIBRARY = 'je_auto_control.utils.skill_library'
 _UTILS_SLO = 'je_auto_control.utils.slo'
 _UTILS_SMART_WAITS = 'je_auto_control.utils.smart_waits'
 _UTILS_SMOOTHING = 'je_auto_control.utils.smoothing'
+_UTILS_SOCKET_SERVER_SOCKET_CLIENT = 'je_auto_control.utils.socket_server.socket_client'
 _UTILS_SOFT_ASSERT = 'je_auto_control.utils.soft_assert'
 _UTILS_SSE_CLIENT = 'je_auto_control.utils.sse_client'
 _UTILS_SSIM = 'je_auto_control.utils.ssim'
@@ -478,10 +481,14 @@ EXPORTS: dict[str, ExportBinding] = {
     'AutoControlFlatTemplateException':
         AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlFlatTemplateException'),
     'ImageNotFoundException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'ImageNotFoundException'),
+    'ImageSearchInputException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'ImageSearchInputException'),
     'AutoControlJsonActionException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlJsonActionException'),
     'AutoControlRecordException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlRecordException'),
     'AutoControlActionNullException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlActionNullException'),
     'AutoControlActionException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlActionException'),
+    'AutoControlForeignException': AttributeBinding(_UTILS_EXCEPTION_EXCEPTIONS, 'AutoControlForeignException'),
+    'AccessibilityWriteOutcomeUnknown':
+        AttributeBinding('je_auto_control.utils.accessibility.walker', 'AccessibilityWriteOutcomeUnknown'),
     'record': AttributeBinding(_WRAPPER_AUTO_CONTROL_RECORD, 'record'),
     'stop_record': AttributeBinding(_WRAPPER_AUTO_CONTROL_RECORD, 'stop_record'),
     'stop_record_timeline': AttributeBinding(_WRAPPER_AUTO_CONTROL_RECORD, 'stop_record_timeline'),
@@ -1300,6 +1307,7 @@ EXPORTS: dict[str, ExportBinding] = {
     'CapabilitySnapshot': AttributeBinding(_WRAPPER_CAPABILITIES, 'CapabilitySnapshot'),
     'CapabilityStatus': AttributeBinding(_WRAPPER_CAPABILITIES, 'CapabilityStatus'),
     'probe_capabilities': AttributeBinding(_WRAPPER_CAPABILITIES, 'probe_capabilities'),
+    'reset_native_input': AttributeBinding(_WRAPPER_CAPABILITIES, 'reset_native_input'),
     'CancellationToken': AttributeBinding(_UTILS_EXCEPTION_CANCELLATION, 'CancellationToken'),
     'TaskProgress': AttributeBinding(_UTILS_EXCEPTION_CANCELLATION, 'TaskProgress'),
     'cancellation_scope': AttributeBinding(_UTILS_EXCEPTION_CANCELLATION, 'cancellation_scope'),
@@ -1766,6 +1774,9 @@ EXPORTS: dict[str, ExportBinding] = {
     'start_autocontrol_socket_server': AttributeBinding(
         'je_auto_control.utils.socket_server.auto_control_socket_server', 'start_autocontrol_socket_server',
     ),
+    'send_socket_command': AttributeBinding(_UTILS_SOCKET_SERVER_SOCKET_CLIENT, 'send_socket_command'),
+    'read_socket_token': AttributeBinding(_UTILS_SOCKET_SERVER_SOCKET_CLIENT, 'read_socket_token'),
+    'authenticate_connection': AttributeBinding(_UTILS_SOCKET_SERVER_SOCKET_CLIENT, 'authenticate_connection'),
     'callback_executor':
         AttributeBinding('je_auto_control.utils.callback.callback_function_executor', 'callback_executor'),
     'package_manager':
@@ -1831,9 +1842,14 @@ EXPORTS: dict[str, ExportBinding] = {
     'rbac_set_user_role': AttributeBinding(_UTILS_RBAC_ADMIN, 'set_user_role'),
     'register_mobile_extension': AttributeBinding(_WRAPPER_MOBILE_EXTENSIONS, 'register_mobile_extension'),
     'run_mobile_command': AttributeBinding(_WRAPPER_MOBILE_COMMANDS, 'run_mobile_command'),
+    'SimctlExtension': AttributeBinding(_IOS_SIMCTL, 'SimctlExtension'),
+    'list_ios_simulators': AttributeBinding(_IOS_SIMCTL, 'list_ios_simulators'),
+    'use_ios_simulator': AttributeBinding(_IOS_SIMCTL, 'use_ios_simulator'),
     'stop_app': AttributeBinding(_WRAPPER_MOBILE_EXTENSIONS, 'stop_app'),
     'stop_execution': AttributeBinding(_UTILS_EXECUTOR_RUN_CONTROL, 'stop_execution'),
     'stoppable_run': AttributeBinding(_UTILS_EXECUTOR_RUN_CONTROL, 'stoppable_run'),
     'use_device': AttributeBinding(_WRAPPER_DEVICE_CONTEXT, 'use_device'),
     'wait_for_app': AttributeBinding(_WRAPPER_MOBILE_EXTENSIONS, 'wait_for_app'),
+    'MAX_REGISTRY_NAMES': AttributeBinding(_UTILS_EXECUTOR_NAMED_REGISTRY, 'MAX_REGISTRY_NAMES'),
+    'RegistryFullError': AttributeBinding(_UTILS_EXECUTOR_NAMED_REGISTRY, 'RegistryFullError'),
 }

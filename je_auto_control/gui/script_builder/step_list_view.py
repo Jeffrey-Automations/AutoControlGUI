@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 
+from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.gui.script_builder.command_schema import COMMAND_SPECS
 from je_auto_control.gui.script_builder.step_model import Step
 
@@ -21,9 +22,13 @@ class StepTreeView(QTreeWidget):
 
     selected_step_changed = Signal(object)  # emits Optional[Step]
 
+    def retranslate(self) -> None:
+        """Show the column header in the active language."""
+        self.setHeaderLabels([language_wrapper.translate("sb_step_header", "sb_step_header")])
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setHeaderLabels(["Step"])
+        self.retranslate()
         self.setColumnCount(1)
         # Item drag-drop is deliberately disabled: Qt's InternalMove reorders
         # the QTreeWidgetItems without touching the Step model (``_roots`` and

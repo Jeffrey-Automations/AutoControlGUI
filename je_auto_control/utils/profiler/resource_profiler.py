@@ -15,6 +15,12 @@ Output (:meth:`flame_graph_payload`) is a JSON blob compatible with
 the `speedscope <https://www.speedscope.app/>`_ "single-thread"
 format, so an operator can drop it into the speedscope web viewer
 and get the usual flame-graph treatment for free.
+
+Memory is bounded while a run lasts: samples and frame timestamps are kept
+in ring buffers of ``max_samples`` entries (default
+:data:`DEFAULT_MAX_SAMPLES`, an hour of samples at the default 0.5 s
+interval), so the report and the speedscope payload describe the newest
+``max_samples`` samples. FPS is counted over the whole run, not the buffer.
 """
 from __future__ import annotations
 
@@ -22,10 +28,14 @@ import json
 import os
 import threading
 import time
+from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from types import ModuleType
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Deque, Dict, Iterator, List, Optional, Tuple
+
+DEFAULT_MAX_SAMPLES = 7200
+"""Samples (and frame timestamps) a profiler keeps; older ones are dropped first."""
 
 
 @dataclass
@@ -73,13 +83,15 @@ def _try_psutil() -> Optional[ModuleType]:
 class ResourceProfiler:
     """Background CPU / RSS / FPS sampler with per-action tagging."""
 
-    def __init__(self, *, interval: float = 0.5) -> None:
+    def __init__(self, *, interval: float = 0.5, max_samples: int = DEFAULT_MAX_SAMPLES) -> None:
         self._interval = max(0.05, float(interval))
+        self._max_samples = max(1, int(max_samples))
         self._psutil = _try_psutil()
         self._proc = self._psutil.Process(os.getpid()) if self._psutil else None
         self._lock = threading.Lock()
-        self._samples: List[_Sample] = []
-        self._frames: List[float] = []
+        self._samples: Deque[_Sample] = deque(maxlen=self._max_samples)
+        self._frames: Deque[float] = deque(maxlen=self._max_samples)
+        self._frame_count = 0
         # Open spans in entry order as (token, action); the newest open one
         # tags samples. Removing each span's own entry (not restoring the
         # value it saw) keeps spans on two threads from leaving a stale tag.
@@ -116,8 +128,9 @@ class ResourceProfiler:
         # A fresh event per run, never clear() on the old one: a thread that
         # outlived stop()'s join would see it cleared and keep running.
         self._stop = threading.Event()
-        self._samples = []
-        self._frames = []
+        self._samples = deque(maxlen=self._max_samples)
+        self._frames = deque(maxlen=self._max_samples)
+        self._frame_count = 0
         self._started_at = time.monotonic()
         self._stopped_at = None
         if self._psutil is None:
@@ -157,15 +170,16 @@ class ResourceProfiler:
                 self._open_spans.remove(entry)
 
     def tick_frame(self) -> None:
-        """Record one frame timestamp for FPS aggregation."""
+        """Record one frame timestamp for FPS aggregation (the newest ``max_samples`` are kept)."""
         with self._lock:
             self._frames.append(time.monotonic())
+            self._frame_count += 1
 
     def report(self) -> ResourceReport:
         """Snapshot the current counters into a :class:`ResourceReport`."""
         with self._lock:
             samples = list(self._samples)
-            frames = list(self._frames)
+            frame_count = self._frame_count
             started, stopped = self._started_at, self._stopped_at
         if started is None:
             duration = 0.0
@@ -187,7 +201,7 @@ class ResourceProfiler:
             cpu_percent_max=round(cpu_max, 2),
             rss_bytes_avg=int(rss_avg),
             rss_bytes_max=int(rss_max),
-            fps_avg=round(len(frames) / duration, 2) if duration else 0.0,
+            fps_avg=round(frame_count / duration, 2) if duration else 0.0,
             per_action=_aggregate_per_action(samples),
         )
 

@@ -2,7 +2,7 @@ import sys
 from typing import Tuple, Optional, Dict
 from ctypes import windll  # type: ignore[attr-defined]  # reason: win32-only ctypes
 from je_auto_control.utils.exception.exception_tags import windows_import_error_message
-from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.exception.exceptions import AutoControlException, AutoControlMouseException
 
 if sys.platform not in ["win32", "cygwin", "msys"]:
     raise AutoControlException(windows_import_error_message)
@@ -123,8 +123,12 @@ def set_position(x: int, y: int) -> None:
     """
     設定滑鼠位置
     Set mouse position
+
+    Raises when Windows refuses (a locked or secure desktop): ignored, the
+    move was reported done and whatever came next acted on the old position.
     """
-    _set_cursor_pos(x, y)
+    if not _set_cursor_pos(x, y):
+        raise AutoControlMouseException(f"Windows refused to move the cursor to ({x}, {y})")
 
 
 def press_mouse(press_button: Tuple[int, int, int]) -> None:

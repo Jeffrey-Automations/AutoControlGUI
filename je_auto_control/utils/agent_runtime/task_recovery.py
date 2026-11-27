@@ -479,6 +479,10 @@ def _check_scope(template: dict[str, Any], reviewed: dict[str, Any]) -> None:
     if any(request_spec_digest({"value": template[key]}) != request_spec_digest({"value": reviewed[key]})
            for key in fixed):
         raise AgentTaskError("recovery must preserve source scope, inputs, budgets and completion criteria")
+    # Every source clause must survive unchanged: an edited clause is a removed one plus an added one.
+    kept = {request_spec_digest({"value": clause}) for clause in reviewed.get("resume_conditions", [])}
+    if any(request_spec_digest({"value": clause}) not in kept for clause in template.get("resume_conditions", [])):
+        raise AgentTaskError("recovery must keep every source resume condition; a reviewer may only add them")
 
 
 def _require_actions(spec: AgentTaskSpec) -> None:

@@ -10,13 +10,17 @@ never enter the variable bag in plaintext.
 
 Unknown variables raise ``ValueError`` so mistakes fail fast rather than
 silently executing with wrong values.
+
+:func:`interpolate_document` is the variant for text that is written out
+rather than executed (a generated SOP or test file): it keeps
+``${secrets.NAME}`` and names not yet defined as the placeholders they are.
 """
 import json
 import re
 from pathlib import Path
 from typing import Any, List, Mapping, MutableMapping, Optional, Tuple
 
-from je_auto_control.utils.logging.secret_scope import remember_secret
+from je_auto_control.utils.logging.secret_scope import remember_secret, scrub_secret_text
 
 # Bounded character class with a single quantifier — avoids the nested
 # alternation that ReDoS scanners (semgrep regex_dos) flag on
@@ -46,6 +50,47 @@ def interpolate_actions(actions: List[Any], variables: Mapping[str, Any]) -> Lis
 
 
 _NESTED = re.compile(r"\$\{[^}]*\$\{")
+
+
+def interpolate_document(value: Any, variables: Mapping[str, Any]) -> Any:
+    """Interpolate what a generated document will hold, keeping references as references.
+
+    Known ``${var}`` placeholders are substituted as :func:`interpolate_value`
+    does. ``${secrets.NAME}`` is never resolved -- the document would hold the
+    value in plaintext -- and a name not defined yet (a loop variable the
+    documented steps bind themselves) or a nested placeholder is kept as
+    written instead of raising: nothing here runs.
+    """
+    if isinstance(value, str):
+        if _NESTED.search(value):
+            return value
+        exact = _PLACEHOLDER.fullmatch(value)
+        if exact is not None:
+            return _document_lookup(exact, variables)
+        return _PLACEHOLDER.sub(lambda m: str(_document_lookup(m, variables)), value)
+    if isinstance(value, list):
+        return [interpolate_document(item, variables) for item in value]
+    if isinstance(value, dict):
+        return {k: interpolate_document(v, variables) for k, v in value.items()}
+    return value
+
+
+def _document_lookup(match: re.Match[str], variables: Mapping[str, Any]) -> Any:
+    """The variable's value, or the placeholder itself for a secret or an unknown name.
+
+    A variable holding a value this run already resolved as a secret is kept
+    as its placeholder too.
+    """
+    name = match.group(1)
+    if name.startswith(_VAULT_NAMESPACE):
+        return match.group(0)
+    try:
+        value = _lookup(name, variables)
+    except ValueError:
+        return match.group(0)
+    if isinstance(value, str) and scrub_secret_text(value) != value:
+        return match.group(0)
+    return value
 
 
 def _interpolate_string(text: str, variables: Mapping[str, Any]) -> Any:

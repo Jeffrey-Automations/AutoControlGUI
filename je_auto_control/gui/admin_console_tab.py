@@ -8,6 +8,13 @@ skipping and drops the rows.
 The health poll and the thumbnail fetch are tasks too, with a deadline and
 **Stop polling** in the Actions menu: stopping either, or closing the tab,
 skips the hosts not reached yet and drops the answer.
+
+Adding and removing hosts rewrites the host file, so both are a tab task too,
+one at a time.
+
+Every command first asks RBAC for its ``AC_admin_*`` command, in the slot
+(the refusal is shown in the tab) and, for the background ones, again on the
+worker; the host list is not shown to a role that may not read it.
 """
 import functools
 import json
@@ -22,7 +29,9 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel, authorized, refusal
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._qt_typed import decoded_image
 from je_auto_control.gui._tab_task import TabTask
@@ -49,6 +58,10 @@ def _t(key: str) -> str:
 class AdminConsoleTab(TranslatableMixin, QWidget):
     """Thin Qt surface over :class:`AdminConsoleClient`."""
 
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_admin_add_host", "AC_admin_remove_host", "AC_admin_list_hosts", "AC_admin_poll",
+                         "AC_admin_broadcast_execute")
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
@@ -63,6 +76,8 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._token_input = QLineEdit()
         self._token_input.setEchoMode(QLineEdit.EchoMode.Password)
         self._table = QTableWidget(0, 5)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tr_cells(self._table)
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents,
         )
@@ -74,13 +89,18 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         self._polls = TabTask(self)
         self._polls.result.connect(self._apply_poll_result)
         self._polls.error.connect(self._apply_poll_failure)
+        self._refusal = RefusalLabel()
         self._broadcast_status = QLabel()
+        self._broadcast_text = self._keyed(self._broadcast_status)
         self._broadcast_status.setWordWrap(True)
         set_role(self._broadcast_status, "hint")
         self._broadcasts = TabTask(self)       # one broadcast at a time
         self._broadcasts.result.connect(self._show_broadcast)
         self._broadcasts.error.connect(self._show_broadcast_error)
         self._broadcast_stop: Optional[threading.Event] = None
+        self._edits = TabTask(self)            # add or remove hosts: the host file is rewritten
+        self._edits.result.connect(self._on_hosts_edited)
+        self._edits.error.connect(self._on_hosts_edit_failed)
         # Phase 6.5: live-thumbnail grid + auto-poll timer.
         self._thumbnails = QListWidget()
         self._thumbnails.setViewMode(QListWidget.ViewMode.IconMode)
@@ -108,6 +128,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         root = QVBoxLayout(self)
         root.setSpacing(12)
         root.addWidget(self._build_add_group())
+        root.addWidget(self._refusal)
         # Hosts and their thumbnails in one column, the broadcast beside them:
         # side by side the page stays one screen tall; stacked it keeps the old order.
         hosts = QWidget()
@@ -170,29 +191,44 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         return group
 
     def _on_add(self) -> None:
-        label = self._label_input.text().strip()
-        url = self._url_input.text().strip()
-        token = self._token_input.text().strip()
-        try:
-            self._client.add_host(label=label, base_url=url, token=token)
-        except ValueError as error:
-            QMessageBox.warning(self, _t("admin_add"), str(error))
+        if not self._refusal.allows("AC_admin_add_host"):
             return
-        self._label_input.clear()
-        self._url_input.clear()
-        self._token_input.clear()
-        self._refresh_table()
+        work = functools.partial(authorized, "AC_admin_add_host", self._client.add_host,
+                                 label=self._label_input.text().strip(), base_url=self._url_input.text().strip(),
+                                 token=self._token_input.text().strip())
+        self._start_edit(work, "add")
 
     def _on_remove(self) -> None:
         labels = self._selected_labels()
-        if not labels:
+        if not labels or not self._refusal.allows("AC_admin_remove_host"):
             return
-        for label in labels:
-            self._client.remove_host(label)
+        self._start_edit(functools.partial(authorized, "AC_admin_remove_host", _remove_hosts, self._client, labels),
+                         "remove")
+
+    def _start_edit(self, work: Callable[[], Any], tag: str) -> None:
+        if not self._edits.start(work, tag=tag):
+            self._broadcast_text.show("task_busy")
+            return
+        self._broadcast_text.show("task_running")
+
+    def _on_hosts_edited(self, _outcome: object) -> None:
+        self._broadcast_text.clear()
+        if self._edits.tag == "add":
+            self._label_input.clear()
+            self._url_input.clear()
+            self._token_input.clear()
+        self._refresh_table()
+
+    def _on_hosts_edit_failed(self, error: object) -> None:
+        self._broadcast_text.clear()
+        title = _t("admin_add") if self._edits.tag == "add" else _t("admin_remove")
+        QMessageBox.warning(self, title, str(error))
         self._refresh_table()
 
     def _on_refresh(self) -> None:
-        self._polls.start(self._client.poll_all, timeout_s=POLL_DEADLINE_S)
+        if self._refusal.allows("AC_admin_poll"):
+            self._polls.start(functools.partial(authorized, "AC_admin_poll", self._client.poll_all),
+                              timeout_s=POLL_DEADLINE_S)
 
     def _on_poll_stop(self) -> None:
         """Cancel the poll and the thumbnail fetch still out; the hosts not reached yet are skipped."""
@@ -201,7 +237,7 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
 
     def _on_broadcast(self) -> None:
         text = self._actions_input.toPlainText().strip()
-        if not text:
+        if not text or not self._refusal.allows("AC_admin_broadcast_execute"):
             return
         try:
             actions = json.loads(text)
@@ -211,20 +247,21 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
         # Each host stops at its first failing action and its row says so.
         # Off the GUI thread: every host is an HTTP round trip.
         stop = threading.Event()
-        work = functools.partial(self._client.broadcast_execute, actions=actions,
+        work = functools.partial(authorized, "AC_admin_broadcast_execute", self._client.broadcast_execute,
+                                 actions=actions,
                                  raise_on_error=True, stop_event=stop)
         if not self._broadcasts.start(work):
-            self._broadcast_status.setText(_t("task_busy"))
+            self._broadcast_text.show("task_busy")
             return
         self._broadcast_stop = stop
-        self._broadcast_status.setText(_t("admin_broadcast_running"))
+        self._broadcast_text.show("admin_broadcast_running")
 
     def _on_broadcast_stop(self) -> None:
         """Skip the hosts not sent to yet; the rows of every host still arrive."""
         if self._broadcast_stop is None or not self._broadcasts.running:
             return
         self._broadcast_stop.set()
-        self._broadcast_status.setText(_t("admin_broadcast_stopping"))
+        self._broadcast_text.show("admin_broadcast_stopping")
 
     def _show_broadcast(self, results: List[Dict[str, Any]]) -> None:
         self._broadcast_stop = None
@@ -232,13 +269,12 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
             json.dumps(results, indent=2, ensure_ascii=False, default=str),
         )
         sent = sum(1 for row in results if row.get("sent"))
-        self._broadcast_status.setText(_t("admin_broadcast_summary").format(
-            sent=sent, total=len(results), skipped=len(results) - sent))
+        self._broadcast_text.show("admin_broadcast_summary", sent=sent, total=len(results), skipped=len(results) - sent)
 
     def _show_broadcast_error(self, error: object) -> None:
         self._broadcast_stop = None
         self._broadcast_output.setPlainText(str(error))
-        self._broadcast_status.setText("")
+        self._broadcast_text.clear()
 
     def _apply_poll_result(self, statuses: List[HostStatus]) -> None:
         self._refresh_table(statuses=statuses)
@@ -261,7 +297,9 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
 
     def _refresh_thumbnails(self) -> None:
         # A tick while the previous fetch is still out is skipped.
-        self._thumbs.start(self._client.fetch_thumbnails, timeout_s=POLL_DEADLINE_S)
+        if self._refusal.allows("AC_admin_poll"):
+            self._thumbs.start(functools.partial(authorized, "AC_admin_poll", self._client.fetch_thumbnails),
+                               timeout_s=POLL_DEADLINE_S)
 
     def _on_thumbnails_failed(self, error: object) -> None:
         # A failed round shows every host as a placeholder, as an empty answer does.
@@ -301,31 +339,46 @@ class AdminConsoleTab(TranslatableMixin, QWidget):
                 out.append(item.text())
         return out
 
-    def _refresh_table(self, statuses: Optional[List[HostStatus]] = None) -> None:
-        hosts = self._client.list_hosts()
-        status_by_label = {s.label: s for s in (statuses or [])}
-        self._table.setRowCount(len(hosts))
+    def retranslate(self) -> None:
+        TranslatableMixin.retranslate(self)
+        self._apply_table_headers()
+
+    def _apply_table_headers(self) -> None:
         self._table.setHorizontalHeaderLabels([
             _t("admin_col_label"), _t("admin_col_url"),
             _t("admin_col_health"), _t("admin_col_latency"),
             _t("admin_col_jobs"),
         ])
+
+    def _refresh_table(self, statuses: Optional[List[HostStatus]] = None) -> None:
+        refused = refusal("AC_admin_list_hosts")
+        if refused is not None:
+            self._table.setRowCount(0)
+            self._broadcast_text.show_plain(refused)
+            return
+        hosts = self._client.list_hosts()
+        status_by_label = {s.label: s for s in (statuses or [])}
+        self._table.setRowCount(len(hosts))
+        self._apply_table_headers()
         for row, host in enumerate(hosts):
             self._table.setItem(row, 0, QTableWidgetItem(host.label))
             self._table.setItem(row, 1, QTableWidgetItem(host.base_url))
             status = status_by_label.get(host.label)
             if status is None:
-                health_text = "?"
-            elif status.healthy:
-                health_text = _t("admin_health_ok")
+                health = QTableWidgetItem("?")
             else:
-                health_text = _t("admin_health_down")
+                health = keyed_cell("admin_health_ok" if status.healthy else "admin_health_down")
             latency_text = "-" if status is None else f"{status.latency_ms:.0f} ms"
             jobs_text = "-" if status is None or status.job_count is None \
                 else str(status.job_count)
-            self._table.setItem(row, 2, QTableWidgetItem(health_text))
+            self._table.setItem(row, 2, health)
             self._table.setItem(row, 3, QTableWidgetItem(latency_text))
             self._table.setItem(row, 4, QTableWidgetItem(jobs_text))
+
+
+def _remove_hosts(client: Any, labels: List[str]) -> int:
+    """Worker thread: remove each host (each removal rewrites the host file); return how many were removed."""
+    return sum(1 for label in labels if client.remove_host(label))
 
 
 __all__ = ["AdminConsoleTab"]

@@ -334,6 +334,7 @@ then retires it without acquiring input ownership or starting a browser. Its res
 `python_dependencies_ready`; `browser_launch=not_probed` and `native_evidence=not_recorded` stay explicit.
 `last_probe` is an in-memory timestamped diagnostic snapshot; passive readiness and task permissions
 are unchanged by probing. Disabled targets stay disabled. Desktop/device native probes remain open.
+A browser profile may also declare host-reviewed `semantic_fields`: up to 64 `{name, selector, frame?, property}` entries whose property is `text`, `value` or `visible`. Each browser observation then carries a `semantic_report` in the shared observation-report schema. The source is bound to the managed browser context, so a new session is a new target lifetime; an absent element is `not_found`, a value the SDK refuses to read back (password, hidden, file or `data-secret` controls) is `protected`, and a navigation during the read makes the source `inconsistent_snapshot`. Capture IDs and times are left out, so an unchanged page fingerprints the same before an action. Selectors must be unique, because the SDK retires the session on an ambiguous one. DOM reads have no revision and stay best-effort; real-browser acceptance remains pending. Browser observations withhold text a page marks `data-secret`: a document showing any loses its page text, and elements in, around or containing a marked one lose their name.
 The prepared isolated environment installs wheels from both feature worktrees. Shared environments
 and production checkouts remain untouched; production service configuration and real-browser acceptance
 remain separate work. Browser automation still belongs entirely to WebRunner (`je_web_runner`).
@@ -821,6 +822,32 @@ repository has driven a real phone, not because the code is unfinished.
   (`DeviceError` is a `RuntimeError`, `DeviceTimeoutError` a `TimeoutError`,
   `JournalFormatError` and `JournalImportError` a `ValueError`,
   `AuthorizationError` a `PermissionError`).
+- An image search that cannot run on its input (a missing or unreadable
+  template, a single-colour template, a threshold outside 0-1, NaN or not a
+  number, an image OpenCV cannot match) raises `ImageSearchInputException`,
+  not `ImageNotFoundException`, which now means only "searched, not on
+  screen". The two are siblings under `AutoControlException`, so code that
+  caught `ImageNotFoundException` to handle a bad path must also catch
+  `ImageSearchInputException`; `AC_assert_image(present=False)`,
+  `AC_wait_image_gone` and `AC_if_image_found` fail on such input.
+- `execute_action` records an error from outside the framework family
+  (`cv2.error`, `sqlite3.Error`, a plugin's own class) as that action's
+  failure, wrapped in `AutoControlForeignException` (`original` and
+  `__cause__` hold the original); with `raise_on_error=True` the wrapper is
+  raised instead of the original. Assertion failures (including a plugin's
+  `AssertionError`), loop signals, stops, cancellation, `KeyboardInterrupt`
+  and `SystemExit` are never contained.
+- MCP HTTP `resources/subscribe` belongs to the session that sent it and is
+  delivered on that session's `GET` stream; without a session it is refused
+  with `-32600` instead of answering `{}`.
+- A named executor registry (behind `AC_cas_put`, `AC_dedup_check`,
+  `AC_idempotency_begin`, `AC_bulkhead_run`, `AC_sequence_observe`,
+  `AC_outbox_enqueue`) refuses a new name once it holds `MAX_REGISTRY_NAMES`
+  (1,024) names, raising `RegistryFullError` (an `AutoControlActionException`);
+  both are exported from `je_auto_control` (beta). Existing names keep working.
+- A voice command or macro step runs only if both its registrant and the current
+  caller may run it; a refused step is an `AuthorizationError`, and so is
+  `AC_define_macro` for a name another principal owns.
 - `python -m mypy` holds every module written since v0.0.225 to
   `disallow_untyped_defs` and `disallow_any_generics`; see
   `test/verify/typing_strict_baseline.txt` for the modules that predate that.
@@ -1515,6 +1542,8 @@ retained owner after acceptance. A passing result reports SCM state, not atomic
 completion, health or desktop noninterference. These tool names are adapter-scoped,
 not global executor commands. Existing task APIs and the GUI JSON editor carry the
 criterion. The host-reviewed `service` profile pins `config_path`, `config_sha256`
-and an ASCII `service_key`. Its fixed worker checks the deployment's service and
+and a `service_key`. Non-ASCII keys are case-folded with Windows' own NT upcase table,
+never Python's case mapping, so every spelling SCM treats as one service shares one lock.
+Its fixed worker checks the deployment's service and
 operation ceiling before accepting task scope. Registration, reload and probe do
 not read the deployment or access SCM; native acceptance remains pending.

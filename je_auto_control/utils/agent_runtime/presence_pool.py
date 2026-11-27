@@ -15,7 +15,7 @@ from je_auto_control.utils.agent_runtime.owned_channel_factory import owned_chan
 from je_auto_control.utils.agent_runtime.presence_frames import (
     identifier, presence_body, unsigned, validate_response,
 )
-from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
+from je_auto_control.utils.agent_runtime.presence_endpoint_wire import endpoint_from_wire, endpoint_to_wire
 
 
 @dataclass(eq=False)

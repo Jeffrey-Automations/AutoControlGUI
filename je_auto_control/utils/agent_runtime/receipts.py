@@ -24,7 +24,7 @@ def reconcile(store: Any, task_id: str, request: Mapping[str, Any]) -> None:
     value = durable_payload(detached(request))
     if not isinstance(value, dict) or set(value) - {"action_id", "decision", "note", "result"}:
         raise AgentTaskError("invalid reconciliation fields")
-    if value.get("decision") not in {"applied", "not_applied"}:
+    if value.get("decision") not in ("applied", "not_applied"):
         raise AgentTaskError("reconciliation decision must be applied or not_applied")
     note = value.get("note")
     if not isinstance(note, str) or not note.strip() or len(note) > 4000:
@@ -71,7 +71,7 @@ def _step_state(action: Mapping[str, Any], receipt: Mapping[str, Any] | None, va
         return "pending"
     try:
         verified = _matches_action(action, receipt, values)
-    except KeyError:
+    except AgentTaskError:  # a capture this step needs is missing or is not text
         return "pending"
     return "success" if verified else "failed"
 

@@ -30,7 +30,7 @@ def guard_probe_image(probe: ReviewedProbe, plan: ImageCodePlan, *,
         if before.size != plan.image_size:
             raise MemoryObservationError(FailureReason.TARGET_CHANGED)
         for item in plan.ranges:
-            actual = view.read(before.base + item.rva, item.size)
+            actual = plan.as_on_disk(item, view.read(before.base + item.rva, item.size), before.base)
             if not hmac.compare_digest(hashlib.sha256(actual).hexdigest(), item.sha256):
                 raise MemoryObservationError(FailureReason.TARGET_CHANGED)
         if view.main_module() != before:

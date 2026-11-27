@@ -20,6 +20,7 @@ import math
 import time
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+from je_auto_control.utils.executor import run_control
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 Sink = Callable[[Dict[str, Any]], None]
@@ -104,8 +105,13 @@ def _pause_seconds(value: Any, name: str) -> float:
 
 
 def _pause(seconds: float) -> None:
+    """Rest between drag steps; a stop of the surrounding run wakes it and raises.
+
+    The raise unwinds through ``_drag_through``'s ``finally``, which releases
+    the button at the last point reached.
+    """
     if seconds:
-        time.sleep(seconds)
+        run_control.pause(seconds, time.sleep)
 
 
 def _release_quietly(dispatch: Sink, button: str, point: Sequence[int]) -> None:
@@ -140,7 +146,7 @@ def _drag_through(points: List[List[int]], button: str, dispatch: Sink,
     first, last = points[0], points[-1]
     if settle:
         dispatch({"op": "move", "x": first[0], "y": first[1]})
-        time.sleep(settle)
+        run_control.pause(settle, time.sleep)
     dispatch({"op": "press", "button": button, "x": first[0], "y": first[1]})
     reached: Sequence[int] = first
     held = True

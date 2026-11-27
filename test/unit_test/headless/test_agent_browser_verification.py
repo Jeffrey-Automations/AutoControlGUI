@@ -71,7 +71,7 @@ def test_blank_page_is_not_negative_visibility_completion_evidence(fake_sdk, tmp
         result = runtime.finish(handle.task_id)
         assert result.state == "waiting_user"
         assert result.verification[0]["status"] == "unknown"
-    session.visible.assert_not_called()
+    assert all("[data-secret]" in call.args[0] for call in session.visible.call_args_list)  # never the criterion
 
 
 def test_preview_text_cannot_substitute_for_an_unavailable_browser_verifier(tmp_path):

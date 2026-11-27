@@ -114,8 +114,21 @@ def _hunk_start(match: "re.Match[str]") -> int:
     return old_start if match.group(2) == "0" else old_start - 1
 
 
+def _checked_start(match: "re.Match[str]", source: List[str]) -> int:
+    """The hunk's start, refused when it lies past the end of the source.
+
+    A pure insertion carries no context to verify, so without this a hunk
+    meant for a longer file was appended to the end of this one.
+    """
+    start = _hunk_start(match)
+    if start > len(source):
+        raise PatchApplyError(
+            f"hunk starts past the end of the file (line {start + 1}, file has {len(source)} lines)")
+    return start
+
+
 def apply_unified(text: str, diff: str) -> str:
-    """Apply a unified ``diff`` to ``text``; raise on context mismatch."""
+    """Apply a unified ``diff`` to ``text``; raise on context mismatch or a hunk past the end."""
     source = _lines(text)
     out: List[str] = []
     cursor = 0
@@ -126,7 +139,7 @@ def apply_unified(text: str, diff: str) -> str:
         if match is None:
             index += 1
             continue
-        start = _hunk_start(match)
+        start = _checked_start(match, source)
         out.extend(source[cursor:start])
         cursor = max(cursor, start)
         body, index = _read_hunk(lines, index + 1, int(match.group(2) or 1),

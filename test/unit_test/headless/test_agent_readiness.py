@@ -42,9 +42,10 @@ def test_missing_tools_and_packages_are_dependencies_and_present_ones_are_only_u
     assert _area(present, 'browser')['state'] == 'not_probed'
 
 
-def test_unimplemented_device_control_is_unsupported_even_when_its_tools_are_installed():
+def test_device_control_is_never_claimed_ready_without_a_probe():
     report = _report(tools=('adb',))
-    assert _area(report, 'android_managed_control')['state'] == 'unsupported'
+    # Android has a helper-backed provider but no device was contacted; iOS has no provider at all.
+    assert _area(report, 'android_managed_control')['state'] == 'not_probed'
     assert _area(report, 'ios_managed_control')['state'] == 'unsupported'
 
 
@@ -52,7 +53,8 @@ def test_unimplemented_device_control_is_unsupported_even_when_its_tools_are_ins
     ('win32', {}, 'not_probed', 'win32'),
     ('darwin', {}, 'not_probed', 'quartz'),
     ('linux', {'DISPLAY': ':0'}, 'not_probed', 'x11'),
-    ('linux', {'DISPLAY': ':0', 'WAYLAND_DISPLAY': 'wayland-0'}, 'unsupported', 'unsupported'),
+    ('linux', {'DISPLAY': ':0', 'WAYLAND_DISPLAY': 'wayland-0'}, 'not_probed', 'evdev'),
+    ('linux', {}, 'unsupported', 'unsupported'),
     ('freebsd14', {'DISPLAY': ':0'}, 'unsupported', 'unsupported'),
 ])
 def test_only_a_platform_with_a_presence_source_reports_one(platform, environ, state, backend):

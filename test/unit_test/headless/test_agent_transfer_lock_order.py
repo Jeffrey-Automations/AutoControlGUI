@@ -58,3 +58,28 @@ def test_source_retirement_proof_does_not_invert_profile_toggle_and_writer(tmp_p
         def lookup(connection):
             assert controller.source.host.context(task, owner, connection=connection)['row']['state'] == 'succeeded'
         prove_order(runtime, monkeypatch, lookup, 'local-files', writer_context, changing_context)
+
+
+def test_lease_maintenance_does_not_wait_for_a_running_transfer_operation(tmp_path, monkeypatch):
+    runtime = AgentRuntime(tmp_path / 'coordinator.sqlite3', targets={})
+    entered, release = Event(), Event()
+    try:
+        controller = runtime.transfers
+
+        def slow_peer(_operation, _request):
+            entered.set()
+            assert release.wait(10)
+            return {}
+
+        monkeypatch.setattr(controller, '_management', slow_peer)
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            operation = workers.submit(controller.control, 'list_imports', {'host': 'remote'})
+            try:
+                assert entered.wait(3)
+                workers.submit(runtime.maintain).result(timeout=3)
+            finally:
+                release.set()
+            assert operation.result(timeout=5) == {}
+    finally:
+        release.set()
+        runtime.close()

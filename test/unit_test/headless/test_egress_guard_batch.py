@@ -95,3 +95,22 @@ def test_facade_exports():
                  "set_egress_policy"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+@pytest.mark.parametrize("url", [
+    "http://evil.example%3a80/", "http://evil.example%3A80/x", "http://%5b::1%5d/",
+    "http://127.0.0.1%3a8080/",
+])
+def test_an_encoded_port_or_bracket_does_not_hide_the_host(url):
+    """urllib decodes the host and http.client splits it again, so these connect."""
+    policy = EgressPolicy(deny=["evil.example", "127.0.0.1", "::1"])
+    assert policy.is_allowed(url) is False
+    with pytest.raises(EgressBlocked):
+        policy.check(url)
+
+
+def test_a_bracketed_ipv6_literal_is_still_matched():
+    policy = EgressPolicy(allow=["::1", "fe80::1%eth0"])
+    assert policy.is_allowed("http://[::1]:8080/") is True
+    assert policy.is_allowed("http://[fe80::1%25eth0]/") is True
+    assert policy.is_allowed("http://[::2]/") is False

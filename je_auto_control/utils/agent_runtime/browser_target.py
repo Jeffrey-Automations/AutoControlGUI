@@ -10,11 +10,12 @@ from je_auto_control.utils.agent_runtime.browser_commands import (
     BROWSER_ADAPTER_TOOLS, BROWSER_TRANSFER_TOOLS, browser_session_scope,
 )
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError, AgentHumanReview
-from je_auto_control.utils.agent_runtime.models import AgentTaskSpec, detached
+from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.agent_runtime.target_continuity import require_context_continuity
 from je_auto_control.utils.agent_runtime.browser_retirement import retirement_proof
 from je_auto_control.utils.agent_runtime.browser_readonly_scope import readonly_verification_scope
+from je_auto_control.utils.agent_runtime.browser_secrets import observe_unmarked
 
 _RETIREMENT_UNCONFIRMED = "browser retirement is unconfirmed"
 
@@ -53,7 +54,11 @@ def _task_origins(spec: AgentTaskSpec) -> tuple[str, ...]:
 class BrowserTarget:
     """A fresh headless browser with task origins intersected by its immutable host profile."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, target_id: str = "", semantic_fields: Any = None) -> None:
+        self._semantic = None
+        if semantic_fields is not None:
+            from je_auto_control.utils.agent_runtime.dom_observation import DomSource, dom_fields
+            self._semantic = DomSource(target_id, dom_fields(semantic_fields))
         self._session: Any = None
         self._identity = uuid.uuid4().hex
         self._spec: AgentTaskSpec | None = None
@@ -151,7 +156,7 @@ class BrowserTarget:
         if self._session is None:
             raise AgentTaskError("browser session is unavailable")
         try:
-            raw = detached(self._session.observe())
+            raw = observe_unmarked(self._session)
         except Exception as error:  # noqa: BLE001 - SDK errors must stay inside the AutoControl error family
             if getattr(error, "reason", "") == "human_review_required":
                 raise AgentHumanReview("browser dialog requires human review") from None
@@ -160,9 +165,20 @@ class BrowserTarget:
         self._elements(elements, raw.get("elements", []), "")
         for frame in raw.get("frames", []):
             self._elements(elements, frame.get("elements", []), frame["selector"])
-        return {"identity": {"browser_session": self._identity, "url": raw.get("url", "")},
-                "title": raw.get("title", ""), "text": raw.get("text", ""), "elements": elements,
-                "semantic_observation": True, "text_redacted": True}
+        result = {"identity": {"browser_session": self._identity, "url": raw.get("url", "")},
+                  "title": raw.get("title", ""), "text": raw.get("text", ""), "elements": elements,
+                  "semantic_observation": True, "text_redacted": True}
+        if self._semantic is not None:
+            result["semantic_report"] = self._semantic_report(self._semantic)
+        return result
+
+    def _semantic_report(self, source: Any) -> dict[str, Any]:
+        """Host-declared DOM fields in the shared report schema, with source identity and per-field reasons."""
+        from je_auto_control.utils.agent_runtime.context import current_operation
+        from je_auto_control.utils.agent_runtime.dom_observation import stable_state
+        operation = current_operation()
+        checkpoint = operation.checkpoint if operation is not None else (lambda: None)
+        return stable_state(source.report(self._session, checkpoint))
 
     @staticmethod
     def _elements(result: list[dict[str, Any]], values: list[dict[str, Any]], frame: str) -> None:
@@ -193,7 +209,8 @@ class BrowserTarget:
 
     def verify_browser(self, clause: Mapping[str, Any]) -> bool:
         """Check only a criterion pinned in this session's task, using fresh explicit SDK reads."""
-        if self._spec is None or self._session is None or clause not in self._spec.success_criteria:
+        if (self._spec is None or self._session is None
+                or clause not in (*self._spec.success_criteria, *self._spec.resume_conditions)):
             raise AgentTaskError("browser verification criterion is outside the owned task")
         from je_auto_control.utils.agent_runtime.browser_verification import evaluate_browser_clause
         try:

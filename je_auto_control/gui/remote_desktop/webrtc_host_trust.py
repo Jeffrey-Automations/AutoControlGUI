@@ -1,5 +1,9 @@
 """Trust list, audit log and file push for the WebRTC host panel.
 
+Every change to the trust list, and its export and import, writes or reads a
+file: each runs off the GUI thread as the panel's ``_trust_task``, one at a
+time, and the list is repainted once it has reported.
+
 One interaction group of ``webrtc_panel._WebRTCHostPanel``, kept as a mixin so the panel class
 still owns every widget and slot under its original name.
 """
@@ -9,7 +13,7 @@ from je_auto_control.gui.remote_desktop.webrtc_panel_state import _HostPanelPart
 
 import functools
 import os
-from typing import Any
+from typing import Any, Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -17,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui.remote_desktop._helpers import (
-    _read_import_entries, _t,
+    _read_import_entries, _t, _write_json_file,
 )
 from je_auto_control.gui.remote_desktop.webrtc_dialogs import (
     AuditLogDialog,
@@ -25,6 +29,7 @@ from je_auto_control.gui.remote_desktop.webrtc_dialogs import (
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
     _JSON_FILE_FILTER,
+    start_panel_call,
     start_panel_task,
 )
 from je_auto_control.gui.tab_task_controller import CancellationToken
@@ -37,7 +42,8 @@ class _HostTrustMixin(_HostPanelPart):
         from je_auto_control.utils.remote_desktop.audit_log import (
             default_audit_log,
         )
-        AuditLogDialog(default_audit_log(), parent=self).exec()
+        # Opening the log creates its database: the dialog does that on its query's worker.
+        AuditLogDialog(default_audit_log, parent=self).exec()
 
     def _on_push_file(self) -> None:
         if self._multi_host is None or self._multi_host.session_count() == 0:
@@ -58,55 +64,54 @@ class _HostTrustMixin(_HostPanelPart):
                                 functools.partial(self._push_done, path), self._push_failed):
             QMessageBox.information(self, "WebRTC", _t("rd_file_busy"))
             return
-        self._status_label.setText(_t("rd_file_sending").replace("{name}", os.path.basename(path)))
+        self._status.show("rd_file_sending", name=os.path.basename(path))
 
     def _push_done(self, path: str, sent: object) -> None:
-        self._status_label.setText("")
+        self._status.show_plain("")
         QMessageBox.information(
             self, "WebRTC",
             _t("rd_webrtc_push_done").format(n=sent, name=path),
         )
 
     def _push_failed(self, error: object) -> None:
-        self._status_label.setText("")
+        self._status.show_plain("")
         QMessageBox.warning(self, "WebRTC", str(error))
 
     def _on_export_trust(self) -> None:
-        import json as _json
         path, _filter = QFileDialog.getSaveFileName(
             self, _t("rd_webrtc_trust_export"), "trusted_viewers.json",
             _JSON_FILE_FILTER,
         )
         if not path:
             return
-        try:
-            with open(path, "w", encoding="utf-8") as fh:
-                _json.dump({"viewers": self._trust_list.list_entries()},
-                           fh, indent=2, ensure_ascii=False)
-        except OSError as error:
-            QMessageBox.warning(self, "WebRTC", str(error))
+        entries = {"viewers": self._trust_list.list_entries()}
+        self._run_trust_io(functools.partial(_write_json_file, path, entries), self._on_trust_changed)
 
     def _on_import_trust(self) -> None:
         path, _filter = QFileDialog.getOpenFileName(
             self, _t("rd_webrtc_trust_import"), "", _JSON_FILE_FILTER,
         )
-        if not path:
-            return
-        try:
-            viewers = _read_import_entries(path, "viewers")
-        except (OSError, ValueError) as error:
-            QMessageBox.warning(self, "WebRTC", str(error))
-            return
-        added = 0
-        for entry in viewers:
-            vid, label = entry.get("viewer_id"), entry.get("label")
-            if isinstance(vid, str) and vid:
-                self._trust_list.add(vid, label=label if isinstance(label, str) else "")
-                added += 1
+        if path:
+            self._run_trust_io(functools.partial(_import_trusted_viewers, self._trust_list, path),
+                               self._trust_imported)
+
+    def _run_trust_io(self, call: Callable[[], object], on_result: Callable[[Any], object]) -> None:
+        """Read or write the trust list (or its export) off the GUI thread, one call at a time."""
+        if not start_panel_call(self, "_trust_task", call, on_result, self._trust_failed):
+            QMessageBox.information(self, "WebRTC", _t("task_busy"))
+
+    def _trust_imported(self, added: int) -> None:
         QMessageBox.information(
             self, "WebRTC",
             _t("rd_webrtc_trust_import_done").format(n=added),
         )
+        self._refresh_trusted_list()
+
+    def _trust_failed(self, error: object) -> None:
+        QMessageBox.warning(self, "WebRTC", str(error))
+        self._refresh_trusted_list()
+
+    def _on_trust_changed(self, _outcome: object = None) -> None:
         self._refresh_trusted_list()
 
     def _refresh_trusted_list(self) -> None:
@@ -117,16 +122,16 @@ class _HostTrustMixin(_HostPanelPart):
             multi_host = self._require_multi_host()
             with multi_host._lock:
                 host = multi_host._sessions.get(sid)
-            full_vid = host.pending_viewer_id if host is not None else None
-            if full_vid:
-                self._trust_list.add(full_vid, label=f"sess {sid[:6]}")
-                self._refresh_trusted_list()
         except (RuntimeError, OSError, ValueError) as error:
             autocontrol_logger.warning("trust viewer: %r", error)
+            return
+        full_vid = host.pending_viewer_id if host is not None else None
+        if full_vid:
+            self._run_trust_io(functools.partial(self._trust_list.add, full_vid, label=f"sess {sid[:6]}"),
+                               self._on_trust_changed)
 
     def _on_remove_trust(self, viewer_id: str) -> None:
-        self._trust_list.remove(viewer_id)
-        self._refresh_trusted_list()
+        self._run_trust_io(functools.partial(self._trust_list.remove, viewer_id), self._on_trust_changed)
 
     def _on_remove_trust_button(self) -> None:
         item = self._trusted_list.currentItem()
@@ -143,8 +148,18 @@ class _HostTrustMixin(_HostPanelPart):
         )
         if result != QMessageBox.StandardButton.Yes:
             return
-        self._trust_list.clear()
-        self._refresh_trusted_list()
+        self._run_trust_io(self._trust_list.clear, self._on_trust_changed)
+
+
+def _import_trusted_viewers(trust_list: Any, path: str) -> int:
+    """Worker thread: trust every viewer an exported file names; return how many were added."""
+    added = 0
+    for entry in _read_import_entries(path, "viewers"):
+        vid, label = entry.get("viewer_id"), entry.get("label")
+        if isinstance(vid, str) and vid:
+            trust_list.add(vid, label=label if isinstance(label, str) else "")
+            added += 1
+    return added
 
 
 def _broadcast_file(host: Any, path: str, _token: CancellationToken) -> int:

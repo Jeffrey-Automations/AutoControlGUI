@@ -51,6 +51,7 @@ class ViewerAuthMixin:
         _ip_whitelist: List[str]
         _permissions: "SessionPermissions"
         _remote_ip: Optional[str]
+        _pending_viewer_id: Optional[str]
         _authenticated: bool
         _auth_deadline_handle: Optional[asyncio.TimerHandle]
         _on_authenticated: Optional[Callable[[], None]]
@@ -200,6 +201,7 @@ class ViewerAuthMixin:
         if self._closed.is_set():
             return
         self._has_pending_viewer = False
+        self._viewer_id = self._pending_viewer_id   # whom the USB session audits
         self._authenticated = True
         self._send_ctrl({
             "type": "auth_ok",

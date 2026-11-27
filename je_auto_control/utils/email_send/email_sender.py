@@ -20,6 +20,8 @@ import ssl
 from email.message import EmailMessage
 from typing import Any, Dict, List, Mapping, Optional
 
+from je_auto_control.utils.executor.run_control import stoppable_call
+
 
 def _as_list(value: Any) -> List[str]:
     """Normalise a string / iterable of addresses into a list of strings."""
@@ -108,7 +110,11 @@ def send_email(message: Mapping[str, Any],
     :param message: ``{sender, to, subject, body, cc?, html?, attachments?}``.
     :param smtp: ``{host, port?, username?, password?, use_tls?, use_ssl?,
         timeout?}``; TLS is enabled by default.
+
+    Inside a stoppable run or a cancellation scope a stop ends the wait for
+    the SMTP exchange (``ExecutionStopped`` / ``CancelledError``); a message
+    already being sent is not recalled, and whether it arrived is unknown.
     """
     mime = _build_message(message)
-    _deliver(mime, smtp)
+    stoppable_call(_deliver, mime, smtp)
     return {"sent": True, "to": mime["To"], "subject": mime["Subject"]}

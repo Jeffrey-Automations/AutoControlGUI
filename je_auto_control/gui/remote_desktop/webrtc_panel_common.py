@@ -1,6 +1,7 @@
 """Signals, defaults and config readers shared by the WebRTC host and viewer panels."""
 from __future__ import annotations
 
+import functools
 import weakref
 from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple
 
@@ -9,7 +10,7 @@ from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QLabel, QLineEdit, QWidget
 
 from je_auto_control.gui.remote_desktop._webrtc_types import AvFrameT, WebRTCConfigT
-from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._i18n_helpers import KeyedText, TranslatableMixin
 from je_auto_control.gui._slow_op import StopQueue
 from je_auto_control.gui._weak_call import weak_slot
 from je_auto_control.gui.remote_desktop._helpers import _t
@@ -79,6 +80,7 @@ class _PanelPart(TranslatableMixin, QWidget):
     # Set by each panel's __init__: shutdowns of sessions the panel let go of.
     _stops: StopQueue
     _status_label: QLabel
+    _status: KeyedText          # what _status_label shows, kept as a key for a language switch
     _signals: _PanelSignals
     _stun_edit: QLineEdit
     _turn_edit: QLineEdit
@@ -92,12 +94,12 @@ class _PanelPart(TranslatableMixin, QWidget):
     def _show_idle(self) -> None:
         """Show "idle" -- or "stopping" while a session this panel let go of is still closing."""
         key = "gui_op_stopping" if self._stops.pending else "rd_webrtc_status_idle"
-        self._status_label.setText(_t(key))
+        self._status.show(key)
 
     def _on_stops_drained(self) -> None:
         """GUI thread: the last shutdown reported; a "stopping" still on show becomes "idle"."""
         if self._status_label.text() == _t("gui_op_stopping"):
-            self._status_label.setText(_t("rd_webrtc_status_idle"))
+            self._status.show("rd_webrtc_status_idle")
 
 
 def start_panel_task(panel: QWidget, attribute: str, work: Callable[..., object],
@@ -119,6 +121,36 @@ def start_panel_task(panel: QWidget, attribute: str, work: Callable[..., object]
     task.error.connect(weak_slot(on_error))
     task.finished.connect(weak_slot(_clear_panel_task, weakref.ref(panel), attribute, weakref.ref(task)))
     return True
+
+
+def start_panel_call(panel: QWidget, attribute: str, call: Callable[[], object],
+                     on_result: Callable[[Any], object],
+                     on_error: Callable[[Any], object]) -> bool:
+    """As :func:`start_panel_task`, for ``call()`` that takes no token (a store write, a file read)."""
+    return start_panel_task(panel, attribute, functools.partial(_call_without_token, call), on_result, on_error)
+
+
+def submit_panel_call(panel: QWidget, call: Callable[[], object],
+                      on_result: Optional[Callable[[Any], object]] = None) -> None:
+    """Run ``call()`` off the GUI thread for a store write nobody waits on; several may be out.
+
+    For what a panel records as a side effect (a session's host in the address
+    book, a pinned fingerprint): it is never refused for being busy, and a
+    failure is logged, as it was when the write ran in the slot.
+    """
+    task = task_controller().submit(functools.partial(_call_without_token, call), owner=panel)
+    if on_result is not None:
+        task.result.connect(weak_slot(on_result))
+    task.error.connect(_log_panel_call_failure)
+
+
+def _log_panel_call_failure(error: object) -> None:
+    autocontrol_logger.debug("panel store write failed: %r", error)
+
+
+def _call_without_token(call: Callable[[], object], _token: object) -> object:
+    """Worker thread: run ``call``; it has no cancellation checkpoint to hand the token to."""
+    return call()
 
 
 def _clear_panel_task(panel_ref: Callable[[], Optional[QWidget]], attribute: str,

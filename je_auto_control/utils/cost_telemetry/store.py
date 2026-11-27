@@ -108,20 +108,18 @@ class CostStore:
         return event
 
     def list_events(self, limit: int = 1000) -> List[CostEvent]:
+        """The newest ``limit`` recorded events, oldest first; unreadable lines are skipped."""
         capped = max(0, int(limit))
-        if capped == 0:
-            return []
+        return _parse_lines(self._lines()[-capped:]) if capped else []
+
+    def _lines(self) -> List[bytes]:
+        """Every stored line, undecoded: a torn write can end inside a UTF-8 sequence."""
         with self._lock:
-            if not self._path.exists():
+            try:
+                with self._path.open("rb") as fp:
+                    return fp.readlines()
+            except FileNotFoundError:
                 return []
-            with self._path.open("r", encoding="utf-8") as fp:
-                lines = fp.readlines()
-        events: List[CostEvent] = []
-        for raw in lines[-capped:]:
-            event = _parse_line(raw)
-            if event is not None:
-                events.append(event)
-        return events
 
     def clear(self) -> None:
         with self._lock:
@@ -132,7 +130,11 @@ class CostStore:
 
     def summarise(self, *, events: Optional[Iterable[CostEvent]] = None,
                   ) -> CostSummary:
-        rows = list(events) if events is not None else self.list_events()
+        """Roll up ``events``, or every recorded one when omitted.
+
+        Only the newest 1000 were read, so the totals stopped growing there.
+        """
+        rows = list(events) if events is not None else _parse_lines(self._lines())
         return summarise_events(rows)
 
 
@@ -171,18 +173,31 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _parse_line(raw: str) -> Optional[CostEvent]:
+def _parse_lines(lines: Iterable[bytes]) -> List[CostEvent]:
+    events = (_parse_line(raw) for raw in lines)
+    return [event for event in events if event is not None]
+
+
+def _parse_line(raw: bytes) -> Optional[CostEvent]:
     text = raw.strip()
     if not text:
         return None
     try:
-        payload = json.loads(text)
-    except ValueError:
+        payload = json.loads(text.decode("utf-8"))
+    except ValueError:   # UnicodeDecodeError, JSONDecodeError
         return None
     try:
-        return CostEvent(**payload)
+        event = CostEvent(**payload)
     except TypeError:
         return None
+    return event if _well_typed(event) else None
+
+
+def _well_typed(event: CostEvent) -> bool:
+    """Whether the fields a summary adds up and groups by have their types."""
+    return (all(isinstance(text, str) for text in (event.timestamp, event.provider, event.model))
+            and all(isinstance(count, int) for count in (event.input_tokens, event.output_tokens))
+            and isinstance(event.estimated_usd, (int, float)))
 
 
 default_cost_store = CostStore()

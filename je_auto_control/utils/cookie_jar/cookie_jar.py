@@ -20,6 +20,8 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from je_auto_control.utils.json_store.json_store import atomic_write_text
+
 SetCookie = Union[str, List[str]]
 _Pairs = List[Tuple[str, str]]
 
@@ -114,15 +116,20 @@ def parse_cookie_date(text: str) -> Optional[datetime.datetime]:
         return None
 
 
+def _non_positive(max_age: str) -> bool:
+    """Whether a valid ``Max-Age`` is 0 or less, read by its sign: int() refuses more than 4300 digits."""
+    return max_age.startswith("-") or not max_age.strip("0")
+
+
 def _is_expired(pairs: _Pairs) -> bool:
     """RFC 6265 5.3 step 3: the last *valid* ``Max-Age`` decides, else the last valid ``Expires``.
 
     An invalid attribute is ignored rather than overriding a valid one before
     it: ``Max-Age=0; Max-Age=abc`` kept the cookie.
     """
-    max_ages = [int(value) for key, value in pairs if key == "max-age" and _MAX_AGE.fullmatch(value)]
+    max_ages = [value for key, value in pairs if key == "max-age" and _MAX_AGE.fullmatch(value)]
     if max_ages:
-        return max_ages[-1] <= 0
+        return _non_positive(max_ages[-1])
     dates = [parse_cookie_date(value) for key, value in pairs if key == "expires"]
     valid = [when for when in dates if when is not None]
     return bool(valid) and valid[-1] <= datetime.datetime.now(datetime.timezone.utc)
@@ -174,10 +181,14 @@ class CookieJar:
         return cls(data)
 
     def save(self, path: str) -> str:
-        """Persist the jar to ``path`` as JSON; return the path."""
+        """Persist the jar to ``path`` as JSON; return the path.
+
+        Session cookies are credentials: the file is created 0600 (POSIX) and
+        replaced whole, where it used to take the umask's default.
+        """
         out = Path(path)
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(self._cookies, indent=2), encoding="utf-8")
+        atomic_write_text(out, json.dumps(self._cookies, indent=2))
         return str(out)
 
     @classmethod

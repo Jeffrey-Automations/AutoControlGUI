@@ -76,3 +76,22 @@ def test_fetch_strips_trailing_slash(rest_server):
         token=rest_server.token,
     )
     assert isinstance(devices, list)
+
+
+@pytest.mark.parametrize("body", [{"devices": [5]}, {"devices": ["x"]}])
+def test_fetch_rejects_devices_that_are_not_objects(monkeypatch, body):
+    from je_auto_control.utils.http_client import http_client
+    monkeypatch.setattr(http_client, "perform_call", lambda _call: {"status": 200, "text": "{}", "json": body})
+    with pytest.raises(ValueError, match="unexpected response shape"):
+        fetch_remote_devices(base_url="http://127.0.0.1:1", token="")  # NOSONAR — never dialled
+
+
+def test_a_number_the_host_sent_as_an_id_is_shown_as_text():
+    """``QTableWidgetItem(1133)`` is an empty item of type 1133; a list raised out of the slot."""
+    from PySide6.QtWidgets import QApplication
+    from je_auto_control.gui.usb_browser_tab import UsbBrowserTab
+    QApplication.instance() or QApplication([])
+    tab = UsbBrowserTab()
+    tab._apply_devices([{"vendor_id": 1133, "product_id": ["c52b"]}])
+    assert (tab._row_text(0, 0), tab._row_text(0, 1)) == ("1133", "['c52b']")
+    tab.deleteLater()

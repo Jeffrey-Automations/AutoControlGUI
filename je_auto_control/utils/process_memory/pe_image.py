@@ -46,13 +46,29 @@ class ImageCodePlan:
     image_sha256: str = field(repr=False)
     image_size: int
     ranges: tuple[ImageRange, ...] = field(repr=False)
+    base: tuple[int, int] = field(repr=False)
 
     def __init__(self, executable: str, version: str, image_sha256: str, image_size: int,
-                 ranges: tuple[ImageRange, ...], *, _token: object = None) -> None:
+                 ranges: tuple[ImageRange, ...], base: tuple[int, int] = (0, 0), *,
+                 _token: object = None) -> None:
         _require(_token is _PLAN_TOKEN)
-        names = ("executable", "version", "image_sha256", "image_size", "ranges")
-        for name, value in zip(names, (executable, version, image_sha256, image_size, ranges)):
+        values = {"executable": executable, "version": version, "image_sha256": image_sha256,
+                  "image_size": image_size, "ranges": ranges, "base": base}
+        for name, value in values.items():
             object.__setattr__(self, name, value)
+
+    def as_on_disk(self, item: ImageRange, loaded: bytes, base: int) -> bytes:
+        """Undo the one header change the loader makes: relocating rewrites ImageBase to the real base.
+
+        The loaded field must be exactly the measured base; every other byte stays as it was read.
+        """
+        field_rva, preferred = self.base
+        offset = field_rva - item.rva
+        if not 0 <= offset <= len(loaded) - 8:
+            return loaded
+        if struct.unpack_from("<Q", loaded, offset)[0] != base:
+            raise MemoryObservationError(FailureReason.TARGET_CHANGED)
+        return loaded[:offset] + struct.pack("<Q", preferred) + loaded[offset + 8:]
 
     @property
     def checked_bytes(self) -> int:
@@ -78,6 +94,7 @@ class _Layout:
     sections: tuple[_Section, ...]
     relocations: tuple[int, int]
     imports: tuple[int, int]
+    base: tuple[int, int]
 
 
 def _headers(raw: bytes) -> tuple[int, int, int, int]:
@@ -139,7 +156,8 @@ def _layout(raw: bytes) -> _Layout:
     sections = _sections(raw, table, count, alignment, (image, header))
     relocations = struct.unpack_from("<II", raw, optional + 112 + 5 * 8)
     imports = struct.unpack_from("<II", raw, optional + 112 + 12 * 8)
-    return _Layout(image, header, entry, sections, relocations, imports)
+    base = (optional + 24, struct.unpack_from("<Q", raw, optional + 24)[0])
+    return _Layout(image, header, entry, sections, relocations, imports, base)
 
 
 def _overlaps(rva: int, size: int, protected: tuple[ImageRange, ...]) -> bool:
@@ -211,4 +229,4 @@ def plan_pinned_image(raw: bytes, pin: PinnedExecutable) -> ImageCodePlan:
         _file_range(raw, layout, rva, size)
         _require(not _overlaps(rva, size, protected))
     return ImageCodePlan(pin.executable, pin.version, pin.sha256, layout.image_size, protected,
-                         _token=_PLAN_TOKEN)
+                         layout.base, _token=_PLAN_TOKEN)

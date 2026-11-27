@@ -8,8 +8,8 @@ future opens of the same device skip the prompt.
 
 The prompt callback wired into :class:`UsbPassthroughSession` is
 synchronous — it must return ``True`` / ``False`` from a non-GUI
-thread (the callback runs on the WebRTC/asyncio bridge thread, not
-the Qt main thread). :class:`PromptBridge` does the cross-thread
+thread (the callback runs on the USB session's worker thread, see
+``session_worker``, not the Qt main thread). :class:`PromptBridge` does the cross-thread
 marshalling: the worker thread calls ``decide()``, which emits a queued
 signal to the GUI thread, waits on a ``threading.Event``, and returns the
 operator's verdict.
@@ -31,14 +31,14 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
-    language_wrapper,
-)
 from je_auto_control.utils.usb.passthrough.acl import AclRule, UsbAcl
 
 
-def _t(key: str) -> str:
-    return language_wrapper.translate(key, key)
+def _plain(text: str) -> QLabel:
+    """What the viewer sent, shown as typed: as markup it could rewrite the question or load an image."""
+    label = QLabel(text)
+    label.setTextFormat(Qt.TextFormat.PlainText)
+    return label
 
 
 class UsbPassthroughPromptDialog(TranslatableMixin, QDialog):
@@ -60,12 +60,8 @@ class UsbPassthroughPromptDialog(TranslatableMixin, QDialog):
             QDialogButtonBox.StandardButton.Yes
             | QDialogButtonBox.StandardButton.No,
         )
-        self._buttons.button(
-            QDialogButtonBox.StandardButton.Yes,
-        ).setText(_t("usb_prompt_allow"))
-        self._buttons.button(
-            QDialogButtonBox.StandardButton.No,
-        ).setText(_t("usb_prompt_deny"))
+        self._tr(self._buttons.button(QDialogButtonBox.StandardButton.Yes), "usb_prompt_allow")
+        self._tr(self._buttons.button(QDialogButtonBox.StandardButton.No), "usb_prompt_deny")
         self._buttons.accepted.connect(self.accept)
         self._buttons.rejected.connect(self.reject)
         self._build_layout()
@@ -77,13 +73,13 @@ class UsbPassthroughPromptDialog(TranslatableMixin, QDialog):
         root.addWidget(intro)
         form = QFormLayout()
         form.addRow(self._tr(QLabel(), "usb_prompt_vendor"),
-                    QLabel(self._vendor_id))
+                    _plain(self._vendor_id))
         form.addRow(self._tr(QLabel(), "usb_prompt_product"),
-                    QLabel(self._product_id))
+                    _plain(self._product_id))
         form.addRow(self._tr(QLabel(), "usb_prompt_serial"),
-                    QLabel(self._serial or "—"))
+                    _plain(self._serial or "—"))
         form.addRow(self._tr(QLabel(), "usb_prompt_viewer"),
-                    QLabel(self._viewer_id or "—"))
+                    _plain(self._viewer_id or "—"))
         root.addLayout(form)
         root.addWidget(self._remember_check)
         root.addWidget(self._buttons)

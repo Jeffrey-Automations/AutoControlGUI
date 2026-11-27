@@ -20,6 +20,11 @@ openpyxl==3.1.5
 python-docx==1.2.0
 python-pptx==1.0.2
 
+# Signaling tests ([signaling] extra) — starlette 1.x's TestClient needs httpx2, a test-only
+# dependency (not part of the extra). Without the extra the signaling tests skip; the Docker image
+# installs it, and its in-image pytest then needs this to build the client.
+httpx2==2.16.2
+
 # Quality tooling — used by .github/workflows/quality.yml and locally.
 ruff==0.17.1
 bandit==1.9.4

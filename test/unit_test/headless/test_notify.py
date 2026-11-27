@@ -59,3 +59,11 @@ def test_notify_missing_tool_is_handled(monkeypatch):
     result = notifier.notify("x", "y", system="Linux")
     assert result.shown is False
     assert "FileNotFoundError" in result.detail
+
+
+def test_text_a_process_cannot_be_given_is_reported_not_raised():
+    """A NUL in the message made subprocess raise ValueError out of a notifier that never raises."""
+    result = notifier.notify("title" + chr(0), "message", system="Linux")
+    assert result.shown is False
+    result = notifier.notify("title", "message" + chr(0), system="Windows")
+    assert result.shown is False

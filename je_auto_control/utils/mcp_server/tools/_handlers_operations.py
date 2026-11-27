@@ -4,6 +4,7 @@ Same contract as :mod:`._handlers` -- normalise arguments and return values so
 they survive the JSON-RPC boundary, with every project import lazy -- split out
 by theme because ``_handlers.py`` is over the 750-line limit.
 """
+import math
 import os
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence
 
@@ -480,11 +481,30 @@ def jwt_encode(claims: Mapping[str, Any], key: str | bytes, alg: str = "HS256") 
     return {"token": encode_jwt(claims, key, alg=alg)}
 
 
+#: The most clock skew ``ac_jwt_decode`` forgives, in seconds.
+JWT_MAX_LEEWAY_S = 3600
+
+
+def _jwt_leeway(leeway: Any) -> float:
+    """``leeway`` as seconds, refused unless finite and within ``[0, JWT_MAX_LEEWAY_S]``.
+
+    The helper adds it to ``exp`` and subtracts it from ``nbf``: NaN or an
+    infinity made an expired token valid forever, a negative value refused
+    valid ones.
+    """
+    from je_auto_control.utils.jwt import JwtError
+    numeric = isinstance(leeway, (int, float)) and not isinstance(leeway, bool)
+    if not numeric or not math.isfinite(leeway) or not 0 <= leeway <= JWT_MAX_LEEWAY_S:
+        raise JwtError(f"leeway must be a number of seconds from 0 to {JWT_MAX_LEEWAY_S}, "
+                       f"not {leeway!r}")
+    return float(leeway)
+
+
 def jwt_decode(token: str, key: str | bytes, algorithms: Optional[Sequence[str]] = None,
                audience: Any = None, leeway: float = 0.0) -> Dict[str, Any]:
     from je_auto_control.utils.jwt import ClaimsPolicy, JwtError, decode_jwt
     policy = ClaimsPolicy(algorithms=tuple(algorithms) if algorithms
-                          else ("HS256",), audience=audience, leeway=leeway)
+                          else ("HS256",), audience=audience, leeway=_jwt_leeway(leeway))
     try:
         claims = decode_jwt(token, key, policy)
     except JwtError as exc:

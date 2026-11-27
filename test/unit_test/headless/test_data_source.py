@@ -110,3 +110,23 @@ def test_executor_ac_load_data():
         {"kind": "inline", "rows": [{"k": 1}]},
     )
     assert rows == [{"k": 1}]
+
+
+def test_a_damaged_worksheet_is_an_action_failure(tmp_path):
+    """openpyxl parses a read-only sheet while rows are read, past the guard on opening it."""
+    openpyxl = pytest.importorskip("openpyxl")
+    import zipfile
+    from je_auto_control.utils.exception.exceptions import AutoControlActionException
+    good, bad = tmp_path / "good.xlsx", tmp_path / "bad.xlsx"
+    workbook = openpyxl.Workbook()
+    for number in range(50):
+        workbook.active.append([f"a{number}", number])
+    workbook.save(good)
+    with zipfile.ZipFile(good) as source, zipfile.ZipFile(bad, "w") as target:
+        for name in source.namelist():
+            data = source.read(name)
+            target.writestr(name, data[:len(data) // 2] if "sheet1.xml" in name else data)
+    with pytest.raises(AutoControlActionException):
+        load_rows({"kind": "excel", "path": str(bad)})
+    with pytest.raises(KeyError):
+        load_rows({"kind": "excel", "path": str(good), "sheet": "missing"})

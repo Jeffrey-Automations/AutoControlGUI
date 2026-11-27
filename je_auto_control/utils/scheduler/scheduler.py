@@ -250,7 +250,16 @@ class Scheduler:
             autocontrol_logger.error("scheduler job %s failed: %r",
                                      job.job_id, error)
         finally:
-            finish_history_run(default_history_store, run_id, outcome, capture_error_snapshot)
+            try:
+                finish_history_run(default_history_store, run_id, outcome, capture_error_snapshot)
+            finally:
+                # Also when the history store failed: the script ran, and a
+                # job left due ran again on every tick, one-shots included.
+                if not outcome.hard_abort:
+                    self._settle(job, now_mono, now_wall)
+
+    def _settle(self, job: ScheduledJob, now_mono: float, now_wall: float) -> None:
+        """Count a run of ``job`` and place its next one, or drop it."""
         with self._lock:
             live = self._jobs.get(job.job_id)
             if live is not job:

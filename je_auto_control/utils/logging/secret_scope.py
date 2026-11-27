@@ -24,6 +24,7 @@ class SecretLogScope:
     def __init__(self) -> None:
         self._lock = RLock()
         self._active = True
+        self._holders = 0
         self._forms: set[str] = set()
         self._ordered: tuple[str, ...] = ()
 
@@ -66,12 +67,40 @@ class SecretLogScope:
             chunks.append(text[cursor:])
             return "".join(chunks)
 
+    def retain(self) -> bool:
+        """Keep the values for one more holder past :meth:`close`; ``False`` once the run ended.
+
+        A worker that outlives its run, such as a shell output reader, holds
+        the mask so what it receives later is still masked. Each successful
+        call needs one :meth:`release`.
+        """
+        with self._lock:
+            if not self._active:
+                return False
+            self._holders += 1
+            return True
+
+    def release(self) -> None:
+        """Drop one holder; a closed mask forgets its values when the last one goes."""
+        with self._lock:
+            self._holders = max(0, self._holders - 1)
+            if not self._active and not self._holders:
+                self._forget()
+
     def close(self) -> None:
-        """Release all values even if an inherited context outlives this run."""
+        """End the run: no new values, and none kept beyond the holders still masking with it.
+
+        The values are released at once unless a holder retained the mask,
+        even if an inherited context outlives this run.
+        """
         with self._lock:
             self._active = False
-            self._forms.clear()
-            self._ordered = ()
+            if not self._holders:
+                self._forget()
+
+    def _forget(self) -> None:
+        self._forms.clear()
+        self._ordered = ()
 
 
 _CURRENT: ContextVar[Optional[SecretLogScope]] = ContextVar("je_auto_control_secret_log_scope", default=None)

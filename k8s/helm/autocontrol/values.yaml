@@ -17,6 +17,8 @@ auth:
   token: ""  # NOSONAR python:S2068  # required value; empty default forces explicit set
 
 # Per-service knobs. Set ``enabled: false`` to skip a service entirely.
+# ``port`` is at once the Service port, the container port and the port the
+# program listens on: each Deployment passes it to the entrypoint as AC_PORT.
 rest:
   enabled: true
   replicas: 1

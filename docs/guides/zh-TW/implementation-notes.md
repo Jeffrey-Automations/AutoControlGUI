@@ -218,7 +218,7 @@ Android 檢查後提案會綁定目前的原生輸入視窗／佇列及 keyguard
 缺少／錯誤階段或退出碼不符都維持未知；輸入返回不代表遠端輸入已清空或任務完成，也不授權重試。
 內部自有遠端 SDK worker 會核對精確任務／擁有者範圍、重新授權與真人接回；可信主機 factory
 建立前先啟動 parent 監看。持久化 begin 並收到 ACK 後才呼叫 SDK，相符裝置／世代的清理證據
-通過後才送 end；缺證據維持隔離。可信裝置控制來源、WDA adapter 與受管 profile 仍待接合。
+通過後才送 end；缺證據維持隔離。Android 的可信裝置控制來源為經 helper 的 `HelperControlProvider`（helper `begin`／`settle`、每次租約新 epoch、以 `getevent` 為實體來源）。WDA adapter（`IosRemoteAdapter`）已就位，但仍需目前尚不存在的 iOS provider。Android 已有 `android` 主機 profile，執行經 helper 的 worker。
 命令編譯器以一次帶標籤的擷取核對三個原生焦點欄位，接受六種順序，缺少／重複／空值仍拒絕。
 前後身分與輸入安全檢查、原本動作期限均保留。自有 POSIX 假裝置減少 Git Bash 讀取程序且維持
 原始檔案 bytes；有限階段／耗時診斷不含命令、參數或輸出。
@@ -495,9 +495,9 @@ Linux 內部 presence_peer_linux 以不可繼承的 pidfd 保留原始 Unix stre
 X11 與 macOS 已有真人活動來源。X11 只計入真實裝置的 XInput2 raw 事件（XTEST 從屬裝置一律排除），
 並從 logind 讀 `Active`／`LockedHint`；沒有 logind 或 `XDG_SESSION_ID` 時視為鎖定。macOS 用唯讀的 session
 event tap（需要輔助使用權限）；只有程序從非 HID 來源狀態送出的事件才算注入，有疑義時讓任務等待而不是接手。
-Wayland 沒有可信來源。Linux 的 presence broker、worker 與 server 已改經此 transport：自有 worker 綁定
+Wayland 上一般 client 看不到全域輸入，所以來源直接讀核心的 evdev 裝置（需 input 群組讀取權限），並只忽略位於 `/devices/virtual/input/` 的裝置——`ydotool` 等 uinput 注入工具建立的裝置都在那裡；藍牙鍵盤與滑鼠（`uhid`）仍計入，libei 的輸入則根本不經 evdev。只要有一個實體裝置讀不到，來源就拒絕；裝置插拔與事件遺失標記都算活動，缺少的活動不會被當成閒置。存在 `ydotoold` 以外的虛擬（`uinput`）鍵盤或指標時拒絕，因為會獨占裝置的鍵位重映射程式（keyd、input-remapper）必須建立它；核心回報按下卻沒有事件的鍵也會拒絕。沒有這種輸出的獨占（例如虛擬機的 evdev passthrough）若只移動滑鼠則偵測不到。Linux 的 presence broker、worker 與 server 已改經此 transport：自有 worker 綁定
 全新的私有 endpoint 並在 bootstrap 回覆中回報，broker 只採用該 endpoint，連線時先核對 listener 即其所列
-程序，再做 presence challenge。macOS 尚無 presence transport；原生驗收前 runtime 仍拒絕非 Windows 共用
+程序，再做 presence challenge。macOS 以自己的 transport 走同一流程：每帳號暫存目錄下的 0700 目錄、長度前綴的 Unix stream socket，連線端以 audit token 指認、以 kqueue 結束監看保留，並以開機內唯一的 `p_uniqueid` 作為 birth。macOS 沒有逐訊息憑證，所以每條連線只認證一次，每次交付前再確認仍存活。原生驗收前 runtime 仍拒絕非 Windows 共用
 桌面任務；此 transport 不是完整 Linux 應用或原生輸入驗收。
 
 [![PyPI](https://img.shields.io/pypi/v/je_auto_control)](https://pypi.org/project/je_auto_control/)

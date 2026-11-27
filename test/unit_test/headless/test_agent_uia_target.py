@@ -9,7 +9,7 @@ from je_auto_control.utils.agent_runtime import AgentRuntime, AgentTaskSpec
 from je_auto_control.utils.agent_runtime.context import TaskOperation, operation_scope
 from je_auto_control.utils.agent_runtime.errors import AgentObservationStale, AgentTaskError
 from je_auto_control.utils.agent_runtime.semantic_native_target import NativeSemanticTarget
-from je_auto_control.utils.agent_runtime import uia_target
+from je_auto_control.utils.agent_runtime import capture_checkpoint
 from je_auto_control.utils.agent_runtime.uia_target import UIA_FIELDS, UIA_SELECTORS, UiaObservationTarget
 from headless.test_agent_scoped_uia import Node, source
 
@@ -110,7 +110,7 @@ def test_cleanup_during_contract_check_prevents_source_publication(monkeypatch):
 def test_revocation_during_capture_prevents_publication(monkeypatch, interval):
     # Full runtime checkpoints are throttled during the read-only capture, but the
     # unthrottled one after it still runs before anything is published.
-    monkeypatch.setattr(uia_target, "_CAPTURE_CHECK_INTERVAL", interval)
+    monkeypatch.setattr(capture_checkpoint, "INTERVAL", interval)
     adapter, _ = target("complete")
     request = AgentTaskSpec.from_dict(spec())
     state = {"checks": 0, "revoke_after": None}
@@ -129,7 +129,7 @@ def test_revocation_during_capture_prevents_publication(monkeypatch, interval):
 
 
 def test_throttled_capture_still_validates_scope_on_every_call(monkeypatch):
-    monkeypatch.setattr(uia_target, "_CAPTURE_CHECK_INTERVAL", 3600.0)
+    monkeypatch.setattr(capture_checkpoint, "INTERVAL", 3600.0)
     adapter, _ = target("complete")
     request = AgentTaskSpec.from_dict(spec())
     full = []

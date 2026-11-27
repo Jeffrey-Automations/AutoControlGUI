@@ -168,6 +168,19 @@ window.set_theme("light")
 report["light"] = LIGHT.window in window.styleSheet() and font_rule(14) in window.styleSheet()
 window.set_theme("dark")
 report["dark"] = DARK.window in window.styleSheet() and font_rule(14) in window.styleSheet()
+
+# A message box takes its position from its parent's window: every page, the
+# closed tab's hidden one included, must stay in this window through a switch.
+workspace.show_tab("scheduler")
+workspace.hide_tab("scheduler")
+pages = [(entry.key, entry.widget) for entry in workspace.tab_registry.entries if entry.built]
+outside = []
+window.set_theme("light")
+for _ in range(5):
+    outside += [key for key, page in pages if page.window() is not window]
+    app.processEvents()
+report["theme_pages"] = sorted(key for key, _page in pages)
+report["theme_outside"] = sorted(set(outside))
 window._user_font_pt = 0
 window._apply_font_pt(0)
 
@@ -230,6 +243,12 @@ def test_the_search_shortcut_reveals_a_hidden_panel(window):
 def test_switching_theme_keeps_the_text_size(window):
     assert window["light"]
     assert window["dark"]
+
+
+def test_a_theme_switch_keeps_every_page_in_the_window(window):
+    """A page parked outside the window for a staged restyle put its message boxes off the window."""
+    assert {"variables", "scheduler"} <= set(window["theme_pages"])
+    assert window["theme_outside"] == []
 
 
 def test_rebuilding_the_menus_for_a_language_switch_adds_no_shortcut(window):

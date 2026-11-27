@@ -30,6 +30,11 @@ def _build_icon(color_hex: str) -> QIcon:
     return QIcon(pix)
 
 
+def _tray_tip(sessions: int) -> str:
+    """The tray tooltip for ``sessions`` connected viewers, in the active language."""
+    return _t("rd_webrtc_tray_running").format(n=sessions) if sessions else _t("rd_webrtc_tray_idle")
+
+
 class HostTrayIcon(QObject):
     """Wraps QSystemTrayIcon with state-driven colour + menu."""
 
@@ -40,38 +45,42 @@ class HostTrayIcon(QObject):
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._tray = QSystemTrayIcon(_build_icon("#888"), parent)
-        self._tray.setToolTip(_t("rd_webrtc_tray_idle"))
+        self._sessions = 0
+        self._tray.setToolTip(_tray_tip(self._sessions))
         self._tray.activated.connect(self._on_activated)
+        self._menu = QMenu()
+        self._actions: list[tuple[QAction, str]] = []
         self._build_menu()
         self._tray.show()
 
     def _build_menu(self) -> None:
-        menu = QMenu()
-        open_action = QAction(_t("rd_webrtc_tray_open"), menu)
-        open_action.triggered.connect(self.open_requested.emit)
-        stop_action = QAction(_t("rd_webrtc_tray_stop"), menu)
-        stop_action.triggered.connect(self.stop_requested.emit)
-        quit_action = QAction(_t("rd_webrtc_tray_quit"), menu)
-        quit_action.triggered.connect(self.quit_requested.emit)
-        menu.addAction(open_action)
-        menu.addAction(stop_action)
-        menu.addSeparator()
-        menu.addAction(quit_action)
-        self._tray.setContextMenu(menu)
+        for key, signal in (("rd_webrtc_tray_open", self.open_requested), ("rd_webrtc_tray_stop", self.stop_requested),
+                            ("rd_webrtc_tray_quit", self.quit_requested)):
+            if key == "rd_webrtc_tray_quit":
+                self._menu.addSeparator()
+            action = QAction(_t(key), self._menu)
+            action.triggered.connect(signal.emit)
+            self._menu.addAction(action)
+            self._actions.append((action, key))
+        self._tray.setContextMenu(self._menu)
+
+    def retranslate(self) -> None:
+        """Show the menu and the tooltip for the current session count in the active language."""
+        for action, key in self._actions:
+            action.setText(_t(key))
+        self._tray.setToolTip(_tray_tip(self._sessions))
 
     def set_state(self, *, sessions: int) -> None:
         """Reflect host state via icon colour + tooltip."""
         if sessions == 0:
             color = "#888"
-            tip = _t("rd_webrtc_tray_idle")
         elif sessions <= 3:
             color = "#3a9c3a"
-            tip = _t("rd_webrtc_tray_running").format(n=sessions)
         else:
             color = "#c97a00"
-            tip = _t("rd_webrtc_tray_running").format(n=sessions)
+        self._sessions = sessions
         self._tray.setIcon(_build_icon(color))
-        self._tray.setToolTip(tip)
+        self._tray.setToolTip(_tray_tip(sessions))
 
     def _on_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason == QSystemTrayIcon.ActivationReason.Trigger:

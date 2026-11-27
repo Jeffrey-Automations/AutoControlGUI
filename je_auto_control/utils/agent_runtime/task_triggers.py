@@ -210,7 +210,7 @@ class AgentTriggers:
                     self._poll_one(row)
             except AuthorizationError:
                 self._fault(row["id"], "trigger owner authorization was revoked")
-            except (AutoControlException, OSError, ValueError, TypeError) as error:
+            except (AutoControlException, OSError, ValueError, TypeError, LookupError) as error:
                 self._fault(row["id"], f"trigger needs review: {type(error).__name__}")
 
     def _poll_one(self, row: dict[str, Any]) -> None:

@@ -20,7 +20,7 @@ negotiation in AUTH_OK absent → assume jpeg, no tag prefix).
 """
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Iterator, Optional
 
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -34,6 +34,9 @@ _CODEC_TAGS = {
     CODEC_HEVC: 0x03,
 }
 _TAGS_TO_CODEC = {v: k for k, v in _CODEC_TAGS.items()}
+_START_CODE = b"\x00\x00\x01"
+_H264_IDR = 5
+_HEVC_IRAP = (16, 21)
 
 
 def codec_tag(name: str) -> int:
@@ -50,6 +53,31 @@ def codec_from_tag(tag: int) -> str:
     return _TAGS_TO_CODEC[tag]
 
 
+def _annexb_nal_headers(packet: bytes) -> Iterator[int]:
+    """Yield the first header byte of each NAL unit in an Annex-B byte stream."""
+    position = packet.find(_START_CODE)
+    while 0 <= position < len(packet) - len(_START_CODE):
+        yield packet[position + len(_START_CODE)]
+        position = packet.find(_START_CODE, position + len(_START_CODE))
+
+
+def is_keyframe_packet(codec: str, packet: bytes) -> bool:
+    """Whether a decoder can start at ``packet`` without any earlier one.
+
+    JPEG frames always can. An H.264 packet can when it holds an IDR slice
+    (NAL type 5), an HEVC one when it holds an IRAP picture (types 16-21);
+    a packet in any other codec is never taken to be one.
+    """
+    if codec == CODEC_JPEG:
+        return True
+    if codec == CODEC_H264:
+        return any(header & 0x1F == _H264_IDR for header in _annexb_nal_headers(packet))
+    if codec == CODEC_HEVC:
+        return any(_HEVC_IRAP[0] <= (header >> 1) & 0x3F <= _HEVC_IRAP[1]
+                   for header in _annexb_nal_headers(packet))
+    return False
+
+
 class CodecProvider:
     """Abstract: convert raw frames into wire-ready encoded packets.
 
@@ -64,6 +92,19 @@ class CodecProvider:
     def encode_jpeg(self, jpeg_bytes: bytes) -> Iterable[bytes]:
         """Yield wire-ready packets for one captured JPEG."""
         raise NotImplementedError
+
+    def request_keyframe(self) -> bool:
+        """Ask for the next encoded frame to be a keyframe.
+
+        Called on the capture thread when a viewer has to resynchronise.
+        ``True`` when the provider will honour it; the default cannot, and
+        such a viewer then waits for the encoder's next natural keyframe.
+        """
+        return False
+
+    def is_keyframe(self, packet: bytes) -> bool:
+        """Whether a viewer can start decoding at ``packet``; see :func:`is_keyframe_packet`."""
+        return is_keyframe_packet(self.name, packet)
 
     def close(self) -> None:
         """Release encoder resources. Idempotent."""
@@ -109,6 +150,7 @@ class H264CodecProvider(CodecProvider):
         self._container: Optional[Any] = None
         self._stream: Optional[Any] = None
         self._closed = False
+        self._force_keyframe = False
 
     def _ensure_stream(self, width: int, height: int) -> Any:
         """Return the encoder stream, opening the container on first use."""
@@ -130,6 +172,9 @@ class H264CodecProvider(CodecProvider):
             "preset": "veryfast",
             "tune": "zerolatency",
             "g": str(self._gop_size),
+            # A forced I-frame is an IDR, so the frames after it never
+            # reference one a resynchronising viewer did not get.
+            "forced-idr": "1",
         }
         self._stream = stream
         return stream
@@ -155,7 +200,15 @@ class H264CodecProvider(CodecProvider):
         if (width, height) != (stream.width, stream.height):
             frame = frame.reformat(width=stream.width, height=stream.height)
         frame.pts = None
+        if self._force_keyframe:
+            self._force_keyframe = False
+            frame.pict_type = av.video.frame.PictureType.I
         return [bytes(packet) for packet in stream.encode(frame)]
+
+    def request_keyframe(self) -> bool:
+        """Make the next encoded frame an IDR; see :meth:`CodecProvider.request_keyframe`."""
+        self._force_keyframe = True
+        return True
 
     def close(self) -> None:
         if self._closed:
@@ -193,5 +246,5 @@ def is_h264_available() -> bool:
 __all__ = [
     "CODEC_JPEG", "CODEC_H264", "CODEC_HEVC",
     "CodecProvider", "JpegPassthrough", "H264CodecProvider",
-    "codec_tag", "codec_from_tag", "is_h264_available",
+    "codec_tag", "codec_from_tag", "is_h264_available", "is_keyframe_packet",
 ]

@@ -6,7 +6,7 @@
 
 - **One API, seven platforms.** `wrapper/platform_wrapper.py` picks the backend at import
   time; your script does not change between Windows, macOS, X11, and Wayland.
-- **Scriptable without Python.** 911 `AC_*` commands cover the whole feature set, so a
+- **Scriptable without Python.** 914 `AC_*` commands cover the whole feature set, so a
   JSON file can do anything the library can — including loops, branches, try/catch,
   macros, and variables.
 - **Headless by default.** `import je_auto_control` never loads Qt. The GUI is an
@@ -114,7 +114,7 @@ desktop app; tab commands live in the window's **Actions** menu.
 | Natural-language planner | `plan_actions`, `run_from_description` | `AC_llm_plan` | LLM Planner |
 | Computer-use agent | `AgentLoop`, `run_agent` | `AC_run_agent` | Computer Use |
 | Record & replay | `record`, `stop_record` | `AC_record`, `AC_stop_record` | Record |
-| JSON scripting | `execute_action`, `execute_files` | all 911 commands | Script, Script Builder |
+| JSON scripting | `execute_action`, `execute_files` | all 914 commands | Script, Script Builder |
 | Variables & flow control | `execute_action_with_vars` | `AC_set_var`, `AC_loop`, `AC_for_each`, `AC_try`, `AC_retry` | Variables |
 | Data-driven runs | — | `AC_for_each_row` (CSV / JSON / SQLite / Excel) | Data Sources |
 | Assertions | `assert_text`, `assert_image` | `AC_assert_text` + 20 more | Assertions |
@@ -133,6 +133,10 @@ desktop app; tab commands live in the window's **Actions** menu.
 | Metrics & tracing | `default_metric_registry`, `render_metrics_text` | — | — |
 | Diagnostics | `run_diagnostics` | `AC_diagnose` | Diagnostics |
 | Test-code generation | `generate_code` | — | — |
+
+**Image search: absent versus unusable.** `ImageNotFoundException` means the search ran and the template is not on screen. An input the search cannot run on raises `ImageSearchInputException` instead: a missing or unreadable template file, a single-colour template (it would match everywhere), a `detect_threshold` / `threshold` outside 0–1, NaN or not a number, or an image OpenCV cannot match. The two are siblings under `AutoControlException`, so a handler for one never catches the other. Absence checks therefore fail on a typo rather than passing: `AC_assert_image` with `present: false` fails with "the template could not be used", `AC_wait_image_gone` and `ac_wait_for_image` raise instead of waiting, and `AC_if_image_found` records a failure instead of running its `else` branch. An image trigger with an unusable template is disabled and logged; observer rules, state-machine `if_image_found` guards and anchor locators raise. Self-healing still falls back to its VLM step and reports why the template failed.
+
+**Errors from outside the framework.** The executor records a failed action and runs the next one (`raise_on_error=False`). That now includes a command that raises `cv2.error`, `sqlite3.Error` or a plugin's own exception class: it is wrapped in `AutoControlForeignException` (`original` and `__cause__` hold the original) at the action that raised it, so `AC_try` catches it, `AC_retry` retries it, a loop records it per pass and `AC_parallel` records it in its branch. With `raise_on_error=True` the wrapper is raised. Never contained, whatever `raise_on_error` says: assertion failures (`AutoControlAssertionException`, and a plugin's own `AssertionError`), `AC_break` / `AC_continue`, stop requests, cancellation, `KeyboardInterrupt` and `SystemExit`.
 
 Self-healing propagates cancellation before fallback or clicking. Its audit log masks secrets already resolved in the current run before writing or returning records; returned locator outcomes retain their original values. Legacy log files are not rewritten.
 
@@ -186,6 +190,10 @@ Run History includes a read-only journal browser. Use **Actions → Use Journals
 
 Values resolved from `${secrets.NAME}` are masked in application diagnostics during executor runs, including nested actions and local parallel/DAG workers. CLI/REST/MCP requests and scheduled, trigger, hotkey and email runs retain the mask through error handling and audit/history writes; report records capture redacted snapshots. DAG calls retain the owner mask through complete node diagnostics, including standalone calls and custom local runners. Watchdog, observer and callback-executor calls also retain it through final diagnostics; independent rules have separate masks. CLI stderr is masked, while API outcomes, raised exceptions and CLI result payloads retain their original values. Masks are discarded when the owning request or run exits. Interrupted history runs are recorded as `error`, while journal steps remain `cancelled`; no error screenshot is taken. Cancellation propagates through non-strict execution, recovery/retry, callbacks and local workers. Hard exits retain their original signal even if history completion fails.
 
+Generated documents keep references as references. `AC_generate_sop` (`actions`, `title`) and `AC_generate_code` (`source`) substitute known `${var}` placeholders, including a `source` path built from variables, but write `${secrets.NAME}`, names not yet bound (a loop variable the documented steps set themselves), nested placeholders and variables holding a value the run already resolved as a secret exactly as written, instead of expanding the secret or failing with *Unknown variable*. `env://` values from `AC_resolve_ref` / `AC_resolve_refs` (and `ac_resolve_ref` / `ac_resolve_refs`) are returned to the caller unchanged but registered with the run's mask like vault values, so logs, the journal and the MCP audit show `***` for the rest of the run; `AC_resolve_ref`'s `value` and `AC_resolve_refs`'s `resolved` are also masked in the logged result and the Script Builder result pane, which offers the value once. `file://` values are not registered.
+
+The named in-memory registries behind `AC_cas_put` / `AC_cas_get`, `AC_dedup_check`, `AC_idempotency_begin` / `_complete` / `_release`, `AC_bulkhead_run`, `AC_sequence_observe` and `AC_outbox_enqueue` / `AC_outbox_pending` (and their MCP tools) hold at most `MAX_REGISTRY_NAMES` (1,024) names each. At the cap an existing name keeps working and nothing is evicted; a new name, including a read of a name never written, raises `RegistryFullError` naming the registry. No registry has a delete or reset command, so names are released when the process ends.
+
 ## Command-line interface
 
 Each `je_auto_control run` invocation, including `--dry-run` and runs without `--var`, gets a fresh variable scope. Top-level `run_from_description` and `StateMachine.run()` also isolate variables while sharing them across their own actions and states; nested calls reuse an existing execution scope. A caller-owned `Executor()` keeps its own variables.
@@ -199,7 +207,7 @@ je_auto_control record out.json [--duration 5]
 je_auto_control codegen script.json --target pytest -o test_flow.py
 je_auto_control failure-bundle failure.zip --error "login timed out"
 je_auto_control list-jobs
-je_auto_control start-server --port 9938      # TCP socket server
+je_auto_control start-server --port 9938      # TCP socket server (AUTH token; --token, --token-file, --no-auth)
 je_auto_control start-rest   --port 9939      # REST API
 je_auto_control version
 ```

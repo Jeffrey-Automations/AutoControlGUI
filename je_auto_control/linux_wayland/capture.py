@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from typing import Callable, List, Optional, Sequence, Tuple
 
 from je_auto_control.linux_wayland import portal
+from je_auto_control.linux_wayland._capture_owner import owned_capture
 from je_auto_control.linux_wayland._detect import (
     WAYLAND_GNOME_SCREENSHOT, WAYLAND_GRIM, WAYLAND_SPECTACLE, binary_path,
 )
@@ -227,9 +228,16 @@ def _override_capture() -> Capture:
 def grab_png(screen_region: Optional[Sequence[int]] = None) -> Capture:
     """Capture the screen as PNG bytes using the first tier that can.
 
+    Inside a managed task the image is returned only while the operation that asked for it is still
+    current and authorized; see :mod:`je_auto_control.linux_wayland._capture_owner`.
+
     :param screen_region: ``[x1, y1, x2, y2]`` to capture, or None for all.
     :return: the PNG bytes and whether the region was applied by the tier.
     """
+    return owned_capture(lambda: _grab_png(screen_region))
+
+
+def _grab_png(screen_region: Optional[Sequence[int]]) -> Capture:
     if _override_template():
         return _override_capture()
     grim = binary_path(WAYLAND_GRIM)

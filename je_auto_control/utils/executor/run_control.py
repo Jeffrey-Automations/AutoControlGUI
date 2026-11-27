@@ -228,13 +228,24 @@ def shielded() -> Iterator[None]:
         _SHIELDED.reset(depth)
 
 
+def shield_depth() -> int:
+    """How many :func:`shielded` blocks this thread is inside, to hand to a worker."""
+    return _SHIELDED.get()
+
+
 @contextmanager
-def bound_stop_token(token: Optional[StopToken]) -> Iterator[Optional[StopToken]]:
-    """Make an existing token current on this thread (an ``AC_parallel`` branch)."""
+def bound_stop_token(token: Optional[StopToken], shield: int = 0) -> Iterator[Optional[StopToken]]:
+    """Make an existing token current on this thread (an ``AC_parallel`` branch).
+
+    ``shield`` is the :func:`shield_depth` of the thread that started the
+    branch: cleanup it runs on other threads is cleanup too.
+    """
     bound = _CURRENT.set(token)
+    depth = _SHIELDED.set(shield)
     try:
         yield token
     finally:
+        _SHIELDED.reset(depth)
         _CURRENT.reset(bound)
 
 

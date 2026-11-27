@@ -19,6 +19,18 @@ class _Accounting(NativeLayout):
                 ('active', ctypes.c_uint32), ('terminated', ctypes.c_uint32)]
 
 
+class _ThreadEntry(NativeLayout):
+    """Native THREADENTRY32 layout; only the thread and owner IDs are read."""
+    _fields_ = [('length', ctypes.c_uint32), ('usage', ctypes.c_uint32), ('thread', ctypes.c_uint32),
+                ('owner', ctypes.c_uint32), ('base_priority', ctypes.c_int32),
+                ('delta_priority', ctypes.c_int32), ('flags', ctypes.c_uint32)]
+
+
+_INVALID_HANDLE = ctypes.c_void_p(-1).value
+_SNAPSHOT_THREADS = 0x4
+_THREAD_SUSPEND_RESUME = 0x2
+
+
 class _ProcessList(NativeLayout):
     """Bounded native Job member list; PID values select query-only handles, never termination."""
     _fields_ = [('assigned', ctypes.c_uint32), ('listed', ctypes.c_uint32),
@@ -56,6 +68,16 @@ def _kernel() -> Any:
     kernel.IsProcessInJob.restype = ctypes.c_int
     kernel.WaitForSingleObject.argtypes = (ctypes.c_void_p, ctypes.c_uint32)
     kernel.WaitForSingleObject.restype = ctypes.c_uint32
+    kernel.CreateToolhelp32Snapshot.argtypes = (ctypes.c_uint32, ctypes.c_uint32)
+    kernel.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+    kernel.Thread32First.argtypes = (ctypes.c_void_p, ctypes.c_void_p)
+    kernel.Thread32First.restype = ctypes.c_int
+    kernel.Thread32Next.argtypes = (ctypes.c_void_p, ctypes.c_void_p)
+    kernel.Thread32Next.restype = ctypes.c_int
+    kernel.OpenThread.argtypes = (ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32)
+    kernel.OpenThread.restype = ctypes.c_void_p
+    kernel.ResumeThread.argtypes = (ctypes.c_void_p,)
+    kernel.ResumeThread.restype = ctypes.c_uint32
     return kernel
 
 
@@ -97,6 +119,49 @@ class NativeJob:
         except BaseException:  # reason: a partial constructor owns and must retire its new job handle
             self.close()
             raise
+
+    def resume(self, pid: int) -> None:
+        """Resume the sole primary thread of a helper created suspended, only after it joined this Job.
+
+        ``subprocess`` closes the primary thread handle, so the thread is found by
+        its owner PID; the caller still holds the process handle, so that PID
+        cannot be reused. A suspended new process has exactly one thread, and
+        that thread must have been suspended exactly once.
+        """
+        if not self._handle:
+            raise AgentTaskError("native helper job is not open")
+        threads = self._threads_of(pid)
+        if len(threads) != 1:
+            raise AgentTaskError("suspended native helper does not have exactly one thread")
+        thread = self._kernel.OpenThread(_THREAD_SUSPEND_RESUME, False, threads[0])
+        if not thread:
+            raise AgentTaskError("suspended native helper thread is unavailable")
+        try:
+            previous = self._kernel.ResumeThread(thread)
+        finally:
+            if not self._kernel.CloseHandle(thread):
+                raise AgentTaskError("native helper thread handle has not retired")
+        if previous != 1:
+            raise AgentTaskError("native helper thread was not suspended exactly once")
+
+    def _threads_of(self, pid: int) -> list[int]:
+        snapshot = self._kernel.CreateToolhelp32Snapshot(_SNAPSHOT_THREADS, 0)
+        if not snapshot or snapshot == _INVALID_HANDLE:
+            raise AgentTaskError("native helper threads are unknown")
+        threads: list[int] = []
+        try:
+            entry = _ThreadEntry()
+            entry.length = _ThreadEntry.size()
+            more = self._kernel.Thread32First(snapshot, entry.pointer())
+            while more:
+                if entry.owner == pid:
+                    threads.append(entry.thread)
+                entry.length = _ThreadEntry.size()
+                more = self._kernel.Thread32Next(snapshot, entry.pointer())
+        finally:
+            if not self._kernel.CloseHandle(snapshot):
+                raise AgentTaskError("native helper thread snapshot has not retired")
+        return threads
 
     def close(self, *, timeout: float = 3) -> None:
         """Confirm the actual owned tree is empty before closing its sole Job handle."""

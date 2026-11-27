@@ -222,3 +222,31 @@ def test_rest_config_import_rejects_bad_bundle(server):
     assert exc_info.value.code == 400
     payload = json.loads(exc_info.value.read().decode("utf-8"))
     assert "rejected" in payload.get("error", "")
+
+
+def test_export_skips_a_file_that_is_not_text(tmp_path):
+    """One undecodable file ended the whole export with UnicodeDecodeError."""
+    _seed_config_root(tmp_path)
+    (tmp_path / "viewer_id").write_bytes(b"\xff\xfe\x00")
+    files = export_config_bundle(tmp_path)["files"]
+    assert "viewer_id" not in files
+    assert files["remote_host_id"]["content"] == "AC1234567"
+
+
+def test_import_skips_content_that_cannot_be_written(tmp_path):
+    """A lone surrogate ended the import part-way, losing the report of what was written."""
+    _seed_config_root(tmp_path)
+    bundle = {"manifest": {"version": BUNDLE_VERSION}, "files": {
+        "remote_host_id": {"format": "text", "content": "\ud800"},
+        "address_book.json": {"format": "json", "content": {"entries": ["\udc00"]}},
+        "viewer_id": {"format": "text", "content": "viewer"},
+    }}
+    report = import_config_bundle(bundle, root=tmp_path)
+    assert report.written == ["viewer_id"]
+    assert sorted(report.skipped) == ["address_book.json", "remote_host_id"]
+    assert (tmp_path / "remote_host_id").read_text(encoding="utf-8") == "AC1234567"
+
+
+def test_an_infinite_bundle_version_is_refused_as_a_bundle_error(tmp_path):
+    with pytest.raises(ConfigBundleError):
+        import_config_bundle({"manifest": {"version": float("inf")}, "files": {}}, root=tmp_path)

@@ -117,10 +117,16 @@ _LEGACY_READS = (
 )
 
 
-def _read_legacy(pattern: Any) -> Dict[str, Any]:
-    """Read a LegacyIAccessiblePattern's MSAA fields into a plain dict."""
+def _read_legacy(pattern: Any, hide_value: bool = False) -> Dict[str, Any]:
+    """Read a LegacyIAccessiblePattern's MSAA fields into a plain dict.
+
+    ``hide_value`` is for a password field: its ``value`` is ``None``, unread.
+    """
     info: Dict[str, Any] = {}
     for key, attribute, cast in _LEGACY_READS:
+        if hide_value and key == "value":
+            info[key] = None
+            continue
         try:
             info[key] = cast(getattr(pattern, attribute))
         except _UIA_ERRORS:

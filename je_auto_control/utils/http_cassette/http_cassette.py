@@ -9,6 +9,8 @@ pass-through over a live transport.
 
 Pure standard library (``json``); imports no ``PySide6``.
 """
+import base64
+import binascii
 import json
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
@@ -22,6 +24,10 @@ Transport = Callable[[Mapping[str, Any]], Dict[str, Any]]
 
 class CassetteMissError(AutoControlException):
     """No recorded interaction matched the request during replay."""
+
+
+class CassetteFormatError(AutoControlException, ValueError):
+    """A recorded interaction cannot be replayed as written."""
 
 
 def _decode_body(body: Any) -> Optional[str]:
@@ -92,6 +98,39 @@ def _redacted_json(value: Any) -> Any:
     return value
 
 
+#: The key of the object a recorded ``content`` (``want_bytes``) is saved as.
+BYTES_MARKER = "$base64"
+
+
+def _recorded_bytes(content: bytes) -> Dict[str, str]:
+    """``content`` as a JSON-ready object, credentials masked as in a text body.
+
+    The raw body of a ``want_bytes`` call went into the cassette as ``bytes``:
+    ``save()`` could not serialise it, and a token in it was not masked.
+    A UTF-8 JSON body that holds a credential is re-encoded masked; any other
+    body is kept byte for byte.
+    """
+    try:
+        data = json.loads(content.decode("utf-8"))
+    except (ValueError, RecursionError):  # not UTF-8, or not JSON
+        data = None
+    masked = _redacted_json(data)
+    if masked != data:
+        content = json.dumps(masked, sort_keys=True).encode("utf-8")
+    return {BYTES_MARKER: base64.b64encode(content).decode("ascii")}
+
+
+def _replayed(response: Dict[str, Any]) -> Dict[str, Any]:
+    """A recorded response with a saved ``content`` turned back into ``bytes``."""
+    content = response.get("content")
+    if isinstance(content, dict) and set(content) == {BYTES_MARKER}:
+        try:
+            response["content"] = base64.b64decode(str(content[BYTES_MARKER]), validate=True)
+        except binascii.Error as error:
+            raise CassetteFormatError(f"recorded content is not base64: {error}") from error
+    return response
+
+
 def _headers_match(recorded: Mapping[str, Any], live: Mapping[str, Any]) -> bool:
     """Every recorded header is sent again with the same value (case-insensitive name).
 
@@ -115,12 +154,14 @@ def _check_match_on(match_on: Sequence[str]) -> None:
 
 def _matches(recorded: Mapping[str, Any], call: Mapping[str, Any],
              match_on: Sequence[str]) -> bool:
-    view = _request_view(call)
+    # Both sides through the same view (it is idempotent): a hand-written
+    # cassette, or one saved before requests were masked, matched nothing.
+    view, taped = _request_view(call), _request_view(recorded)
     for field in match_on:
         if field == "headers":
             if not _headers_match(recorded.get("headers", {}), dict(call.get("headers") or {})):
                 return False
-        elif recorded.get(field) != view[field]:
+        elif taped[field] != view[field]:
             return False
     return True
 
@@ -162,10 +203,15 @@ class Cassette:
         # http_request also hands every Set-Cookie back in its own list.
         if isinstance(recorded_response.get("set_cookie"), list):
             recorded_response["set_cookie"] = [REDACTED] * len(recorded_response["set_cookie"])
+        # The URL the response came from repeats the request's query string.
+        if "url" in recorded_response:
+            recorded_response["url"] = _redacted_url(recorded_response["url"])
         if "json" in recorded_response:
             recorded_response["json"] = _redacted_json(recorded_response["json"])
         if isinstance(recorded_response.get("text"), str):
             recorded_response["text"] = _redacted_text(recorded_response["text"])
+        if isinstance(recorded_response.get("content"), (bytes, bytearray)):
+            recorded_response["content"] = _recorded_bytes(bytes(recorded_response["content"]))
         self._interactions.append({"request": _request_view(call),
                                    "response": recorded_response})
 
@@ -175,7 +221,7 @@ class Cassette:
         _check_match_on(match_on)
         for interaction in self._interactions:
             if _matches(interaction.get("request", {}), call, match_on):
-                return dict(interaction["response"])
+                return _replayed(dict(interaction["response"]))
         raise CassetteMissError(
             f"no recorded interaction for {call.get('method')} {call.get('url')}")
 

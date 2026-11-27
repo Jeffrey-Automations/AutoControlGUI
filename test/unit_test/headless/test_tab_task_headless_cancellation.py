@@ -109,3 +109,32 @@ def test_tab_work_delivers_normal_result_with_scope():
         assert _pump(app, lambda: scopes[0]() is None), "completed work retained its cancellation scope"
     finally:
         _destroy(app, owner)
+
+
+@pytest.mark.parametrize("start", ["start", "start_script", "start_until_stopped"])
+def test_background_work_runs_under_the_authority_it_was_started_with(start):
+    from je_auto_control.utils.rbac import AuthorizationContext, Role, authorization_scope
+    from je_auto_control.utils.rbac.authorization import AuthorizationError
+    from je_auto_control.utils.rbac.policy import authorize_command
+
+    app = QApplication.instance() or QApplication([])
+    owner = QWidget()
+    tab = TabTask(owner)
+    errors, results = [], []
+    tab.error.connect(errors.append)
+    tab.result.connect(results.append)
+
+    def work(*_stop):
+        authorize_command("AC_reset_native_input")
+        return "ran"
+
+    try:
+        with authorization_scope(AuthorizationContext("viewer", Role.VIEWER)):
+            assert getattr(tab, start)(work)
+        assert _pump(app, lambda: not tab.running)
+        assert results == [] and isinstance(errors[0], AuthorizationError)
+        assert getattr(tab, start)(work)                  # trusted local work: no scope, nothing refused
+        assert _pump(app, lambda: not tab.running)
+        assert results == ["ran"]
+    finally:
+        _destroy(app, owner)

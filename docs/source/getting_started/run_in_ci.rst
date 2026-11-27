@@ -46,6 +46,13 @@ Build the slim image once, then run any of the entry-point modes:
 Set ``XVFB_GEOMETRY`` (default ``1280x800x24``) to change the virtual
 screen resolution. ``DISPLAY`` defaults to ``:99``.
 
+``remote-host`` refuses to start (exit code 2, before anything listens) when
+``AC_TOKEN`` is missing or blank; there is no built-in default token.
+``AC_PORT`` sets the port the program listens on in every mode (defaults 9939 for
+``rest``, 9940 for ``remote-host``, 8765 for ``signaling``), and the Helm chart
+sets it from ``rest.port`` / ``signaling.port``. Both images include the
+``signaling`` extra.
+
 ----
 
 GitHub Actions

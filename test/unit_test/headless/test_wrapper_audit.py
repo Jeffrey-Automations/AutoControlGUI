@@ -20,7 +20,7 @@ pytest.importorskip("je_open_cv")
 
 from je_auto_control.utils.cv2_utils import template_detection  # noqa: E402
 from je_auto_control.utils.exception.exceptions import (  # noqa: E402
-    AutoControlKeyboardException, AutoControlMouseException, ImageNotFoundException,
+    AutoControlKeyboardException, AutoControlMouseException, ImageSearchInputException,
 )
 from je_auto_control.wrapper import auto_control_image, auto_control_keyboard, auto_control_mouse  # noqa: E402
 
@@ -55,14 +55,14 @@ def test_locate_all_with_drawing_returns_the_boxes(screen):
 
 
 def test_a_missing_template_file_is_named(screen):
-    with pytest.raises(ImageNotFoundException, match="missing.png"):
+    with pytest.raises(ImageSearchInputException, match="missing.png"):
         auto_control_image.locate_image_center("C:/nope/missing.png")
 
 
 @pytest.mark.parametrize("threshold", [-1, 85])
 def test_a_threshold_outside_zero_to_one_is_refused(screen, threshold):
     template = screen.crop((130, 80, 170, 120))
-    with pytest.raises(ImageNotFoundException, match="between 0 and 1"):
+    with pytest.raises(ImageSearchInputException, match="between 0 and 1"):
         auto_control_image.locate_all_image(template, threshold)
 
 

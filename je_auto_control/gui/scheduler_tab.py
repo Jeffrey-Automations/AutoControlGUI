@@ -9,9 +9,10 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._slow_op import SlowOp
-from je_auto_control.gui._qt_typed import filled_item
+from je_auto_control.gui._qt_typed import filled_item, kept_selection
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
@@ -35,6 +36,8 @@ class SchedulerTab(TranslatableMixin, QWidget):
         self._repeat_check = self._tr(QCheckBox(), "sch_repeat")
         self._repeat_check.setChecked(True)
         self._table = QTableWidget(0, 5)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tr_cells(self._table)
         self._apply_table_headers()
         self._status = QLabel()
         self._engine_op = SlowOp(self)
@@ -87,7 +90,6 @@ class SchedulerTab(TranslatableMixin, QWidget):
         TranslatableMixin.retranslate(self)
         self._apply_table_headers()
         self._apply_status()
-        self._refresh_table()
 
     def _build_layout(self) -> None:
         # Browse/add/remove/start/stop commands run from the Actions menu;
@@ -123,12 +125,12 @@ class SchedulerTab(TranslatableMixin, QWidget):
     def _on_add(self) -> None:
         path = self._path_input.text().strip()
         if not path:
-            QMessageBox.warning(self, "Error", "Script path is required")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("sch_script_required"))
             return
         try:
             interval = float(self._interval_input.text() or "60")
         except ValueError:
-            QMessageBox.warning(self, "Error", "Interval must be a number")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("sch_interval_not_number"))
             return
         default_scheduler.add_job(
             script_path=path,
@@ -164,12 +166,11 @@ class SchedulerTab(TranslatableMixin, QWidget):
 
     def _refresh_table(self) -> None:
         jobs = default_scheduler.list_jobs()
-        self._table.setRowCount(len(jobs))
-        yes = _t("tr_yes")
-        no = _t("tr_no")
-        for row, job in enumerate(jobs):
-            for col, value in enumerate((
-                job.job_id, job.script_path, f"{job.interval_seconds:g}",
-                str(job.runs), yes if job.enabled else no,
-            )):
-                self._table.setItem(row, col, QTableWidgetItem(value))
+        with kept_selection(self._table):       # a finished job leaves the list
+            self._table.setRowCount(len(jobs))
+            for row, job in enumerate(jobs):
+                for col, value in enumerate((
+                    job.job_id, job.script_path, f"{job.interval_seconds:g}", str(job.runs),
+                )):
+                    self._table.setItem(row, col, QTableWidgetItem(value))
+                self._table.setItem(row, 4, keyed_cell("tr_yes" if job.enabled else "tr_no"))

@@ -19,6 +19,9 @@ from je_auto_control.utils.dag.graph import (
     DagDefinition, DagDefinitionError, DagNode, parse_definition,
 )
 from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.executor.run_control import (
+    ExecutionStopped, bound_stop_token, checkpoint, current_stop_token, shield_depth,
+)
 from je_auto_control.utils.run_history.run_outcome import is_run_interruption
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.logging.secret_scope import (
@@ -102,6 +105,8 @@ def run_dag(definition: Any,
     for review. They require destination completion and input-retirement evidence.
     Optional batch_id binds a registered all-managed graph and durable dispatch claims;
     the same batch cannot be started again without a separate recovery decision.
+    Inside a stoppable run the nodes belong to that run: a stop ends them and
+    raises ``ExecutionStopped`` here once the running ones have unwound.
     """
     dag = _coerce_definition(definition)
     if batch_id is not None:
@@ -121,8 +126,9 @@ def run_dag(definition: Any,
     nodes_by_id = dag.by_id()
     results = {nid: NodeResult(id=nid, host=nodes_by_id[nid].host)
                for nid in nodes_by_id}
-    _execute_with_pool(dag, results, local, remote, max(1, int(max_parallel)),
-                       stop_event)
+    _execute_with_pool(dag, results, _in_run(local), _in_run(remote),
+                       max(1, int(max_parallel)), stop_event)
+    checkpoint()  # the run was stopped: that is not an outcome of the graph
     return DagRunResult(
         succeeded=all(r.status == STATUS_SUCCEEDED for r in results.values()),
         elapsed_s=round(time.monotonic() - started_at, 3), nodes=results,
@@ -131,6 +137,21 @@ def run_dag(definition: Any,
 
 class _NodeStopped(AutoControlException):
     """A node reached its runner after a stop was requested."""
+
+
+def _in_run(runner: NodeRunner) -> NodeRunner:
+    """``runner`` as part of the caller's stoppable run, if it is inside one.
+
+    A run is the thread that entered it, so a pool thread has to be handed
+    the token: without it a stopped run's nodes ran to their last action.
+    """
+    token, shield = current_stop_token(), shield_depth()
+
+    def run(node: DagNode, definition: DagDefinition) -> Any:
+        with bound_stop_token(token, shield):
+            checkpoint()
+            return runner(node, definition)
+    return run
 
 
 def _stoppable(runner: NodeRunner, stop_event: threading.Event) -> NodeRunner:
@@ -266,7 +287,7 @@ def _run_one(node: DagNode, result: NodeResult, runner: NodeRunner, _nodes: Dict
             cancellation_checkpoint()
             with DeferredAuthorization.capture().context_scope():
                 outcome = runner(node, _build_proxy_definition(node, _nodes))
-        except _NodeStopped:
+        except (_NodeStopped, ExecutionStopped):
             result.status = STATUS_SKIPPED
             result.error = "stopped"
         # A runner is user code and may raise any Exception subclass; one that

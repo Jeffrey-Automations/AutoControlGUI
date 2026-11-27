@@ -1,7 +1,7 @@
 from os import getcwd
 from pathlib import Path
 from threading import Lock
-from typing import Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 from je_auto_control.utils.json.json_file import write_action_json
@@ -14,7 +14,6 @@ from je_auto_control.utils.project.template.template_keyword import (
 )
 
 _project_lock = Lock()
-_TEMPLATE_PLACEHOLDER = "{temp}"  # noqa: S101  # reason: literal sentinel substituted in templates
 
 
 def create_dir(dir_name: str) -> None:
@@ -39,53 +38,80 @@ def _write_file(file_path: Path, content: str) -> None:
         file.write(content)
 
 
+def _template_files(keyword_dir: Path, executor_dir: Path) -> List[Tuple[Path, Callable[[Path], None]]]:
+    """Every file the template writes, with the call that writes it."""
+    def keyword(content: Any) -> Callable[[Path], None]:
+        return lambda path: write_action_json(str(path), content)
+
+    # Written verbatim: each script finds ``keyword/`` from its own location,
+    # so no creation-time path is baked in and a moved project still runs.
+    def executor(template: str) -> Callable[[Path], None]:
+        return lambda path: _write_file(path, template)
+
+    files: List[Tuple[Path, Callable[[Path], None]]] = []
+    if keyword_dir.is_dir():
+        files += [
+            (keyword_dir / "keyword1.json", keyword(template_keyword_1)),
+            (keyword_dir / "keyword2.json", keyword(template_keyword_2)),
+            (keyword_dir / "bad_keyword_1.json", keyword(bad_template_1)),
+        ]
+    if executor_dir.is_dir():
+        files += [
+            (executor_dir / "executor_one_file.py", executor(executor_template_1)),
+            (executor_dir / "executor_bad_file.py", executor(bad_executor_template_1)),
+            (executor_dir / "executor_folder.py", executor(executor_template_2)),
+        ]
+    return files
+
+
 def create_template(parent_name: str,
-                    project_path: Optional[str] = None) -> None:
+                    project_path: Optional[str] = None,
+                    overwrite: bool = False) -> Dict[str, List[str]]:
     """
     Create template files in keyword and executor directories.
     在 keyword 與 executor 目錄中建立範例模板檔案
 
+    A file that already exists is left alone and listed under ``skipped``
+    unless ``overwrite`` is true. 既有檔案預設不覆寫。
+
     :param parent_name: 專案主目錄名稱 Project parent directory name
     :param project_path: 專案路徑 Project path (預設為當前工作目錄)
+    :param overwrite: 是否覆寫既有檔案 Replace files that already exist
+    :return: ``{"written": [...], "skipped": [...]}`` file paths
     """
     if project_path is None:
         project_path = getcwd()
-
-    keyword_dir_path = Path(project_path) / parent_name / "keyword"
-    executor_dir_path = Path(project_path) / parent_name / "executor"
-
+    root = Path(project_path) / parent_name
+    report: Dict[str, List[str]] = {"written": [], "skipped": []}
     with _project_lock:
-        # 建立 keyword JSON 檔案 Create keyword JSON files
-        if keyword_dir_path.exists() and keyword_dir_path.is_dir():
-            write_action_json(str(keyword_dir_path / "keyword1.json"), template_keyword_1)
-            write_action_json(str(keyword_dir_path / "keyword2.json"), template_keyword_2)
-            write_action_json(str(keyword_dir_path / "bad_keyword_1.json"), bad_template_1)
-
-        # 建立 executor Python 檔案 Create executor Python files
-        if executor_dir_path.exists() and executor_dir_path.is_dir():
-            _write_file(
-                executor_dir_path / "executor_one_file.py",
-                executor_template_1.replace(_TEMPLATE_PLACEHOLDER, repr(str(keyword_dir_path / "keyword1.json")))
-            )
-            _write_file(
-                executor_dir_path / "executor_bad_file.py",
-                bad_executor_template_1.replace(
-                    _TEMPLATE_PLACEHOLDER, repr(str(keyword_dir_path / "bad_keyword_1.json")))
-            )
-            _write_file(
-                executor_dir_path / "executor_folder.py",
-                executor_template_2.replace(_TEMPLATE_PLACEHOLDER, repr(str(keyword_dir_path)))
-            )
+        for path, write in _template_files(root / "keyword", root / "executor"):
+            if path.exists() and not overwrite:
+                report["skipped"].append(str(path))
+                continue
+            write(path)
+            report["written"].append(str(path))
+    if report["skipped"]:
+        autocontrol_logger.warning(
+            "create_project_dir kept %d existing file(s); pass overwrite=True to replace them: %s",
+            len(report["skipped"]), report["skipped"],
+        )
+    return report
 
 
 def create_project_dir(project_path: Optional[str] = None,
-                       parent_name: str = "AutoControl") -> None:
+                       parent_name: str = "AutoControl",
+                       overwrite: bool = False) -> Dict[str, List[str]]:
     """
     Create project directory structure and templates.
     建立專案目錄結構並生成範例模板檔案
 
+    Existing template files are not replaced unless ``overwrite`` is true;
+    the result lists what was written and what was skipped.
+
     :param project_path: 專案路徑 Project path (預設為當前工作目錄)
     :param parent_name: 專案主目錄名稱 Project parent directory name
+    :param overwrite: 是否覆寫既有檔案 Replace template files that already exist
+    :return: ``{"written": [...], "skipped": [...]}`` file paths
     """
     autocontrol_logger.info(f"create_project_dir, project_path: {project_path}, parent_name: {parent_name}")
 
@@ -97,4 +123,4 @@ def create_project_dir(project_path: Optional[str] = None,
     create_dir(str(Path(project_path) / parent_name / "executor"))
 
     # 建立範例模板檔案 Create template files
-    create_template(parent_name, project_path)
+    return create_template(parent_name, project_path, overwrite=overwrite)

@@ -65,6 +65,9 @@ Flow control & variables
   couldn't express. Parameters are the call's own: after the call (a nested
   or recursive one included) the caller's variables of the same names are
   back as they were.
+
+  Each step must be allowed for both the macro's definer and the caller, and
+  only the definer (or trusted local code) may redefine the macro.
 * **In-process parallel** — ``AC_parallel`` runs branch action lists
   concurrently, each on a fresh isolated executor so branches never race
   on shared variables (the in-process complement to the cross-host DAG).

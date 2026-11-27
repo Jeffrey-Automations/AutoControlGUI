@@ -48,8 +48,9 @@ def test_transfer_refuses_oversized_success_and_error_bodies_over_real_http(stat
     body = b'{"padding":"' + b'x' * (1024 * 1024 - 13) + b'"}'
     assert len(body) == 1024 * 1024 + 1
     with wire_server(body, status=status) as (url, _received):
-        with pytest.raises(URLError, match='1048576'):
+        with pytest.raises(AgentTaskError) as refused:
             request_json(url + path, body={}, token='owned-source-token', timeout=3)
+        assert isinstance(refused.value.__cause__, URLError) and '1048576' in str(refused.value.__cause__)
 
 
 def test_transfer_reply_bound_does_not_reduce_ordinary_http_reply_limit():

@@ -10,7 +10,10 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel
+from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.diagnostics_capabilities import CapabilityView
 from je_auto_control.gui.failed_stops_view import FailedStopsView
@@ -26,7 +29,7 @@ from je_auto_control.utils.exception.control_signals import raise_caused_run_int
 from je_auto_control.utils.logging.secret_scope import scrub_secret_text
 from je_auto_control.utils.rbac.policy import authorize_command
 from je_auto_control.utils.run_history.run_outcome import _ordinary_error_text
-from je_auto_control.wrapper.capabilities import BackendContext, probe_capabilities
+from je_auto_control.wrapper.capabilities import BackendContext, probe_capabilities, reset_native_input
 
 
 _SEVERITY_COLOR = {
@@ -57,11 +60,17 @@ def _diagnostic_work(runner: Callable[[], DiagnosticsReport], token: Cancellatio
     return runner()
 
 
+def _reset_work() -> object:
+    """Retire the native input session under the role its command needs."""
+    authorize_command('AC_reset_native_input')
+    return reset_native_input(BackendContext.current())
+
+
 class DiagnosticsTab(TranslatableMixin, QWidget):
     """Run :func:`run_diagnostics` and render the results."""
 
     #: Checked against the active RBAC role when the page is shown (the page banner says what is refused).
-    REQUIRED_COMMANDS = ("AC_diagnose",)
+    REQUIRED_COMMANDS = ("AC_diagnose", "AC_probe_capabilities")
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -70,12 +79,17 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         self.execution_details = ExecutionDetailsSource(self)
         self._task_controller = TaskController(self)
         self._active_task: Optional[TaskHandle] = None
+        # Off the GUI thread: retiring the session waits for any consent dialog still open.
+        self._reset_task = TabTask(self, details=False)
+        self._reset_task.result.connect(self._on_reset)
+        self._reset_task.error.connect(self._on_reset_error)
         self._summary_label = QLabel(_t("diag_summary_idle"))
         self._summary_label.setTextFormat(Qt.TextFormat.PlainText)
         self._summary_label.setWordWrap(True)
         self._progress_label = QLabel()
         self._progress_label.setWordWrap(True)
         self._capability_view = CapabilityView()
+        self._refusal = RefusalLabel()          # why the last capability probe was refused
         self._mcp_discovery = MCPDiscoveryView()
         self._failed_stops = FailedStopsView()
         self._table = QTableWidget(0, 4)
@@ -93,6 +107,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         root = QVBoxLayout(self)
         root.setSpacing(12)
         root.addWidget(self._capability_view)
+        root.addWidget(self._refusal)
         set_role(self._progress_label, "hint")
         results = Card().add(self._summary_label).add(self._progress_label).add(self._table, stretch=1)
         root.addWidget(results, stretch=1)
@@ -103,6 +118,7 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         """Expose tab commands to the window-level Actions menu."""
         return [
             ("diag_probe", self._probe_capabilities),
+            ("diag_reset_native_input", self._reset_native_input),
             ("diag_run", self._refresh),
             ("diag_stop", self._stop),
         ] + self._failed_stops.menu_actions() + self._mcp_discovery.menu_actions()
@@ -118,7 +134,27 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         if self._view.report is not None:
             self._fill_table(self._view.report)
 
+    def _reset_native_input(self) -> None:
+        """Thin wrapper: the headless reset on a worker, then show the refreshed snapshot."""
+        if not self._reset_task.start(_reset_work):
+            self._show_note(_t("task_busy"))
+
+    def _on_reset(self, _result: object) -> None:
+        self._render_summary()              # an earlier refusal is no longer news
+        self._probe_capabilities()
+
+    def _on_reset_error(self, error: object) -> None:
+        detail = _ordinary_error_text(error) if isinstance(error, Exception) else str(error)
+        self._show_note(scrub_secret_text(detail))
+
+    def _show_note(self, text: str) -> None:
+        self._progress_label.setText(text)
+        self._progress_label.setVisible(True)
+
     def _probe_capabilities(self) -> None:
+        """Show the capability snapshot, as ``AC_probe_capabilities`` would; a refusal is shown in the tab."""
+        if not self._refusal.allows("AC_probe_capabilities"):
+            return
         snapshot = probe_capabilities(BackendContext.current())
         self._capability_view.set_snapshot(snapshot)
 
@@ -207,6 +243,13 @@ class DiagnosticsTab(TranslatableMixin, QWidget):
         self.execution_details.publish(ExecutionDetails(
             phase, text, self._view.completed, self._view.total if self._active_task is not None else 0,
         ))
+
+    def dispose(self) -> None:
+        """Drop a reset still running in the background; the registry calls it before deleting the tab.
+
+        Retiring the native session cannot be interrupted, so it runs to its end and its result is dropped.
+        """
+        release_resources(self)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Abandon this run's display and request cleanup without blocking or closing another owner."""

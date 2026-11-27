@@ -249,3 +249,25 @@ def test_a_media_owners_state_comes_from_its_errors_snapshot_never_a_live_query(
     [held] = custody.snapshot()
     assert held.detail == "admission closed; resources uncertain; finalization pending; failed: unregister"
     assert custody.retry(held.stop_id)
+
+
+@pytest.mark.parametrize("kind", ["queue", "slow_op"])
+def test_a_stop_that_fails_after_its_tab_is_gone_is_kept(custody, kind):
+    """Closing a tab starts the stop and destroys what would have heard of its failure."""
+    import threading
+    from PySide6.QtCore import QEvent
+    release, owner = threading.Event(), QWidget()
+
+    def stop():
+        release.wait(10.0)
+        raise OSError("socket busy")
+
+    if kind == "queue":
+        _slow_op.StopQueue(owner).retire(stop)
+    else:
+        assert _slow_op.SlowOp(owner).run(stop, retain_failure=True)
+    owner.deleteLater()
+    _APP.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+    release.set()
+    assert pump_until(lambda: bool(custody.snapshot()))
+    assert [held.error for held in custody.snapshot()] == ["OSError: socket busy"]

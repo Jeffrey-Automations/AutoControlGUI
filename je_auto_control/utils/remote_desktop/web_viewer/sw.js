@@ -1,8 +1,8 @@
 // Minimal service worker so the PWA installs cleanly.
 // Caches the shell on first visit and serves it offline.
-const CACHE = "ac-viewer-v8";
+const CACHE = "ac-viewer-v9";
 const ASSETS = ["./index.html", "./manifest.webmanifest", "./icon.svg",
-                "./mic-worklet.js"];
+                "./mic-worklet.js", "./viewer-session.js"];
 
 globalThis.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));

@@ -20,9 +20,10 @@ default driver raises a clear error telling the caller to pass ``driver=``.
 
 Imports no ``PySide6``.
 """
+import functools
 import math
 import sys
-from typing import Optional, Protocol
+from typing import Any, Callable, Optional, Protocol, TypeVar
 
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
 
@@ -147,12 +148,45 @@ def toggle_mute(*, driver: Optional[VolumeDriver] = None) -> bool:
     return new_state
 
 
+_Result = TypeVar("_Result")
+
+
+def _com_errors() -> tuple[type[BaseException], ...]:
+    """``COMError`` where it exists; it derives from ``Exception`` alone."""
+    if sys.platform == "win32":
+        from _ctypes import COMError
+        return (COMError,)
+    return ()
+
+
+def _com_errors_as_action_errors(function: Callable[..., _Result]) -> Callable[..., _Result]:
+    """Raise Core Audio's ``COMError`` as :class:`AutoControlActionException`.
+
+    A host without an audio device (a server, an RDP session) or a device that
+    goes away escaped every containment boundary and ended the script.
+    """
+    @functools.wraps(function)
+    def wrapper(*args: Any, **kwargs: Any) -> _Result:
+        try:
+            return function(*args, **kwargs)
+        except _com_errors() as error:
+            raise AutoControlActionException(f"system volume is unavailable: {error}") from error
+    return wrapper
+
+
 class _PycawDriver:
     """Default :class:`VolumeDriver` over Windows Core Audio via ``pycaw``."""
 
     def __init__(self) -> None:
         """Activate the default-output ``IAudioEndpointVolume`` interface."""
         from ctypes import POINTER, cast  # local: optional Windows path
+        from je_auto_control.utils.accessibility.backends.windows_automation import (
+            enter_apartment, import_comtypes_client,
+        )
+        # The same COM initialisation the UIA backend uses: comtypes' first import fixes the
+        # apartment of the importing thread, and Core Audio needs this thread's COM entered.
+        import_comtypes_client()
+        enter_apartment()
         from comtypes import CLSCTX_ALL
         from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
         speakers = AudioUtilities.GetSpeakers()
@@ -165,29 +199,35 @@ class _PycawDriver:
             IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
         self._volume = cast(interface, POINTER(IAudioEndpointVolume))
 
+    @_com_errors_as_action_errors
     def get_scalar(self) -> float:
         """Read the master volume scalar from Core Audio."""
         return float(self._volume.GetMasterVolumeLevelScalar())
 
+    @_com_errors_as_action_errors
     def set_scalar(self, scalar: float) -> None:
         """Write the master volume scalar to Core Audio."""
         self._volume.SetMasterVolumeLevelScalar(float(scalar), None)
 
+    @_com_errors_as_action_errors
     def get_mute(self) -> bool:
         """Read the master mute flag from Core Audio."""
         return bool(self._volume.GetMute())
 
+    @_com_errors_as_action_errors
     def set_mute(self, muted: bool) -> None:
         """Write the master mute flag to Core Audio."""
         self._volume.SetMute(bool(muted), None)
 
 
+@_com_errors_as_action_errors
 def _default_driver() -> VolumeDriver:
     """Return the OS volume driver, or raise if unavailable.
 
     Uses Windows Core Audio through the optional ``pycaw`` dependency. Raises
     ``RuntimeError`` on a non-Windows platform or when ``pycaw`` is not
-    installed, instructing the caller to pass ``driver=``.
+    installed, instructing the caller to pass ``driver=``, and
+    ``AutoControlActionException`` when there is no audio device.
     """
     if not sys.platform.startswith("win"):
         raise RuntimeError(

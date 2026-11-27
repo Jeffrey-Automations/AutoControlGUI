@@ -26,7 +26,8 @@ class DeferredAuthorization:
         """Capture the current caller when work is registered, not when started."""
         return cls(current_authorization())
 
-    def _resolve(self) -> Optional[AuthorizationContext]:
+    def resolve(self) -> Optional[AuthorizationContext]:
+        """The registrant as it stands now, refreshed from its store; raises when removed."""
         context = self.context
         if context is None or context.store_path is None:
             return context
@@ -40,7 +41,7 @@ class DeferredAuthorization:
     @contextmanager
     def context_scope(self) -> Iterator[Optional[AuthorizationContext]]:
         """Refresh and bind the registrant; work must authorize its own operation's capability."""
-        context = self._resolve()
+        context = self.resolve()
         with authorization_scope(context):
             yield context
 

@@ -108,6 +108,20 @@ journal 的情況，都不會開啟 history 資料庫。
    啟動 GUI 需要安裝 ``[gui]`` 額外套件：
    ``pip install je_auto_control[gui]``
 
+啟動 TCP socket 伺服器
+======================
+
+.. code-block:: bash
+
+   python -m je_auto_control.cli start-server --host 127.0.0.1 --port 9938
+
+客戶端每條連線都必須先送 ``AUTH <token>``。token 依序取 ``--token``、
+``$JE_AUTOCONTROL_SOCKET_TOKEN``，都沒有則隨機產生；它以僅擁有者可讀的方式寫入
+``--token-file``（預設 ``~/.je_auto_control/socket_server_<port>.token``），指令會印出
+這個路徑，伺服器停止時刪除檔案。RBAC 下只接受使用者 token，也不寫檔。``--no-auth``
+恢復不驗證的協定，並記錄一則警告：任何連得到伺服器的程序都能執行任何指令。握手與
+限制見 Socket 伺服器說明。
+
 管理 RBAC 使用者
 ================
 

@@ -150,3 +150,90 @@ def test_frame_display_paints_cursor_overlay():
         assert display._remote_cursor is None  # noqa: SLF001
     finally:
         display.deleteLater()
+
+
+def _display():
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
+    from PySide6.QtGui import QImage
+    from PySide6.QtWidgets import QApplication
+    if QApplication.instance() is None:
+        QApplication([])
+    from je_auto_control.gui.remote_desktop.frame_display import _FrameDisplay
+    display = _FrameDisplay()
+    display.resize(400, 300)
+    display.set_image(QImage(400, 300, QImage.Format.Format_RGB32))
+    sent = []
+    for name in ("mouse_pressed", "mouse_released", "key_pressed", "key_released", "type_text",
+                 "annotation_event"):
+        getattr(display, name).connect(lambda *args, _name=name: sent.append((_name, *args)))
+    return display, sent
+
+
+def _mouse(kind, x, y, held=True):
+    from PySide6.QtCore import QEvent, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+    button = Qt.MouseButton.LeftButton
+    return QMouseEvent(getattr(QEvent.Type, kind), QPointF(x, y), QPointF(x, y), button,
+                       button if held else Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
+
+
+def test_a_button_let_go_outside_the_frame_is_released_on_the_host():
+    """A drag that ended past the frame's edge sent no release: the host went on dragging."""
+    display, sent = _display()
+    try:
+        display.mousePressEvent(_mouse("MouseButtonPress", 100, 100))
+        display.mouseReleaseEvent(_mouse("MouseButtonRelease", 900, 120, held=False))
+        assert sent[0] == ("mouse_pressed", 100, 100, "mouse_left")
+        assert sent[1] == ("mouse_released", 399, 120, "mouse_left")
+        display.mouseReleaseEvent(_mouse("MouseButtonRelease", 900, 120, held=False))     # nothing is held now
+        assert len(sent) == 2
+    finally:
+        display.deleteLater()
+
+
+def test_a_pen_stroke_let_go_outside_the_frame_ends():
+    display, sent = _display()
+    try:
+        display.set_pen_mode(True)
+        display.mousePressEvent(_mouse("MouseButtonPress", 10, 10))
+        display.mouseReleaseEvent(_mouse("MouseButtonRelease", -50, 10, held=False))
+        assert sent == [("annotation_event", "begin", 10, 10), ("annotation_event", "end", 0, 10)]
+        assert display._pen_drawing is False
+    finally:
+        display.deleteLater()
+
+
+def _key(kind, key, text="", modifier="NoModifier"):
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QKeyEvent
+    return QKeyEvent(getattr(QEvent.Type, kind), key, getattr(Qt.KeyboardModifier, modifier), text)
+
+
+def test_a_shortcut_reaches_the_host_as_its_key_not_as_a_control_character():
+    """Ctrl+C arrived as typed text ``\\x03``, which no application takes for Copy."""
+    from PySide6.QtCore import Qt
+    display, sent = _display()
+    try:
+        display.keyPressEvent(_key("KeyPress", Qt.Key.Key_Control, modifier="ControlModifier"))
+        display.keyPressEvent(_key("KeyPress", Qt.Key.Key_C, "\x03", "ControlModifier"))
+        display.keyReleaseEvent(_key("KeyRelease", Qt.Key.Key_C, "\x03", "ControlModifier"))
+        display.keyPressEvent(_key("KeyPress", Qt.Key.Key_A, "A", "ShiftModifier"))      # text is kept as typed
+        assert sent == [("key_pressed", "control"), ("key_pressed", "c"), ("key_released", "c"),
+                        ("key_pressed", "A")]
+    finally:
+        display.deleteLater()
+
+
+def test_keys_held_when_the_focus_leaves_are_released_on_the_host():
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QFocusEvent
+    display, sent = _display()
+    try:
+        display.keyPressEvent(_key("KeyPress", Qt.Key.Key_Alt, modifier="AltModifier"))
+        display.focusOutEvent(QFocusEvent(QEvent.Type.FocusOut))          # Alt+Tab: the release goes elsewhere
+        display.focusOutEvent(QFocusEvent(QEvent.Type.FocusOut))
+        assert sent == [("key_pressed", "menu"), ("key_released", "menu")]
+    finally:
+        display.deleteLater()

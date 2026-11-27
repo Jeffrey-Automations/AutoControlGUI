@@ -12,7 +12,7 @@ from typing import Any, List, Optional, Sequence, Tuple
 from je_auto_control.utils.cv2_utils.image_file import read_image
 from je_auto_control.utils.cv2_utils.optional import require_cv2, require_je_open_cv
 from je_auto_control.utils.cv2_utils.locator_frame import current_locator_frame
-from je_auto_control.utils.exception.exceptions import ImageNotFoundException
+from je_auto_control.utils.exception.exceptions import ImageNotFoundException, ImageSearchInputException
 from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.monitor_layout.logical_frame import grab_logical
 
@@ -29,22 +29,39 @@ def _shift(box: Sequence[int], origin: Tuple[int, int]) -> List[int]:
 _SCORE_EPSILON = 1e-5
 
 
+def checked_threshold(detect_threshold: Any) -> float:
+    """``detect_threshold`` as a float in 0-1, or :class:`ImageSearchInputException`.
+
+    -1 matched everything (154 "hits" on a random frame); 85, meant as a
+    percentage, could only ever report "not found"; NaN fails every comparison.
+    """
+    try:
+        threshold = float(detect_threshold)
+    except (TypeError, ValueError) as error:
+        raise ImageSearchInputException(
+            f"detect_threshold must be a number between 0 and 1, got {detect_threshold!r}") from error
+    if not 0.0 <= threshold <= 1.0:
+        raise ImageSearchInputException(
+            f"detect_threshold must be between 0 and 1, got {detect_threshold!r}")
+    return threshold
+
+
 def _prepare(image: Any, detect_threshold: float,
              screen_region: Optional[Sequence[int]],
              all_screens: bool) -> Tuple[Any, Any, float, Tuple[int, int]]:
-    """Validate the inputs; return ``(scores, template, threshold, origin)``."""
-    threshold = float(detect_threshold)
-    if not 0.0 <= threshold <= 1.0:
-        # -1 matched everything (154 "hits" on a random frame); 85, meant as a
-        # percentage, could only ever report "not found".
-        raise ImageNotFoundException(
-            f"detect_threshold must be between 0 and 1, got {detect_threshold!r}")
+    """Validate the inputs; return ``(scores, template, threshold, origin)``.
+
+    Input the search cannot run on raises :class:`ImageSearchInputException`;
+    only a search that ran and found nothing is :class:`ImageNotFoundException`.
+    """
+    threshold = checked_threshold(detect_threshold)
     if isinstance(image, (str, os.PathLike)) and not os.path.isfile(image):
-        raise ImageNotFoundException(f"template image not found: {image}")
+        raise ImageSearchInputException(f"template image not found: {image}")
     # Still the door that names the missing wheel on Windows arm64.
     require_je_open_cv()
     cv2 = require_cv2()
     template = _gray_template(cv2, image)
+    reject_flat_template(template)
     owner = current_locator_frame()
     if owner is None:
         grab_image, origin_x, origin_y = grab_logical(screen_region, all_screens=all_screens)
@@ -61,8 +78,8 @@ def _prepare(image: Any, detect_threshold: float,
         scores = stoppable_call(cv2.matchTemplate, frame, template, cv2.TM_CCOEFF_NORMED)
     except cv2.error as error:
         # An input OpenCV cannot match (an empty frame, a pixel type it does
-        # not take) is a search that found nothing, in the type callers catch.
-        raise ImageNotFoundException(f"cannot match template image: {error}") from error
+        # not take): the search never ran, so it is not an answer about the screen.
+        raise ImageSearchInputException(f"cannot match template image: {error}") from error
     finally:
         if owner is not None:
             grab_image.close()
@@ -84,7 +101,7 @@ def _to_gray(cv2: Any, image: Any) -> Any:
     if array.ndim == 3:
         array = cv2.cvtColor(array, cv2.COLOR_RGB2GRAY)
     if array.ndim != 2:
-        raise ImageNotFoundException(
+        raise ImageSearchInputException(
             f"template detection needs a 2-D or 3-D image, got shape {array.shape}")
     if array.dtype == np.bool_:
         # PIL mode "1": True / False, which OpenCV has no pixel type for.
@@ -104,7 +121,20 @@ def _gray_template(cv2: Any, image: Any) -> Any:
             return read_image(os.fspath(image), cv2.IMREAD_GRAYSCALE)
         return _to_gray(cv2, image)
     except (ValueError, TypeError, cv2.error) as error:
-        raise ImageNotFoundException(f"cannot read template image: {image!r}") from error
+        raise ImageSearchInputException(f"cannot read template image: {image!r}") from error
+
+
+def reject_flat_template(template: Any) -> None:
+    """Refuse a single-colour template, which scores 1.0 at every position.
+
+    Normalised correlation divides by the template's variance; with none,
+    OpenCV reports a perfect match everywhere and the first position -- the
+    corner of the screen -- was located, and clicked.
+    """
+    if template.size and template.min() == template.max():
+        raise ImageSearchInputException(
+            "template is a single colour, which matches everywhere; "
+            "crop a region with a pattern or text in it")
 
 
 def _draw(frame: Any, boxes: Sequence[Sequence[int]]) -> Any:

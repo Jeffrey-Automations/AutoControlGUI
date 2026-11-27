@@ -58,6 +58,76 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261127-07 | 2026-11-27 | Fix the recording and trust findings of the code review | #done #fix #security #review | [2026-11-c](2026-11-c.md) |
+| U-20261127-06 | 2026-11-27 | Fix the remaining Python findings of the code review | #done #fix #review | [2026-11-c](2026-11-c.md) |
+| U-20261127-05 | 2026-11-27 | Fix the container and deployment findings of the code review | #done #fix #security #docker #review | [2026-11-c](2026-11-c.md) |
+| U-20261127-04 | 2026-11-27 | Fix the VS Code and LSP findings of the code review | #done #fix #lsp #review | [2026-11-c](2026-11-c.md) |
+| U-20261127-03 | 2026-11-27 | Fix the browser extension findings of the code review | #done #fix #security #review | [2026-11-c](2026-11-c.md) |
+| U-20261127-02 | 2026-11-27 | Fix the web viewer findings of the code review | #done #fix #remote-desktop #review | [2026-11-c](2026-11-c.md) |
+| U-20261127-01 | 2026-11-27 | Fix the native findings of the code review | #done #fix #native #android #review | [2026-11-c](2026-11-c.md) |
+| U-20261126-43 | 2026-11-26 | Let a stop prevent an accessibility write that has not acted | #done #stop #accessibility #decide | [2026-11-c](2026-11-c.md) |
+| U-20261126-42 | 2026-11-26 | Poll Slack faster while a run is going and honour Retry-After | #done #chatops #stop #decide | [2026-11-c](2026-11-c.md) |
+| U-20261126-41 | 2026-11-26 | Let a stop end adb, device, capture, email and model calls | #done #stop #fix | [2026-11-c](2026-11-c.md) |
+| U-20261126-40 | 2026-11-26 | Reveal embedded action-list secrets once and explain a replaced Quick Connect | #done #gui #fix | [2026-11-c](2026-11-c.md) |
+| U-20261126-39 | 2026-11-26 | Build the socket driver with Nuitka in CI instead of committing binaries | #done #socket #build #ci | [2026-11-c](2026-11-c.md) |
+| U-20261126-38 | 2026-11-26 | Keep authenticating connections out of viewer slots and resync slow H.264 viewers | #done #fix #decide #remote-desktop | [2026-11-c](2026-11-c.md) |
+| U-20261126-37 | 2026-11-26 | Run stored action lists under both authorities, cap named registries and keep secrets out of generated output | #done #security #decide #rbac | [2026-11-c](2026-11-c.md) |
+| U-20261126-36 | 2026-11-26 | Fail image absence checks on unusable input, contain foreign errors and deliver HTTP resource updates | #done #fix #decide #mcp | [2026-11-c](2026-11-c.md) |
+| U-20261126-35 | 2026-11-26 | Require authentication on the TCP socket server | #done #security #decide #socket | [2026-11-c](2026-11-c.md) |
+| U-20261126-34 | 2026-11-26 | Let the read-only worker verify desktop tasks | #done #agent #decide | [2026-11-c](2026-11-c.md) |
+| U-20261126-33 | 2026-11-26 | Translate table cells and the GUI strings still written in English | #done #gui #i18n | [2026-11-c](2026-11-c.md) |
+| U-20261126-32 | 2026-11-26 | Make state texts follow a language switch | #done #gui #i18n | [2026-11-c](2026-11-c.md) |
+| U-20261126-31 | 2026-11-26 | Read every executor adapter and fix what was wrong | #done #fix #security #review #usb | [2026-11-c](2026-11-c.md) |
+| U-20261126-30 | 2026-11-26 | Decode frames, load TLS and query the audit log off the GUI thread | #done #gui #remote-desktop | [2026-11-c](2026-11-c.md) |
+| U-20261126-29 | 2026-11-26 | Fix the reconnect count, label parsing and stale language texts; bound receipts and USB threads | #done #fix #gui #remote-desktop #usb | [2026-11-c](2026-11-c.md) |
+| U-20261126-28 | 2026-11-26 | Review the server files the last pass had not read | #done #fix #security #review | [2026-11-c](2026-11-c.md) |
+| U-20261126-27 | 2026-11-26 | Move the remaining GUI file and store work off the GUI thread | #done #gui #fix | [2026-11-c](2026-11-c.md) |
+| U-20261126-26 | 2026-11-26 | Close the server and utils A-L review follow-ups | #done #fix #security #agent #rbac | [2026-11-c](2026-11-c.md) |
+| U-20261126-25 | 2026-11-26 | Close the remote desktop review follow-ups | #done #fix #remote-desktop | [2026-11-c](2026-11-c.md) |
+| U-20261126-24 | 2026-11-26 | Close the agent runtime review follow-ups | #done #fix #agent #stop #security | [2026-11-c](2026-11-c.md) |
+| U-20261126-23 | 2026-11-26 | Close the utils L-Z review follow-ups | #done #fix #stop | [2026-11-c](2026-11-c.md) |
+| U-20261126-22 | 2026-11-26 | Authorize, mask and move older GUI work off the GUI thread | #done #decision #gui #rbac | [2026-11-c](2026-11-c.md) |
+| U-20261126-21 | 2026-11-26 | Serve USB passthrough off the WebRTC event loop | #done #decision #usb #concurrency | [2026-11-c](2026-11-c.md) |
+| U-20261126-20 | 2026-11-26 | Stop Slack replays and bound outbox and asset store damage | #done #decision #chatops #storage | [2026-11-c](2026-11-c.md) |
+| U-20261126-19 | 2026-11-26 | Fix three CI test failures after the review | #ci #test | [2026-11-c](2026-11-c.md) |
+| U-20261126-18 | 2026-11-26 | Review and fix the agent runtime | #review #fix #agent #stop | [2026-11-c](2026-11-c.md) |
+| U-20261126-17 | 2026-11-26 | Review and fix remote desktop and USB | #review #fix #remote-desktop #usb #security | [2026-11-c](2026-11-c.md) |
+| U-20261126-16 | 2026-11-26 | Review and fix the utils subpackages A to L | #review #fix #security #rbac | [2026-11-c](2026-11-c.md) |
+| U-20261126-15 | 2026-11-26 | Review and fix the utils subpackages L to Z | #review #fix #stop #security | [2026-11-c](2026-11-c.md) |
+| U-20261126-14 | 2026-11-26 | Review and fix the platform backends | #review #fix #windows #linux #macos #android | [2026-11-c](2026-11-c.md) |
+| U-20261126-13 | 2026-11-26 | Review and fix the servers and the executor | #review #fix #mcp #rbac #executor #security | [2026-11-c](2026-11-c.md) |
+| U-20261126-12 | 2026-11-26 | Review and fix the GUI | #review #fix #gui #security | [2026-11-c](2026-11-c.md) |
+| U-20261126-11 | 2026-11-26 | Fix the first whole-package review batch | #review #fix #security | [2026-11-c](2026-11-c.md) |
+| U-20261126-10 | 2026-11-26 | Refuse hosts that may grab input devices | #decision #presence #security | [2026-11-c](2026-11-c.md) |
+| U-20261126-09 | 2026-11-26 | Extend the native memory fixture cases | #memory #acceptance | [2026-11-c](2026-11-c.md) |
+| U-20261126-08 | 2026-11-26 | Withhold marked page text and verify the browser helper | #security #browser #acceptance #rbac | [2026-11-c](2026-11-c.md) |
+| U-20261126-07 | 2026-11-26 | Stop charging durable checkpoints to the read deadline | #incident #ci #memory #agent | [2026-11-c](2026-11-c.md) |
+| U-20261126-06 | 2026-11-26 | Drive the managed browser target in real Chromium | #browser #acceptance #webrunner | [2026-11-c](2026-11-c.md) |
+| U-20261126-05 | 2026-11-26 | Run the owned UI fixture and fix what it found | #incident #uia #acceptance | [2026-11-c](2026-11-c.md) |
+| U-20261126-04 | 2026-11-26 | Run the native memory fixture and fix what it found | #incident #memory #acceptance | [2026-11-c](2026-11-c.md) |
+| U-20261126-03 | 2026-11-26 | Close the gaps left by the evdev and walker correction | #incident #presence #accessibility | [2026-11-c](2026-11-c.md) |
+| U-20261126-02 | 2026-11-26 | Bind Wayland captures to their managed operation | #done #wayland #agent | [2026-11-c](2026-11-c.md) |
+| U-20261126-01 | 2026-11-26 | Correct the evdev source, the accessibility walker and the stub | #incident #presence #accessibility #ci | [2026-11-c](2026-11-c.md) |
+| U-20261121-20 | 2026-11-21 | Remove two races from the transfer import tests | #incident #ci #agent | [2026-11-c](2026-11-c.md) |
+| U-20261121-19 | 2026-11-21 | Add the iOS Simulator extension through xcrun simctl | #done #ios #mobile | [2026-11-c](2026-11-c.md) |
+| U-20261121-18 | 2026-11-21 | Expose the explicit Wayland input-session reset | #done #wayland #capabilities | [2026-11-c](2026-11-c.md) |
+| U-20261121-17 | 2026-11-21 | Declare comtypes and run UI Automation on real COM in CI | #done #accessibility #ci #windows | [2026-11-c](2026-11-c.md) |
+| U-20261121-16 | 2026-11-21 | Add the android target profile kind | #done #agent #android | [2026-11-c](2026-11-c.md) |
+| U-20261121-15 | 2026-11-21 | Stop waiting for read-only accessibility walks | #done #executor #stop #accessibility | [2026-11-c](2026-11-c.md) |
+| U-20261121-14 | 2026-11-21 | Prove the local-model contract against a fake Ollama server | #done #agent #ollama | [2026-11-c](2026-11-c.md) |
+| U-20261121-13 | 2026-11-21 | Read Wayland human activity from physical evdev devices | #done #agent #presence #wayland | [2026-11-c](2026-11-c.md) |
+| U-20261121-12 | 2026-11-21 | Keep AC_android_shell out of the MCP registry | #decision #mcp #android | [2026-11-c](2026-11-c.md) |
+| U-20261121-11 | 2026-11-21 | Pass the Android helper emulator stage | #incident #ci #android | [2026-11-c](2026-11-c.md) |
+| U-20261121-10 | 2026-11-21 | Stop waiting for VLM locator requests on a stop | #done #executor #stop #vlm | [2026-11-c](2026-11-c.md) |
+| U-20261121-09 | 2026-11-21 | Add the WebDriverAgent remote adapter behind a required provider | #done #agent #ios | [2026-11-c](2026-11-c.md) |
+| U-20261121-08 | 2026-11-21 | Drive managed Android input through the device helper | #done #agent #android | [2026-11-c](2026-11-c.md) |
+| U-20261121-07 | 2026-11-21 | Add the macOS presence transport | #done #agent #presence #macos | [2026-11-c](2026-11-c.md) |
+| U-20261121-06 | 2026-11-21 | Hold nested DAG, suite and assertion paths to MCP roots | #done #mcp #security | [2026-11-c](2026-11-c.md) |
+| U-20261121-05 | 2026-11-21 | Report host-declared DOM fields with browser context identity | #done #agent #browser | [2026-11-c](2026-11-c.md) |
+| U-20261121-04 | 2026-11-21 | Wake gesture pacing sleeps on a stop | #done #executor #stop | [2026-11-c](2026-11-c.md) |
+| U-20261121-03 | 2026-11-21 | Install the image stack on Windows arm64 again | #done #deps #arm64 | [2026-11-c](2026-11-c.md) |
+| U-20261121-02 | 2026-11-21 | Fold Unicode service keys with the OS casing table for one lock | #done #agent #service | [2026-11-c](2026-11-c.md) |
+| U-20261121-01 | 2026-11-21 | Start owned helpers suspended until their Job owns them | #done #security #agent | [2026-11-c](2026-11-c.md) |
 | U-20261119-04 | 2026-11-19 | Publish helper "entered" markers whole | #incident #ci #agent | [2026-11-c](2026-11-c.md) |
 | U-20261119-03 | 2026-11-19 | Throttle full checkpoints inside read-only UIA captures | #incident #ci #agent #uia | [2026-11-c](2026-11-c.md) |
 | U-20261119-02 | 2026-11-19 | Order captures with a fine clock; keep Docker helpers on the full package | #incident #ci #agent | [2026-11-c](2026-11-c.md) |

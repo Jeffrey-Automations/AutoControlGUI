@@ -62,24 +62,38 @@ fields, then send ``{"request_id": "..."}``). Every reply to that request
 value under the same key; CREDIT never does. A request without a usable
 id is answered exactly as before, so a viewer older than the field sees
 no change. See ``protocol`` for the rule in full.
+
+Concurrency: ``handle_frame`` may run on several threads at once -- the
+channel host serves each claim on its own lane (``session_worker``) so a
+transfer blocked in the backend never stalls the WebRTC event loop. A claim
+released (CLOSE or ``close_all``) while one of its transfers is still in
+the backend has its handle closed by that transfer when it returns, once,
+and that late result is discarded.
 """
 from __future__ import annotations
 
-import base64
-import json
 import secrets
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.usb.passthrough.acl import UsbAcl, normalize_usb_id
 from je_auto_control.utils.usb.passthrough.backend import UsbBackend, UsbHandle
 from je_auto_control.utils.usb.passthrough.protocol import (
-    MAX_PAYLOAD_BYTES, REQUEST_ID_KEY, Frame, Opcode, fragment_payload,
-    request_id_of,
+    Frame, Opcode, fragment_payload, request_id_of,
+)
+# The wire bounds are re-exported here, where callers have always read them.
+from je_auto_control.utils.usb.passthrough.session_frames import (  # noqa: F401  # pylint: disable=unused-import  # reason: re-export
+    MAX_CONTROL_LENGTH, MAX_ENDPOINT_LENGTH, MAX_TIMEOUT_MS,
+)
+from je_auto_control.utils.usb.passthrough.session_frames import (
+    _bulk_handler, _control_handler, _decode_json_payload,
+    _encode_json_payload, _error_frame, _identified, _interrupt_handler,
+    _is_misbehaviour, _opened_failure, _reply_opcode, _run_transfer,
+    _with_request_id,
 )
 
 
@@ -92,6 +106,9 @@ _TOPUP_PER_REPLY = 1
 _ABUSE_MAX_STRIKES = 20.0
 _ABUSE_DECAY_PER_S = 5.0
 _ABUSE_LOCKOUT_S = 5.0
+# Frames a peer may legitimately have queued beyond its transfer credits:
+# OPEN / LIST / RESUME / CLOSE / CREDIT, which no credit governs.
+_CONTROL_FRAME_ALLOWANCE = 16
 
 
 class SessionError(AutoControlException):
@@ -132,12 +149,20 @@ class _AbuseTracker:
 
 @dataclass
 class _ClaimState:
-    """Per-claim handle + credit accounting + resume token."""
+    """Per-claim handle + credit accounting + resume token.
+
+    ``in_flight`` counts transfers inside the backend; ``released`` is set
+    once, by whoever removes the claim from the table. The handle is closed
+    by that remover if nothing is in flight, otherwise by the last transfer
+    to return -- exactly once either way, and never under a running call.
+    """
 
     handle: UsbHandle
     inbound_credits: int = _DEFAULT_INITIAL_CREDITS
     outbound_credits: int = _DEFAULT_INITIAL_CREDITS
     resume_token: str = ""
+    in_flight: int = 0
+    released: bool = False
 
 
 class UsbPassthroughSession:
@@ -163,12 +188,25 @@ class UsbPassthroughSession:
         self._claims: Dict[int, _ClaimState] = {}
         self._resume_index: Dict[str, int] = {}
         self._next_claim_id = 1
+        #: How often close_all() ran, so an OPEN that was in the backend
+        #: meanwhile does not leave a claim nobody will ever close.
+        self._closings = 0
         self._abuse = _AbuseTracker()
 
     @property
     def active_claim_count(self) -> int:
         with self._lock:
             return len(self._claims)
+
+    @property
+    def frame_budget(self) -> int:
+        """How many frames a well-behaved peer can have outstanding at once."""
+        return self._max_claims * self._initial_credits + _CONTROL_FRAME_ALLOWANCE
+
+    def has_claim(self, claim_id: int) -> bool:
+        """True while ``claim_id`` names a live claim."""
+        with self._lock:
+            return int(claim_id) in self._claims
 
     def credits_for(self, claim_id: int) -> Optional[Dict[str, int]]:
         """Inspect (inbound, outbound) credits for a claim — for tests."""
@@ -182,18 +220,21 @@ class UsbPassthroughSession:
             }
 
     def close_all(self) -> None:
-        """Release every outstanding claim — call on peer disconnect."""
+        """Release every outstanding claim — call on peer disconnect.
+
+        Never waits on the device: a claim whose transfer is still inside
+        the backend leaves the table now, and that transfer closes the
+        handle when it returns (its result is discarded). An OPEN still in
+        the backend when this runs closes the handle it gets.
+        """
         with self._lock:
-            handles = [c.handle for c in self._claims.values()]
+            self._closings += 1
+            claims = list(self._claims.values())
             self._claims.clear()
             self._resume_index.clear()
-        for handle in handles:
-            try:
-                handle.close()
-            except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: best-effort cleanup; surface via logger
-                autocontrol_logger.warning(
-                    "passthrough close_all: handle.close() raised %r", error,
-                )
+            idle = [claim.handle for claim in claims if _release_locked(claim)]
+        for handle in idle:
+            _close_quietly(handle, "close_all")
 
     def is_locked_out(self) -> bool:
         """True while the peer is in a rate-limit cool-down."""
@@ -207,10 +248,25 @@ class UsbPassthroughSession:
                 _error_frame(frame.claim_id, "rate limited; locked out"), request_id)]
         replies = [_with_request_id(reply, request_id)
                    for reply in self._dispatch(frame, request_id)]
+        self._count_misbehaviour(replies)
+        return replies
+
+    def refuse(self, frame: Frame, message: str, *, strike: bool = True) -> List[Frame]:
+        """Answer ``frame`` with ERROR(``message``) without serving it.
+
+        ``strike`` counts it against the viewer (a flood past the queue
+        bound); a host-side fault passes ``strike=False``.
+        """
+        replies = [_with_request_id(_error_frame(frame.claim_id, message),
+                                    request_id_of(frame.payload))]
+        if strike:
+            self._count_misbehaviour(replies)
+        return replies
+
+    def _count_misbehaviour(self, replies: List[Frame]) -> None:
         if _is_misbehaviour(replies) and self._abuse.record_strike():
             self._audit("usb_rate_limited", "?", "?", None,
                         detail="viewer locked out for repeated failures")
-        return replies
 
     def _dispatch(self, frame: Frame, request_id: Optional[str] = None) -> List[Frame]:
         """Route one incoming frame; return zero or more reply frames.
@@ -289,6 +345,8 @@ class UsbPassthroughSession:
                 serial = str(serial)
         except (KeyError, ValueError, TypeError) as error:
             return _opened_failure(frame.claim_id, f"bad OPEN payload: {error}")
+        with self._lock:
+            closings = self._closings
         decision = self._acl_decision(vendor_id, product_id, serial)
         if serial is None and self._has_serial_rules(vendor_id, product_id):
             # A rule scoped to one serial cannot be honoured if the viewer
@@ -300,14 +358,20 @@ class UsbPassthroughSession:
             return _opened_failure(
                 frame.claim_id, "denied by ACL policy",
             )
+        return self._claim_device(frame, vendor_id, product_id, serial, closings)
+
+    def _claim_device(self, frame: Frame, vendor_id: str, product_id: str,
+                      serial: Optional[str], closings: int) -> Frame:
+        """Open an admitted device and register the claim, or answer why not.
+
+        ``closings`` is how often the session had been closed when the OPEN
+        arrived: the operator's prompt and the device both take their time,
+        and a claim added after ``close_all()`` is one nobody will release.
+        """
         with self._lock:
-            if len(self._claims) >= self._max_claims:
-                self._audit("usb_open_rejected_max_claims",
-                            vendor_id, product_id, serial)
-                return _opened_failure(
-                    frame.claim_id,
-                    f"max concurrent claims reached ({self._max_claims})",
-                )
+            full = len(self._claims) >= self._max_claims
+        if full:
+            return self._max_claims_reached(frame, vendor_id, product_id, serial)
         try:
             handle = self._backend.open(
                 vendor_id=vendor_id, product_id=product_id, serial=serial,
@@ -318,14 +382,16 @@ class UsbPassthroughSession:
             return _opened_failure(frame.claim_id, str(error))
         resume_token = secrets.token_hex(16)
         with self._lock:
-            claim_id = self._allocate_claim_id_locked()
-            self._claims[claim_id] = _ClaimState(
-                handle=handle,
-                inbound_credits=self._initial_credits,
-                outbound_credits=self._initial_credits,
-                resume_token=resume_token,
-            )
-            self._resume_index[resume_token] = claim_id
+            # Re-checked: another OPEN may have run in the meantime.
+            closed = closings != self._closings
+            full = len(self._claims) >= self._max_claims
+            if not closed and not full:
+                claim_id = self._add_claim_locked(handle, resume_token)
+        if closed or full:
+            _close_quietly(handle, "open")
+            if closed:
+                return _opened_failure(frame.claim_id, "session closed while the device was opened")
+            return self._max_claims_reached(frame, vendor_id, product_id, serial)
         self._audit("usb_open_allowed", vendor_id, product_id, serial,
                     detail=f"claim_id={claim_id}")
         return Frame(
@@ -335,6 +401,26 @@ class UsbPassthroughSession:
                 "resume_token": resume_token,
             }),
         )
+
+    def _max_claims_reached(self, frame: Frame, vendor_id: str, product_id: str,
+                            serial: Optional[str]) -> Frame:
+        self._audit("usb_open_rejected_max_claims", vendor_id, product_id, serial)
+        return _opened_failure(
+            frame.claim_id,
+            f"max concurrent claims reached ({self._max_claims})",
+        )
+
+    def _add_claim_locked(self, handle: UsbHandle, resume_token: str) -> int:
+        """Register ``handle`` as a claim and return its id. Caller holds ``self._lock``."""
+        claim_id = self._allocate_claim_id_locked()
+        self._claims[claim_id] = _ClaimState(
+            handle=handle,
+            inbound_credits=self._initial_credits,
+            outbound_credits=self._initial_credits,
+            resume_token=resume_token,
+        )
+        self._resume_index[resume_token] = claim_id
+        return claim_id
 
     def _handle_resume(self, frame: Frame) -> Frame:
         """Re-bind a still-open claim to a reconnecting viewer.
@@ -441,14 +527,16 @@ class UsbPassthroughSession:
     def _handle_close(self, frame: Frame) -> Frame:
         with self._lock:
             claim = self._claims.pop(int(frame.claim_id), None)
-            if claim is not None and claim.resume_token:
+            if claim is not None:
                 self._resume_index.pop(claim.resume_token, None)
+            close_now = claim is not None and _release_locked(claim)
         if claim is None:
             return _error_frame(
                 frame.claim_id, f"unknown claim_id {frame.claim_id}",
             )
         try:
-            claim.handle.close()
+            if close_now:  # else the transfer still in the backend closes it
+                claim.handle.close()
         except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: log-and-acknowledge; the claim is already gone from our table
             return _error_frame(frame.claim_id, f"close failed: {error}")
         self._audit("usb_close", "?", "?", None,
@@ -463,33 +551,20 @@ class UsbPassthroughSession:
     def _handle_transfer(self, frame: Frame,
                          dispatcher: Callable[[UsbHandle, Dict[str, Any]], bytes],
                          request_id: Optional[str] = None) -> List[Frame]:
-        with self._lock:
-            claim = self._claims.get(int(frame.claim_id))
-            if claim is None:
-                return [_error_frame(
-                    frame.claim_id, f"unknown claim_id {frame.claim_id}",
-                )]
-            if claim.inbound_credits <= 0:
-                return [_error_frame(frame.claim_id, "credit exhausted")]
-            claim.inbound_credits -= 1
-            handle = claim.handle
+        claim = self._begin_transfer(frame)
+        if isinstance(claim, Frame):
+            return [claim]
         try:
             request = _decode_json_payload(frame.payload)
         except ValueError as error:
             with self._lock:
                 claim.inbound_credits += 1  # nothing was served; refund it
+            self._finish_transfer(claim)
             return [_error_frame(frame.claim_id, f"bad payload: {error}")]
-        try:
-            result_bytes = dispatcher(handle, request)
-        except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: backends raise their own error types
-            reply_payload = _encode_json_payload(_identified(
-                {"ok": False, "error": str(error)}, request_id,
-            ))
-        else:
-            reply_payload = _encode_json_payload(_identified({
-                "ok": True,
-                "data": base64.b64encode(result_bytes).decode("ascii"),
-            }, request_id))
+        reply_payload = _encode_json_payload(_identified(
+            _run_transfer(dispatcher, claim.handle, request), request_id))
+        if self._finish_transfer(claim):
+            return []   # released meanwhile: nobody is left to answer
         # Fragment so an oversize IN transfer (open question 2) spans
         # multiple EOF-terminated frames instead of breaching the cap.
         frames = fragment_payload(
@@ -502,6 +577,34 @@ class UsbPassthroughSession:
             claim.inbound_credits += _TOPUP_PER_REPLY
         frames.append(self._make_credit_frame(frame.claim_id, _TOPUP_PER_REPLY))
         return frames
+
+    def _begin_transfer(self, frame: Frame) -> Union[_ClaimState, Frame]:
+        """Spend a credit and mark the claim busy, or return the ERROR reply."""
+        with self._lock:
+            claim = self._claims.get(int(frame.claim_id))
+            if claim is None:
+                return _error_frame(
+                    frame.claim_id, f"unknown claim_id {frame.claim_id}",
+                )
+            if claim.inbound_credits <= 0:
+                return _error_frame(frame.claim_id, "credit exhausted")
+            claim.inbound_credits -= 1
+            claim.in_flight += 1
+            return claim
+
+    def _finish_transfer(self, claim: _ClaimState) -> bool:
+        """Mark one transfer done; True if the claim was released meanwhile.
+
+        The last transfer out of a released claim closes its handle, which
+        the releaser left open rather than close it under a running call.
+        """
+        with self._lock:
+            claim.in_flight -= 1
+            released = claim.released
+            close_now = released and claim.in_flight == 0
+        if close_now:
+            _close_quietly(claim.handle, "late transfer")
+        return released
 
     def _handle_credit(self, frame: Frame) -> None:
         try:
@@ -530,161 +633,23 @@ class UsbPassthroughSession:
         )
 
 
-# ---------------------------------------------------------------------------
-# Transfer dispatchers — pure functions that pull args out of the JSON
-# payload and call the right backend method.
-# ---------------------------------------------------------------------------
+def _release_locked(claim: _ClaimState) -> bool:
+    """Mark ``claim`` released; True if its handle can be closed right now.
 
-
-#: Bounds on numbers taken from the wire. A control transfer's wLength is a
-#: 16-bit field; bulk and interrupt reads are capped so one request cannot
-#: make the host allocate (and base64, and fragment) gigabytes.
-MAX_CONTROL_LENGTH = 0xFFFF
-MAX_ENDPOINT_LENGTH = 1024 * 1024
-MAX_TIMEOUT_MS = 60_000
-
-
-def _bounded(request: Dict[str, Any], key: str, default: int, upper: int) -> int:
-    value = int(request.get(key, default))
-    if not 0 <= value <= upper:
-        raise ValueError(f"{key} must be within 0..{upper}, got {value}")
-    return value
-
-
-def _control_handler(handle: UsbHandle, request: Dict[str, Any]) -> bytes:
-    payload = _decode_b64(request.get("data"))
-    return handle.control_transfer(
-        bm_request_type=int(request["bm_request_type"]),
-        b_request=int(request["b_request"]),
-        w_value=int(request.get("w_value", 0)),
-        w_index=int(request.get("w_index", 0)),
-        data=payload,
-        length=_bounded(request, "length", 0, MAX_CONTROL_LENGTH),
-        timeout_ms=_bounded(request, "timeout_ms", 1000, MAX_TIMEOUT_MS),
-    )
-
-
-def _bulk_handler(handle: UsbHandle, request: Dict[str, Any]) -> bytes:
-    return _endpoint_call(handle.bulk_transfer, request)
-
-
-def _interrupt_handler(handle: UsbHandle, request: Dict[str, Any]) -> bytes:
-    return _endpoint_call(handle.interrupt_transfer, request)
-
-
-def _endpoint_call(method: Callable[..., bytes],
-                   request: Dict[str, Any]) -> bytes:
-    direction = str(request.get("direction", ""))
-    if direction not in ("in", "out"):
-        raise RuntimeError(f"direction must be 'in' or 'out', got {direction!r}")
-    return method(
-        endpoint=int(request["endpoint"]),
-        direction=direction,
-        data=_decode_b64(request.get("data")),
-        length=_bounded(request, "length", 0, MAX_ENDPOINT_LENGTH),
-        timeout_ms=_bounded(request, "timeout_ms", 1000, MAX_TIMEOUT_MS),
-    )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-_REPLY_OPCODES: Dict[Opcode, Opcode] = {
-    Opcode.CTRL: Opcode.CTRL,
-    Opcode.BULK: Opcode.BULK,
-    Opcode.INT: Opcode.INT,
-}
-
-
-def _reply_opcode(request_op: Opcode) -> Opcode:
-    return _REPLY_OPCODES.get(request_op, Opcode.ERROR)
-
-
-def _is_misbehaviour(replies: List[Frame]) -> bool:
-    """True if the replies indicate a viewer-caused protocol failure.
-
-    Counts ERROR frames and failed OPENED replies as strikes; a device
-    transfer that fails at the backend (CTRL/BULK/INT with ok=false) is
-    the device's fault, not the viewer's, so it is not counted.
+    The caller holds the session lock and has just removed the claim from
+    the table, so this runs once per claim.
     """
-    for reply in replies:
-        if reply.op == Opcode.ERROR:
-            return True
-        if reply.op == Opcode.OPENED:
-            try:
-                body = json.loads(reply.payload.decode("utf-8"))
-            except ValueError:
-                return True
-            if not body.get("ok"):
-                return True
-    return False
+    claim.released = True
+    return claim.in_flight == 0
 
 
-def _decode_b64(value: Any) -> bytes:
-    if value is None or value == "":
-        return b""
-    if isinstance(value, (bytes, bytearray)):
-        return bytes(value)
-    return base64.b64decode(str(value))
-
-
-def _opened_failure(claim_id: int, message: str) -> Frame:
-    return Frame(
-        op=Opcode.OPENED, claim_id=claim_id,
-        payload=_encode_json_payload({"ok": False, "error": message}),
-    )
-
-
-def _error_frame(claim_id: int, message: str) -> Frame:
-    return Frame(
-        op=Opcode.ERROR, claim_id=claim_id,
-        payload=_encode_json_payload({"error": message}),
-    )
-
-
-#: Replies that are always one frame, so the id can be added after the fact.
-_SINGLE_FRAME_REPLIES = (Opcode.OPENED, Opcode.CLOSED, Opcode.ERROR)
-
-
-def _identified(body: Dict[str, Any], request_id: Optional[str]) -> Dict[str, Any]:
-    """``body`` with the request's id added, if the request had one."""
-    if request_id is not None:
-        body[REQUEST_ID_KEY] = request_id
-    return body
-
-
-def _with_request_id(frame: Frame, request_id: Optional[str]) -> Frame:
-    """Echo ``request_id`` in a single-frame reply; other frames pass through.
-
-    CREDIT is a grant rather than a reply and never carries an id; LIST and
-    transfer replies got theirs before they were fragmented.
-    """
-    if request_id is None or frame.op not in _SINGLE_FRAME_REPLIES:
-        return frame
+def _close_quietly(handle: UsbHandle, where: str) -> None:
     try:
-        body = _decode_json_payload(frame.payload)
-    except ValueError:
-        return frame
-    payload = _encode_json_payload(_identified(body, request_id))
-    if len(payload) > MAX_PAYLOAD_BYTES:
-        return frame    # an unidentified reply still beats none at all
-    return Frame(op=frame.op, flags=frame.flags, claim_id=frame.claim_id,
-                 payload=payload)
-
-
-def _encode_json_payload(obj: object) -> bytes:
-    return json.dumps(obj, ensure_ascii=False).encode("utf-8")
-
-
-def _decode_json_payload(payload: bytes) -> Dict[str, Any]:
-    if not payload:
-        raise ValueError("empty payload")
-    decoded = json.loads(payload.decode("utf-8"))
-    if not isinstance(decoded, dict):
-        raise ValueError("payload must be a JSON object")
-    return decoded
+        handle.close()
+    except Exception as error:  # noqa: BLE001  # pylint: disable=broad-except  # reason: best-effort cleanup; surface via logger
+        autocontrol_logger.warning(
+            "passthrough %s: handle.close() raised %r", where, error,
+        )
 
 
 __all__ = ["SessionError", "UsbPassthroughSession"]

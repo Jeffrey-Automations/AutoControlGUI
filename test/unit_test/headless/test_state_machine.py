@@ -228,3 +228,25 @@ def test_transition_to_undefined_state_raises():
 def test_non_mapping_spec_raises():
     with pytest.raises(StateMachineError):
         StateMachine([])  # type: ignore[arg-type]  # NOSONAR python:S5655  # reason: intentional bad-type negative test
+
+
+def test_an_image_guard_lets_a_stop_through(monkeypatch):
+    """A stop read as "image not found", and the machine then failed for want of a transition."""
+    from je_auto_control.utils.executor.run_control import ExecutionStopped
+
+    def stopped(*_args, **_kwargs):
+        raise ExecutionStopped("run", "probe")
+
+    monkeypatch.setattr("je_auto_control.wrapper.auto_control_image.locate_image_center", stopped)
+    spec = {"initial": "a", "states": {
+        "a": {"transitions": [{"if_image_found": "x.png", "go_to": "b"}]}, "b": {"final": True}}}
+    with pytest.raises(ExecutionStopped):
+        run_state_machine(spec, execute_action=lambda _action: None)
+
+
+@pytest.mark.parametrize("timeout", [float("nan"), "soon", None])
+def test_a_global_timeout_that_is_not_a_number_is_refused(timeout):
+    """NaN compares false with everything, so the machine had no time limit at all."""
+    spec = {"initial": "a", "global_timeout_s": timeout, "states": {"a": {"final": True}}}
+    with pytest.raises(StateMachineError):
+        run_state_machine(spec, execute_action=lambda _action: None)

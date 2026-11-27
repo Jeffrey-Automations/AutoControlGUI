@@ -35,3 +35,6 @@
 的鍵放掉，讓重試能再跑一次(已完成的鍵會保留)。三者使用具名實例登錄(如斷路器/隔艙，沒有 TTL),並以 MCP 工具
 (``ac_idempotency_begin`` / ``ac_idempotency_complete`` / ``ac_idempotency_release``)以及 Script Builder
 中 **Flow** 分類下的命令提供。
+
+登錄最多保存 ``MAX_REGISTRY_NAMES``(1,024)個名稱；超過時新名稱會拋出 ``RegistryFullError``,既有名稱照常運作，
+名稱在程序結束時釋放。隔艙、CAS、dedup、sequence 與 outbox 登錄也套用相同上限。

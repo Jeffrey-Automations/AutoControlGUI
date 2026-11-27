@@ -392,6 +392,8 @@ class _Quartz(types.ModuleType):
     kCGHIDEventTap = 0                      # noqa: N815
     kCGHeadInsertEventTap = 0               # noqa: N815
     kCGEventTapOptionDefault = 0            # noqa: N815
+    kCGEventTapDisabledByTimeout = 0xFFFFFFFE       # noqa: N815
+    kCGEventTapDisabledByUserInput = 0xFFFFFFFF     # noqa: N815
 
     def __init__(self, tap="tap") -> None:
         super().__init__("Quartz")
@@ -507,3 +509,14 @@ def test_an_unrelated_modifier_bit_is_masked_off_before_matching(mac_backend,
 def test_the_macos_backend_names_the_api_it_uses(mac_backend):
     assert mac_backend.name == "macos"
     assert mac.MacOSHotkeyBackend is MacOSHotkeyBackend
+
+
+@pytest.mark.parametrize("event_type", [0xFFFFFFFE, 0xFFFFFFFF])
+def test_a_tap_the_window_server_disabled_is_enabled_again(mac_backend, quartz, event_type):
+    """A script run from the listener thread outlives the tap's timeout; the tap then stayed off."""
+    module = quartz()
+    mac_backend.run_forever(_context([_binding()]))
+    module.enabled.clear()
+    marker = object()
+    assert module.callback(None, event_type, marker, None) is marker
+    assert module.enabled == [True]

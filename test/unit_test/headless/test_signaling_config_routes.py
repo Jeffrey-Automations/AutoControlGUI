@@ -10,7 +10,10 @@ import time
 import pytest
 
 pytest.importorskip("fastapi")
-testclient = pytest.importorskip("fastapi.testclient")
+try:
+    import fastapi.testclient as testclient
+except (ImportError, RuntimeError) as missing:  # starlette names the HTTP client it needs
+    pytest.skip(f"no usable fastapi test client: {missing}", allow_module_level=True)
 
 from je_auto_control.utils.remote_desktop.signaling_server import create_app  # noqa: E402
 

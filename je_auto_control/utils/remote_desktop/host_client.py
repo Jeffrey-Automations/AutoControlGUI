@@ -9,8 +9,9 @@ module does not import it.
 """
 import collections
 import json
+import queue
 import threading
-from typing import TYPE_CHECKING, Deque, NoReturn, Optional, Any, Set, Tuple
+from typing import TYPE_CHECKING, Callable, Deque, List, NoReturn, Optional, Any, Set, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.exception.control_signals import raise_caused_run_interruption
@@ -19,6 +20,7 @@ from je_auto_control.utils.remote_desktop.auth import make_nonce
 from je_auto_control.utils.remote_desktop.clipboard_sync import (
     ClipboardEchoGuard, ClipboardSyncError, decode as decode_clipboard,
 )
+from je_auto_control.utils.remote_desktop.delta_frames import DeltaFrameGate
 from je_auto_control.utils.remote_desktop.file_transfer import (
     FileTransferError, decode_begin,
 )
@@ -36,6 +38,7 @@ from je_auto_control.utils.remote_desktop.transport import MessageChannel
 
 if TYPE_CHECKING:  # avoids a runtime cycle: host imports this module
     from je_auto_control.utils.remote_desktop.host import RemoteDesktopHost
+    from je_auto_control.utils.remote_desktop.host_admission import PendingAdmission
 
 _FILE_MSG_TYPES = frozenset({
     MessageType.FILE_BEGIN, MessageType.FILE_CHUNK, MessageType.FILE_END,
@@ -45,15 +48,24 @@ _FILE_MSG_TYPES = frozenset({
 #: Messages a view-only viewer may not send, besides INPUT.
 _CONTROL_MSG_TYPES = frozenset({MessageType.CLIPBOARD, *_FILE_MSG_TYPES})
 
+#: A host-initiated send (chat, clipboard, file) run on the viewer's own thread.
+OutgoingJob = Callable[[MessageChannel], None]
+
 
 class _ClientHandler:
     """Per-connection auth + input-receive + frame-send state."""
 
     _AUDIO_QUEUE_MAXLEN = 50  # ~2.5 s of buffered chunks at 50 ms each
+    _CURSOR_QUEUE_MAXLEN = 64  # ~2 s of updates at 30 Hz
+    _OUTGOING_QUEUE_MAXSIZE = 64  # host-initiated sends waiting on one viewer
 
     def __init__(self, host: "RemoteDesktopHost",
-                 channel: MessageChannel, address: Tuple[Any, ...]) -> None:
+                 channel: MessageChannel, address: Tuple[Any, ...],
+                 admission: Optional["PendingAdmission"] = None) -> None:
         self._host = host
+        #: The pending slot and auth deadline this connection holds until
+        #: its credentials verify; ``None`` outside the host's accept path.
+        self.admission = admission
         self._channel = channel
         self._address = address
         self._shutdown = threading.Event()
@@ -65,6 +77,18 @@ class _ClientHandler:
         self._audio_lock = threading.Lock()
         self._audio_event = threading.Event()
         self._audio_sender_thread: Optional[threading.Thread] = None
+        # Cursor updates waiting for the sender thread; guarded by _frame_cond.
+        self._cursor_queue: Deque[bytes] = collections.deque(
+            maxlen=self._CURSOR_QUEUE_MAXLEN,
+        )
+        # Chat, clipboard and file sends the host initiated, run on this
+        # viewer's own rd-outgoing thread so a viewer that stopped reading
+        # blocks only itself; full means the viewer is that far behind.
+        self._outgoing: "queue.Queue[Tuple[str, OutgoingJob]]" = queue.Queue(
+            maxsize=self._OUTGOING_QUEUE_MAXSIZE,
+        )
+        self._outgoing_lock = threading.Lock()
+        self._outgoing_thread: Optional[threading.Thread] = None
         self.authenticated = False
         #: What this viewer and the host have exchanged over the clipboard,
         #: so a forwarded change is not sent back to where it came from.
@@ -140,7 +164,7 @@ class _ClientHandler:
             return
         try:
             self._channel.send_typed(MessageType.FRAME, frame)
-        except OSError:
+        except (OSError, ProtocolError):
             pass
 
     def push_audio(self, chunk: bytes) -> None:
@@ -150,6 +174,56 @@ class _ClientHandler:
         with self._audio_lock:
             self._audio_queue.append(chunk)
         self._audio_event.set()
+
+    def push_cursor(self, payload: bytes) -> None:
+        """Enqueue a CURSOR payload for the sender thread; oldest dropped if full."""
+        with self._host._frame_cond:
+            self._cursor_queue.append(payload)
+            self._host._frame_cond.notify_all()
+
+    def push_outgoing(self, what: str, job: OutgoingJob) -> bool:
+        """Queue a host-initiated send for this viewer's own sender thread.
+
+        ``False`` when the viewer is gone or so far behind that its bounded
+        queue is full: the send is dropped for this viewer only.
+        """
+        if self._shutdown.is_set():
+            return False
+        try:
+            self._outgoing.put_nowait((what, job))
+        except queue.Full:
+            autocontrol_logger.warning(
+                "remote_desktop %s to %s dropped: the viewer is not reading", what, self._address,
+            )
+            return False
+        with self._outgoing_lock:
+            if self._outgoing_thread is None:
+                self._outgoing_thread = threading.Thread(
+                    target=self._outgoing_loop, name="rd-outgoing", daemon=True,
+                )
+                self._outgoing_thread.start()
+        return True
+
+    def _outgoing_loop(self) -> None:
+        while not self._shutdown.is_set():
+            try:
+                what, job = self._outgoing.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            if self._shutdown.is_set():
+                return
+            try:
+                job(self._channel)
+            except OSError as error:
+                autocontrol_logger.info(
+                    "remote_desktop %s send to %s failed: %r", what, self._address, error,
+                )
+                self.stop()
+                return
+            except ProtocolError as error:
+                autocontrol_logger.warning(
+                    "remote_desktop %s to %s not sent: %r", what, self._address, error,
+                )
 
     def stop(self) -> None:
         """Signal threads, abandon this viewer's unfinished uploads, close the socket."""
@@ -191,9 +265,15 @@ class _ClientHandler:
             )
             return PERMISSION_DENIED
 
+    def _pending_read_timeout(self) -> float:
+        """Socket timeout while unauthenticated: the pending deadline's time left, if any."""
+        if self.admission is None:
+            return _AUTH_TIMEOUT_S
+        return self.admission.read_timeout()
+
     def _authenticate(self) -> None:
         nonce = make_nonce()
-        self._channel.settimeout(_AUTH_TIMEOUT_S)
+        self._channel.settimeout(self._pending_read_timeout())
         self._channel.send_typed(MessageType.AUTH_CHALLENGE, nonce)
         msg_type, payload = self._channel.read_typed()
         if msg_type is not MessageType.AUTH_RESPONSE:
@@ -202,11 +282,16 @@ class _ClientHandler:
         # signs with that token directly — host short-circuits the
         # approval popup and reuses the saved permission.
         resumed = self._host._try_consume_resume(nonce, payload)
+        if resumed is None and not self._host._verify_token(nonce, payload):
+            self._reject_auth(b"bad token", "bad token")
+        # Only now, credentials proven, does the connection take a viewer
+        # slot: an unauthenticated one used to hold it for up to 60 s.
+        self._channel.settimeout(_AUTH_TIMEOUT_S)
+        if not self._host._admit_client(self):
+            self._reject_auth(b"host full", "no viewer slot")
         if resumed is not None:
             self.permission = resumed
         else:
-            if not self._host._verify_token(nonce, payload):
-                self._reject_auth(b"bad token", "bad token")
             # Host operator gates the session *before* AUTH_OK so the
             # viewer surfaces the rejection as an AuthenticationError
             # instead of connecting and then mysteriously disconnecting.
@@ -230,6 +315,8 @@ class _ClientHandler:
     def _reject_auth(self, payload: bytes, message: str) -> NoReturn:
         """Release admission capacity before the terminal reply lets the viewer immediately reconnect."""
         self._shutdown.set()
+        if self.admission is not None:
+            self.admission.settle()
         self._channel.send_typed(MessageType.AUTH_FAIL, payload)
         raise AuthenticationError(message)
 
@@ -240,29 +327,86 @@ class _ClientHandler:
         # blank until the host moves). Doing it here rather than in start()
         # keeps a slow-reading viewer from stalling the accept thread.
         self._host._send_initial_cursor(self)
-        self._send_initial_frame()
+        # JPEG frames stand alone and only the newest is sent; a delta-coded
+        # stream goes through a gate that keeps it decodable (delta_frames).
+        gate = None if self._host._delta_history is None else DeltaFrameGate()
+        if gate is None:
+            self._send_initial_frame()
         last_sent = 0
-        while not self._shutdown.is_set():
-            with self._host._frame_cond:
-                while (not self._shutdown.is_set()
-                       and self._host._latest_seq <= last_sent):
-                    self._host._frame_cond.wait(timeout=0.5)
-                if self._shutdown.is_set():
-                    return
-                frame = self._host._latest_frame
-                seq = self._host._latest_seq
-            if frame is None:
-                continue
-            try:
-                self._channel.send_typed(MessageType.FRAME, frame)
-            except OSError as error:
-                autocontrol_logger.info(
-                    "remote_desktop send to %s failed: %r",
-                    self._address, error,
-                )
-                self.stop()
+        while True:
+            outgoing, delta_frames, last_sent = self._next_streamed(last_sent, gate)
+            if self._shutdown.is_set():
                 return
-            last_sent = seq
+            for msg_type, payload in outgoing:
+                if not self._send_streamed(msg_type, payload):
+                    return
+            if gate is not None and not self._send_delta_frames(delta_frames, gate):
+                return
+
+    def _next_streamed(self, last_sent: int, gate: Optional[DeltaFrameGate],
+                       ) -> Tuple[List[Tuple[MessageType, bytes]], List[bytes], int]:
+        """Wait for cursor updates or a frame newer than ``last_sent``.
+
+        Returns the cursor updates (plus, for JPEG, the newest frame), the
+        delta-coded frames the gate lets through, and the new mark.
+        """
+        host = self._host
+        with host._frame_cond:
+            while (not self._shutdown.is_set() and not self._cursor_queue
+                   and host._latest_seq <= last_sent):
+                host._frame_cond.wait(timeout=0.5)
+            outgoing = [(MessageType.CURSOR, cursor) for cursor in self._cursor_queue]
+            self._cursor_queue.clear()
+            frame = host._latest_frame
+            seq = host._latest_seq
+            history = host._delta_history
+            delta_frames = [] if gate is None or history is None else gate.take(history)
+        if gate is None and frame is not None and seq > last_sent:
+            outgoing.append((MessageType.FRAME, frame))
+        return outgoing, delta_frames, seq
+
+    def _send_delta_frames(self, frames: List[bytes], gate: DeltaFrameGate) -> bool:
+        """Send delta-coded frames in order; ``False`` once the connection is gone.
+
+        A frame that cannot be sent takes the rest of the batch with it --
+        they reference it -- and, like a viewer that fell behind, leaves the
+        gate waiting for a keyframe, which is then asked for.
+        """
+        for payload in frames:
+            sent = self._try_send(MessageType.FRAME, payload)
+            if sent is None:
+                return False
+            if not sent:
+                gate.lose()
+                break
+        if gate.needs_keyframe:
+            self._host._request_keyframe()
+        return True
+
+    def _send_streamed(self, msg_type: MessageType, payload: bytes) -> bool:
+        """Send one streamed message; ``False`` once the connection is gone."""
+        return self._try_send(msg_type, payload) is not None
+
+    def _try_send(self, msg_type: MessageType, payload: bytes) -> Optional[bool]:
+        """Send one streamed message: ``True`` sent, ``False`` skipped, ``None`` connection gone."""
+        try:
+            self._channel.send_typed(msg_type, payload)
+        except OSError as error:
+            autocontrol_logger.info(
+                "remote_desktop send to %s failed: %r",
+                self._address, error,
+            )
+            self.stop()
+            return None
+        except ProtocolError as error:
+            # Over the payload cap: that one message is skipped. Raising ended
+            # this thread while the viewer stayed connected and in control.
+            autocontrol_logger.warning(
+                "remote_desktop %s to %s not sent: %r",
+                msg_type.name, self._address, error,
+            )
+            return False
+        return True
 
     def _audio_send_loop(self) -> None:
         while not self._shutdown.is_set():
@@ -398,7 +542,7 @@ class _ClientHandler:
             return
         try:
             body = json.loads(payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except (ValueError, RecursionError):   # also the int-digit and nesting limits
             return
         if not isinstance(body, dict):
             return
@@ -440,7 +584,7 @@ class _ClientHandler:
     def _handle_input_payload(self, payload: bytes) -> None:
         try:
             message = json.loads(payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (ValueError, RecursionError) as error:
             autocontrol_logger.info(
                 "remote_desktop bad INPUT from %s: %r",
                 self._address, error,

@@ -1,4 +1,6 @@
 """Phase 7.10: self-healing replay tests."""
+import pytest
+
 from je_auto_control.utils.semantic_recording import (
     SelfHealingReplayer, self_healing_replay,
 )
@@ -170,3 +172,50 @@ def test_anchor_description_includes_app_name():
     assert captured
     assert "ShopApp" in captured[0]
     assert "Submit" in captured[0]
+
+
+def _control_signals():
+    from concurrent.futures import CancelledError
+    from je_auto_control.utils.exception.control_signals import OperationCancelledError
+    from je_auto_control.utils.executor.run_control import ExecutionStopped
+    return [ExecutionStopped("run"), OperationCancelledError("request"), CancelledError()]
+
+
+def test_a_stop_or_cancel_is_not_healed_and_retried():
+    """A stopped run clicked again, at the place a (paid) VLM request named."""
+    for signal in _control_signals():
+        executed, located = [], []
+
+        def execute(action, raised=signal, seen=executed):
+            seen.append(action)
+            raise raised
+
+        replayer = SelfHealingReplayer(
+            execute, vlm_locate=lambda text, seen=located: seen.append(text) or (1, 2))
+        with pytest.raises(type(signal)):
+            replayer.replay([_click(5, 5, {"role": "button", "name": "OK"})])
+        assert len(executed) == 1
+        assert located == []
+
+
+def test_a_stop_while_healing_ends_the_replay():
+    for signal in _control_signals():
+        def locate(_text, raised=signal):
+            raise raised
+
+        replayer = SelfHealingReplayer(lambda _action: None, verify_step=lambda *_: False, vlm_locate=locate)
+        with pytest.raises(type(signal)):
+            replayer.replay([_click(5, 5, {"role": "button", "name": "OK"})])
+
+
+def test_anchor_lookups_let_a_cancellation_through():
+    from je_auto_control.utils.exception.control_signals import OperationCancelledError
+    from je_auto_control.utils.semantic_recording import AnchorLocator, AnchorResolver
+
+    def cancelled(*_args):
+        raise OperationCancelledError("request")
+
+    with pytest.raises(OperationCancelledError):
+        AnchorResolver(cancelled).resolve(1, 2)
+    with pytest.raises(OperationCancelledError):
+        AnchorLocator(cancelled).locate({"name": "OK"})

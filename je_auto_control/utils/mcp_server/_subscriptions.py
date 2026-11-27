@@ -4,7 +4,10 @@ The handshake era subscribes to a resource with ``resources/subscribe`` and is
 sent ``notifications/resources/updated`` and ``notifications/tools/list_changed``
 on its connection's notifier, which is also where they go to a peer that never
 subscribed to anything. Neither goes to a stateless peer
-(``_unsolicited_notifier``).
+(``_unsolicited_notifier``). Over HTTP a ``resources/subscribe`` belongs to the
+session that made it and its updates go down that session's standing ``GET``
+stream, through the transport's resource sink; a request with no session has
+no stream to deliver on and is refused rather than answered ``{}``.
 
 MCP 2026-07-28 replaces all of that with ``subscriptions/listen``: one
 long-lived request per subscription, whose response stream carries only the
@@ -113,7 +116,8 @@ class SubscriptionMixin:
     if TYPE_CHECKING:
         _resources: Any
         _audit: Any
-        _resource_subscriptions: Dict[str, Any]
+        _resource_subscriptions: Dict[Tuple[Any, str], Any]
+        _resource_sinks: Dict[Any, Any]
         _subscriptions_lock: threading.Lock
         _listeners: Dict[Any, Listener]
         _listeners_lock: threading.Lock
@@ -184,6 +188,8 @@ class SubscriptionMixin:
         if not _is_hashable(msg_id):
             raise _MCPError(-32600, "Invalid Request: id must be a string or a number")
         tools_list_changed, uris = _listen_filter(params)
+        for uri in uris:  # as resources/subscribe: the same right as reading it
+            authorize_resource(uri, self._audit, LISTEN_METHOD)
         key = (self._connection_id, msg_id)
         listener = Listener(msg_id, writer, tools_list_changed)
         with self._listeners_lock:
@@ -250,6 +256,24 @@ class SubscriptionMixin:
 
     # --- handshake era: resources/subscribe ------------------------------------
 
+    def _register_resource_sink(self, owner: Any, sink: Any) -> None:
+        """Let a transport deliver resource updates to its connections.
+
+        ``sink.reaches(connection)`` says whether it has a channel for that
+        connection id; ``sink.send(connection, payload)`` writes one message.
+        """
+        with self._listeners_lock:
+            self._resource_sinks[owner] = sink
+
+    def _unregister_resource_sink(self, owner: Any) -> None:
+        with self._listeners_lock:
+            self._resource_sinks.pop(owner, None)
+
+    def _resource_sink_for(self, connection: Any) -> Any:
+        with self._listeners_lock:
+            sinks = list(self._resource_sinks.values())
+        return next((sink for sink in sinks if sink.reaches(connection)), None)
+
     def _handle_resources_subscribe(self,
                                     params: Dict[str, Any]) -> Dict[str, Any]:
         uri = params.get("uri")
@@ -257,19 +281,26 @@ class SubscriptionMixin:
             raise _MCPError(-32602, "resources/subscribe requires 'uri'")
         # A subscription delivers the resource's updates: the same right as reading it.
         authorize_resource(uri, self._audit, "resources/subscribe")
+        connection = self._connection_id
+        if connection is not None and self._resource_sink_for(connection) is None:
+            # An answer of {} promised updates that had nowhere to go.
+            raise _MCPError(-32600, "Invalid Request: resources/subscribe needs a session to deliver "
+                                    "notifications/resources/updated on; send the Mcp-Session-Id that "
+                                    "initialize returned and open its GET stream")
+        key = (connection, uri)
         # Hold the lock across the check *and* the subscribe so two concurrent
         # requests for the same uri cannot both create a provider handle and
         # leak the loser (a TOCTOU that left an orphaned subscription running).
         with self._subscriptions_lock:
-            if uri in self._resource_subscriptions:
+            if key in self._resource_subscriptions:
                 return {}
             handle = self._resources.subscribe(
                 uri,
-                functools.partial(self._notify_resource_updated, uri),
+                functools.partial(self._notify_resource_updated, connection, uri),
             )
             if handle is None:
                 raise _MCPError(-32602, f"Unsubscribable resource: {uri}")
-            self._resource_subscriptions[uri] = handle
+            self._resource_subscriptions[key] = handle
         return {}
 
     def _handle_resources_unsubscribe(self,
@@ -278,12 +309,23 @@ class SubscriptionMixin:
         if not isinstance(uri, str) or not uri:
             raise _MCPError(-32602, "resources/unsubscribe requires 'uri'")
         with self._subscriptions_lock:
-            handle = self._resource_subscriptions.pop(uri, None)
+            handle = self._resource_subscriptions.pop((self._connection_id, uri), None)
         if handle is not None:
             self._resources.unsubscribe(uri, handle)
         return {}
 
-    def _notify_resource_updated(self, uri: str) -> None:
+    def _drop_resource_subscriptions(self, connection: Any) -> None:
+        """Release every ``resources/subscribe`` the connection holds."""
+        with self._subscriptions_lock:
+            keys = [key for key in self._resource_subscriptions if key[0] == connection]
+            held = [(key[1], self._resource_subscriptions.pop(key)) for key in keys]
+        for uri, handle in held:
+            self._resources.unsubscribe(uri, handle)
+
+    def _notify_resource_updated(self, connection: Any, uri: str) -> None:
+        if connection is not None:
+            self._send_resource_update(connection, uri)
+            return
         notifier = self._unsolicited_notifier()
         if notifier is None:
             return
@@ -293,3 +335,14 @@ class SubscriptionMixin:
             autocontrol_logger.exception(
                 "MCP failed to send resources/updated for %s", uri,
             )
+
+    def _send_resource_update(self, connection: Any, uri: str) -> None:
+        """Deliver to one transport connection; dropped while it has no stream open."""
+        sink = self._resource_sink_for(connection)
+        if sink is None:
+            return
+        payload = _notification_message("notifications/resources/updated", {"uri": uri})
+        try:
+            sink.send(connection, payload)
+        except _SEND_ERRORS as error:
+            autocontrol_logger.info("MCP resources/updated for %s lost its stream: %r", uri, error)

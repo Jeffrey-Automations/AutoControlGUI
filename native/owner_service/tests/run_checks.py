@@ -68,6 +68,7 @@ def main():
             "owner_core_acceptance": ([*OWNER, "owner_core_acceptance.c"], ["--suite=lifecycle"], 0),
             "service_e2e": (["service_e2e.c", *SHARED], None, None),
             "guardian_journal_acceptance": (["guardian_journal_acceptance.c", "guardian_journal.c"], [], 0),
+            "guardian_journal_io_acceptance": (["guardian_journal_io_acceptance.c"], [], 0),
             "purge_siphash_check": (["purge_siphash_check.c"], [], 0),
             "path_anchored_check": (["path_anchored_check.c"], [], 0),
             "purge_watch_acceptance": (["purge_watch_acceptance.c", "guardian_journal.c"], [], 0),

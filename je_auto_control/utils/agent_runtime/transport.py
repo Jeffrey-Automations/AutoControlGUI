@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import queue
 import threading
+from concurrent.futures import CancelledError
 import time
 from contextvars import copy_context
 from typing import Any, Callable, NoReturn
@@ -11,6 +12,7 @@ from urllib.parse import urlsplit
 from je_auto_control.utils.agent_runtime.errors import AgentControlBusy, AgentTaskError, AgentObservationStale
 from je_auto_control.utils.agent_runtime.control_admission import CONTROL_HEADER
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.http_client.http_client import build_call, urllib_transport
 
 _SLOTS = threading.BoundedSemaphore(4)
@@ -57,6 +59,20 @@ def _fetch(url: str, body: Any, token: str | None, timeout: float, *,
     return urllib_transport(call)
 
 
+def _raise_worker_error(error: BaseException) -> NoReturn:
+    """Re-raise framework errors, cancellation and interpreter exits; map every other failure.
+
+    A refused connection or socket error reaches here as a ``URLError``/``OSError`` from the
+    worker thread. It is raised as ``AgentTaskError`` (the original kept as its cause), so every task boundary
+    that catches the framework family handles it. Only those say the endpoint was the problem.
+    """
+    if isinstance(error, (AutoControlException, CancelledError)) or not isinstance(error, Exception):
+        raise error
+    if isinstance(error, OSError):
+        raise AgentTaskError("local HTTP request failed; the endpoint was unreachable or closed") from error
+    raise AgentTaskError(f"local HTTP request failed: {type(error).__name__}") from error
+
+
 def _await_reply(replies: queue.Queue[Any], timeout: float, check: Callable[[], None]) -> dict[str, Any]:
     """Poll for the worker's reply, checking cancellation, until the request deadline."""
     deadline = time.monotonic() + timeout
@@ -67,7 +83,7 @@ def _await_reply(replies: queue.Queue[Any], timeout: float, check: Callable[[], 
         except queue.Empty:
             continue
         if isinstance(reply, BaseException):
-            raise reply
+            _raise_worker_error(reply)
         check()
         if not 200 <= reply.get("status", 0) < 300 or not isinstance(reply.get("json"), dict):
             _raise_reply_error(reply)

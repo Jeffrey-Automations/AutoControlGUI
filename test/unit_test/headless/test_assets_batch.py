@@ -68,6 +68,51 @@ def test_persists_across_instances(tmp_path):
     assert AssetStore(db).get("token", environment="prod").value == 42
 
 
+_DAMAGED = [b'{"default": {"url": {"type": "text", "value": "x"}},}',  # a hand edit's stray comma
+            b"[1, 2]", b"\xff\xfe not utf-8"]
+
+
+@pytest.mark.parametrize("content", _DAMAGED, ids=["syntax", "not-an-object", "not-utf8"])
+def test_a_damaged_file_is_kept_aside_not_erased_by_a_write(tmp_path, content):
+    # A non-strict store read the damaged file as {} and the next set()
+    # wrote back only its own asset, erasing every hand-written one.
+    from je_auto_control.utils.exception.exceptions import AutoControlException
+    db = tmp_path / "assets.json"
+    db.write_bytes(content)
+    with pytest.raises(AutoControlException, match="assets.json"):
+        AssetStore(str(db)).set("token", "1")
+    [kept] = tmp_path.glob("assets.json.corrupt-*")
+    assert kept.read_bytes() == content
+    assert not db.exists(), "the damaged file was overwritten"
+
+
+@pytest.mark.parametrize("read", [
+    lambda store: store.get("url"),
+    lambda store: store.list(),
+    lambda store: store.delete("url"),
+], ids=["get", "list", "delete"])
+def test_a_damaged_file_is_reported_by_reads_too(tmp_path, read):
+    from je_auto_control.utils.exception.exceptions import AutoControlException
+    db = tmp_path / "assets.json"
+    db.write_bytes(_DAMAGED[0])
+    with pytest.raises(AutoControlException):
+        read(AssetStore(str(db)))
+    [kept] = tmp_path.glob("assets.json.corrupt-*")
+    assert kept.read_bytes() == _DAMAGED[0]
+
+
+def test_after_a_damaged_file_is_moved_aside_the_store_starts_clean(tmp_path):
+    from je_auto_control.utils.exception.exceptions import AutoControlException
+    db = tmp_path / "assets.json"
+    db.write_bytes(_DAMAGED[0])
+    store = AssetStore(str(db))
+    with pytest.raises(AutoControlException):
+        store.set("token", "1")
+    store.set("token", "2")
+    assert store.get("token").value == "2"
+    assert len(list(tmp_path.glob("assets.json.corrupt-*"))) == 1
+
+
 def test_active_environment(monkeypatch):
     monkeypatch.delenv(ENV_VAR, raising=False)
     assert active_environment() == "default"

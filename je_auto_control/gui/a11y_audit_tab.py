@@ -56,6 +56,7 @@ class A11yAuditTab(TranslatableMixin, QWidget):
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setStretchLastSection(True)
         self._summary = QLabel()
+        self._summary_text = self._keyed(self._summary)
         self._task = TabTask(self)          # the audit, off the GUI thread; one at a time
         self._task.result.connect(self._render)
         self._task.error.connect(self._on_audit_error)
@@ -106,10 +107,10 @@ class A11yAuditTab(TranslatableMixin, QWidget):
     def _on_run(self) -> None:
         app = self._app.text().strip() or None
         self._task.start(functools.partial(_audit, app))   # False while one runs: the text is true either way
-        self._summary.setText(_t("task_running"))
+        self._summary_text.show("task_running")
 
     def _on_audit_error(self, error: object) -> None:
-        self._summary.setText(str(error))
+        self._summary_text.show_plain(str(error))
 
     def _render(self, report: dict[str, Any]) -> None:
         issues = report["issues"]
@@ -121,18 +122,16 @@ class A11yAuditTab(TranslatableMixin, QWidget):
                 item = QTableWidgetItem(str(text))
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(row, col, item)
-        self._summary.setText(
-            _t("audit_summary")
-            .replace("{errors}", str(report["error_count"]))
-            .replace("{warnings}", str(report["warning_count"])),
-        )
+        self._summary_text.show("audit_summary", errors=report["error_count"], warnings=report["warning_count"])
 
     def _on_contrast(self) -> None:
         try:
             ratio = ac.contrast_ratio(_ints(self._fg.text()),
                                       _ints(self._bg.text()))
         except (ValueError, IndexError) as error:
-            self._summary.setText(str(error))
+            self._summary_text.show_plain(str(error))
             return
-        verdict = "PASS" if ratio >= 4.5 else "FAIL"
-        self._summary.setText(f"contrast {ratio:.2f}:1 — AA {verdict}")
+        verdict = "audit_contrast_pass" if ratio >= 4.5 else "audit_contrast_fail"
+        shown = f"{ratio:.2f}"
+        self._summary_text.show_rendered(
+            lambda: _t("audit_contrast_result").replace("{ratio}", shown).replace("{verdict}", _t(verdict)))

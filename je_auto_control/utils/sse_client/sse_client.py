@@ -15,6 +15,9 @@ from typing import Any, Dict, List, Optional
 
 _LINE_SPLIT = re.compile(r"\r\n|\r|\n")
 _BOM = chr(0xFEFF)
+#: Longer ``retry`` values are ignored: ``int()`` refuses more than 4300
+#: digits, and the ValueError lost every event of the chunk.
+_MAX_RETRY_DIGITS = 18
 
 
 @dataclass(frozen=True)
@@ -110,7 +113,7 @@ class SSEParser:
             self._data.append(value)
         elif field == "id" and "\x00" not in value:
             self._last_id = value
-        elif field == "retry" and value.isascii() and value.isdigit():
+        elif field == "retry" and value.isascii() and value.isdigit() and len(value) <= _MAX_RETRY_DIGITS:
             self._retry = int(value)
 
     def _dispatch(self) -> Optional[SSEEvent]:

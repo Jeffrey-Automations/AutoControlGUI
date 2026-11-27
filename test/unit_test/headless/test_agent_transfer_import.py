@@ -48,8 +48,26 @@ def import_hosts(tmp_path, monkeypatch, *, source_context=None, selection=None):
             yield destination, named, exported, body, users.rotate_token('recipient'), root, actor
         finally:
             named.stop()
-            destination.close()
+            _close_when_idle(destination)
             source.stop()
+
+
+def _close_when_idle(destination, seconds=15.0):
+    """Close once the background import worker has let go; the runtime rightly refuses before that.
+
+    A terminal import state is persisted before the worker thread returns, so a test that saw it can
+    reach teardown while the worker is still retiring, which on a loaded runner takes a while.
+    """
+    from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+    deadline = time.monotonic() + seconds
+    while True:
+        try:
+            destination.close()
+            return
+        except AgentTaskError as error:
+            if 'active transfer operation' not in str(error) or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.05)
 
 
 def test_actual_source_bytes_reach_only_the_approved_destination_generation(tmp_path, monkeypatch):

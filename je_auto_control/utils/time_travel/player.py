@@ -8,6 +8,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from je_auto_control.utils.path_guard.path_guard import validate_path
+
 
 @dataclass(frozen=True)
 class ActionEvent:
@@ -63,16 +65,20 @@ def load_action_log(path: str | os.PathLike[str]) -> List[ActionEvent]:
     events: List[ActionEvent] = []
     if not target.exists():
         return events
-    for line in target.read_text(encoding="utf-8").splitlines():
+    # errors="replace": a write cut inside a multi-byte character made the
+    # whole log unreadable instead of that one line being skipped.
+    for line in target.read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
         if not line:
             continue
+        # ValueError (JSONDecodeError is one) / TypeError: a torn line, or one
+        # whose fields have the wrong type.
         try:
             body = json.loads(line)
-        except json.JSONDecodeError:
+            if isinstance(body, dict):
+                events.append(ActionEvent.from_dict(body))
+        except (TypeError, ValueError):
             continue
-        if isinstance(body, dict):
-            events.append(ActionEvent.from_dict(body))
     return sorted(events, key=lambda e: e.timestamp)
 
 
@@ -182,8 +188,12 @@ class TimelinePlayer:
         return list(self._actions[low:high])
 
     def load_frame_bytes(self, frame: FrameRef) -> bytes:
-        """Read the raw JPEG payload for one frame."""
-        target = self._dir / frame.filename
+        """Read the raw JPEG payload for one frame.
+
+        The filename comes from ``manifest.json``: one that leads outside the
+        recording raises ``PathNotAllowedError``.
+        """
+        target = validate_path(self._dir / frame.filename, allowed_roots=[self._dir])
         return target.read_bytes()
 
     # --- internals ----------------------------------------------------

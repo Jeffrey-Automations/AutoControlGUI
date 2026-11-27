@@ -118,3 +118,10 @@ def test_facade_exports():
     for attr in ("Recurrence", "parse_rrule", "occurrences", "next_occurrence"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_a_far_future_utc_until_against_a_naive_start():
+    """The local conversion fails for such dates (OSError on Windows, OverflowError east of UTC)."""
+    start = dt.datetime(2026, 1, 1, 9, 0)
+    rule = parse_rrule("FREQ=DAILY;UNTIL=99991231T235959Z")
+    assert list(occurrences(rule, start, count=2)) == [start, start + dt.timedelta(days=1)]

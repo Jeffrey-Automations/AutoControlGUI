@@ -12,6 +12,10 @@ class AgentControlBusy(AgentTaskError):
     """Another task still owns the target's input or cleanup."""
 
 
+class PresencePeerRefused(AgentTaskError):
+    """One accepted presence connection was refused for its own peer; its listener stays open."""
+
+
 class AgentObservationStale(AgentTaskError):
     """No action was dispatched because its observation is missing, expired or changed."""
 

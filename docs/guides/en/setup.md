@@ -20,18 +20,20 @@ Optional extras, installed only when you need them:
 | `pdf` / `office` | PDF and Excel / Word / PowerPoint reading |
 | `fuzzy` / `locale` | `rapidfuzz` matching, `babel` locale parsing |
 | `s3` / `audio` | S3 artifact store, system volume control |
+| `accessibility` | Real Windows UI Automation (`comtypes`; Windows only) |
 
 Closing a factory-built feature with the tab cross releases its widget, subscriptions and timers on the next Qt event-loop turn; reopening starts a new panel. **View → Tabs** and the embedding `hide_tab` API only hide it and preserve state. `tab_registry.open/close` and `close_tab` expose explicit lifecycle operations. Core pages and Remote Desktop also release on close. Shared TCP/WebSocket registry sessions remain available to scripts; page-owned WebRTC sessions are stopped in the background. Reopening creates fresh controls without reattaching an existing session. Pending approvals and late page callbacks are rejected. Widgets explicitly supplied by embedders retain their existing ownership contract.
 
 **Windows on arm64** installs and runs, minus what upstream cannot ship
-there: neither `opencv-python` nor `cryptography` publishes a `win_arm64`
-wheel. So `find_image*`, `screenshot()` (the OpenCV/BGR one — the Pillow
-capture still works), the secret vault, action-file encryption, ACME/TLS
-and encrypted recording each raise a message naming the missing wheel
-instead of failing obscurely. Mouse, keyboard, screen size, window
-management, the accessibility tree, the action executor, the MCP/REST/TCP
-servers and the GUI all work — measured, not assumed. Every other platform
-is unaffected.
+there: `cryptography` publishes no `win_arm64` wheel at this project's
+security floor. So the secret vault, action-file encryption, Ed25519 action
+signing, ACME/TLS and encrypted recording each raise a message naming the
+missing wheel instead of failing obscurely. Image matching works there:
+`opencv-python` 5.1.0.95 ships a `win_arm64` wheel, so `find_image*` and the
+OpenCV/BGR `screenshot()` are installed like everywhere else. Mouse, keyboard,
+screen size, window management, the accessibility tree, the action executor,
+the MCP/REST/TCP servers and the GUI all work — measured, not assumed. Every
+other platform is unaffected.
 
 **Requirements:** Python ≥ 3.11. On Linux, install build
 prerequisites first:

@@ -20,7 +20,7 @@ import threading
 from types import SimpleNamespace
 from typing import Any, Mapping
 
-from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+from je_auto_control.utils.agent_runtime.errors import AgentTaskError, PresencePeerRefused
 from je_auto_control.utils.agent_runtime.presence_frames import decode_frame, encode_frame
 
 _FRAME_LIMIT = 4096
@@ -147,9 +147,18 @@ class LinuxPresenceListener:
         return endpoint_to_wire(self._listener.endpoint)
 
     def accept(self) -> LinuxBytePipe:
-        """Wait for a connection, then accept it within one bounded operation."""
-        _wait_readable(self._listener.fileno(), self._cancel)
-        return LinuxBytePipe(self._listener.accept(timeout=1, cancel=self._cancel))
+        """Wait for a connection, then accept it within one bounded operation.
+
+        A connector refused for its own peer identity, or gone before it could be identified, fails
+        only that connection, as a Windows client that left before ``ConnectNamedPipe`` does: this
+        keeps waiting for the next one instead of failing the presence server's whole listener.
+        """
+        while True:
+            _wait_readable(self._listener.fileno(), self._cancel)
+            try:
+                return LinuxBytePipe(self._listener.accept(timeout=1, cancel=self._cancel))
+            except PresencePeerRefused:
+                continue
 
     def close(self) -> None:
         """Stop waiting, then retire the listener and its private endpoint."""

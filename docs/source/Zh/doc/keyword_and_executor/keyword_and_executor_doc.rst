@@ -68,6 +68,25 @@ JSON 陣列（關鍵字），由執行者解析並執行。
 
    execute_action(read_action_json("actions.json"))
 
+錯誤與 ``raise_on_error``
+=========================
+
+``execute_action`` 會把失敗的動作記成它的 ``repr`` 並執行下一個；``raise_on_error=True``
+則在第一個失敗就拋出。以這種方式收納的是 ``AutoControlException`` 家族，以及內建的
+``OSError``、``RuntimeError``、``ArithmeticError``、``AttributeError``、``TypeError``、
+``ValueError``、``LookupError`` 與 ``ImportError``。
+
+指令拋出其他錯誤（``cv2.error``、``sqlite3.Error``、外掛自訂的例外類別）時，會在該動作
+被包成 ``AutoControlForeignException``，它的 ``original`` 屬性與 ``__cause__`` 是原本的
+錯誤。之後它跟其他失敗一樣被記錄，``AC_try`` 會攔到、``AC_retry`` 會重試、``AC_loop``
+逐輪記錄、``AC_parallel`` 記在它的分支裡。``raise_on_error=True`` 時拋出的是這個包裝，
+所以原本在 ``execute_action`` 外攔 ``cv2.error`` 或 ``sqlite3.Error`` 的程式碼，應改攔
+``AutoControlForeignException`` 並讀取 ``original``。
+
+不論 ``raise_on_error`` 怎麼設都從不收納的有：斷言失敗（``AutoControlAssertionException``
+與外掛自己的 ``AssertionError``）、``AC_break``／``AC_continue``、停止請求
+（``ExecutionStopped``）、取消、``KeyboardInterrupt`` 與 ``SystemExit``。
+
 執行資料夾內所有 JSON 檔案
 ===========================
 
@@ -148,3 +167,44 @@ JSON 陣列（關鍵字），由執行者解析並執行。
    from je_auto_control import executor
 
    print(executor.event_dict)
+
+
+存下的動作清單、具名 registry 與產生的文件
+==========================================
+
+**語音指令與 macro 同時檢查兩方權限。** ``AC_voice_register`` 與 ``AC_define_macro``
+會記下註冊動作清單的人。``AC_voice_dispatch`` 或 ``AC_call_macro`` 執行它時，每個步驟（包含巢狀內容與
+``AC_parallel`` 分支）都必須註冊者與目前呼叫端同時具備該步驟需要的權限才會執行；被拒絕的步驟記為
+``AuthorizationError``。因此存下的清單不會借用 admin 的權限，也不會在 GUI 或 Python 觸發時不經檢查就執行。
+來自使用者檔的註冊者會在觸發時重新讀取，所以已刪除使用者的清單不再執行。macro 表由所有伺服器共用：
+每個身分只能重新定義自己的 macro；受信任的本機程式碼（沒有 RBAC 範圍）可以重新定義任何 macro，它定義的 macro
+也不能被使用者取代。匿名 MCP session 以 ``mcp:<session>`` operator 身分執行，所以即使 RBAC 關閉也適用；
+不在 RBAC 與 MCP 之下時行為不變。
+
+**具名 registry 有上限。** ``AC_cas_put`` / ``AC_cas_get``、``AC_dedup_check``、
+``AC_idempotency_begin`` / ``_complete`` / ``_release``、``AC_bulkhead_run``、``AC_sequence_observe``
+與 ``AC_outbox_enqueue`` / ``AC_outbox_pending`` 背後的 store 每個最多保存 ``MAX_REGISTRY_NAMES``
+（1,024）個名稱。達到上限時既有名稱照常運作，也不會淘汰任何狀態；新名稱（包含讀取從未寫入過的名稱）會拋出指出該
+registry 的 ``RegistryFullError``。這些 registry 都沒有刪除或重設指令，名稱在程序結束時釋放。
+
+**產生的文件保留參照。** ``AC_generate_sop``（``actions``、``title``）與 ``AC_generate_code``（``source``）
+會代換已知的 ``${var}``（包含以變數組成的 ``source`` 路徑），但 ``${secrets.NAME}``、尚未綁定的名稱
+（文件描述的步驟自己設定的迴圈變數）、巢狀佔位符，以及存放本次執行已解析為機密之值的變數，都照原樣寫出。
+
+**解析出的 env:// 值會遮罩。** ``AC_resolve_ref`` 與 ``AC_resolve_refs`` 仍把 ``env://`` 值回傳給呼叫端，
+但會登記到本次執行的機密遮罩，所以該次執行剩下的期間日誌、journal 與 MCP 稽核都顯示 ``***``。
+``AC_resolve_ref`` 的 ``value`` 與 ``AC_resolve_refs`` 的 ``resolved`` 在記錄的結果與 Script Builder
+結果窗格中也會遮罩。``file://`` 的值不會登記。
+
+停止執行
+--------
+
+停止（或取消）會以 ``ExecutionStopped`` 結束進行中指令的等待：等待與暫停、擷取輸出的 shell 指令、共用 HTTP client、
+範本比對、OCR、VLM 與 LLM 請求、唯讀無障礙讀取、adb 指令、USB 與 Wayland 擷取工具、行動裝置呼叫與 find-element 等待、
+``AC_wait_for_port`` 探測、``AC_send_email`` （郵件可能已送出也可能沒有）、``AC_feature_match``、``AC_agent_run`` ／
+``AC_computer_use`` 的每次模型呼叫、``AC_assert_audio`` ／ ``AC_assert_video``，以及管理主控台的輪詢與廣播（尚未連到的主機會略過）。
+呼叫進行到一半被停止的行動裝置工作階段會關閉，與逾時相同。無法中斷的原生呼叫會在背景跑完，結果不會被使用。
+
+無障礙寫入（設值／invoke／toggle）在執行中整個交給無障礙 walker 執行緒：寫入動作前收到停止就不會寫入；動作進行中收到停止則最多等 5 秒，之後回傳結果或拋出 ``AccessibilityWriteOutcomeUnknown``。Windows 上的檢查點在找到元素與動作之間，其他後端把整個呼叫視為動作。未在執行中時行為不變。
+
+仍不可中斷： ``AC_parallel`` 等待分支結束（所有分支結束才放開按住的鍵），以及螢幕錄影的收尾。

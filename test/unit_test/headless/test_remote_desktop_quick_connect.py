@@ -334,9 +334,46 @@ def test_recent_connections_populated_after_connect(qapp, tmp_path,
             entries = book.list_entries()
             expected_url = f"tcp://127.0.0.1:{host.port}"
             assert any(e["host_id"] == expected_url for e in entries)
+            # The Recent list is written off the GUI thread and filled when that write reports back.
+            deadline = time.monotonic() + 10.0
+            while screen._recent.count() < 1 and time.monotonic() < deadline:  # noqa: SLF001
+                QApplication.processEvents()
+                time.sleep(0.02)
             assert screen._recent.count() >= 1  # noqa: SLF001
             screen._disconnect()  # noqa: SLF001
         finally:
             screen.deleteLater()
     finally:
         host.stop(timeout=1.0)
+
+
+def test_approval_dialog_enter_never_grants_control(qapp, monkeypatch):
+    """Enter presses the box's default button, which must be the safe Deny, never Allow (full)."""
+    from PySide6.QtWidgets import QMessageBox
+    from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
+    from je_auto_control.gui.remote_desktop.connection_screen import QuickConnectScreen
+    from je_auto_control.gui.remote_desktop.view_approvals import ApprovalRequest
+    from je_auto_control.utils.remote_desktop.host_access import PendingViewer
+
+    seen = {}
+
+    def press_enter(box):
+        default, escape = box.defaultButton(), box.escapeButton()
+        seen["default"] = default.text() if default is not None else None
+        seen["escape"] = escape.text() if escape is not None else None
+        if default is not None:
+            default.click()                # what Enter does on a QMessageBox
+        return 0
+
+    monkeypatch.setattr(QMessageBox, "exec", press_enter)
+    screen = QuickConnectScreen()
+    try:
+        request = ApprovalRequest(PendingViewer(address=("10.0.0.5", 4000), host_id="1", transport="tcp"))
+        screen._show_approval_dialog(request)  # noqa: SLF001
+        deny = language_wrapper.translate("rd_quick_approval_deny", "rd_quick_approval_deny")
+        assert seen == {"default": deny, "escape": deny}
+        assert request.event.is_set()
+        assert request.decision == "denied"
+    finally:
+        screen.dispose()
+        screen.deleteLater()

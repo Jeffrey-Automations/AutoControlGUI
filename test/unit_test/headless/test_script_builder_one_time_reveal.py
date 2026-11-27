@@ -208,6 +208,43 @@ def test_a_result_is_logged_with_its_secret_named_fields_masked_at_any_depth(cap
     execute_action([["AC_revoke_lease", {"token": issued["token"]}]])
 
 
+_EMBEDDED = "AC_test_embedded_plan"
+
+
+def _embedded_plan() -> dict:
+    """A result carrying an action list, the way a recorder or planner answers with one."""
+    return {"plan": [["AC_type_text", {"text": "hello"}],
+                     ["AC_webhook_call", {"headers": {"Authorization": "Bearer emb-1"}}],
+                     ["AC_write_secret", "emb-2"]]}
+
+
+@pytest.fixture
+def embedding_command(monkeypatch):
+    """Registers a command whose result embeds an action list with two secret arguments."""
+    from je_auto_control.utils.executor.action_executor import executor
+    monkeypatch.setitem(executor.event_dict, _EMBEDDED, _embedded_plan)
+    return [[_EMBEDDED]]
+
+
+def test_an_action_list_in_a_result_offers_its_masked_arguments_once(embedding_command, caplog):
+    """The gap: the argument rule masked them, and the builder offered none of them."""
+    autocontrol_logger.addHandler(caplog.handler)
+    try:
+        with caplog.at_level(logging.DEBUG, logger=autocontrol_logger.name):
+            record, values, _truncated = _collected(embedding_command)
+    finally:
+        autocontrol_logger.removeHandler(caplog.handler)
+    assert [(value.step, value.command, value.name, value.value) for value in values] == [
+        (1, _EMBEDDED, "plan[1][1].headers.Authorization", "Bearer emb-1"),
+        (1, _EMBEDDED, "plan[2][1]", "emb-2")]
+    shown = json.dumps(displayable_record(record))
+    assert shown.count('"***"') == len(values), "exactly what the pane masks is offered"
+    assert "hello" in shown, "an ordinary argument stays readable"
+    logged = "\n".join(entry.getMessage() for entry in caplog.records)
+    assert _EMBEDDED in logged
+    assert "emb-1" not in logged and "emb-2" not in logged, "the log stays masked"
+
+
 def test_the_extraction_is_free_of_qt():
     import je_auto_control.gui.script_builder.step_model as step_model
     assert "PySide6" not in Path(step_model.__file__).read_text(encoding="utf-8")
@@ -361,6 +398,21 @@ def test_a_token_issued_inside_a_block_is_offered_and_labelled_by_its_path(build
     assert "Step 2 › " + _label("AC_loop") + " run 2, step 2 › " in dialog.labels()[2]
     assert UserStore(users).authenticate(tokens[2]).user_id == "ann"
     dialog.reject()
+
+
+def test_the_dialog_reveals_the_arguments_of_an_action_list_in_a_result(builder, embedding_command):
+    tab, _module, clipboard = builder
+    _run(tab, [Step(_EMBEDDED)])
+    text = tab._result.toPlainText()
+    assert "emb-1" not in text and "emb-2" not in text
+    assert _translated("sb_one_time_available", count=2) in text
+    dialog = tab._take_one_time_dialog()
+    assert dialog.shown_values() == ["Bearer emb-1", "emb-2"]
+    assert dialog.labels()[1].endswith(" · plan[2][1]")
+    assert dialog.copy_value(0)
+    assert clipboard.copied == ["Bearer emb-1"]
+    dialog.reject()
+    assert dialog.shown_values() == ["", ""], "closing forgets them like any other value"
 
 
 def test_the_pane_says_when_a_run_issued_more_values_than_are_kept(builder, tmp_path, monkeypatch):

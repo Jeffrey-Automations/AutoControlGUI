@@ -181,3 +181,22 @@ def test_refusal_reaches_the_action_record(shared_gate):
     record = executor.execute_action([["AC_add_package_to_executor", {"package": "os"}]])
     assert any("not allowed" in str(value) for value in record.values())
     assert "os_system" not in executor.event_dict
+
+
+def test_architecture_overview_states_the_closed_default():
+    """architecture.md said an unconfigured gate loads any package with a warning.
+
+    The code refuses (above); the overview must say so and name the ways to
+    allow a package, as the setup guides do.
+    """
+    from pathlib import Path
+
+    overview = (Path(__file__).resolve().parents[3] / "architecture.md").read_text(encoding="utf-8")
+    start = overview.index("- `AC_add_package_to_executor`")
+    bullet = overview[start:overview.index("\n- ", start + 1)]
+    assert "DeprecationWarning" not in bullet
+    assert "any package loads" not in bullet
+    assert "refuse" in bullet
+    for way in (ENV, "--allow-package", "executor.allow_packages(...)",
+                "executor.set_allow_arbitrary_packages(True)"):
+        assert way in bullet

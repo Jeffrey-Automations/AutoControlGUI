@@ -185,3 +185,25 @@ def test_revocation_reason_is_final_when_cancellation_is_published(owned, monkey
     assert published
     assert published[0]["reason"] == "owner authorization or origin scope requires review"
     assert runtime.store.get(task) == published[0], "Terminal publication must leave a stable recovery snapshot"
+
+
+def test_one_failed_cleanup_does_not_leave_other_expired_leases_unenforced(tmp_path, monkeypatch):
+    class Stuck(FakeTarget):
+        def cleanup(self):
+            raise RuntimeError("cleanup is unconfirmed")
+
+    stuck = Stuck()
+    runtime = AgentRuntime(tmp_path / "runtime.sqlite", targets={"fixture": stuck, "other": FakeTarget()})
+    try:
+        first = runtime.submit(specification()).task_id
+        second = runtime.submit(specification(target="other")).task_id
+        runtime.observe(first)
+        runtime.observe(second)
+        monkeypatch.setattr(runtime.clock, "remaining", lambda _row: 0)
+        runtime.maintain()
+        assert runtime.store.get(second)["state"] == "timed_out"
+        assert runtime.store.get(first)["state"] == "cancelling"
+        assert list(runtime._leases) == [first], "a failed cleanup keeps only its own lease"
+    finally:
+        stuck.cleanup = lambda: None
+        runtime.close()

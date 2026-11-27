@@ -1,0 +1,281 @@
+"""The script editors, the heal log and the flakiness report read and write off the GUI thread.
+
+The Flow Editor, the Script Builder and the Recording Editor opened, saved and
+exported inside the slot; a recording can be several megabytes. The
+Self-Healing tab read and cleared its JSONL audit log, and the Flaky Tests tab
+queried the run history, the same way. Offscreen Qt
+against gated fakes: the slot returns first, the tab says it is running or
+busy, the outcome arrives later on the GUI thread, and disposing the tab drops
+one still out. Every file dialog is faked.
+"""
+import os
+import threading
+import time
+
+import pytest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
+
+from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox  # noqa: E402
+
+from headless._qt_settle import pump_until  # noqa: E402
+from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper  # noqa: E402
+
+_WAIT = 10.0
+
+
+def _t(key: str) -> str:
+    return language_wrapper.translate(key, key)
+
+
+class _Gate:
+    """A backend call that blocks until released, remembers where it ran, then delegates."""
+
+    def __init__(self, then) -> None:
+        self.entered = threading.Event()
+        self.release = threading.Event()
+        self.threads: list = []
+        self.then = then
+
+    def __call__(self, *args, **kwargs):
+        self.threads.append(threading.get_ident())
+        self.entered.set()
+        self.release.wait(_WAIT)
+        return self.then(*args, **kwargs)
+
+    def off_gui_thread(self) -> bool:
+        return bool(self.threads) and all(ident != threading.get_ident() for ident in self.threads)
+
+
+@pytest.fixture
+def boxes(monkeypatch):
+    QApplication.instance() or QApplication([])
+    shown = []
+    for name in ("warning", "information", "critical"):
+        monkeypatch.setattr(QMessageBox, name, lambda *args: shown.append(args[-1]))
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: ("", ""))
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: ("", ""))
+    return shown
+
+
+def _returns_at_once(slot) -> None:
+    started = time.monotonic()
+    slot()
+    assert time.monotonic() - started < 5.0, "the slot held the GUI thread"
+
+
+def _paths(monkeypatch, source, target) -> None:
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(source), ""))
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(target), ""))
+
+
+def _script(tmp_path):
+    source = tmp_path / "in.json"
+    source.write_text('[["AC_click_mouse", {"mouse_keycode": "mouse_left"}]]', encoding="utf-8")
+    return source, tmp_path / "out.json"
+
+
+def _round_trip(tab, tasks, status, open_slot, save_slot, gate_load, gate_save) -> None:
+    _returns_at_once(open_slot)
+    assert gate_load.entered.wait(_WAIT)
+    assert status() == _t("task_running")
+    open_slot()                                     # one file at a time
+    assert status() == _t("task_busy")
+    gate_load.release.set()
+    assert pump_until(lambda: not tasks.running)
+    _returns_at_once(save_slot)
+    assert gate_save.entered.wait(_WAIT)
+    gate_save.release.set()
+    assert pump_until(lambda: not tasks.running)
+    assert gate_load.off_gui_thread() and gate_save.off_gui_thread()
+
+
+def test_the_flow_editor_opens_and_saves_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.flow_editor import tab as module
+    source, target = _script(tmp_path)
+    _paths(monkeypatch, source, target)
+    load, save = _Gate(module.load_action_file), _Gate(module.save_action_file)
+    monkeypatch.setattr(module, "load_action_file", load)
+    monkeypatch.setattr(module, "save_action_file", save)
+    tab = module.FlowEditorTab()
+    _round_trip(tab, tab._files, tab._status.text, tab._on_open, tab._on_save, load, save)
+    assert len(tab.steps()) == 1 and target.exists() and boxes == []
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_the_script_builder_loads_and_saves_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui.script_builder import builder_tab as module
+    source, target = _script(tmp_path)
+    _paths(monkeypatch, source, target)
+    load, save = _Gate(module.load_action_file), _Gate(module.save_action_file)
+    monkeypatch.setattr(module, "load_action_file", load)
+    monkeypatch.setattr(module, "save_action_file", save)
+    tab = module.ScriptBuilderTab()
+    _round_trip(tab, tab._files, tab._result.toPlainText, tab._on_load, tab._on_save, load, save)
+    assert len(tab._tree.root_steps()) == 1 and target.exists() and boxes == []
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_the_recording_editor_loads_saves_and_exports_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui import recording_editor_tab as module
+    source, target = _script(tmp_path)
+    _paths(monkeypatch, source, target)
+    load, save = _Gate(module.read_action_json), _Gate(module.write_action_json)
+    monkeypatch.setattr(module, "read_action_json", load)
+    monkeypatch.setattr(module, "write_action_json", save)
+    tab = module.RecordingEditorTab()
+    tab._path_input.setText(str(source))
+    _round_trip(tab, tab._files, tab._status.text, tab._load, tab._save_as, load, save)
+    assert tab._status.text() == f"Saved to {target}" and target.exists()
+    export = _Gate(module.generate_code_file)
+    monkeypatch.setattr(module, "generate_code_file", export)
+    monkeypatch.setattr(QInputDialog, "getItem", lambda *args, **kwargs: ("python", True))
+    code = tmp_path / "out.py"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(code), ""))
+    _returns_at_once(tab._export_code)
+    assert export.entered.wait(_WAIT)
+    export.release.set()
+    assert pump_until(lambda: not tab._files.running)
+    assert export.off_gui_thread() and code.exists() and boxes == []
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_disposing_the_recording_editor_drops_a_load_still_out(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui import recording_editor_tab as module
+    source, _target = _script(tmp_path)
+    load = _Gate(module.read_action_json)
+    monkeypatch.setattr(module, "read_action_json", load)
+    tab = module.RecordingEditorTab()
+    tab._path_input.setText(str(source))
+    tab._load()
+    assert load.entered.wait(_WAIT)
+    tab.dispose()
+    load.release.set()
+    pump_until(lambda: False, timeout=0.5)
+    assert tab._list.count() == 0
+    tab.deleteLater()
+
+
+# --- the self-healing audit log and the flakiness report ----------------------------------------------------
+
+def test_the_heal_log_is_read_and_cleared_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui import self_healing_tab as module
+    from je_auto_control.utils.self_healing import HealEvent, HealEventLog
+    log = HealEventLog(tmp_path / "events.jsonl")
+    log.append(HealEvent("now", "image", [1, 2], 1.0))
+    read = _Gate(log.list_events)
+    monkeypatch.setattr(log, "list_events", read)
+    monkeypatch.setattr(module, "default_heal_log", log)
+    started = time.monotonic()
+    tab = module.SelfHealingTab()
+    assert time.monotonic() - started < 5.0, "building the tab waited for the log"
+    assert read.entered.wait(_WAIT)
+    tab.refresh_log()                               # asked again while one is out: runs once it reports
+    read.release.set()
+    assert pump_until(lambda: not tab._log.running and tab._table.rowCount() == 1)
+    assert read.off_gui_thread()
+    clear = _Gate(log.clear)
+    monkeypatch.setattr(log, "clear", clear)
+    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
+    _returns_at_once(tab._on_clear_log)
+    assert clear.entered.wait(_WAIT)
+    clear.release.set()
+    assert pump_until(lambda: not tab._log.running and tab._table.rowCount() == 0)
+    assert clear.off_gui_thread()
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_the_flakiness_report_is_computed_off_the_gui_thread(boxes, monkeypatch):
+    from je_auto_control.gui import flakiness_tab as module
+    from je_auto_control.utils.flakiness import FlakinessReport
+    empty = FlakinessReport(generated_at=0.0, group_by="script_path", total_groups=0, flaky_count=0)
+    gate = _Gate(lambda **kwargs: empty)
+    monkeypatch.setattr(module, "analyze_flakiness", gate)
+    started = time.monotonic()
+    tab = module.FlakinessTab()
+    assert time.monotonic() - started < 5.0, "building the tab waited for the report"
+    assert gate.entered.wait(_WAIT)
+    assert tab._status.text() == _t("task_running")
+    tab._refresh()
+    assert tab._status.text() == _t("task_busy")
+    gate.release.set()
+    assert pump_until(lambda: not tab._reports.running)
+    assert gate.off_gui_thread() and tab._status.text() == _t("flaky_summary_empty")
+    tab.dispose()
+    tab.deleteLater()
+
+
+# --- the test suite tab -----------------------------------------------------------------------------------
+
+def test_the_suite_tab_loads_and_exports_off_the_gui_thread(boxes, monkeypatch, tmp_path):
+    from je_auto_control.gui import test_suite_tab as module
+    spec = tmp_path / "suite.json"
+    spec.write_text('{"cases": []}', encoding="utf-8")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(spec), ""))
+    load = _Gate(module._read_spec)
+    monkeypatch.setattr(module, "_read_spec", load)
+    tab = module.TestSuiteTab()
+    _returns_at_once(tab._on_load_file)
+    assert load.entered.wait(_WAIT)
+    assert tab._summary.text() == _t("task_running")
+    tab._on_load_file()                             # one file at a time
+    assert tab._summary.text() == _t("task_busy")
+    load.release.set()
+    assert pump_until(lambda: not tab._files.running)
+    assert load.off_gui_thread() and tab._spec.toPlainText() == '{"cases": []}'
+    write = _Gate(lambda *args: None)
+    monkeypatch.setattr(module.ac, "write_junit_xml", write)
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(tmp_path / "j.xml"), ""))
+    tab._last_result = module.TestSuiteResult(name="s", cases=[])
+    _returns_at_once(tab._on_junit)
+    assert write.entered.wait(_WAIT)
+    write.release.set()
+    assert pump_until(lambda: not tab._files.running)
+    assert write.off_gui_thread()
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_the_quarantine_is_changed_and_read_off_the_gui_thread(boxes, monkeypatch):
+    from je_auto_control.gui import test_suite_tab as module
+    entries = [type("Entry", (), {"name": "flaky_case", "reason": "flips"})()]
+    cleared = _Gate(entries.clear)
+    store = type("Store", (), {"list": staticmethod(lambda: list(entries)), "clear": staticmethod(cleared),
+                               "remove": staticmethod(lambda name: None)})()
+    monkeypatch.setattr(module, "default_quarantine_store", lambda: store)
+    started = time.monotonic()
+    tab = module.TestSuiteTab()
+    assert time.monotonic() - started < 5.0, "building the tab waited for the quarantine"
+    assert pump_until(lambda: tab._quarantine.count() == 1)
+    _returns_at_once(tab._on_clear_quarantine)
+    assert cleared.entered.wait(_WAIT)
+    assert tab._quarantine.count() == 1
+    cleared.release.set()
+    assert pump_until(lambda: tab._quarantine.count() == 0)
+    assert cleared.off_gui_thread()
+    tab.dispose()
+    tab.deleteLater()
+
+
+def test_releasing_a_case_removes_it_by_its_name_not_its_label(boxes, monkeypatch):
+    from je_auto_control.gui import test_suite_tab as module
+    name = "login  (slow network)"                   # the separator the label uses, inside the name
+    entries = [type("Entry", (), {"name": name, "reason": "flips"})()]
+    removed = []
+    store = type("Store", (), {"list": staticmethod(lambda: list(entries)),
+                               "remove": staticmethod(removed.append)})()
+    monkeypatch.setattr(module, "default_quarantine_store", lambda: store)
+    tab = module.TestSuiteTab()
+    assert pump_until(lambda: tab._quarantine.count() == 1)
+    assert tab._quarantine.item(0).text() == f"{name}  (flips)"
+    tab._quarantine.setCurrentRow(0)
+    tab._on_release_selected()
+    assert pump_until(lambda: not tab._store.running)
+    assert removed == [name]
+    tab.dispose()
+    tab.deleteLater()

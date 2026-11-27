@@ -7,12 +7,13 @@ import json
 import os
 import secrets
 import threading
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, Iterator, List, Optional, Set, Tuple
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
-from je_auto_control.utils.json_store.json_store import atomic_write_text
+from je_auto_control.utils.json_store.json_store import _file_lock, atomic_write_text
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 
@@ -111,6 +112,18 @@ _SAVES: Dict[str, int] = {}
 _SAVES_LOCK = threading.Lock()
 
 
+# Held for one change to a user store, from reading the file to replacing it.
+# Every management call opens its own UserStore, so a lock per instance let
+# two of them load the same users and the second save undo the first --
+# which brought a removed user back. Reentrant: ``admin`` holds it around
+# the last-admin check as well.
+STORE_CHANGES = threading.RLock()
+
+# How deep the thread holding STORE_CHANGES holds each file's lock, by the
+# key of :func:`_saves_key`; only read or changed under STORE_CHANGES.
+_HELD_FILES: Dict[str, int] = {}
+
+
 def _saves_key(path: Path) -> str:
     return os.path.normcase(os.path.abspath(path))
 
@@ -165,7 +178,7 @@ class UserStore:
             role=role, token_hash=_hash_token(plain_token),
             tags=_tags(tags),
         )
-        with self._lock:
+        with self._changing():
             if user_id in self._users:
                 raise UserAuthError(
                     f"user_id {user_id!r} already exists",
@@ -179,7 +192,7 @@ class UserStore:
         return plain_token
 
     def remove_user(self, user_id: str) -> bool:
-        with self._lock:
+        with self._changing():
             if user_id not in self._users:
                 return False
             self._commit_locked({key: record for key, record in self._users.items() if key != user_id})
@@ -188,7 +201,7 @@ class UserStore:
     def rotate_token(self, user_id: str) -> str:
         """Generate a fresh token for an existing user; returns the plain token."""
         plain_token = secrets.token_urlsafe(24)
-        with self._lock:
+        with self._changing():
             existing = self._users.get(user_id)
             if existing is None:
                 raise UserAuthError(f"unknown user_id: {user_id!r}")
@@ -199,7 +212,7 @@ class UserStore:
     def set_role(self, user_id: str, role: str) -> None:
         if role not in Role.all():
             raise UserAuthError(f"unknown role: {role!r}")
-        with self._lock:
+        with self._changing():
             existing = self._users.get(user_id)
             if existing is None:
                 raise UserAuthError(f"unknown user_id: {user_id!r}")
@@ -236,6 +249,54 @@ class UserStore:
                 return False
         self._load()
         return True
+
+    @contextmanager
+    def exclusive(self) -> Iterator[None]:
+        """Hold the store's file against every other change, here and in other processes.
+
+        :data:`STORE_CHANGES` serialises the changes of this process; the
+        file's own lock (``<file>.lock``, as every shared JSON store takes)
+        those of the CLI and a server editing it at once, which otherwise
+        overwrote each other. Reentrant within the holding thread. The file
+        is re-read on entry: another process may have saved it in the same
+        clock tick at the same size, which :meth:`refresh` cannot see.
+        Raises :class:`UserAuthError` when another process keeps it busy.
+        """
+        with STORE_CHANGES:
+            if _HELD_FILES.get(self._saves_key):
+                _HELD_FILES[self._saves_key] += 1
+                try:
+                    self._load()
+                    yield
+                finally:
+                    _HELD_FILES[self._saves_key] -= 1
+                return
+            with self._file_held():
+                self._load()
+                yield
+
+    @contextmanager
+    def _file_held(self) -> Iterator[None]:
+        """The file lock, counted in :data:`_HELD_FILES`; held under ``STORE_CHANGES``."""
+        with ExitStack() as stack:
+            try:
+                stack.enter_context(_file_lock(self._path))
+            except TimeoutError as error:
+                raise UserAuthError(f"user store {self._path} is busy: {error}") from error
+            except OSError as error:
+                raise UserAuthError(f"could not lock user store {self._path}: {error}") from error
+            _HELD_FILES[self._saves_key] = 1
+            try:
+                yield
+            finally:
+                del _HELD_FILES[self._saves_key]
+
+    @contextmanager
+    def _changing(self) -> Iterator[None]:
+        """Hold the store for one change, made to what the file holds now."""
+        with self.exclusive():
+            with self._lock:
+                yield
 
     def _stamp(self) -> Optional[Tuple[int, int]]:
         """``(mtime_ns, size)`` of the file, or ``None`` when there is none."""

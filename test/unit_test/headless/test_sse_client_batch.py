@@ -75,3 +75,10 @@ def test_facade_exports():
     for attr in ("SSEEvent", "SSEParser", "parse_event_stream"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_an_absurd_retry_is_ignored_instead_of_losing_the_chunk():
+    """int() refuses more than 4300 digits, so one field from the server raised out of feed()."""
+    text = "retry: " + "9" * 5000 + chr(10) + "data: x" + chr(10) * 2
+    events = parse_event_stream(text)
+    assert [(event.data, event.retry) for event in events] == [("x", None)]

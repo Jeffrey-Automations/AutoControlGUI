@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
-from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.generate_report.generate_html_report import generate_html_report
 from je_auto_control.utils.generate_report.generate_json_report import generate_json_report
 from je_auto_control.utils.generate_report.generate_xml_report import generate_xml_report
@@ -31,7 +30,8 @@ class ReportTab(TranslatableMixin, QWidget):
         # Actions menu; the tab keeps only status, name input, and result.
         tr_group = self._tr(QGroupBox(), "test_record_status")
         tr_h = QHBoxLayout()
-        self.tr_status_label = QLabel("OFF")
+        self.tr_status_label = QLabel()
+        self._record_state = self._keyed(self.tr_status_label)
         tr_h.addWidget(self.tr_status_label)
         tr_group.setLayout(tr_h)
         layout.addWidget(tr_group)
@@ -43,6 +43,7 @@ class ReportTab(TranslatableMixin, QWidget):
 
         result_card = Card().add(set_role(self._tr(QLabel(), "report_result"), "sectionTitle"))
         self.report_result_text = QTextEdit()
+        self._result_text = self._keyed(self.report_result_text)
         self.report_result_text.setReadOnly(True)
         layout.addWidget(result_card.add(self.report_result_text, stretch=1), stretch=1)
         self._task = TabTask(self)
@@ -60,7 +61,7 @@ class ReportTab(TranslatableMixin, QWidget):
         ]
 
     def sync_with_engine(self) -> None:
-        self.tr_status_label.setText("ON" if test_record_instance.init_record else "OFF")
+        self._record_state.show("report_record_on" if test_record_instance.init_record else "report_record_off")
 
     def showEvent(self, event: QShowEvent) -> None:  # noqa: N802  # reason: Qt virtual method
         self.sync_with_engine()
@@ -79,7 +80,7 @@ class ReportTab(TranslatableMixin, QWidget):
     def _start_report(self, generator: Callable[[str], None], format_name: str) -> None:
         name = self.report_name_input.text() or "autocontrol_report"
         if self._task.start(partial(_write_report, generator, name, format_name)):
-            self.report_result_text.setText(language_wrapper.translate("task_running", "task_running"))
+            self._result_text.show("task_running")
 
     def _gen_html(self) -> None:
         self._start_report(generate_html_report, "HTML")
@@ -90,17 +91,19 @@ class ReportTab(TranslatableMixin, QWidget):
     def _gen_xml(self) -> None:
         self._start_report(generate_xml_report, "XML")
 
-    def _on_report_result(self, result: str) -> None:
-        self.report_result_text.setText(result)
+    def _on_report_result(self, result: tuple[str, str]) -> None:
+        format_name, name = result
+        self._result_text.show("report_generated", format=format_name, name=name)
 
     def _on_report_error(self, error: object) -> None:
-        self.report_result_text.setText(f"Error: {error}")
+        self._result_text.show_joined("gui_error_title", error)
 
     def dispose(self) -> None:
         """Drop late results; an already-running report write may still finish."""
         self._task.stop()
 
 
-def _write_report(generator: Callable[[str], None], name: str, format_name: str) -> str:
+def _write_report(generator: Callable[[str], None], name: str, format_name: str) -> tuple[str, str]:
+    """Worker thread: write the report; the format and name the tab reports back."""
     generator(name)
-    return f"{format_name} report generated: {name}"
+    return format_name, name

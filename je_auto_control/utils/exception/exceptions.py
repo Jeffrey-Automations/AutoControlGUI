@@ -36,7 +36,20 @@ class AutoControlScreenException(AutoControlException):
 
 
 class ImageNotFoundException(AutoControlException):
-    pass
+    """The template image was searched for and is not there."""
+
+
+class ImageSearchInputException(AutoControlException):
+    """An image search could not run on what it was given, so it says nothing about the screen.
+
+    A missing or unreadable template, a single-colour one, a threshold outside
+    0-1 (or NaN), or a frame OpenCV cannot match. A sibling of
+    :class:`ImageNotFoundException`, not a subclass: an absence check
+    (``AC_assert_image(present=False)``, ``AC_wait_image_gone``, the else
+    branch of ``AC_if_image_found``) that catches "not found" must not pass
+    on a misspelled template path. It stays in the family, so every
+    containment boundary still records it as the action's failure.
+    """
 
 
 class AutoControlFlatTemplateException(AutoControlScreenException):
@@ -72,6 +85,22 @@ class AutoControlActionNullException(AutoControlException):
 
 class AutoControlActionException(AutoControlException):
     pass
+
+
+class AutoControlForeignException(AutoControlActionException):
+    """A command raised an error from outside the framework family.
+
+    ``cv2.error``, ``sqlite3.Error`` or a plugin's own exception class, which
+    no containment boundary names. The executor wraps it at the per-action
+    boundary so it is recorded as that action's failure instead of aborting
+    the action list; the original is ``original`` and the ``__cause__``.
+    """
+
+    def __init__(self, command: str, error: BaseException) -> None:
+        kind = type(error)
+        super().__init__(f"{command} raised {kind.__module__}.{kind.__qualname__}: {error}")
+        self.command = command
+        self.original = error
 
 
 class AutoControlAddCommandException(AutoControlException):

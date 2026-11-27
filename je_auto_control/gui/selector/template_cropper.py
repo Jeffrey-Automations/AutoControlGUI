@@ -43,6 +43,15 @@ def crop_template_to_file(save_path: str,
     region = open_region_selector(parent)
     if region is None:
         return None
+    return save_region_template(save_path, region)
+
+
+def save_region_template(save_path: str, region: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    """Grab ``region`` (x, y, w, h) of the screen and write it to ``save_path`` as PNG; return the region.
+
+    No Qt: the screen grab and the file write are what a tab runs off the GUI
+    thread once the operator has picked the region.
+    """
     resolved = _validate_output_path(save_path)
     frame = _capture_region(region)
     # write_image: cv2.imwrite returns False for a non-ASCII path on Windows.

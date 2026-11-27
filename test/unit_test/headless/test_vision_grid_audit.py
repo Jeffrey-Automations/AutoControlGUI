@@ -102,3 +102,20 @@ def test_tesseract_boxes_are_read_and_bad_boxes_are_value_errors():
     assert assign_text_to_grid(_GRID, [tesseract_box])[0][0] == "Name"
     with pytest.raises(ValueError):
         assign_text_to_grid(_GRID, [{"x": 10, "width": 60, "height": 20}])
+
+
+def test_creating_a_project_again_keeps_existing_files(tmp_path):
+    from je_auto_control.utils.project.create_project_structure import create_project_dir
+    first = create_project_dir(str(tmp_path), "Demo")
+    assert len(first["written"]) == 6 and first["skipped"] == []
+    keyword = tmp_path / "Demo" / "keyword" / "keyword1.json"
+    executor_script = tmp_path / "Demo" / "executor" / "executor_one_file.py"
+    keyword.write_text("[]", encoding="utf-8")
+    executor_script.write_text("# mine", encoding="utf-8")
+    again = create_project_dir(str(tmp_path), "Demo")
+    assert again["written"] == [] and str(keyword) in again["skipped"] and len(again["skipped"]) == 6
+    assert keyword.read_text(encoding="utf-8") == "[]"
+    assert executor_script.read_text(encoding="utf-8") == "# mine"
+    replaced = create_project_dir(str(tmp_path), "Demo", overwrite=True)
+    assert len(replaced["written"]) == 6 and replaced["skipped"] == []
+    assert keyword.read_text(encoding="utf-8") != "[]"

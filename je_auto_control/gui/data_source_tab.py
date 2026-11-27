@@ -2,7 +2,10 @@
 
 Thin wrapper over :func:`je_auto_control.load_rows` — the widget only
 builds a source spec dict from the form and renders the returned rows.
+Reading a file or querying a database runs as a
+:class:`~je_auto_control.gui._tab_task.TabTask`, one load at a time.
 """
+import functools
 import json
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -12,14 +15,15 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
     language_wrapper,
 )
 from je_auto_control.utils.data_source import data_source_kinds, load_rows
-from je_auto_control.utils.exception.exceptions import AutoControlException
 
 
 def _t(key: str) -> str:
@@ -44,8 +48,16 @@ class DataSourceTab(TranslatableMixin, QWidget):
         self._table = QTableWidget(0, 0)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
+        self._loads = TabTask(self)         # reading the file or querying the database
+        self._loads.result.connect(self._on_loaded)
+        self._loads.error.connect(self._show_error)
         self._build_layout()
         self._sync_visibility(self._kind.currentText())
+
+    def dispose(self) -> None:
+        """Cancel a load still out; its rows are dropped. Safe to call twice."""
+        release_resources(self)
 
     def _build_layout(self) -> None:
         # The load command runs from the Actions menu; the tab keeps the
@@ -108,13 +120,22 @@ class DataSourceTab(TranslatableMixin, QWidget):
 
     def _on_load(self) -> None:
         try:
-            limit = self._limit.value() or None
-            rows = load_rows(self._build_source(), limit=limit)
-        except (AutoControlException, ValueError, OSError, RuntimeError) as error:
-            self._status.setText(_t("ds_error").replace("{error}", str(error)))
+            source = self._build_source()
+        except ValueError as error:         # the inline rows are not JSON
+            self._show_error(error)
             return
+        work = functools.partial(load_rows, source, limit=self._limit.value() or None)
+        if not self._loads.start(work):
+            self._status_text.show("task_busy")
+            return
+        self._status_text.show("task_running")
+
+    def _show_error(self, error: object) -> None:
+        self._status_text.show("ds_error", error=error)
+
+    def _on_loaded(self, rows: List[Dict[str, Any]]) -> None:
         self._render_rows(rows)
-        self._status.setText(_t("ds_row_count").replace("{n}", str(len(rows))))
+        self._status_text.show("ds_row_count", n=len(rows))
 
     def _render_rows(self, rows: List[Dict[str, Any]]) -> None:
         columns: List[str] = []

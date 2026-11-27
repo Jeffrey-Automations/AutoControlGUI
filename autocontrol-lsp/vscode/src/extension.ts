@@ -3,8 +3,11 @@
 // and exposes a tree view of the current script's steps.
 
 import * as vscode from "vscode";
+import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as https from "node:https";
+import * as os from "node:os";
+import * as nodePath from "node:path";
 import { URL } from "node:url";
 import {
     LanguageClient,
@@ -47,6 +50,10 @@ export function deactivate(): Thenable<void> | undefined {
 
 // --- LSP client --------------------------------------------------
 
+// Keep in step with package.json's autocontrolLsp.actionFiles default and
+// DEFAULT_ACTION_FILE_GLOBS in autocontrol_lsp/server/action_files.py.
+const DEFAULT_ACTION_FILES: string[] = ["**/*.ac.json", "**/actions/**/*.json"];
+
 function startLanguageClient(): LanguageClient {
     const config = vscode.workspace.getConfiguration("autocontrolLsp");
     const pythonPath = config.get<string>("python.path", "python");
@@ -58,16 +65,16 @@ function startLanguageClient(): LanguageClient {
         args: ["-m", serverModule],
         transport: TransportKind.stdio,
     };
+    // Only action files, never every JSON document: a package.json is not
+    // an action list. The server applies the same globs as a guard.
+    const actionFiles = config.get<string[]>(
+        "actionFiles", DEFAULT_ACTION_FILES,
+    );
     const clientOptions: LanguageClientOptions = {
-        documentSelector: [
-            { scheme: "file", language: "json" },
-            { scheme: "file", language: "jsonc" },
-        ],
-        synchronize: {
-            fileEvents: vscode.workspace.createFileSystemWatcher(
-                "**/*.{json,jsonc}",
-            ),
-        },
+        documentSelector: actionFiles.map(
+            (pattern) => ({ scheme: "file", pattern }),
+        ),
+        initializationOptions: { actionFiles },
     };
     const lc = new LanguageClient(
         "autocontrolLsp", "AutoControl LSP",
@@ -93,7 +100,10 @@ interface RestReply {
     body: string;
 }
 
-function postJson(path: string, payload: unknown): Promise<RestReply> {
+// The REST server routes each path for one method only; /screenshot is GET.
+function restRequest(
+    method: "GET" | "POST", path: string, payload?: unknown,
+): Promise<RestReply> {
     return new Promise((resolve, reject) => {
         const { url, token } = restConfig();
         let parsed: URL;
@@ -106,17 +116,22 @@ function postJson(path: string, payload: unknown): Promise<RestReply> {
             return;
         }
         const isHttps = parsed.protocol === "https:";
-        const body = Buffer.from(JSON.stringify(payload), "utf-8");
+        const body = payload === undefined
+            ? undefined
+            : Buffer.from(JSON.stringify(payload), "utf-8");
+        const headers: http.OutgoingHttpHeaders = {
+            "Authorization": token ? `Bearer ${token}` : "",
+        };
+        if (body !== undefined) {
+            headers["Content-Type"] = "application/json";
+            headers["Content-Length"] = body.length;
+        }
         const requestOptions: http.RequestOptions = {
             hostname: parsed.hostname,
             port: parsed.port || (isHttps ? 443 : 80),
             path: parsed.pathname + parsed.search,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Content-Length": body.length,
-                "Authorization": token ? `Bearer ${token}` : "",
-            },
+            method,
+            headers,
         };
         const httpModule = isHttps ? https : http;
         const request = httpModule.request(requestOptions, (response) => {
@@ -130,7 +145,9 @@ function postJson(path: string, payload: unknown): Promise<RestReply> {
             });
         });
         request.on("error", reject);
-        request.write(body);
+        if (body !== undefined) {
+            request.write(body);
+        }
         request.end();
     });
 }
@@ -155,7 +172,7 @@ async function runCurrentScript(): Promise<void> {
         return;
     }
     try {
-        const reply = await postJson("/execute", { actions });
+        const reply = await restRequest("POST", "/execute", { actions });
         if (reply.statusCode >= 200 && reply.statusCode < 300) {
             vscode.window.showInformationMessage(
                 `AutoControl: ran ${editor.document.fileName}`,
@@ -173,22 +190,63 @@ async function runCurrentScript(): Promise<void> {
 }
 
 async function takeScreenshot(): Promise<void> {
+    let reply: RestReply;
     try {
-        const reply = await postJson("/screenshot", {});
-        if (reply.statusCode >= 200 && reply.statusCode < 300) {
-            vscode.window.showInformationMessage(
-                "AutoControl: screenshot captured.",
-            );
-            return;
-        }
-        vscode.window.showErrorMessage(
-            `AutoControl: REST ${reply.statusCode}`,
-        );
+        reply = await restRequest("GET", "/screenshot");
     } catch (error) {
         vscode.window.showErrorMessage(
             `AutoControl: REST call failed (${(error as Error).message})`,
         );
+        return;
     }
+    if (reply.statusCode < 200 || reply.statusCode >= 300) {
+        vscode.window.showErrorMessage(
+            `AutoControl: REST ${reply.statusCode}: ${reply.body.slice(0, 240)}`,
+        );
+        return;
+    }
+    const png = decodeScreenshot(reply.body);
+    if (png === undefined) {
+        vscode.window.showErrorMessage(
+            "AutoControl: the screenshot reply did not hold a base64 PNG.",
+        );
+        return;
+    }
+    const file = nodePath.join(
+        os.tmpdir(), `autocontrol-screenshot-${Date.now()}.png`,
+    );
+    try {
+        await fs.writeFile(file, png);
+        await vscode.commands.executeCommand(
+            "vscode.open", vscode.Uri.file(file),
+        );
+    } catch (error) {
+        vscode.window.showErrorMessage(
+            `AutoControl: cannot show the screenshot (${(error as Error).message})`,
+        );
+    }
+}
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+// GET /screenshot answers {"format": "png", "encoding": "base64", "data": ...}.
+function decodeScreenshot(body: string): Buffer | undefined {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(body);
+    } catch {
+        return undefined;
+    }
+    if (typeof parsed !== "object" || parsed === null) {
+        return undefined;
+    }
+    const reply = parsed as { format?: unknown; encoding?: unknown; data?: unknown };
+    if (reply.format !== "png" || reply.encoding !== "base64"
+        || typeof reply.data !== "string") {
+        return undefined;
+    }
+    const png = Buffer.from(reply.data, "base64");
+    return PNG_SIGNATURE.equals(png.subarray(0, 8)) ? png : undefined;
 }
 
 // --- Tree view ----------------------------------------------------

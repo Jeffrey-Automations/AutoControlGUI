@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 
+from je_auto_control.utils.executor import run_control
 from je_auto_control.utils.exception.exceptions import (
     AutoControlMouseException,
 )
@@ -97,13 +98,16 @@ def humanized_path(start: Point, end: Point,
 
 def move_mouse_humanized(x: int, y: int, *, duration_s: float = 0.4,
                          motion: Optional[HumanizedMotion] = None,
-                         sleep: Callable[[float], None] = time.sleep
+                         sleep: Optional[Callable[[float], None]] = None
                          ) -> List[Tuple[int, int]]:
     """Move the cursor to ``(x, y)`` along a human-like path.
 
     Returns the integer waypoints walked. ``sleep`` is injectable so tests
-    can run without real delays.
+    can run without real delays; by default each step's rest wakes and raises
+    on a stop of the surrounding stoppable run.
     """
+    if sleep is None:
+        sleep = _stoppable_sleep
     from je_auto_control.wrapper.auto_control_mouse import (
         get_mouse_position, set_mouse_position,
     )
@@ -119,3 +123,8 @@ def move_mouse_humanized(x: int, y: int, *, duration_s: float = 0.4,
         if per_step:
             sleep(per_step)
     return path
+
+
+def _stoppable_sleep(seconds: float) -> None:
+    """``time.sleep`` that a stop of the surrounding stoppable run wakes."""
+    run_control.pause(seconds, time.sleep)

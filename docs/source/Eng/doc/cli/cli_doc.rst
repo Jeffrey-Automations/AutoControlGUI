@@ -93,6 +93,15 @@ Start the TCP socket server
 
    python -m je_auto_control.cli start-server --host 127.0.0.1 --port 9938
 
+Clients must open each connection with ``AUTH <token>``. The token is
+``--token``, else ``$JE_AUTOCONTROL_SOCKET_TOKEN``, else a random one; it is
+written owner-only to ``--token-file`` (default
+``~/.je_auto_control/socket_server_<port>.token``), whose path the command
+prints, and deleted when the server stops. Under RBAC only user tokens are
+accepted and no file is written. ``--no-auth`` restores the unauthenticated
+protocol and logs a warning that any process able to reach the server can run
+any command. See the Socket Server guide for the handshake and limits.
+
 Start the REST API server
 -------------------------
 

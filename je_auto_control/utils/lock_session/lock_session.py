@@ -16,19 +16,33 @@ a stream of lock-state samples to lock / unlock events. ``lock_session`` adds:
 * :func:`classify_lock_transitions` — pure: a list of lock-state samples to a
   list of ``{event, locked}`` lock / unlock transitions.
 
-Imports no ``PySide6``.
+The ``loginctl`` / ``CGSession`` command runs for at most
+:data:`LOCK_COMMAND_TIMEOUT_S` seconds; a stop or cancel ends the wait, and
+either way the command is killed. Imports no ``PySide6``.
 """
+import subprocess  # nosec B404  # reason: fixed lock argv, no shell
 import sys
 import time
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
-from je_auto_control.utils.executor.run_control import pause
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.executor.run_control import checkpoint, pause
 from je_auto_control.utils.session_guard import is_session_locked
 from je_auto_control.utils.session_guard.session_guard import LockProbe
 from je_auto_control.utils.timeouts import clamp_poll_interval, deadline_after
 
 # A driver performs the lock and returns whether it succeeded.
 LockDriver = Callable[[], bool]
+
+LOCK_COMMAND_TIMEOUT_S = 10.0
+"""Seconds the lock command may run before it is killed and the lock fails."""
+_POLL_S = 0.1
+_REAP_S = 1.0
+
+
+class LockSessionTimeout(AutoControlException):
+    """The lock command did not finish within its timeout."""
 
 
 def _win_lock() -> bool:
@@ -73,11 +87,30 @@ def plan_lock_session() -> Dict[str, Any]:
     return {"backend": backend, "argv": argv, "available": available}
 
 
-def _run_argv(argv: List[str]) -> bool:
-    """Run a fixed lock argv and report success (no shell)."""
-    import subprocess  # nosec B404  # reason: fixed argv, no shell
-    completed = subprocess.run(argv, check=False)  # nosec B603  # nosemgrep
-    return completed.returncode == 0
+def _run_argv(argv: List[str], timeout_s: float = LOCK_COMMAND_TIMEOUT_S) -> bool:
+    """Run a fixed lock argv and report success (no shell).
+
+    Waits at most ``timeout_s`` (then raises :class:`LockSessionTimeout`) and
+    looks at a stop or cancel every 0.1 s; the command is killed whenever it
+    is left running.
+    """
+    deadline = time.monotonic() + max(0.0, float(timeout_s))
+    # pylint: disable-next=consider-using-with  # reason: the finally below kills and reaps it with a deadline
+    process = subprocess.Popen(argv, stdin=subprocess.DEVNULL)  # nosec B603  # nosemgrep  # reason: fixed argv
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise LockSessionTimeout(f"{argv[0]} did not finish within {timeout_s} s")
+            try:
+                return process.wait(timeout=min(_POLL_S, remaining)) == 0
+            except subprocess.TimeoutExpired:
+                cancellation_checkpoint()
+                checkpoint()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=_REAP_S)
 
 
 def _default_driver() -> LockDriver:

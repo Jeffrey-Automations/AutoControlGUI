@@ -10,6 +10,7 @@ from hashlib import sha256
 from typing import List, Optional, Tuple
 
 from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+from je_auto_control.utils.executor.run_control import stoppable_call
 from je_auto_control.utils.vision.backends import get_backend
 from je_auto_control.utils.cv2_utils.locator_frame import (
     LocatorFrame, LocatorFrameOwner, current_locator_frame, provided_locator_frame,
@@ -52,7 +53,8 @@ def locate_by_description(description: str,
         image_bytes, frame = capture_with_geometry(_capture_screenshot_bytes, screen_region)
     # A task stopped while the screen was captured does not pay for a model request.
     cancellation_checkpoint()
-    coords = bound.locate(image_bytes, description, model=model)
+    # A stop ends the wait for the model; the request finishes in the background and is discarded.
+    coords = stoppable_call(bound.locate, image_bytes, description, model=model)
     if coords is None:
         return None
     return frame.to_screen(coords) if frame is not None else _to_screen(coords, image_bytes, screen_region)

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from je_auto_control.utils.executor.run_control import stoppable_call
-from je_auto_control.utils.exception.exceptions import ImageNotFoundException
+from je_auto_control.utils.exception.exceptions import ImageNotFoundException, ImageSearchInputException
 from je_auto_control.wrapper.device_context import DeviceError
 
 ORIENTATION_PORTRAIT = "portrait"
@@ -141,22 +141,25 @@ class DeviceFrame:
     def locate_image(self, template: Any, detect_threshold: float = 0.9) -> Point:
         """Centre of the best template match, in device points.
 
-        Raises :class:`ImageNotFoundException` when nothing reaches the threshold.
+        Raises :class:`ImageNotFoundException` when nothing reaches the threshold,
+        and :class:`ImageSearchInputException` when the search cannot run on
+        its input (an unusable template, threshold or frame).
         """
-        threshold = float(detect_threshold)
-        if not 0.0 <= threshold <= 1.0:
-            raise ImageNotFoundException(
-                f"detect_threshold must be between 0 and 1, got {detect_threshold!r}")
+        from je_auto_control.utils.cv2_utils.template_detection import (
+            checked_threshold, reject_flat_template,
+        )
+        threshold = checked_threshold(detect_threshold)
         from je_auto_control.utils.cv2_utils.optional import require_cv2
         cv2 = require_cv2()
         needle = _gray_template(cv2, template)
+        reject_flat_template(needle)
         haystack = _gray(cv2, self.image)
         if needle.shape[0] > haystack.shape[0] or needle.shape[1] > haystack.shape[1]:
             raise ImageNotFoundException("template is larger than the device frame")
         try:
             scores = stoppable_call(cv2.matchTemplate, haystack, needle, cv2.TM_CCOEFF_NORMED)
         except cv2.error as error:
-            raise ImageNotFoundException(f"cannot match template image: {error}") from error
+            raise ImageSearchInputException(f"cannot match template image: {error}") from error
         _low, best, _low_at, (left, top) = cv2.minMaxLoc(scores)
         if best < min(threshold, 1.0 - _SCORE_EPSILON):
             raise ImageNotFoundException(
@@ -192,7 +195,7 @@ class DeviceFrame:
             raise VLMNotAvailableError(
                 "no VLM backend configured; set ANTHROPIC_API_KEY or "
                 "OPENAI_API_KEY and install the matching SDK")
-        reply = bound.locate(self.png(), description, model=model)
+        reply = stoppable_call(bound.locate, self.png(), description, model=model)
         if reply is None:
             return None
         width, height = self.pixel_size
@@ -211,7 +214,7 @@ def _gray(cv2: Any, image: Any) -> Any:
     if array.ndim == 3:
         array = cv2.cvtColor(array, cv2.COLOR_RGB2GRAY)
     if array.ndim != 2:
-        raise ImageNotFoundException(f"cannot search an image of shape {array.shape}")
+        raise ImageSearchInputException(f"cannot search an image of shape {array.shape}")
     return array.astype(np.uint8, copy=False)
 
 
@@ -220,12 +223,12 @@ def _gray_template(cv2: Any, template: Any) -> Any:
     try:
         if isinstance(template, (str, os.PathLike)):
             if not os.path.isfile(template):
-                raise ImageNotFoundException(f"template image not found: {template}")
+                raise ImageSearchInputException(f"template image not found: {template}")
             from je_auto_control.utils.cv2_utils.image_file import read_image
             return read_image(os.fspath(template), cv2.IMREAD_GRAYSCALE)
         return _gray(cv2, template)
     except (ValueError, TypeError, cv2.error) as error:
-        raise ImageNotFoundException(f"cannot read template image: {template!r}") from error
+        raise ImageSearchInputException(f"cannot read template image: {template!r}") from error
 
 
 __all__ = [

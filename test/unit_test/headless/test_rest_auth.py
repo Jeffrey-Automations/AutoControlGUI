@@ -96,3 +96,57 @@ def test_successful_auth_resets_failure_counter():
     for _ in range(3):
         verdict = gate.check(client_ip=_TEST_IP_F, header_value="Bearer wrong")
         assert verdict == "unauthorized"
+
+
+# --- the per-client table is bounded -----------------------------------------
+
+def _clock(monkeypatch):
+    from types import SimpleNamespace
+
+    from je_auto_control.utils.rest_api import rest_auth
+    now = [1000.0]
+    monkeypatch.setattr(rest_auth, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    return now
+
+
+def _ip(n):
+    return f"2001:db8::{n:x}"   # RFC 3849 documentation range: one host has many
+
+
+def test_idle_clients_are_forgotten(monkeypatch):
+    """A bucket refilled and with no failure window open is what a new client gets."""
+    now = _clock(monkeypatch)
+    gate = RestAuthGate(expected_token="real")
+    for n in range(200):
+        gate.check(client_ip=_ip(n), header_value="Bearer wrong")
+    now[0] += 61.0
+    assert gate.check(client_ip=_TEST_IP_A, header_value="Bearer real") == "ok"
+    assert len(gate._buckets) == 1
+
+
+def test_the_table_is_capped_even_when_every_client_is_active(monkeypatch):
+    from je_auto_control.utils.rest_api import rest_auth
+    _clock(monkeypatch)
+    monkeypatch.setattr(rest_auth, "_MAX_TRACKED_CLIENTS", 8, raising=False)
+    gate = RestAuthGate(expected_token="real")
+    for n in range(100):
+        gate.check(client_ip=_ip(n), header_value="Bearer real")
+        gate.authenticate(client_ip=_ip(n), header_value="Bearer real", control=True)
+    assert len(gate._buckets) <= 8
+    assert len(gate._control_buckets) <= 8
+
+
+def test_forgetting_idle_clients_keeps_an_active_limit_and_lockout(monkeypatch):
+    from je_auto_control.utils.rest_api import rest_auth
+    now = _clock(monkeypatch)
+    monkeypatch.setattr(rest_auth, "_MAX_TRACKED_CLIENTS", 8, raising=False)
+    gate = RestAuthGate(expected_token="real", burst=10)
+    for _ in range(10):
+        gate.check(client_ip=_TEST_IP_B, header_value="Bearer wrong")   # burst spent, locked out
+    assert gate.check(client_ip=_TEST_IP_B, header_value="Bearer wrong") == "rate_limited"
+    for n in range(50):
+        now[0] += 0.1   # far inside the refill and lockout windows
+        gate.check(client_ip=_ip(n), header_value="Bearer real")
+        if n % 4 == 0:   # the scanner keeps knocking
+            assert gate.check(client_ip=_TEST_IP_B, header_value="Bearer wrong") in (
+                "rate_limited", "locked_out")

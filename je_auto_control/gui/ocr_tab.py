@@ -57,6 +57,7 @@ class OCRReaderTab(TranslatableMixin, QWidget):
         self._result = QTextEdit()
         self._result.setReadOnly(True)
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._task: Optional[TaskHandle] = None     # one read at a time
         self._title_key = "ocr_dump_region"
         self._apply_placeholders()
@@ -124,9 +125,9 @@ class OCRReaderTab(TranslatableMixin, QWidget):
         try:
             parts = [int(token.strip()) for token in text.split(",")]
         except ValueError as error:
-            raise ValueError(_t("ocr_region_invalid")) from error
+            raise ValueError("ocr_region_invalid") from error
         if len(parts) != 4:
-            raise ValueError(_t("ocr_region_invalid"))
+            raise ValueError("ocr_region_invalid")
         return parts
 
     def _parse_min_conf(self) -> float:
@@ -134,7 +135,7 @@ class OCRReaderTab(TranslatableMixin, QWidget):
         try:
             return float(text)
         except ValueError as error:
-            raise ValueError(_t("ocr_min_conf_invalid")) from error
+            raise ValueError("ocr_min_conf_invalid") from error
 
     def _on_dump(self) -> None:
         self._run_ocr("ocr_dump_region", read_text_in_region, {})
@@ -142,12 +143,12 @@ class OCRReaderTab(TranslatableMixin, QWidget):
     def _on_find_regex(self) -> None:
         pattern = self._regex.text().strip()
         if not pattern:
-            self._status.setText(_t("ocr_regex_required"))
+            self._status_text.show("ocr_regex_required")
             return
         try:
             compiled = re.compile(pattern)
         except re.error as error:
-            self._status.setText(f"{_t('ocr_regex_invalid')}: {error}")
+            self._status_text.show_joined("ocr_regex_invalid", error)
             return
         self._run_ocr("ocr_find_regex", find_text_regex, {"pattern": compiled})
 
@@ -158,11 +159,11 @@ class OCRReaderTab(TranslatableMixin, QWidget):
         try:
             options = {"region": self._parse_region(), "min_confidence": self._parse_min_conf(),
                        "lang": self._lang.text().strip() or "eng", **extra}
-        except ValueError as error:
-            self._status.setText(str(error))
+        except ValueError as error:         # its message is the catalogue key
+            self._status_text.show(str(error))
             return
         self._title_key = title_key
-        self._status.setText(_t("ocr_running"))
+        self._status_text.show("ocr_running")
         # The OCR backends take neither a timeout nor a cancel signal: a
         # cancelled read runs to its end and its matches are dropped.
         self._task = task_controller().submit(functools.partial(_call_backend, backend, options), owner=self)
@@ -175,15 +176,13 @@ class OCRReaderTab(TranslatableMixin, QWidget):
 
     def _show_matches(self, matches: list[TextMatch]) -> None:
         self._result.setText(_matches_to_json(matches))
-        self._status.setText(
-            _t("ocr_match_count").replace("{n}", str(len(matches)))
-        )
+        self._status_text.show("ocr_match_count", n=len(matches))
 
     def _show_error(self, error: Exception) -> None:
         if isinstance(error, ValueError):
-            self._status.setText(str(error))
+            self._status_text.show_plain(str(error))
             return
-        self._status.setText("")
+        self._status_text.clear()
         QMessageBox.warning(self, _t(self._title_key), str(error))
 
 

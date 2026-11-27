@@ -143,3 +143,128 @@ def test_rapid_start_stop_never_leaks_a_thread_exception(monkeypatch):
         server.stop(timeout=1.0)   # no sleep: keep the race window wide
 
     assert caught == [], f"accept thread raised: {caught[:3]}"
+
+
+def test_stopping_the_relay_frees_a_session_blocked_on_a_peer_that_stopped_reading():
+    """The pipe blocked in sendall() saw neither the stop flag nor the other pipe's shutdown."""
+    from je_auto_control.utils.remote_desktop import relay as relay_module
+    host_far, host_near = socket.socketpair()
+    viewer_far, viewer_near = socket.socketpair()
+    viewer_near.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 8192)
+    stop = threading.Event()
+    session = threading.Thread(target=relay_module._pair_and_pump, args=(host_near, viewer_near, stop),
+                               daemon=True)
+    session.start()
+    feeder = threading.Thread(target=_feed_until_refused, args=(host_far,), daemon=True)
+    feeder.start()
+    try:
+        time.sleep(0.5)                 # the viewer never reads: the pipe is blocked by now
+        stop.set()
+        session.join(timeout=5.0)
+        assert not session.is_alive()
+    finally:
+        for sock in (host_far, viewer_far, host_near, viewer_near):
+            sock.close()
+        feeder.join(timeout=2.0)
+
+
+def _feed_until_refused(sock: socket.socket) -> None:
+    sock.settimeout(3.0)
+    try:
+        for _ in range(256):
+            sock.sendall(b"x" * 65536)
+    except OSError:
+        pass
+
+
+def test_a_peer_that_finishes_its_handshake_after_stop_is_not_parked():
+    server = RelayServer(bind="127.0.0.1", port=0)
+    server.start()
+    server.stop(timeout=1.0)
+    near, far = socket.socketpair()
+    try:
+        server._register_or_pair(0x01, b"S" * 32, near)
+        assert not server._pending
+        assert near.fileno() == -1
+    finally:
+        near.close()
+        far.close()
+
+
+def test_an_aborted_connection_does_not_end_the_relays_accept_loop(monkeypatch):
+    server = RelayServer(bind="127.0.0.1", port=0)
+    server.start()
+    real = server._listen_sock
+    server.stop(timeout=1.0)
+
+    class _Flaky:
+        calls = 0
+
+        def accept(self):
+            _Flaky.calls += 1
+            if _Flaky.calls == 1:
+                raise ConnectionAbortedError("aborted before accept")
+            stop.set()
+            raise socket.timeout()
+
+    del real
+    stop = threading.Event()
+    server._listen_sock = _Flaky()
+    server._accept_loop(stop)
+    server._listen_sock = None
+    assert _Flaky.calls == 2
+
+
+def test_one_deadline_bounds_the_whole_handshake_of_a_trickling_peer(monkeypatch):
+    from je_auto_control.utils.remote_desktop import relay as relay_module
+    monkeypatch.setattr(relay_module, "_HANDSHAKE_TIMEOUT_S", 0.5)
+    server = RelayServer(bind="127.0.0.1", port=0)
+    near, far = socket.socketpair()
+    handshake = encode_handshake("host", b"S" * 32)
+
+    def trickle():
+        try:
+            for byte in handshake:       # each read beats the timeout; the whole does not
+                far.sendall(bytes([byte]))
+                time.sleep(0.1)
+        except OSError:
+            pass
+
+    feeder = threading.Thread(target=trickle, daemon=True)
+    feeder.start()
+    try:
+        started = time.monotonic()
+        server._handle_client(near)
+        assert time.monotonic() - started < 2.0
+        assert not server._pending
+        assert near.fileno() == -1
+    finally:
+        near.close()
+        far.close()
+        feeder.join(timeout=5.0)
+
+
+def _closed_by_peer(sock: socket.socket, timeout: float) -> bool:
+    sock.settimeout(timeout)
+    try:
+        return sock.recv(1) == b""
+    except socket.timeout:
+        return False
+    except OSError:
+        return True
+
+
+def test_handshakes_beyond_the_cap_are_refused():
+    server = RelayServer(bind="127.0.0.1", port=0, max_handshakes=2)
+    server.start()
+    silent = [_connect(server.port), _connect(server.port)]
+    try:
+        time.sleep(0.2)                  # let the relay take the first two in
+        extra = _connect(server.port)
+        silent.append(extra)
+        assert _closed_by_peer(extra, 2.0)
+        assert not _closed_by_peer(silent[0], 0.2)
+    finally:
+        for sock in silent:
+            sock.close()
+        server.stop(timeout=1.0)

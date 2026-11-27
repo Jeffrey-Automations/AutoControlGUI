@@ -7,6 +7,7 @@ import pytest
 pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 from PySide6.QtWidgets import QApplication, QPushButton
 
+from headless._qt_settle import pump_until, settle
 from je_auto_control.gui.self_healing_tab import SelfHealingTab
 from je_auto_control.utils.self_healing import HealEvent, HealEventLog, HealOutcome
 
@@ -45,10 +46,34 @@ def test_runtime_region_reaches_headless_api_and_comparison_stays_separate(widge
     view._description_input.setText("submit")
     view._region_input.setText("[-20,-30,10,20]")
     view._on_locate()
+    assert settle(view._task, "task")
     assert calls[0]["screen_region"] == [-20, -30, 10, 20]
     assert view.findChildren(QPushButton) == []
     assert view._group_box.parentWidget() is view._views.widget(0)
     assert view._evaluation is view._views.widget(1)
+
+
+def test_a_locate_leaves_the_gui_thread_and_runs_one_at_a_time(widget, monkeypatch):
+    """A screen search and a model request: on the GUI thread the window froze for both."""
+    import threading
+    view, _log = widget
+    release, threads = threading.Event(), []
+
+    def locate(**_arguments):
+        threads.append(threading.current_thread())
+        release.wait(10.0)
+        return HealOutcome(True, (5, 6), "vlm")
+
+    monkeypatch.setattr("je_auto_control.gui.self_healing_tab.self_heal_locate", locate)
+    view._description_input.setText("submit")
+    view._on_locate()                                # returns while the locate waits
+    assert pump_until(lambda: len(threads) == 1)
+    assert threads[0] is not threading.main_thread()
+    view._on_locate()                                # refused, not run beside it
+    release.set()
+    assert settle(view._task, "task")
+    assert len(threads) == 1
+    assert "5" in view._status.text() and "6" in view._status.text()
 
 
 @pytest.mark.parametrize("raw", ["not-json", '"not-a-region"'])
@@ -66,7 +91,7 @@ def test_selected_log_shows_version_frame_and_unknown_verification(widget):
     view, log = widget
     log.append(HealEvent("now", "image", [1, 2], 1.0, schema_version=2, locator_version="revision",
                          frame_hash="frame-hash", operation="click", operation_status="issued"))
-    view.refresh_log()
+    _refresh_log(view)
     view._table.setCurrentCell(0, 0)
     details = json.loads(view._details.toPlainText())
     assert details["locator_version"] == "revision"
@@ -74,7 +99,7 @@ def test_selected_log_shows_version_frame_and_unknown_verification(widget):
     assert details["operation_status"] == "issued"
     assert details["verified"] is None
     log.clear()
-    view.refresh_log()
+    _refresh_log(view)
     assert view._details.toPlainText() == ""
 
 
@@ -112,8 +137,10 @@ def test_verification_input_is_explicit_and_reports_its_result(widget, monkeypat
     view._description_input.setText("submit")
     view._verification_input.setText("confirmation is visible")
     view._on_locate()
+    assert settle(view._task, "task")
     assert calls == []
     view._on_click()
+    assert settle(view._task, "task")
     assert len(calls) == 1
     assert calls[0].operation == "click"
     assert calls[0].verification.description == "confirmation is visible"
@@ -143,7 +170,7 @@ def test_builder_roundtrips_nested_verification_request(widget):
 def test_source_action_without_captured_metadata_does_not_read(widget, monkeypatch):
     view, log = widget
     log.append(HealEvent("now", "image", [1, 2], 1))
-    view.refresh_log()
+    _refresh_log(view)
     view._table.setCurrentCell(0, 0)
     monkeypatch.setattr(view._source, "read", lambda: pytest.fail("legacy data must not invent a source"))
     view._on_source()
@@ -162,7 +189,7 @@ def test_source_action_reads_only_selected_original_step_off_thread(widget, monk
     source = ac.read_events(path)[-1]
     log.append(HealEvent("now", "image", [1, 2], 1, journal_path=str(path),
                          run_id=source.run_id, step_id=source.step_id))
-    view.refresh_log()
+    _refresh_log(view)
     view._table.setCurrentCell(0, 0)
     from je_auto_control.utils.action_journal.inspection import inspect_journal
     threads = []
@@ -198,7 +225,7 @@ def test_source_action_switching_during_read_loads_new_target(widget, monkeypatc
     view, log = widget
     for step in ("first", "second"):
         log.append(HealEvent("now", "image", [1, 2], 1, journal_path=f"{step}.jsonl", run_id="run", step_id=step))
-    view.refresh_log()
+    _refresh_log(view)
     entered, release = threading.Event(), threading.Event()
     calls = []
 
@@ -228,3 +255,9 @@ def test_source_action_switching_during_read_loads_new_target(widget, monkeypatc
     assert not view._source._task.running
     assert calls == ["first", "second"]
     assert [row["step_id"] for row in view._source._events] == ["second"]
+
+
+def _refresh_log(view):
+    """Re-read the heal log; the read runs off the GUI thread."""
+    view.refresh_log()
+    assert pump_until(lambda: not view._log.running)

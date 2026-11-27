@@ -12,6 +12,7 @@ from je_auto_control.utils.agent_runtime.presence_security_windows import Window
 
 _PTR, _U32 = ctypes.c_void_p, ctypes.c_uint32
 _INVALID = _PTR(-1).value
+_NO_DATA = 232  # ERROR_NO_DATA
 
 
 @dataclass(frozen=True)
@@ -130,7 +131,12 @@ class WindowsPresencePipe:
     def wait_connected(self, handle: int) -> None:
         """Wait only inside an owned helper; its outer process deadline fences a blocked accept."""
         self._owned(handle)
-        operation = self._native.async_api.ConnectNamedPipe(handle, overlapped=True)
+        try:
+            operation = self._native.async_api.ConnectNamedPipe(handle, overlapped=True)
+        except OSError as refused:
+            if getattr(refused, 'winerror', None) != _NO_DATA:
+                raise
+            return  # A client connected and already left; reading its connection reports that, not the listener.
         try:
             _count, error = operation.GetOverlappedResult(True)
         except BaseException:

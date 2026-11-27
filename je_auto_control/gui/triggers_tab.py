@@ -10,7 +10,9 @@ from PySide6.QtWidgets import (
 )
 
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -79,6 +81,8 @@ class TriggersTab(TranslatableMixin, QWidget):
         self._engine_op = SlowOp(self)
         self._apply_status()
         self._table = QTableWidget(0, 5)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tr_cells(self._table)
         self._table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(
@@ -142,7 +146,6 @@ class TriggersTab(TranslatableMixin, QWidget):
         self._apply_type_combo()
         self._apply_table_headers()
         self._apply_status()
-        self._refresh()
 
     def _build_layout(self) -> None:
         # Browse/add/remove/combine/start/stop commands run from the Actions
@@ -269,12 +272,12 @@ class TriggersTab(TranslatableMixin, QWidget):
     def _on_add(self) -> None:
         script = self._script_input.text().strip()
         if not script:
-            QMessageBox.warning(self, "Error", "Script path is required")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("tr_script_required"))
             return
         try:
             trigger = self._build_trigger(script)
         except ValueError as error:
-            QMessageBox.warning(self, "Error", str(error))
+            QMessageBox.warning(self, _t("gui_error_title"), str(error))
             return
         default_trigger_engine.add(trigger)
         self._refresh()
@@ -341,11 +344,11 @@ class TriggersTab(TranslatableMixin, QWidget):
     def _on_combine(self, mode: str) -> None:
         ids = self._selected_ids()
         if len(ids) < 2:
-            QMessageBox.warning(self, "Error", _t("tr_combine_need_two"))
+            QMessageBox.warning(self, _t("gui_error_title"), _t("tr_combine_need_two"))
             return
         script = self._script_input.text().strip()
         if not script:
-            QMessageBox.warning(self, "Error", "Script path is required")
+            QMessageBox.warning(self, _t("gui_error_title"), _t("tr_script_required"))
             return
         children = children_to_combine(
             ids, default_trigger_engine.list_triggers())
@@ -377,17 +380,18 @@ class TriggersTab(TranslatableMixin, QWidget):
         self._refresh()
 
     def _refresh(self) -> None:
-        triggers = default_trigger_engine.list_triggers()
+        with kept_selection(self._table):       # a trigger can go away between two refreshes
+            self._fill_table(default_trigger_engine.list_triggers())
+
+    def _fill_table(self, triggers: Sequence[_TriggerBase]) -> None:
         self._table.setRowCount(len(triggers))
-        yes = _t("tr_yes")
-        no = _t("tr_no")
         for row, trigger in enumerate(triggers):
             detail = _describe(trigger)
             for col, value in enumerate((
-                trigger.trigger_id, type(trigger).__name__, detail,
-                str(trigger.fired), yes if trigger.enabled else no,
+                trigger.trigger_id, type(trigger).__name__, detail, str(trigger.fired),
             )):
                 self._table.setItem(row, col, QTableWidgetItem(value))
+            self._table.setItem(row, 4, keyed_cell("tr_yes" if trigger.enabled else "tr_no"))
 
 
 def _describe(trigger: _TriggerBase) -> str:

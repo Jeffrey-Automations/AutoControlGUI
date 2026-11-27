@@ -33,8 +33,8 @@ from je_auto_control.utils.mcp_server.tools import _handlers_journal as h_journa
 from je_auto_control.utils.mcp_server.tools import _handlers_scheduling as h_sched
 from je_auto_control.utils.mcp_server.tools import _handlers_remote as h_remote
 from je_auto_control.utils.mcp_server.tools._base import (
-    DESTRUCTIVE, MCPTool, MCPToolAnnotations, NON_DESTRUCTIVE, READ_ONLY,
-    SIDE_EFFECT_ONLY, schema,
+    ASSERTION_SPEC, CHATOPS_CONTEXT, DAG_DEFINITION, DESTRUCTIVE, MCPTool, MCPToolAnnotations, NON_DESTRUCTIVE,
+    READ_ONLY, SIDE_EFFECT_ONLY, SUITE_SPEC, schema,
 )
 
 #: A JSON document argument: an object or an array (a root array was refused).
@@ -228,7 +228,7 @@ def screen_tools() -> List[MCPTool]:
                 "image_path": {"type": "string", "format": "path"},
                 "timeout": {"type": "number"},
                 "poll": {"type": "number"},
-                "detect_threshold": {"type": "number"},
+                "detect_threshold": {"type": "number", "minimum": 0, "maximum": 1},
             }, required=["image_path"]),
             handler=h_screen.wait_for_image,
             annotations=READ_ONLY,
@@ -279,7 +279,7 @@ def image_and_ocr_tools() -> List[MCPTool]:
                          "centre [x, y]. detect_threshold is 0.0–1.0."),
             input_schema=schema({
                 "image_path": {"type": "string", "format": "path"},
-                "detect_threshold": {"type": "number"},
+                "detect_threshold": {"type": "number", "minimum": 0, "maximum": 1},
             }, required=["image_path"]),
             handler=h_screen.locate_image_center,
             annotations=READ_ONLY,
@@ -290,7 +290,7 @@ def image_and_ocr_tools() -> List[MCPTool]:
             input_schema=schema({
                 "image_path": {"type": "string", "format": "path"},
                 "mouse_keycode": {"type": "string"},
-                "detect_threshold": {"type": "number"},
+                "detect_threshold": {"type": "number", "minimum": 0, "maximum": 1},
             }, required=["image_path"]),
             handler=h_screen.locate_and_click,
             annotations=DESTRUCTIVE,
@@ -1022,7 +1022,7 @@ def chatops_tools() -> List[MCPTool]:
                          "reply back to Slack / Discord / webhook."),
             input_schema=schema({
                 "message": {"type": "string"},
-                "context": {"type": "object"},
+                "context": CHATOPS_CONTEXT,
                 "script_root": {"type": "string", "format": "path"},
             }, required=["message"]),
             handler=h_ops.chatops_dispatch,
@@ -1046,7 +1046,7 @@ def dag_tools() -> List[MCPTool]:
                          "console REST clients. Failures cascade — "
                          "downstream nodes are skipped, not retried."),
             input_schema=schema({
-                "definition": {"type": "object"},
+                "definition": DAG_DEFINITION,
                 "max_parallel": {"type": "integer"},
                 "batch_id": {"type": "string"},
                 "recovery": {"type": "object"},
@@ -1807,7 +1807,7 @@ def ab_locator_tools() -> List[MCPTool]:
             "kind": {"type": "string",
                      "enum": ["image", "ocr", "vlm", "a11y"]},
             "template_path": {"type": "string", "format": "path"},
-            "detect_threshold": {"type": "number"},
+            "detect_threshold": {"type": "number", "minimum": 0, "maximum": 1},
             "text": {"type": "string"},
             "min_confidence": {"type": "number"},
             "description": {"type": "string"},
@@ -1942,7 +1942,7 @@ def smart_wait_tools() -> List[MCPTool]:
                          "'timeout_s', 'poll_interval_s', 'gone_for_s'."),
             input_schema=schema({
                 "image": {"type": "string", "format": "path"},
-                "detect_threshold": {"type": "number"},
+                "detect_threshold": {"type": "number", "minimum": 0, "maximum": 1},
                 "timeout_s": {"type": "number"},
                 "poll_interval_s": {"type": "number"},
                 "gone_for_s": {"type": "number"}},
@@ -2276,7 +2276,7 @@ def anchor_locator_tools() -> List[MCPTool]:
             "kind": {"type": "string",
                      "enum": ["image", "ocr", "vlm", "a11y"]},
             "template_path": {"type": "string", "format": "path"},
-            "detect_threshold": {"type": "number"},
+            "detect_threshold": {"type": "number", "minimum": 0, "maximum": 1},
             "text": {"type": "string"},
             "min_confidence": {"type": "number"},
             "region": {"type": "array", "items": {"type": "integer"}},
@@ -2355,7 +2355,7 @@ def self_healing_tools() -> List[MCPTool]:
             input_schema=schema({
                 "template_path": {"type": "string", "format": "path"},
                 "description": {"type": "string"},
-                "detect_threshold": {"type": "number"},
+                "detect_threshold": {"type": "number", "minimum": 0, "maximum": 1},
                 "screen_region": {"type": "array",
                                    "items": {"type": "integer"}},
                 "model": {"type": "string"},
@@ -2375,7 +2375,7 @@ def self_healing_tools() -> List[MCPTool]:
                 "template_path": {"type": "string", "format": "path"},
                 "description": {"type": "string"},
                 "mouse_keycode": {"type": "string"},
-                "detect_threshold": {"type": "number"},
+                "detect_threshold": {"type": "number", "minimum": 0, "maximum": 1},
                 "screen_region": {"type": "array",
                                    "items": {"type": "integer"}},
                 "model": {"type": "string"},
@@ -6581,12 +6581,14 @@ def jwt_tools() -> List[MCPTool]:
             name="ac_jwt_decode",
             description=("Verify a JWT 'token' with 'key' and an 'algorithms' "
                          "allowlist (rejects alg=none/confusion), checking exp/"
-                         "nbf/aud (a token with aud needs 'audience'). Returns "
+                         "nbf/aud (a token with aud needs 'audience'); 'leeway' "
+                         "forgives up to 3600 s of clock skew on exp/nbf. Returns "
                          "{ok, claims} or {ok:false, error}."),
             input_schema=schema(
                 {"token": {"type": "string"}, "key": {"type": "string"},
                  "algorithms": {"type": "array"},
-                 "audience": {"type": "string"}},
+                 "audience": {"type": "string"},
+                 "leeway": {"type": "number", "minimum": 0, "maximum": 3600}},
                 ["token", "key"]),
             handler=h_ops.jwt_decode,
             annotations=READ_ONLY,
@@ -8179,6 +8181,14 @@ def remote_desktop_tools() -> List[MCPTool]:
                 "max_clients": {"type": "integer"},
                 "host_id": {"type": "string",
                             "description": "Optional 9-digit ID; auto-generated when omitted"},
+                "max_pending_handshakes": {
+                    "type": "integer", "minimum": 1,
+                    "description": "Connections still authenticating at once; more are "
+                                   "refused at accept (default 8)"},
+                "auth_timeout": {
+                    "type": "number", "exclusiveMinimum": 0, "maximum": 60,
+                    "description": "Seconds a connection has to authenticate, TLS "
+                                   "included (default 10)"},
             }, required=["token"]),
             handler=h_remote.remote_host_start,
             annotations=DESTRUCTIVE,
@@ -8605,7 +8615,7 @@ def assertion_tools() -> List[MCPTool]:
                          "\"Saved\"}; kind is one of text/image/pixel/window/"
                          "clipboard."),
             input_schema=schema({
-                "specs": {"type": "array", "items": {"type": "object"}},
+                "specs": {"type": "array", "items": ASSERTION_SPEC},
                 "raise_on_fail": {"type": "boolean"},
             }, required=["specs"]),
             handler=hq.assert_all,
@@ -8618,7 +8628,7 @@ def assertion_tools() -> List[MCPTool]:
                          "complement of ac_assert_all. Each spec is an object "
                          "like {\"kind\": \"text\", \"text\": \"Welcome\"}."),
             input_schema=schema({
-                "specs": {"type": "array", "items": {"type": "object"}},
+                "specs": {"type": "array", "items": ASSERTION_SPEC},
                 "raise_on_fail": {"type": "boolean"},
             }, required=["specs"]),
             handler=hq.assert_any,
@@ -8631,7 +8641,7 @@ def assertion_tools() -> List[MCPTool]:
                          "seconds. The spec is an object like {\"kind\": "
                          "\"window\", \"title\": \"Done\"}."),
             input_schema=schema({
-                "spec": {"type": "object"},
+                "spec": ASSERTION_SPEC,
                 "timeout": {"type": "number"},
                 "interval": {"type": "number"},
                 "raise_on_fail": {"type": "boolean"},
@@ -9144,7 +9154,7 @@ def suite_tools() -> List[MCPTool]:
                          "also write CI-native reports. Quarantined case names "
                          "are skipped."),
             input_schema=schema({
-                "spec": {"type": "object"},
+                "spec": SUITE_SPEC,
                 "tags": {"type": "array", "items": {"type": "string"}},
                 "respect_quarantine": {"type": "boolean"},
                 "junit_path": {"type": "string", "format": "path"},

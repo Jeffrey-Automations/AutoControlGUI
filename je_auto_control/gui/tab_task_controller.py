@@ -268,6 +268,8 @@ class TaskHandle(QObject):
         self._state = state
         self._worker_handle: Optional[WorkerHandle] = None
         self._announced = False
+        self._reporting = False
+        self._thread_over = False
         self._timer: Optional[QTimer] = None
         self._on_end: Callable[["TaskHandle"], None] = _nothing
 
@@ -312,7 +314,15 @@ class TaskHandle(QObject):
                                            on_thread_done=self._on_thread_done)
 
     def _on_thread_done(self) -> None:
-        """The work's thread ended and its outcome was delivered: nothing more will be emitted."""
+        """The work's thread ended and its outcome was delivered: nothing more will be emitted.
+
+        A slot of the outcome that opened a dialog is still running its own
+        event loop when this arrives; deleted under it, the handle could not
+        announce ``finished`` and its tab stayed busy for good.
+        """
+        if self._reporting:
+            self._thread_over = True
+            return
         on_end, self._on_end = self._on_end, _nothing
         on_end(self)
         # Python-side state stays readable; only the Qt object goes, so a tab
@@ -330,16 +340,26 @@ class TaskHandle(QObject):
 
     def _on_timeout(self) -> None:
         if self._state.cancel(_TIMED_OUT, only_running=True):
-            self.error.emit(TaskTimeout("the task did not finish in time"))
-            self._announce_finished()
+            self._report(self.error, TaskTimeout("the task did not finish in time"))
 
     def _deliver(self, _value: object = None) -> None:
         if self._timer is not None:
             self._timer.stop()
         pending = self._state.take()
         if pending is not None:
-            (self.result if pending[0] == _DONE else self.error).emit(pending[1])
+            self._report(self.result if pending[0] == _DONE else self.error, pending[1])
         self._announce_finished()
+
+    def _report(self, signal: Any, value: object) -> None:
+        """Emit one outcome and then ``finished``, outliving any event loop a slot runs."""
+        self._reporting = True
+        try:
+            signal.emit(value)
+            self._announce_finished()
+        finally:
+            self._reporting = False
+            if self._thread_over:
+                self._on_thread_done()
 
     def _announce_finished(self) -> None:
         if not self._announced:

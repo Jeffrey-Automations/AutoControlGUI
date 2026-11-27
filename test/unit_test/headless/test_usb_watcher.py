@@ -344,3 +344,62 @@ def test_priming_does_not_overwrite_a_snapshot_taken_while_it_ran(monkeypatch):
     finally:
         enumerator.release.set()
         watcher.stop()
+
+
+def _failed(*_args):
+    return UsbEnumerationResult(backend="fake", devices=[], error="powershell: timed out")
+
+
+def test_a_failed_enumeration_is_not_every_device_being_unplugged():
+    results = [UsbEnumerationResult(backend="fake", devices=[_dev("a", "1")]), _failed(),
+               UsbEnumerationResult(backend="fake", devices=[_dev("a", "1")])]
+    watcher = UsbHotplugWatcher(enumerator=lambda: results.pop(0))
+    assert len(watcher.poll_once()) == 1
+    assert watcher.poll_once() == []
+    assert watcher.poll_once() == []
+
+
+def test_a_failed_first_enumeration_does_not_report_the_inventory_as_added():
+    polled = threading.Event()
+    results = [_failed(), UsbEnumerationResult(backend="fake", devices=[_dev("a", "1")])]
+
+    def enumerate_devices():
+        if len(results) > 1:
+            return results.pop(0)
+        if watcher._snapshot:
+            polled.set()
+        return results[0]
+
+    watcher = UsbHotplugWatcher(enumerator=enumerate_devices, poll_interval_s=0.25)
+    watcher.start()
+    try:
+        assert polled.wait(5.0)
+        assert watcher.recent_events() == []
+    finally:
+        watcher.stop()
+
+
+def test_a_reset_during_the_first_enumeration_does_not_end_the_watcher():
+    """The poller returned for good, while start() kept seeing a running watcher."""
+    entered, release, later = threading.Event(), threading.Event(), threading.Event()
+    calls = []
+
+    def enumerate_devices():
+        calls.append(None)
+        if len(calls) == 1:
+            entered.set()
+            release.wait(5.0)
+        else:
+            later.set()
+        return UsbEnumerationResult(backend="fake", devices=[_dev("a", "1")])
+
+    watcher = UsbHotplugWatcher(enumerator=enumerate_devices, poll_interval_s=0.25)
+    watcher.start()
+    try:
+        assert entered.wait(2.0)
+        watcher.reset()
+        release.set()
+        assert later.wait(3.0)
+    finally:
+        release.set()
+        watcher.stop()

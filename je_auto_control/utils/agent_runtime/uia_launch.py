@@ -20,10 +20,15 @@ class BoundUiaWindow:
     identity: ProcessIdentity
     hwnd: int = field(repr=False)
     _verify: Callable[[Callable[[], None]], None] = field(repr=False)
+    _children: Callable[[], tuple[int, ...]] = field(repr=False, default=tuple)
 
     def verify(self, checkpoint: Callable[[], None]) -> None:
         """Revalidate the original process and current window owner without minting a new identity."""
         self._verify(checkpoint)
+
+    def children(self) -> tuple[int, ...]:
+        """Current descendant windows, unverified: a hidden window's children are not in the UIA tree."""
+        return self._children()
 
 
 def pinned_uia_channel(argv: Sequence[str]) -> OwnedUiaChannel:
@@ -57,7 +62,8 @@ class OwnedUiaLauncher(OwnedProcessChannel[OwnedUiaChannel]):
                 hwnd = self._bootstrap_window(value, launch.identity)
                 self._verify_window(launch, hwnd, checkpoint)
                 self._binding = BoundUiaWindow(launch.identity, hwnd,
-                    lambda check: self._verify_window(launch, hwnd, check))
+                    lambda check: self._verify_window(launch, hwnd, check),
+                    lambda: self._windows.children(hwnd))
                 return self._binding
             except BaseException as error:
                 self._retire_failed(error)

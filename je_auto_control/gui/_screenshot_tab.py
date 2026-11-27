@@ -37,6 +37,7 @@ class ScreenshotTab(TranslatableMixin, QWidget):
         # pixel probe inputs; lookup runs from the Actions menu.
         layout.addWidget(ResponsiveBox(self._build_size_group(), self._build_pixel_group(), stretches=(1, 2)))
         self.ss_result_text = QTextEdit()
+        self._ss_text = self._keyed(self.ss_result_text)
         self.ss_result_text.setReadOnly(True)
         self.ss_result_text.setMaximumHeight(100)
         layout.addWidget(Card().add(self.ss_result_text))
@@ -49,6 +50,7 @@ class ScreenshotTab(TranslatableMixin, QWidget):
     def _build_size_group(self) -> QGroupBox:
         size_group = self._tr(QGroupBox(), "screen_size_label")
         self.screen_size_label = QLabel("--")
+        self._size_text = self._keyed(self.screen_size_label)
         QHBoxLayout(size_group).addWidget(self.screen_size_label)
         return size_group
 
@@ -89,7 +91,7 @@ class ScreenshotTab(TranslatableMixin, QWidget):
 
     def _get_screen_size(self) -> None:
         if self._task.start(_read_screen_size, tag="size"):
-            self.screen_size_label.setText(_t("task_running"))
+            self._size_text.show("task_running")
 
     def _browse_ss_path(self) -> None:
         path, _ = QFileDialog.getSaveFileName(self, _t("save_screenshot"), "", "PNG (*.png);;All (*)")
@@ -111,10 +113,10 @@ class ScreenshotTab(TranslatableMixin, QWidget):
             region_text = self.ss_region_input.text().strip()
             region = tuple(int(x.strip()) for x in region_text.split(",")) if region_text else None
         except (ValueError, TypeError) as error:
-            self.ss_result_text.setText(f"Error: {error}")
+            self._ss_text.show_joined("gui_error_title", error)
             return
         if self._task.start(partial(_capture, path, region), tag="screenshot"):
-            self.ss_result_text.setText(_t("task_running"))
+            self._ss_text.show("task_running")
 
     def _get_pixel_color(self) -> None:
         if self._task.running:
@@ -132,28 +134,28 @@ class ScreenshotTab(TranslatableMixin, QWidget):
 
     def _on_result(self, result: str) -> None:
         if self._task.tag == "size":
-            self.screen_size_label.setText(result)
+            self._size_text.show_plain(result)
         elif self._task.tag == "pixel":
             self._pixel_result = ("value", result)
             self._render_pixel_result()
         else:
-            self.ss_result_text.setText(result)
+            self._ss_text.show_rendered(partial(_saved_text, result))
 
     def _on_error(self, error: object) -> None:
         if self._task.tag == "size":
-            self.screen_size_label.setText(f"Error: {error}")
+            self._size_text.show_joined("gui_error_title", error)
         elif self._task.tag == "pixel":
             self._pixel_result = ("error", str(error))
             self._render_pixel_result()
         else:
-            self.ss_result_text.setText(f"Error: {error}")
+            self._ss_text.show_joined("gui_error_title", error)
 
     def _render_pixel_result(self) -> None:
         kind, text = self._pixel_result
         if kind == "running":
             self.pixel_result_label.setText(_t("task_running"))
         elif kind == "error":
-            self.pixel_result_label.setText(f"Error: {text}")
+            self.pixel_result_label.setText(f"{_t('gui_error_title')}: {text}")
         else:
             self.pixel_result_label.setText(f"{_t('pixel_result')} {text}")
 
@@ -172,8 +174,14 @@ def _read_screen_size() -> str:
 
 
 def _capture(path: Optional[str], region: Optional[tuple[int, ...]]) -> str:
+    """Worker thread: take the screenshot; the path it was written to, empty when it was not written."""
     screenshot(file_path=path, screen_region=list(region) if region is not None else None)
-    return f"Screenshot saved: {path or '(not saved)'}"
+    return path or ""
+
+
+def _saved_text(path: str) -> str:
+    """The line shown after a screenshot, in the active language."""
+    return _t("screenshot_saved").replace("{path}", path or _t("screenshot_not_saved"))
 
 
 def _read_pixel(x: int, y: int) -> str:

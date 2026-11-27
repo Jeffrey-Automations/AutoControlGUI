@@ -68,7 +68,7 @@ def test_router_returns_reply_on_db_error():
 
 # --- finding 10c: slack_bot commits last_seen_ts per message --------------
 
-def test_last_seen_ts_committed_before_reply(monkeypatch):
+def test_last_seen_ts_committed_before_reply(monkeypatch, tmp_path):
     """A reply-post failure must not cause the command to run twice."""
     executed: list = []
     router = CommandRouter()
@@ -81,7 +81,9 @@ def test_last_seen_ts_committed_before_reply(monkeypatch):
     # worker, whose failed reply is logged rather than raised here (covered
     # by test_chatops_slack_background_run.py).
     router.register("job", do_run)
-    bot = SlackBot(token="xoxb-test", channel_id="C1", router=router)
+    # A position is given: a bot with none runs nothing on its first poll.
+    bot = SlackBot(token="xoxb-test", channel_id="C1", router=router,
+                   last_seen_ts="0", state_path=str(tmp_path / "slack.json"))
 
     # Slack returns newest-first; only the older message ("1") is reached
     # before the reply fails.

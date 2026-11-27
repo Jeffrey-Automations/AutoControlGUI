@@ -7,7 +7,9 @@ transfer). Two adapters:
 
 * :class:`UsbChannelHost` — wraps a host-side channel + a
   :class:`UsbPassthroughSession`. Incoming frames are decoded, gated on
-  the feature flag, fed to the session, and the replies are sent back.
+  the feature flag, and queued for the session's worker threads
+  (``session_worker``), which send the replies back; the event loop
+  never waits on a USB transfer or an operator prompt.
 * :class:`UsbChannelClient` — wraps a viewer-side channel + a
   :class:`UsbPassthroughClient`, exposing ``list_devices`` / ``open`` /
   ``resume``.
@@ -33,6 +35,9 @@ from je_auto_control.utils.usb.passthrough.protocol import (
     ProtocolError, decode_frame, encode_frame, request_id_of,
 )
 from je_auto_control.utils.usb.passthrough.session import UsbPassthroughSession
+from je_auto_control.utils.usb.passthrough.session_worker import (
+    CLOSED_MESSAGE, QUEUE_FULL_MESSAGE, UsbSessionWorker, WorkerLimits,
+)
 from je_auto_control.utils.usb.passthrough.viewer_client import (
     ClientHandle, UsbPassthroughClient,
 )
@@ -92,7 +97,15 @@ def _request_id_in(raw: Any) -> Optional[str]:
 
 
 class UsbChannelHost:
-    """Carry a :class:`UsbPassthroughSession` over a host DataChannel."""
+    """Carry a :class:`UsbPassthroughSession` over a host DataChannel.
+
+    ``_on_message`` runs on the shared WebRTC event loop, so it only
+    decodes and enqueues: the session's :class:`UsbSessionWorker` serves
+    the frame on its own threads and the replies are marshalled back onto
+    the loop through the bridge. ``limits`` bounds that queue (default:
+    the session's frame budget) and how long :meth:`close` waits for a
+    worker still inside the backend.
+    """
 
     def __init__(self, channel: Any, *,
                  session: Optional[UsbPassthroughSession] = None,
@@ -100,12 +113,16 @@ class UsbChannelHost:
                      Callable[[], UsbPassthroughSession]
                  ] = None,
                  bridge: Optional[Any] = None,
-                 enabled_check: Optional[Callable[[], bool]] = None) -> None:
+                 enabled_check: Optional[Callable[[], bool]] = None,
+                 limits: Optional[WorkerLimits] = None) -> None:
         self._channel = channel
         self._session = session
         self._factory = session_factory
         self._bridge = bridge
         self._enabled = enabled_check or is_usb_passthrough_enabled
+        self._limits = limits
+        self._worker: Optional[UsbSessionWorker] = None
+        self._closed = False
         self._lock = threading.Lock()
         channel.on("message")(self._on_message)
         channel.on("close")(self.close)
@@ -115,11 +132,16 @@ class UsbChannelHost:
 
         Without it an open device stayed claimed after the viewer left --
         libusb handle open, kernel HID drivers detached -- which can leave
-        the host without its own keyboard or mouse.
+        the host without its own keyboard or mouse. Returns within
+        ``limits.join_timeout_s`` even if a transfer is stuck in the
+        backend; later frames on this channel are refused.
         """
         with self._lock:
-            session = self._session
-        if session is not None:
+            self._closed = True
+            session, worker = self._session, self._worker
+        if worker is not None:
+            worker.close()      # also releases every claim of the session
+        elif session is not None:
             session.close_all()
 
     @property
@@ -128,9 +150,18 @@ class UsbChannelHost:
 
     def _ensure_session(self) -> Optional[UsbPassthroughSession]:
         with self._lock:
-            if self._session is None and self._factory is not None:
+            if self._session is None and self._factory is not None and not self._closed:
                 self._session = self._factory()
             return self._session
+
+    def _ensure_worker(self, session: UsbPassthroughSession) -> Optional[UsbSessionWorker]:
+        """The session's worker, built on first use; None once closed."""
+        with self._lock:
+            if self._closed:
+                return None
+            if self._worker is None:
+                self._worker = UsbSessionWorker(session, self._send_frame, self._limits)
+            return self._worker
 
     def _on_message(self, raw: Any) -> None:
         request_id = _request_id_in(raw)
@@ -150,8 +181,16 @@ class UsbChannelHost:
         if session is None:
             self._reply(_error_bytes("no usb session on host", request_id))
             return
-        for reply in session.handle_frame(frame):
-            self._reply(encode_frame(reply))
+        worker = self._ensure_worker(session)
+        refusal = CLOSED_MESSAGE if worker is None else worker.submit(frame)
+        if refusal is not None:
+            # A flood past the queue bound counts against the viewer; a closed
+            # channel or a host out of threads is not the viewer's doing.
+            for reply in session.refuse(frame, refusal, strike=refusal == QUEUE_FULL_MESSAGE):
+                self._send_frame(reply)
+
+    def _send_frame(self, frame: Frame) -> None:
+        self._reply(encode_frame(frame))
 
     def _reply(self, data: bytes) -> None:
         _resolve_bridge(self._bridge).call_soon(self._channel.send, data)

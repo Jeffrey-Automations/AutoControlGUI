@@ -113,3 +113,17 @@ def test_facade_exports():
                  "read_mo_file"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+@pytest.mark.parametrize("char", [" ", " ", "\x85", "\x0b", "\x0c"])
+def test_a_line_separator_inside_a_string_does_not_end_the_line(char):
+    """str.splitlines() also splits on these, so the translation was cut to '\"x'."""
+    catalog = parse_po(f'msgid "a"\nmsgstr "x{char}y"\n')
+    assert catalog.gettext("a") == f"x{char}y"
+
+
+def test_a_byte_order_mark_does_not_hide_the_header(tmp_path):
+    from je_auto_control.utils.gettext_catalog import parse_po_file
+    path = tmp_path / "bom.po"
+    path.write_bytes(b"\xef\xbb\xbf" + b'msgid ""\nmsgstr "Plural-Forms: nplurals=3; plural=0;\\n"\n')
+    assert parse_po_file(str(path)).nplurals == 3

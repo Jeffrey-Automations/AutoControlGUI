@@ -39,6 +39,9 @@ from typing import Any, Callable, Dict, NamedTuple, Optional, Sequence, Tuple
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop.host import RemoteDesktopHost
+from je_auto_control.utils.remote_desktop.host_admission import (
+    DEFAULT_AUTH_TIMEOUT_S, DEFAULT_MAX_PENDING_HANDSHAKES, validate_admission_args,
+)
 from je_auto_control.utils.remote_desktop.viewer import RemoteDesktopViewer
 from je_auto_control.utils.remote_desktop.ws_host import WebSocketDesktopHost
 from je_auto_control.utils.remote_desktop.ws_viewer import (
@@ -296,14 +299,24 @@ class _RemoteDesktopRegistry:
                    max_clients: int = 4,
                    host_id: Optional[str] = None,
                    ssl_context: Optional[ssl.SSLContext] = None,
+                   max_pending_handshakes: int = DEFAULT_MAX_PENDING_HANDSHAKES,
+                   auth_timeout: float = DEFAULT_AUTH_TIMEOUT_S,
                    ) -> Dict[str, Any]:
-        """Stop any existing host, then start a fresh one with the given config."""
+        """Stop any existing host, then start a fresh one with the given config.
+
+        ``max_pending_handshakes`` (default 8) caps connections still
+        authenticating; ``auth_timeout`` (default 10 s, at most 60) is how
+        long each has to authenticate. Both are checked before the running
+        host is stopped, so a bad value leaves it running.
+        """
+        pending, deadline = validate_admission_args(max_pending_handshakes, auth_timeout)
         self.stop_host()
         host = RemoteDesktopHost(
             token=token, bind=bind, port=int(port),
             fps=float(fps), quality=int(quality),
             region=region, max_clients=int(max_clients),
             host_id=host_id, ssl_context=ssl_context,
+            max_pending_handshakes=pending, auth_timeout=deadline,
         )
         host.start()
         self.adopt(SLOT_HOST, host, SCRIPT_OWNER)
@@ -390,14 +403,21 @@ class _RemoteDesktopRegistry:
                       max_clients: int = 4,
                       host_id: Optional[str] = None,
                       ssl_context: Optional[ssl.SSLContext] = None,
+                      max_pending_handshakes: int = DEFAULT_MAX_PENDING_HANDSHAKES,
+                      auth_timeout: float = DEFAULT_AUTH_TIMEOUT_S,
                       ) -> Dict[str, Any]:
-        """Stop any existing WS host, then start a fresh one (wss:// when ssl)."""
+        """Stop any existing WS host, then start a fresh one (wss:// when ssl).
+
+        The admission settings are those of :meth:`start_host`, checked the same way.
+        """
+        pending, deadline = validate_admission_args(max_pending_handshakes, auth_timeout)
         self.stop_ws_host()
         host = WebSocketDesktopHost(
             token=token, bind=bind, port=int(port),
             fps=float(fps), quality=int(quality),
             region=region, max_clients=int(max_clients),
             host_id=host_id, ssl_context=ssl_context,
+            max_pending_handshakes=pending, auth_timeout=deadline,
         )
         host.start()
         self.adopt(SLOT_WS_HOST, host, SCRIPT_OWNER)

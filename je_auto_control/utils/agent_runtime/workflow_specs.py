@@ -151,8 +151,8 @@ def _forms(config: dict[str, Any], policy: TaskPolicy) -> dict[str, Any]:
         if config.get("new_record_selector"):
             actions.append(_action("AC_workflow_control", {"operation": "invoke",
                                    "selector": config["new_record_selector"]}, True))
-        if any(field.get("column") not in row for field in fields):
-            raise AgentTaskError("a mapped column is missing from the input table")
+        if any(row.get(str(field.get("column", ""))) is None for field in fields):
+            raise AgentTaskError("a mapped column is missing from the input table or has no value")
         for field in fields:
             selector = field["selector"]
             value = str(row[field["column"]])

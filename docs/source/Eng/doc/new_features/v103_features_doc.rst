@@ -45,3 +45,8 @@ named-instance registry (like circuit breakers / bulkheads), which has no TTL,
 and are exposed as MCP tools (``ac_idempotency_begin`` /
 ``ac_idempotency_complete`` / ``ac_idempotency_release``) and as Script Builder
 commands under **Flow**.
+
+The registry holds at most ``MAX_REGISTRY_NAMES`` (1,024) names; a new name past
+that raises ``RegistryFullError`` while existing names keep working, and names
+are released when the process ends. The same cap applies to the bulkhead, CAS,
+dedup, sequence and outbox registries.

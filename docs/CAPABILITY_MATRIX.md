@@ -452,19 +452,21 @@ silently, on every BSD.
 
 **arm64.** `macos-15` is arm64, as `macos-14` was before it; `ubuntu-22.04-arm` joins the
 smoke matrix and passes. `windows-11-arm` was tried and removed, on
-measurement rather than assumption, and **two** dependencies are why:
-**opencv-python publishes no `win_arm64` wheel** in any version, so pip falls
-back to building from source and CMake cannot configure for ARM64; and
-**cryptography stopped publishing one after 46.0.3**, while this project's
-floor is `>=50.0.0` — a security floor (GHSA-537c-gmf6-5ccf, then
-GHSA-g6cj-pr64-35w5) that cannot be lowered to reach a wheel. The same floor
+measurement rather than assumption, because of two dependencies; it is back
+with one marked off. **opencv-python published no `win_arm64` wheel** until
+5.1.0.95 (a cp37-abi3 wheel), so pip built from source and CMake could not
+configure for ARM64; it is a plain dependency again and the smoke square runs
+cv2 template matching. **cryptography stopped publishing one after 46.0.3**,
+while this project's floor is `>=50.0.0` — a security floor
+(GHSA-537c-gmf6-5ccf, then GHSA-g6cj-pr64-35w5) that cannot be lowered to
+reach a wheel, so it stays marked off Windows arm64. The same floor
 costs Intel Macs their prebuilt wheel: cryptography 49.0.0 stopped publishing
 `macosx_10_9_universal2` and ships `macosx_11_0_arm64` only, so `pip install`
 on an x86_64 Mac compiles cryptography from source and needs a Rust toolchain
-first. Neither is a CI problem to work around: the package
-genuinely cannot be installed on Windows arm64 today. `Progress.md` records
-both, alongside a `pip --dry-run --platform win_arm64` command that re-checks
-them in seconds without an arm64 machine.
+first. Neither is a CI problem to work around: cryptography genuinely cannot
+be installed on Windows arm64 today. `Progress.md` records it, alongside a
+`pip --dry-run --platform win_arm64` command that re-checks it in seconds
+without an arm64 machine.
 
 The accessibility row said `backend tests` for Linux X11 and meant nothing by
 it: there was no Linux backend at all, and `_build_backend()` fell straight
@@ -1196,12 +1198,22 @@ Physical-activity sources now exist for X11 and macOS. X11 counts XInput2 raw ev
 devices, never from XTEST slaves, and reads `Active`/`LockedHint` from logind: without logind or
 `XDG_SESSION_ID` the seat counts as locked. macOS uses a listen-only session event tap (it needs the
 Accessibility permission). An event counts as injected only when a process posted it from a non-HID
-source state, so a doubt keeps a task waiting rather than letting it take over. Wayland has no
-trusted source. On Linux the presence broker, worker and server now run over this transport: the owned
+source state, so a doubt keeps a task waiting rather than letting it take over. On Wayland, where a
+client sees no global input, the source reads the kernel's evdev devices directly (input-group read
+access) and ignores only devices under `/devices/virtual/input/`, which is where `uinput` injectors such as
+`ydotool` create theirs; Bluetooth keyboards and mice (`uhid`) stay in, and libei input never reaches evdev.
+One physical device that cannot be read refuses the source, and a device plugged in or removed, or a
+dropped-event marker, counts as activity: missing activity is never read as idleness. A virtual (`uinput`) keyboard or
+pointer other than `ydotoold`'s refuses it, because a key remapper that grabs devices (keyd, input-remapper) needs one;
+so does a key the kernel reports down without an event. Motion on a device grabbed without such output, as a virtual
+machine's evdev passthrough can do, is not detected. On Linux the presence broker, worker and server now run over this transport: the owned
 worker binds a fresh private endpoint and reports it in its bootstrap reply, the broker adopts only that
-endpoint, and connecting pins the listener to the process it names before the presence challenge. macOS has
-no presence transport yet, and the runtime still refuses non-Windows shared desktop tasks until native
-acceptance. This transport is not full Linux application or native input acceptance.
+endpoint, and connecting pins the listener to the process it names before the presence challenge. macOS
+uses the same flow over its own transport: a 0700 directory under the per-user temporary directory, a
+length-prefixed Unix stream socket, the connector named by its audit token and retained by a kqueue exit
+watch with the boot-unique `p_uniqueid` as its birth. macOS has no per-message credentials, so the
+connector is authenticated once per connection and checked alive before each delivery. The runtime still
+refuses non-Windows shared desktop tasks until native acceptance. This transport is not full Linux application or native input acceptance.
 
 Installed wheel and source distributions include the REST Dashboard and Swagger HTML, CSS and
 JavaScript resources. The same localhost REST routes and authentication rules apply to an
@@ -1244,6 +1256,8 @@ retained owner after acceptance. A passing result reports SCM state, not atomic
 completion, health or desktop noninterference. These tool names are adapter-scoped,
 not global executor commands. Existing task APIs and the GUI JSON editor carry the
 criterion. The host-reviewed `service` profile pins `config_path`, `config_sha256`
-and an ASCII `service_key`. Its fixed worker checks the deployment's service and
+and a `service_key`. Non-ASCII keys are case-folded with Windows' own NT upcase table,
+never Python's case mapping, so every spelling SCM treats as one service shares one lock.
+Its fixed worker checks the deployment's service and
 operation ceiling before accepting task scope. Registration, reload and probe do
 not read the deployment or access SCM; native acceptance remains pending.

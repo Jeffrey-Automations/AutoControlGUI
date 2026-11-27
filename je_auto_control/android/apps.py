@@ -63,7 +63,8 @@ def _package(app_id: str) -> str:
 def launch(adb: Any, app_id: str) -> None:
     """Start an app by package (its launcher activity) or by ``package/activity``."""
     if isinstance(app_id, str) and _COMPONENT.fullmatch(app_id):
-        out = adb.shell(f"am start -n {app_id}")
+        # Quoted: the device shell expanded the $ of an inner-class activity.
+        out = adb.shell(f"am start -n {shlex.quote(app_id)}")
         if "Error" in out:
             raise AdbError(f"could not start {app_id}: {out.strip().splitlines()[-1]}")
         return

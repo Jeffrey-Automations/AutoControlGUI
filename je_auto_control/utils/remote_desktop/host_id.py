@@ -69,7 +69,7 @@ def load_or_create_host_id(path: Optional[Path] = None) -> str:
         try:
             existing = target.read_text(encoding="utf-8").strip()
             return validate_host_id(existing)
-        except (OSError, HostIdError):
+        except (OSError, ValueError):   # HostIdError, or bytes that are not UTF-8
             # Corrupt / unreadable — regenerate rather than fail the host.
             pass
     new_id = generate_host_id()

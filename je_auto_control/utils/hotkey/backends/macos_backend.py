@@ -96,7 +96,14 @@ class MacOSHotkeyBackend(HotkeyBackend):
             CFRunLoopRunInMode, kCFRunLoopDefaultMode,
         )
 
-        def tap_callback(_proxy: Any, _event_type: Any, event: Any, _refcon: Any) -> Any:
+        def tap_callback(_proxy: Any, event_type: Any, event: Any, _refcon: Any) -> Any:
+            if event_type in (Quartz.kCGEventTapDisabledByTimeout,
+                              Quartz.kCGEventTapDisabledByUserInput):
+                # A hotkey's script runs on this thread, so keys typed meanwhile
+                # outwait the tap and the window server turns it off: every
+                # hotkey stayed dead from then on.
+                Quartz.CGEventTapEnable(tap, True)
+                return event
             keycode = Quartz.CGEventGetIntegerValueField(
                 event, Quartz.kCGKeyboardEventKeycode,
             )

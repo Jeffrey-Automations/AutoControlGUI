@@ -2,6 +2,235 @@
 
 ## [Unreleased]
 
+- `record` / `record_to_json` exit 1 and leave the target file unchanged when the recorder cannot stop,
+  instead of writing `[]`. With mandatory signing, the Record tab's load and the generated
+  `executor_one_file.py` / `executor_bad_file.py` refuse unsigned or tampered files. Shell output that
+  arrives after its run ended is logged with that run's secrets masked. On Windows, record start and stop
+  raise `AutoControlRecordException` when the hook thread does not start or does not exit.
+
+- A device timeout of 0, a negative number, NaN or infinity raises `DeviceError` (`DeviceContext`, the
+  matrix spec's `timeout_s`, `device_timeout_s`, `invoke(timeout_s=...)`); an explicit 0 no longer means
+  30 s. Generated and example executor scripts find `keyword/` relative to themselves, so projects created
+  earlier need regenerating. `window_message` passes 64-bit WPARAM / LPARAM and returns the full LRESULT.
+
+- Docker: `remote-host` refuses to start without a non-blank `AC_TOKEN` (the `change-me` fallback is
+  gone); `signaling` mode works (the images install the extra, and the entrypoints pass `--bind`, which
+  the server accepts); `AC_PORT` sets the port in every mode, and Helm `rest.port` / `signaling.port`
+  now change it; the image's wheel contains the pytest plugin module and LICENSE.
+
+- VS Code / LSP: only files matching `autocontrolLsp.actionFiles` (default `**/*.ac.json`,
+  `**/actions/**/*.json`) are diagnosed, so `package.json` and commented settings files are left
+  alone; flow commands and positional argument lists are no longer flagged; the screenshot command
+  uses `GET /screenshot` and opens the image; hover and edits are right on lines with emoji.
+
+- Browser extension: password and other sensitive fields are recorded as `${secrets.NAME}`, never as
+  their value; recording follows only the tab where Start was pressed (refused without one) and ends
+  when it closes; commands are applied one at a time so quick events are not lost; the declared icons
+  ship, so the extension loads unpacked from a clean checkout.
+
+- Web viewer: mouse and keyboard input now reaches the host (the host rejected every web event before);
+  only the `ctrl` channel carries control, so a usb channel arriving later no longer takes auth and input;
+  a microphone or screen share granted after a disconnect is stopped at once. New asset `viewer-session.js`.
+
+- Native: the Linux guardian refuses to recover from its journal when a slot cannot be read
+  (`GJ_ERROR_IO`) instead of falling back to an older record. The Android helper fails a swipe on its
+  first refused event and always releases the pointer, keeps serving after one client disconnects,
+  and no longer revives a command when a fence returns to a retired epoch value.
+
+- Inside a run, accessibility set-value / invoke / toggle run on the accessibility walker thread: a
+  stop before the write acts prevents it, and one during the act waits up to 5 s, then returns the
+  result or raises `AccessibilityWriteOutcomeUnknown` (exported from the facade). Outside a run
+  nothing changes. Backends gain a `gates_writes` attribute; only Windows is gated today.
+
+- `SlackBot` polls every `run_poll_interval_s` (new, 1 s by default; finite, > 0 and at most
+  `poll_interval_s`) while a `/run` is going, so a `/stop` lands within about a second; idle it keeps
+  `poll_interval_s` (5 s). A Slack `429` with `Retry-After` now holds every poll back until it passes.
+
+- A stop now also ends adb commands, the USB and Wayland capture tools, mobile device calls and
+  find-element waits, `AC_wait_for_port`, `AC_send_email`, `AC_feature_match`, each agent model call,
+  `AC_assert_audio` / `AC_assert_video` and admin poll / broadcast. A device session stopped mid-call is
+  closed; a stopped email may or may not have been delivered. `run_captured(kill_tree=False)` is new.
+
+- GUI: Script Builder offers the secret arguments of an action list returned in a result as one-time
+  values; Quick Connect says when its session or host was taken over instead of just closing.
+
+- The prebuilt `autocontrol_driver/AutoControlDriverWindows.exe` and `generate_autocontrol_driver_linux`
+  are removed: they shipped the old unauthenticated socket server. The `Driver` workflow builds the
+  driver with Nuitka (a windowless `AutoControlDriver.exe`, a Linux `AutoControlDriver`), smoke-tests
+  its authentication, and attaches both to each GitHub release; `autocontrol_driver/build_driver.py`
+  builds it locally.
+
+- **Breaking:** the TCP socket server (`start-server`, `start_autocontrol_socket_server`) requires
+  authentication. A client that sends a command (or `quit_server`) without it gets
+  `authentication required` and the command does not run. To migrate, send `AUTH <token>` as the
+  first line of each connection and read the `AUTH_OK` line before the reply, or use
+  `send_socket_command()`. The token is read from `~/.je_auto_control/socket_server_<port>.token`
+  (owner-only, deleted on close), set with `--token` / `JE_AUTOCONTROL_SOCKET_TOKEN`, or under RBAC
+  is a user's token (the server token is then refused; actions need `drive_input`, `quit_server`
+  needs `manage_hosts`). To keep the old protocol, start the server with `--no-auth`
+  (`require_auth=False`), which logs a warning at start. `TCPServer.close_flag` was already gone;
+  wait on `server.socket.fileno() == -1` instead.
+- Agent runtime: a desktop task can be verified by a permanent read-only completion reader; the
+  read-only helper takes no presence binding and refuses one.
+- Image search: unusable input now raises `ImageSearchInputException` (exported from the facade) instead of
+  `ImageNotFoundException`: a missing or unreadable template, a single-colour template, a threshold outside
+  0-1, NaN or not a number, or an image OpenCV cannot match; `DeviceFrame.locate_image` follows. The two are
+  siblings under `AutoControlException`, so code that caught `ImageNotFoundException` for a typo in the
+  template path must also catch `ImageSearchInputException`. `AC_assert_image` with `present: false`,
+  `AC_wait_image_gone`, `ac_wait_for_image` and the `else` branch of `AC_if_image_found` now fail on such
+  input instead of passing; image triggers with it are disabled, and observer rules, state-machine
+  `if_image_found` guards and anchor locators raise.
+
+- Executor: an error from outside the framework family (`cv2.error`, `sqlite3.Error`, a plugin's own
+  exception) no longer aborts the action list; it is recorded as that action's failure, wrapped in
+  `AutoControlForeignException` (exported; `original` and `__cause__` hold the original). With
+  `raise_on_error=True` the wrapper is raised, so code that caught `cv2.error` or `sqlite3.Error` from
+  `execute_action` should catch `AutoControlForeignException` and read `original`. `AC_try` now catches
+  these errors and `AC_retry` retries them. Assertion failures (including a plugin's `AssertionError`),
+  loop signals, stops, cancellation, `KeyboardInterrupt` and `SystemExit` are still never contained.
+
+- MCP HTTP: `resources/subscribe` belongs to the session that sent it and `notifications/resources/updated`
+  is delivered on that session's `GET` stream (dropped while none is open); ending the session releases its
+  subscriptions. A request without a session is refused with `-32600` instead of answered `{}`.
+- Voice commands and macros now run each step only if both the principal who registered them and
+  the current caller may run it. A flow that relied on dispatching someone else's voice command or
+  macro with the dispatcher's own rights (an admin speaking an operator's phrase, or the GUI or
+  Python calling a restricted user's macro) now records an `AuthorizationError` for every step the
+  registrant may not run; register or define the list as a principal with those rights.
+  `AC_define_macro` refuses to redefine a macro another principal owns; only the owner or trusted
+  local code may. Anonymous MCP sessions act as an `mcp:<session>` operator, so even with RBAC off
+  their macros and voice commands keep operator limits, and a reconnected MCP session can no longer
+  redefine a macro an earlier session defined (redefine it from trusted local code, or use a new name).
+
+- The named registries behind `AC_cas_put`, `AC_dedup_check`, `AC_idempotency_begin`,
+  `AC_bulkhead_run`, `AC_sequence_observe` and `AC_outbox_enqueue` hold at most 1,024 names each
+  (`MAX_REGISTRY_NAMES`); a new name past that raises `RegistryFullError`. Existing names keep
+  working and are released only when the process ends. Both names are exported from the facade.
+
+- `AC_generate_sop` and `AC_generate_code` no longer expand `${secrets.NAME}` into the generated
+  file and result, and a name not yet bound (a loop variable) is kept as written instead of failing
+  with "Unknown variable". Generated documents that used to contain the expanded secret value now
+  contain the `${secrets.NAME}` reference; known `${var}` placeholders are still substituted.
+
+- `env://` values returned by `AC_resolve_ref` / `AC_resolve_refs` are masked for the rest of the run
+  in logs, the journal and the MCP audit, and `value` / `resolved` are masked in the logged result and
+  the Script Builder result pane; the executor record and the MCP result still carry the value.
+- Remote desktop: a TCP / WebSocket connection still authenticating no longer takes a `max_clients`
+  slot. At most `max_pending_handshakes` (default 8) may be authenticating at once (more are closed
+  at accept), and each has `auth_timeout` (default 10 s, at most 60; it was 60 s per read) for TLS,
+  the WebSocket upgrade and the challenge-response together, so a silent connection is dropped after
+  10 s. A viewer whose host filled up while it authenticated receives `AUTH_FAIL "host full"`. Both
+  settings are accepted by `RemoteDesktopHost`, `registry.start_host` / `start_ws_host`,
+  `AC_start_remote_host`, `AC_start_ws_host`, `ac_remote_host_start` and the host tab; a boolean,
+  string, fractional cap or deadline outside (0, 60] raises `ValueError`. Over H.264 a viewer that
+  falls behind skips ahead to a fresh keyframe instead of decoding broken P-frames, and a new viewer
+  starts at a keyframe; the host forces one at most once a second (`CodecProvider.request_keyframe`,
+  honoured by `H264CodecProvider`). JPEG streams are unchanged.
+
+- GUI: translated table and list cells follow a language switch, and 58 message-box titles,
+  validation messages and result lines that were hard-coded English are translated.
+
+- GUI: status lines, results, hints, window titles and the tray menu follow a language switch;
+  Presence, Variables, Run History and WebRunner no longer re-run their query on a switch.
+
+- Executor flags spelled `"false"` are honoured by `AC_usb_passthrough_enable`, `AC_usb_acl_add`,
+  `AC_usb_acl_import`, `AC_assert_visual`, `AC_soft_assert`, the fuzzy commands and `AC_execute_action`
+  (`dry_run`). List arguments given as a JSON string must decode to a list. `AC_wait_color`,
+  `AC_assert_audio`, `AC_assert_video_changes` and `AC_perceptual_diff` refuse NaN or infinite thresholds.
+  `AC_expect_poll` rejects unknown ops. `AC_usb_watch_start` reports the interval in use.
+
+- GUI: remote-desktop frames and result images decode off the GUI thread; a CA-store load failure
+  is reported as the connect error; audit-log query errors and template-crop errors show in place.
+
+- The config-sync outbox database moves to schema v4 (migrated in place); peer-control receipts are
+  pruned by the outbox bounds but kept at least a day. USB passthrough refuses new claims with
+  "usb host busy" while `WorkerLimits.max_abandoned` (16) closed-session threads are still in the
+  backend. One WebRTC drop uses one auto-reconnect attempt.
+
+- Secrets passed as positional arguments are masked in logs, record keys, the MCP audit file and
+  the action journal, so record keys change for those actions. The Prometheus exporter and the
+  ACME HTTP-01 server drop a silent client after 30 s. `AC_expect_poll` no longer matches
+  `expected: null` on a failing attempt.
+
+- GUI: file and store operations of the editors, Run History, Test Suites, Self-Healing, REST users,
+  USB ACL, the admin console and the remote-desktop trust list, address book and known hosts run
+  off the GUI thread; the REST one-time token field is masked; Diagnostics' capability probe is
+  refused for roles without `read_data`.
+
+- `${...}` in `AC_agent_task_submit` / `_lookup` / `_act`, `AC_agent_dag`, `_trigger`, `_skill` and
+  `_task_recovery` payloads is no longer expanded at dispatch; the runtime expands it against the
+  task's `inputs`, so pass caller values through `spec.inputs`. `ClaimsPolicy` refuses a NaN,
+  infinite or negative `leeway`; `ac_jwt_decode` accepts `leeway` (0-3600 s). The MCP audit log
+  records admission refusals (`refused`, `invalid_arguments`, `rate_limited`, `unconfirmed`).
+
+- Remote desktop: chat, clipboard and file sends queue per viewer (a stalled viewer's overflow
+  is dropped); `RelayServer(max_handshakes=64)` caps handshakes; `generate-systemd` /
+  `generate-launchd` escape paths and refuse unrepresentable ones (`ServiceUnitError`, exit 2);
+  the TURN bundle is written owner-only; `SyncOutbox` skips conflict rows and prunes receipts.
+
+- Agent runtime: `stop_all` returns without waiting for a busy DAG batch (it is fenced in the
+  background and listed in `batch_fence_pending`); a pinned image directly under a default
+  drive root is refused; a recovery successor may only add resume conditions.
+
+- `create_project_dir` / `AC_create_project` keep existing files unless `overwrite=True` and
+  return `{"written": [...], "skipped": [...]}`; `apply_unified` refuses a hunk past the end
+  of the text; `lock_session` commands stop after 10 s and raise `LockSessionTimeout`;
+  `ResourceProfiler` keeps the newest `max_samples` samples (default 7,200).
+
+- GUI: under RBAC the older tabs (secrets, webhooks, plugins, REST, admin console,
+  audit log, USB, remote-desktop host panels, agent tasks) check the role before a
+  privileged command and show a refusal in the tab. Token and secret fields are masked
+  with a Show toggle; the Quick Connect approval dialog denies on Enter or Escape.
+  Vault, plugin, config bundle, audit log, Data Source and Trace Replay work runs off
+  the GUI thread.
+
+- USB passthrough serves each session on its own worker threads, one ordered lane per
+  claim, instead of on the shared WebRTC event loop: a slow transfer no longer stalls
+  other sessions. A session's queue is bounded (`frame_budget`); a frame over it is
+  refused with the protocol's ERROR frame.
+
+- `SlackBot` never runs commands already in the channel history: a first start
+  records the newest message and runs nothing, and the position is saved
+  (`state_path`, default `~/.je_auto_control/chatops/`) before each command
+  runs. Tests or callers that relied on the first poll running old messages
+  must pass `last_seen_ts`.
+- `Outbox` keeps at most 1,000 sent entries and none older than 7 days
+  (`max_sent`, `max_sent_age_s`); sent entries gain an optional `sent_at`.
+  Files stay readable in both directions.
+- A damaged asset store file is moved aside as `<name>.corrupt-<time>` and the
+  call raises `JsonStoreDamagedError`, instead of being erased by the next `set()`.
+
+- Windows: arrow, navigation, right Ctrl and AltGr keys are sent as extended keys, a refused
+  cursor move raises `AutoControlMouseException`, and `AC_check_key_is_press` reports only keys
+  that are down now. A single-colour template is refused as not found. `enumerate_monitors`
+  marks the monitor the system names as primary, which need not be the first.
+
+- Browser task observations no longer contain text a page marks `data-secret`: such a
+  document's page text is empty, and elements touching marked content have no name.
+
+- New `android` agent target profile kind, driven through the device helper; Wayland sessions now
+  read human activity from physical evdev devices; read-only accessibility walks and VLM requests
+  stop waiting on a stop; a refused local HTTP connection is now an `AgentTaskError`.
+
+- With MCP path roots configured, `ac_run_dag` node `action_file`, `ac_run_suite`
+  case `data.path` and assertion spec `template_path` / `path` are now confined and
+  canonicalised like other path arguments.
+
+- Browser host profiles accept `semantic_fields`; observations then include a
+  `semantic_report` with per-field `not_found` / `protected` reasons, bound to the
+  managed browser context. Profiles without the setting are unchanged.
+
+- Windows arm64 now installs `opencv-python` and `je_open_cv`: opencv-python 5.1.0.95
+  ships a `win_arm64` wheel, so image matching works there. `cryptography` stays
+  marked off that platform. The image-stack accessors no longer mention arm64.
+
+- Service keys may now be non-ASCII on Windows. They are case-folded with the NT
+  upcase table, so every SCM spelling of a service shares one lock; ASCII keys
+  keep their existing lock digest.
+
+- Owned helpers on Windows start suspended and run only after their kill-on-close
+  Job owns them, so a child spawned at startup cannot escape containment.
+
 - Host-reviewed service profiles now bind a fixed worker to pinned configuration,
   an ASCII service key and bounded START/STOP permissions. Registration, reload
   and probe remain passive; native service acceptance is still pending.

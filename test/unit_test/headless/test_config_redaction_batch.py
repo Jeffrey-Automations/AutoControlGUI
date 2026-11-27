@@ -80,3 +80,11 @@ def test_facade_exports():
     for attr in ("redact_config", "redact_secret_text"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_a_url_password_without_a_user_name_is_masked():
+    """redis://:password@host is the usual Redis URL, and it was left in clear text."""
+    text = redact_secret_text("redis://:hunter2@localhost:6379/0 and amqp://u:pw@h")
+    assert "hunter2" not in text
+    assert text == "redis://:***@localhost:6379/0 and amqp://u:***@h"
+    assert redact_secret_text("http://:8080/path") == "http://:8080/path"

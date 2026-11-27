@@ -1,7 +1,9 @@
+import inspect
 import threading
 import types
 from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 from je_auto_control.utils.diagnostics.capability_commands import probe_current_capabilities as _probe_capabilities
+from je_auto_control.utils.diagnostics.capability_commands import reset_current_native_input as _reset_native_input
 
 from je_auto_control.utils.exception.exception_tags import (
     action_is_null_error_message, add_command_exception_error_message,
@@ -30,7 +32,16 @@ from je_auto_control.utils.executor.action_schema import (
     unknown_command_names, validate_actions,
 )
 from je_auto_control.utils.executor.flags import as_bool as _as_bool
+from je_auto_control.utils.executor.adapter_args import finite_float as _finite, json_list as _json_list
 from je_auto_control.utils.executor.dispatch import dispatch_checkpoint
+from je_auto_control.utils.executor.containment import call_contained
+from je_auto_control.utils.executor.document_commands import (
+    generate_code_command as _generate_code, generate_sop_command as _generate_sop,
+)
+from je_auto_control.utils.executor.ref_commands import (
+    resolve_ref_command as _resolve_ref, resolve_refs_command as _resolve_refs,
+)
+from je_auto_control.utils.executor.named_registry import NamedRegistry
 from je_auto_control.utils.agent_runtime.commands import COMMANDS as AGENT_TASK_COMMANDS
 from je_auto_control.utils.executor.flow_control import (
     BLOCK_COMMANDS, LoopBreak, LoopContinue, MacroDepthExceeded,
@@ -104,7 +115,6 @@ from je_auto_control.utils.http_client.http_client import http_request
 from je_auto_control.utils.generate_report.generate_html_report import generate_html, generate_html_report
 from je_auto_control.utils.generate_report.generate_json_report import generate_json, generate_json_report
 from je_auto_control.utils.generate_report.generate_xml_report import generate_xml, generate_xml_report
-from je_auto_control.utils.json.json_file import read_action_json
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.mcp_server.http_transport import start_mcp_http_server
 from je_auto_control.utils.mcp_server.discovery import search_mcp_tools, get_mcp_tool_schema
@@ -263,6 +273,7 @@ def _run_dag(definition: Dict[str, Any],
 
 
 _AX_RECORDER_SINGLETON = None
+_AX_RECORDER_LOCK = threading.Lock()  # two concurrent starts each built and started one
 _DEFAULT_APPROVALS_DIR = ".approvals"
 
 
@@ -327,25 +338,24 @@ def _a11y_record_start(app_name: Optional[str] = None,
     """Executor adapter: start the singleton accessibility recorder."""
     from je_auto_control.utils.accessibility import AccessibilityRecorder
     global _AX_RECORDER_SINGLETON
-    if (_AX_RECORDER_SINGLETON is not None
-            and _AX_RECORDER_SINGLETON.is_running):
-        return {"running": True, "already": True}
-    _AX_RECORDER_SINGLETON = AccessibilityRecorder(
-        app_name=app_name,
-        poll_interval_s=float(poll_interval_s),
-        min_movement_px=int(min_movement_px),
-    )
-    _AX_RECORDER_SINGLETON.start()
+    with _AX_RECORDER_LOCK:
+        if _AX_RECORDER_SINGLETON is not None and _AX_RECORDER_SINGLETON.is_running:
+            return {"running": True, "already": True}
+        _AX_RECORDER_SINGLETON = AccessibilityRecorder(
+            app_name=app_name, poll_interval_s=float(poll_interval_s),
+            min_movement_px=int(min_movement_px))
+        _AX_RECORDER_SINGLETON.start()
     return {"running": True, "already": False}
 
 
 def _a11y_record_stop() -> List[Dict[str, Any]]:
     """Executor adapter: stop the recorder and return the captured events."""
     global _AX_RECORDER_SINGLETON
-    if _AX_RECORDER_SINGLETON is None:
-        return []
-    events = _AX_RECORDER_SINGLETON.stop()
-    _AX_RECORDER_SINGLETON = None
+    with _AX_RECORDER_LOCK:
+        if _AX_RECORDER_SINGLETON is None:
+            return []
+        events = _AX_RECORDER_SINGLETON.stop()
+        _AX_RECORDER_SINGLETON = None
     return [event.to_dict() for event in events]
 
 
@@ -547,7 +557,7 @@ def _wait_color(target_rgb: Any, region: Any = None,
         region = json.loads(region) if region.strip() else None
     return wait_until_color(
         region=region, target_rgb=target_rgb, tolerance=int(tolerance),
-        min_fraction=float(min_fraction), present=_as_bool(present),
+        min_fraction=_finite(min_fraction, "min_fraction"), present=_as_bool(present),
         timeout_s=float(timeout_s), poll_interval_s=float(poll_interval_s),
     ).to_dict()
 
@@ -1161,7 +1171,7 @@ def _assert_audio(duration_s: float = 1.0,
     """Executor adapter: assert audio activity / silence."""
     from je_auto_control.utils.media_assert import assert_audio_activity
     return assert_audio_activity(
-        duration_s=float(duration_s), threshold=float(threshold),
+        duration_s=float(duration_s), threshold=_finite(threshold, "threshold"),
         expect_sound=_as_bool(expect_sound), samplerate=int(samplerate),
         channels=int(channels), raise_on_fail=_as_bool(raise_on_fail),
     ).to_dict()
@@ -1179,7 +1189,7 @@ def _assert_video_changes(video_path: str,
     return assert_video_changes(
         video_path, start_s=float(start_s),
         end_s=None if end_s is None else float(end_s),
-        threshold=float(threshold), expect_motion=_as_bool(expect_motion),
+        threshold=_finite(threshold, "threshold"), expect_motion=_as_bool(expect_motion),
         region=region, raise_on_fail=_as_bool(raise_on_fail),
     ).to_dict()
 
@@ -1213,12 +1223,15 @@ def _remote_start_host(token: str,
                        fps: float = 10.0,
                        quality: int = 70,
                        region: Optional[List[int]] = None,
-                       max_clients: int = 4) -> Dict[str, Any]:
+                       max_clients: int = 4,
+                       max_pending_handshakes: int = 8,
+                       auth_timeout: float = 10.0) -> Dict[str, Any]:
     """Executor adapter: start the singleton remote-desktop host."""
     return remote_desktop_registry.start_host(
         token=token, bind=bind, port=int(port),
         fps=float(fps), quality=int(quality),
         region=region, max_clients=int(max_clients),
+        max_pending_handshakes=max_pending_handshakes, auth_timeout=auth_timeout,
     )
 
 
@@ -1258,12 +1271,15 @@ def _ws_start_host(token: str,
                    fps: float = 10.0,
                    quality: int = 70,
                    region: Optional[List[int]] = None,
-                   max_clients: int = 4) -> Dict[str, Any]:
+                   max_clients: int = 4,
+                   max_pending_handshakes: int = 8,
+                   auth_timeout: float = 10.0) -> Dict[str, Any]:
     """Executor adapter: start the singleton WebSocket-transport host."""
     return remote_desktop_registry.start_ws_host(
         token=token, bind=bind, port=int(port),
         fps=float(fps), quality=int(quality),
         region=region, max_clients=int(max_clients),
+        max_pending_handshakes=max_pending_handshakes, auth_timeout=auth_timeout,
     )
 
 
@@ -1580,10 +1596,10 @@ def _usb_watch_start(poll_interval_s: float = 2.0) -> Dict[str, Any]:
     """Executor adapter: start the singleton USB hotplug watcher."""
     from je_auto_control.utils.usb.usb_watcher import default_usb_watcher
     watcher = default_usb_watcher()
-    # poll_interval_s is consumed at watcher construction time only;
-    # honor it on a fresh singleton, otherwise just (re-)start.
+    # The singleton is built with the default interval and poll_interval_s
+    # cannot change it, so report the one in use, not the one asked for.
     watcher.start()
-    return {"running": watcher.is_running, "interval_s": poll_interval_s}
+    return {"running": watcher.is_running, "interval_s": watcher.poll_interval_s}
 
 
 def _usb_watch_stop() -> Dict[str, Any]:
@@ -1606,7 +1622,7 @@ def _usb_recent_events(since: int = 0,
 
 def _usb_passthrough_enable(enabled: bool = True) -> Dict[str, Any]:
     from je_auto_control.utils.usb.passthrough import commands
-    return commands.passthrough_enable(enabled)
+    return commands.passthrough_enable(_as_bool(enabled))
 
 
 def _usb_passthrough_status() -> Dict[str, Any]:
@@ -1624,8 +1640,8 @@ def _usb_acl_add(vendor_id: str, product_id: str,
                  prompt_on_open: bool = False, label: str = "") -> Dict[str, Any]:
     from je_auto_control.utils.usb.passthrough import commands
     return commands.acl_add(
-        vendor_id, product_id, serial=serial, allow=allow,
-        prompt_on_open=prompt_on_open, label=label,
+        vendor_id, product_id, serial=serial, allow=_as_bool(allow),
+        prompt_on_open=_as_bool(prompt_on_open), label=label,
     )
 
 
@@ -1647,7 +1663,7 @@ def _usb_acl_export(path: str) -> Dict[str, Any]:
 
 def _usb_acl_import(path: str, replace: bool = False) -> Dict[str, Any]:
     from je_auto_control.utils.usb.passthrough import commands
-    return commands.acl_import(path, replace=replace)
+    return commands.acl_import(path, replace=_as_bool(replace))
 
 
 def _usb_loopback_list() -> Dict[str, Any]:
@@ -1872,6 +1888,18 @@ def _mobile_command_handlers() -> Dict[str, Callable[..., Any]]:
 
 
 # === iOS executor adapters (WebDriverAgent / facebook-wda) ==================
+
+def _ios_use_simulator(udid: Optional[str] = None) -> Dict[str, Any]:
+    """Route iOS install / files / pasteboard / recording through ``xcrun simctl`` for one Simulator."""
+    from je_auto_control.ios.simctl import use_ios_simulator
+    return use_ios_simulator(udid)
+
+
+def _ios_list_simulators() -> List[Dict[str, str]]:
+    """Booted iOS Simulators; empty where ``xcrun simctl`` is unavailable."""
+    from je_auto_control.ios.simctl import list_ios_simulators
+    return list_ios_simulators()
+
 
 def _ios_device(url: Optional[str]) -> Any:
     """The WDA wrapper for ``url``: the bound session's, else a new one."""
@@ -2257,7 +2285,9 @@ _EXECUTOR_METRIC_CACHE: Dict[str, Any] = {}
 
 def _executor_metrics() -> Dict[str, Any]:
     """Lazily register the action-executor Counter + Histogram (Phase 10.1)."""
-    if "calls" in _EXECUTOR_METRIC_CACHE:
+    # The last one added: with "calls", an action on another thread found the
+    # cache half filled and was recorded as failed (KeyError 'duration').
+    if "duration" in _EXECUTOR_METRIC_CACHE:
         return _EXECUTOR_METRIC_CACHE
     from je_auto_control.utils.observability import (
         Counter, Histogram, default_registry,
@@ -2441,24 +2471,19 @@ def _snap_window(title: str, position: str = "left") -> Dict[str, Any]:
 def _arrange_grid(titles: Any, rows: Any = None, cols: Any = None,
                   gap: Any = 0) -> Dict[str, Any]:
     """Executor adapter: tile a list of window titles into a grid."""
-    import json
     from je_auto_control.utils.window_capture import arrange_grid
-    if isinstance(titles, str):
-        titles = json.loads(titles)
-    moved = arrange_grid(list(titles),
+    titles = _json_list(titles, "titles")
+    moved = arrange_grid(titles,
                          rows=int(rows) if rows is not None else None,
                          cols=int(cols) if cols is not None else None,
                          gap=int(gap))
-    return {"moved": moved, "count": len(list(titles))}
+    return {"moved": moved, "count": len(titles)}
 
 
 def _arrange_cascade(titles: Any, offset: Any = 30) -> Dict[str, Any]:
     """Executor adapter: cascade a list of window titles diagonally."""
-    import json
     from je_auto_control.utils.window_capture import arrange_cascade
-    if isinstance(titles, str):
-        titles = json.loads(titles)
-    titles = list(titles)
+    titles = _json_list(titles, "titles")
     return {"moved": arrange_cascade(titles, offset=int(offset)),
             "count": len(titles)}
 
@@ -2506,20 +2531,6 @@ def _region_color_stats(region: Optional[List[int] | str] = None,
             pass
 
 
-def _generate_code(source: Any, output: Optional[str] = None,
-                   target: str = "pytest", name: str = "recorded_flow",
-                   style: str = "calls") -> str:
-    """Render an action list/file as code, optionally writing a file."""
-    from je_auto_control.utils.codegen.codegen import (
-        generate_code, generate_code_file,
-    )
-    if output:
-        return generate_code_file(source, output, target=target,
-                                  name=name, style=style)
-    actions = source if isinstance(source, list) else read_action_json(source)
-    return generate_code(actions, target=target, name=name, style=style)
-
-
 def _send_email(message: Any, smtp: Any) -> Dict[str, Any]:
     """Adapter: send an email via SMTP (message/smtp config dicts)."""
     from je_auto_control.utils.email_send.email_sender import send_email
@@ -2555,7 +2566,7 @@ def _assert_visual(golden_path: str, region: Optional[List[int]] = None,
     from je_auto_control.utils.visual_regression import (
         compare_to_golden, take_golden,
     )
-    if create_if_missing and not os.path.exists(
+    if _as_bool(create_if_missing) and not os.path.exists(
             os.path.expanduser(str(golden_path))):
         take_golden(golden_path, region=region)
         return {"created": True, "matched": True, "golden": str(golden_path)}
@@ -2568,7 +2579,7 @@ def _assert_visual(golden_path: str, region: Optional[List[int]] = None,
             "differing_pixels": result.differing_pixels,
             "total_pixels": result.total_pixels,
             "tolerance_pct": result.tolerance_pct}
-    if not result.matched and raise_on_fail:
+    if not result.matched and _as_bool(raise_on_fail):
         raise AutoControlAssertionException(result.summary)
     return data
 
@@ -3977,12 +3988,12 @@ def _rate_limit(name: str, rate: float = 1.0, capacity: float = 1.0,
             "wait": round(bucket.time_until_available(float(n)), 4)}
 
 
-_BULKHEADS: Dict[str, Any] = {}
-_IDEMPOTENCY_STORES: Dict[str, Any] = {}
-_DEDUP_WINDOWS: Dict[str, Any] = {}
-_SEQUENCE_TRACKERS: Dict[str, Any] = {}
-_VERSIONED_STORES: Dict[str, Any] = {}
-_OUTBOXES: Dict[str, Any] = {}
+_BULKHEADS = NamedRegistry("bulkhead", "AC_bulkhead_run")
+_IDEMPOTENCY_STORES = NamedRegistry("idempotency store", "AC_idempotency_begin / _complete / _release")
+_DEDUP_WINDOWS = NamedRegistry("dedup window", "AC_dedup_check")
+_SEQUENCE_TRACKERS = NamedRegistry("sequence tracker", "AC_sequence_observe")
+_VERSIONED_STORES = NamedRegistry("versioned store", "AC_cas_put / AC_cas_get")
+_OUTBOXES = NamedRegistry("outbox", "AC_outbox_enqueue / AC_outbox_pending")
 
 
 def _outbox_enqueue(name: str, event: Any) -> Dict[str, Any]:
@@ -4008,11 +4019,8 @@ def _outbox_pending(name: str) -> Dict[str, Any]:
 def _collation_sort(items: Any, strength: str = "tertiary",
                     tailoring: Any = None, reverse: Any = False) -> Dict[str, Any]:
     """Adapter: locale-aware sort of a list of strings."""
-    import json
     from je_auto_control.utils.locale_collation import sort_strings
-    if isinstance(items, str):
-        items = json.loads(items)
-    ordered = sort_strings(list(items), strength=strength,
+    ordered = sort_strings(_json_list(items, "items"), strength=strength,
                            tailoring=tailoring or None, reverse=_as_bool(reverse))
     return {"sorted": ordered}
 
@@ -4063,11 +4071,8 @@ def _bidi_strip(text: str) -> Dict[str, Any]:
 def _format_list(items: Any, style: str = "and",
                  locale: str = "en") -> Dict[str, Any]:
     """Adapter: join items into a localised list string."""
-    import json
     from je_auto_control.utils.list_format import format_list
-    if isinstance(items, str):
-        items = json.loads(items)
-    return {"text": format_list(list(items), style=style, locale=locale)}
+    return {"text": format_list(_json_list(items, "items"), style=style, locale=locale)}
 
 
 def _format_message(pattern: str, args: Any = None,
@@ -4962,7 +4967,14 @@ def _expect_poll(action: Any, key: Any = None, op: str = "truthy",
                 "gt": lambda: to_be_greater_than(expected),
                 "regex": lambda: to_match_regex(str(expected)),
                 "truthy": to_be_truthy}
-    matcher = builders.get(str(op), to_be_truthy)()
+    name = "truthy" if op in (None, "") else str(op)
+    if name not in builders:  # "eq" fell back to truthy and matched any non-empty value
+        raise AutoControlActionException(f"unknown expect_poll op {op!r}; expected one of {sorted(builders)}")
+    inner = builders[name]()
+    failed = object()  # a failed attempt: distinct from a result of None, so it never matches
+
+    def matcher(value: Any) -> bool:
+        return value is not failed and inner(value)
 
     def getter() -> Any:
         try:
@@ -4973,7 +4985,7 @@ def _expect_poll(action: Any, key: Any = None, op: str = "truthy",
             # With raise_on_error=False the record would hold repr(error) — a
             # truthy string that satisfies the default truthy matcher and ends
             # the poll on the first attempt instead of waiting for success.
-            return None
+            return failed
         value = next(iter(record.values()), None)
         if key is not None and isinstance(value, dict):
             return value.get(key)
@@ -4981,7 +4993,8 @@ def _expect_poll(action: Any, key: Any = None, op: str = "truthy",
 
     result = expect_poll(getter, matcher, timeout_s=float(timeout_s),
                          interval_s=float(interval_s))
-    return {"ok": result.ok, "value": result.value, "attempts": result.attempts,
+    value = None if result.value is failed else result.value
+    return {"ok": result.ok, "value": value, "attempts": result.attempts,
             "waited_s": result.waited_s}
 
 
@@ -5398,7 +5411,7 @@ def _soft_assert(checks: Any, raise_on_fail: Any = False) -> Dict[str, Any]:
         ok = _eval_check(op, check.get("value"), check.get("expected"))
         soft.check(ok, check.get("message", "")
                    or f"{check.get('value')!r} {op} {check.get('expected')!r}")
-    if raise_on_fail:
+    if _as_bool(raise_on_fail):
         soft.assert_all()
     return {"ok": not soft.failures, "passed": soft.passed,
             "failures": soft.failures}
@@ -5409,9 +5422,10 @@ def _perceptual_diff(actual: str, expected: str, threshold: Any = 0.1,
                      max_diff_ratio: Any = None) -> Dict[str, Any]:
     """Adapter: perceptual (YIQ) image diff with anti-alias suppression."""
     from je_auto_control.utils.perceptual_diff import perceptual_diff
+    limit = None if max_diff_ratio is None else _finite(max_diff_ratio, "max_diff_ratio")
     result = perceptual_diff(actual, expected, threshold=float(threshold),
                              include_aa=_as_bool(include_aa))
-    if max_diff_ratio is not None and result.diff_ratio > float(max_diff_ratio):
+    if limit is not None and result.diff_ratio > limit:
         raise AutoControlActionException(
             f"perceptual diff {result.diff_ratio} exceeds {max_diff_ratio}")
     return {"diff_pixels": result.diff_pixels, "total_pixels": result.total_pixels,
@@ -5885,23 +5899,6 @@ def _validate_config(schema: Any, config: Any) -> Dict[str, Any]:
     if isinstance(config, str):
         config = json.loads(config)
     return validate_config(schema, config)
-
-
-def _resolve_ref(ref: str) -> Dict[str, Any]:
-    """Adapter: resolve an env:// / file:// reference; secret:// is refused (it would be recorded)."""
-    from je_auto_control.utils.secret_ref import refuse_secret_refs, resolve_ref
-    refuse_secret_refs(ref)
-    return {"value": resolve_ref(ref)}
-
-
-def _resolve_refs(obj: Any) -> Dict[str, Any]:
-    """Adapter: recursively resolve references in a structure (or JSON str); no secret://."""
-    import json
-    from je_auto_control.utils.secret_ref import refuse_secret_refs, resolve_refs_in
-    if isinstance(obj, str):
-        obj = json.loads(obj)
-    refuse_secret_refs(obj)
-    return {"resolved": resolve_refs_in(obj)}
 
 
 def _redact_config(obj: Any, mask: str = "***") -> Dict[str, Any]:
@@ -6585,15 +6582,6 @@ def _jwt_decode(token: str, key: str, algorithms: Any = None,
     return {"ok": True, "claims": claims}
 
 
-def _generate_sop(actions: List[Any], title: str = "Automation Procedure",
-                  path: Optional[str] = None) -> Dict[str, Any]:
-    """Adapter: build (or write) a step-by-step SOP from an action list."""
-    from je_auto_control.utils.process_doc import generate_sop, write_sop
-    if path:
-        return {"path": write_sop(actions, path, title=title)}
-    return generate_sop(actions, title=title)
-
-
 def _tween_drag(start: List[int], end: List[int], steps: int = 30,
                 easing: str = "ease_in_out_quad",
                 button: str = "mouse_left", step_delay_s: Any = 0.0,
@@ -6793,15 +6781,14 @@ def _write_step_video(steps: Any, output: str, fps: int = 10,
 
 
 def _coerce_list(value: Any) -> List[Any]:
-    import json
-    return json.loads(value) if isinstance(value, str) else list(value)
+    return _json_list(value)
 
 
 def _fuzzy_ratio(left: Any, right: Any,
                  ignore_case: bool = True) -> Dict[str, Any]:
     """Adapter: similarity score (0..1) between two values."""
     from je_auto_control.utils.fuzzy import fuzzy_ratio
-    return {"score": fuzzy_ratio(left, right, ignore_case=ignore_case)}
+    return {"score": fuzzy_ratio(left, right, ignore_case=_as_bool(ignore_case))}
 
 
 def _fuzzy_best_match(query: Any, choices: Any, score_cutoff: float = 0.0,
@@ -6809,7 +6796,7 @@ def _fuzzy_best_match(query: Any, choices: Any, score_cutoff: float = 0.0,
     """Adapter: best fuzzy match from choices, or a null match."""
     from je_auto_control.utils.fuzzy import fuzzy_best_match
     best = fuzzy_best_match(query, _coerce_list(choices),
-                            score_cutoff=score_cutoff, ignore_case=ignore_case)
+                            score_cutoff=score_cutoff, ignore_case=_as_bool(ignore_case))
     if best is None:
         return {"match": None, "score": 0.0, "index": -1}
     return {"match": best[0], "score": best[1], "index": best[2]}
@@ -6820,7 +6807,7 @@ def _fuzzy_dedupe(items: Any, threshold: float = 0.9,
     """Adapter: drop near-duplicate items, keeping the first of each cluster."""
     from je_auto_control.utils.fuzzy import fuzzy_dedupe
     return {"unique": fuzzy_dedupe(_coerce_list(items), threshold=threshold,
-                                   ignore_case=ignore_case)}
+                                   ignore_case=_as_bool(ignore_case))}
 
 
 def _s3_upload(local_path: str, key: Optional[str] = None) -> Dict[str, Any]:
@@ -7302,6 +7289,18 @@ class Executor:
         "AC_run_suite": frozenset({"spec"}),
         "AC_replay_trace": frozenset({"trace"}),
         "AC_run_dag": frozenset({"definition"}),
+        # The agent runtime expands a task's placeholders against the task's own
+        # inputs as each action runs; a template a trigger, skill, recovery or
+        # DAG submits later is expanded then too.
+        "AC_agent_task_submit": frozenset({"spec"}),
+        "AC_agent_task_lookup": frozenset({"spec"}),  # digested like the submitted spec
+        "AC_agent_task_act": frozenset({"action"}),
+        # Written out, not run: expanded by document_commands, which keeps
+        # ${secrets.*} and names not yet bound as placeholders.
+        "AC_generate_sop": frozenset({"actions", "title"}),
+        "AC_generate_code": frozenset({"source"}),
+        **{name: frozenset({"request"}) for name in (
+            "AC_agent_dag", "AC_agent_trigger", "AC_agent_skill", "AC_agent_task_recovery")},
         **{name: frozenset({"actions"}) for name in (
             "AC_circuit_call", "AC_bulkhead_run", "AC_run_resumable",
             "AC_run_device_matrix", "AC_observe_add", "AC_voice_register",
@@ -8241,6 +8240,9 @@ class Executor:
 
             # System diagnostics
             "AC_probe_capabilities": _probe_capabilities,
+            "AC_reset_native_input": _reset_native_input,
+            "AC_ios_use_simulator": _ios_use_simulator,
+            "AC_ios_list_simulators": _ios_list_simulators,
             "AC_diagnose": _diagnose,
 
             # Config bundle export / import
@@ -8337,8 +8339,22 @@ class Executor:
                     resolved[key] = interpolate_value(value, self.variables)
             return resolved
         if isinstance(args, list):
-            return [interpolate_value(item, self.variables) for item in args]
+            positions = self._deferred_positions(command)
+            return [item if index in positions else interpolate_value(item, self.variables)
+                    for index, item in enumerate(args)]
         return args
+
+    def _deferred_positions(self, command: str) -> FrozenSet[int]:
+        """The positional arguments of ``command`` that hold a deferred action list.
+
+        The keys were honoured for named arguments only, so
+        ``["AC_execute_action", [[...]]]`` was still expanded twice.
+        """
+        keys = self._DEFERRED_COMMAND_KEYS.get(command)
+        if keys is None:
+            return frozenset()
+        names = inspect.signature(self.event_dict[command]).parameters
+        return frozenset(index for index, name in enumerate(names) if name in keys)
 
     def _execute_event(self, action: List[Any]) -> Any:
         """
@@ -8413,7 +8429,7 @@ class Executor:
         # AC_try body it ran non-strict and its failures never reached catch.
         # A top-level call always sees False -- the finally below restores it.
         inherited = getattr(_STRICT_BODIES, "value", False)
-        raise_on_error = _as_bool(raise_on_error) or inherited
+        raise_on_error, dry_run = _as_bool(raise_on_error) or inherited, _as_bool(dry_run)
         _STRICT_BODIES.value = raise_on_error
         running = getattr(_RUNNING, "value", None)
         _RUNNING.value = self
@@ -8519,7 +8535,7 @@ class Executor:
         started = _time.monotonic()
         try:
             with default_profiler.measure(action_name):
-                record[key] = self._execute_event(action)
+                record[key] = call_contained(action_name, self._execute_event, action)
             report_result(action, record[key])  # a no-op unless a result hook watches this run
             _observe_executor_metrics(action_name, started, error=None)
         except (LoopBreak, LoopContinue, ExecutionStopped):
@@ -8533,9 +8549,11 @@ class Executor:
         # is contained (recorded) here rather than aborting the whole script.
         # ArithmeticError: an OverflowError (a date past year 9999, int() of
         # an infinite float) or a ZeroDivisionError is a failed action too;
-        # it used to abort every remaining action.
+        # it used to abort every remaining action. ImportError: so is a command
+        # whose optional package is not installed. Anything else (cv2.error, a plugin's
+        # own class) arrives wrapped by call_contained as AutoControlForeignException.
         except (AutoControlException, OSError, RuntimeError, ArithmeticError,
-                AttributeError, TypeError, ValueError, LookupError) as error:
+                AttributeError, TypeError, ValueError, LookupError, ImportError) as error:
             _observe_executor_metrics(action_name, started, error=error)
             # A failed ``AC_assert_*`` (raise_on_fail=True) is a deliberate
             # fail signal, not an incidental error, so it still propagates even

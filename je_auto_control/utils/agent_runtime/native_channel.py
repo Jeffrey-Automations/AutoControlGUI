@@ -18,6 +18,7 @@ from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
 from je_auto_control.utils.agent_runtime.native_errors import raise_reply_error
 
 _PACKET_LIMIT = 1_100_000
+_CREATE_SUSPENDED = 0x4
 
 
 def classify_reply(reply: Any, request_id: str) -> tuple[bool, Any]:
@@ -67,7 +68,9 @@ class OwnedChannel:
             # The kernel would reap the leader at once, and its group ID could be reused
             # before close signals it.
             raise AgentTaskError("native helper cannot be owned while SIGCHLD is ignored")
-        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+        # On Windows the helper starts suspended and runs only once its Job owns it, so
+        # nothing it spawns can exist outside kill-on-close containment.
+        flags = (getattr(subprocess, "CREATE_NO_WINDOW", 0) | _CREATE_SUSPENDED) if sys.platform == "win32" else 0
         self._process = subprocess.Popen(  # nosec B603  # reason: trusted host factory supplies explicit argv
             list(argv), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             bufsize=0, creationflags=flags, start_new_session=sys.platform != "win32",
@@ -76,6 +79,7 @@ class OwnedChannel:
             if sys.platform == "win32":
                 from je_auto_control.utils.agent_runtime.native_job import NativeJob
                 self._job = NativeJob(self._process)
+                self._job.resume(self._process.pid)
             self._reader = threading.Thread(target=self._read, name="NativeReply", daemon=True)
             self._writer = threading.Thread(target=self._write, name="NativeRequest", daemon=True)
             self._reader.start()

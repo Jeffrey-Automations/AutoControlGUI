@@ -1170,7 +1170,7 @@ registry 包成工具,工廠函式為
 ``ac_remote_host_start``
    啟動(或重啟)singleton TCP host,參數 ``token``、
    ``bind``、``port``、``fps``、``quality``、``max_clients``、
-   ``host_id``,回傳
+   ``host_id``、``max_pending_handshakes``、``auth_timeout``,回傳
    ``{running, port, host_id, connected_clients}``。
 
 ``ac_remote_host_stop``
@@ -1806,3 +1806,39 @@ TCP 認證拒絕後的名額釋放
 即使拒絕日誌或 socket 清理尚未完成，host 仍能接受立即重試的新連線。線路 payload
 與待處理握手的獨立上限維持不變；失敗的 viewer 不會被放行，作用中 client 的
 ``max_clients`` 也不會增加。
+
+
+驗證中的連線與慢速 viewer 的 H.264
+----------------------------------------------------------------
+
+TCP 或 WebSocket 連線從 accept 起到證明身分（token、分享碼、綁 TOTP 的 token 或
+resume token）為止都算 *待驗證*。待驗證的連線不再占用 ``max_clients`` 的 viewer 名額，
+幾個不說話的 socket 不能再把真正的 viewer 擋在外面：
+
+* ``max_pending_handshakes``（預設 ``8``）限制同時還在驗證的連線數，超過的在 accept 時就關閉。
+* ``auth_timeout``（預設 ``10`` 秒，最多 ``60``）是 TLS 握手、WebSocket 升級與
+  challenge-response 合起來的單一期限。逾時沒完成驗證的連線會被關閉，一次送一個位元組的
+  也一樣。所以不說話的連線 10 秒後就被斷開，以前則會占著 viewer 名額最多 60 秒。
+* 連線要等身分驗證通過才占用 ``max_clients`` 名額。核准回呼仍受整個握手 60 秒的既有上限，
+  期間該 viewer 占著名額。主機已滿時，新連線照舊在 challenge 之前就被關閉；若在驗證途中
+  名額被占滿，該 viewer 會收到 ``AUTH_FAIL "host full"``。
+
+兩個設定都能用在 ``RemoteDesktopHost`` / ``WebSocketDesktopHost``、
+``registry.start_host`` / ``start_ws_host``、``AC_start_remote_host`` /
+``AC_start_ws_host`` 指令、``ac_remote_host_start`` MCP 工具，以及 Remote Desktop
+主機分頁的 *進階* 區（*驗證中上限*、*驗證逾時（秒）*）。布林值、字串、非整數的上限，或
+不在 ``(0, 60]`` 內的期限會引發 ``ValueError``；registry 會在停止執行中的主機之前檢查::
+
+   from je_auto_control import RemoteDesktopHost
+   host = RemoteDesktopHost(token="tok", max_pending_handshakes=4, auth_timeout=5.0)
+
+   ["AC_start_remote_host", {"token": "tok", "max_pending_handshakes": 4, "auth_timeout": 5}]
+
+以前 TCP 上的 H.264（或 HEVC）串流只送每個 viewer 最新的封包，落後的 viewer 會漏掉
+P-frame，解碼器在下一個關鍵影格之前都顯示破碎的畫面。現在主機保留 8 個封包的共用
+backlog，依序餵給每個 viewer。必須丟掉影格的 viewer（落後超過 backlog，或某個封包超過
+payload 上限）在下一個關鍵影格之前什麼都不會收到，之後從該影格繼續；它絕不會收到參考
+影格已遺失的 P-frame。新的 viewer 從 backlog 中最新的關鍵影格開始。這樣等待的 viewer
+會向編碼器要求關鍵影格，整個主機每秒最多一次；``H264CodecProvider`` 會以 IDR 回應
+（``CodecProvider.request_keyframe``），擷取迴圈即使畫面沒變也會編出被要求的關鍵影格。
+JPEG 串流不變：慢速 viewer 仍只拿到最新的一格。

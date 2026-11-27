@@ -1,23 +1,26 @@
 """``_HostPanel``: the 'host this machine' Remote Desktop sub-tab."""
 import functools
 import secrets
-import ssl
 from typing import Any, Optional
 
 from PySide6.QtCore import QTimer, Signal
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QImage
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
-    QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
+    QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._qt_typed import decoded_image
+from je_auto_control.gui._latest_decoder import LatestDecoder, decode_jpeg
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
-from je_auto_control.gui.remote_desktop._host_ops import release_host, replace_host, stop_host
+from je_auto_control.gui.remote_desktop._host_ops import (
+    HostTlsError, release_host, replace_host, replace_tls_host, stop_host,
+)
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui.remote_desktop._helpers import (
     _CollapsibleSection, _StatusBadge, _t,
@@ -29,6 +32,9 @@ from je_auto_control.utils.remote_desktop import (
 from je_auto_control.utils.remote_desktop.audio import (
     AudioCaptureConfig, is_audio_backend_available,
 )
+from je_auto_control.utils.remote_desktop.host_admission import (
+    DEFAULT_AUTH_TIMEOUT_S, DEFAULT_MAX_PENDING_HANDSHAKES,
+)
 from je_auto_control.utils.remote_desktop.host_id import format_host_id
 from je_auto_control.utils.remote_desktop.registry import (
     SLOT_HOST, new_owner, registry,
@@ -38,6 +44,9 @@ from je_auto_control.utils.remote_desktop.registry import (
 
 class _HostPanel(TranslatableMixin, QWidget):
     """Start / stop the singleton host and show what is being streamed."""
+
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_start_remote_host", "AC_stop_remote_host", "AC_start_ws_host", "AC_stop_ws_host")
 
     _PREVIEW_INTERVAL_MS = 250  # 4 fps preview is enough to confirm liveness
 
@@ -76,6 +85,16 @@ class _HostPanel(TranslatableMixin, QWidget):
         self._quality = QSpinBox()
         self._quality.setRange(1, 95)
         self._quality.setValue(70)
+        # Connections still authenticating, and how long each has (the host
+        # refuses a deadline over 60 s, so the field does too).
+        self._max_pending = QSpinBox()
+        self._max_pending.setRange(1, 64)
+        self._max_pending.setValue(DEFAULT_MAX_PENDING_HANDSHAKES)
+        self._auth_timeout = QDoubleSpinBox()
+        self._auth_timeout.setRange(1.0, 60.0)
+        self._auth_timeout.setDecimals(1)
+        self._auth_timeout.setSingleStep(1.0)
+        self._auth_timeout.setValue(DEFAULT_AUTH_TIMEOUT_S)
         self._tls_cert = QLineEdit()
         self._tls_key = QLineEdit()
         self._enable_audio = QCheckBox()
@@ -90,6 +109,11 @@ class _HostPanel(TranslatableMixin, QWidget):
         # Preview is read-only — a host watching their own stream shouldn't
         # trigger fake input on themselves through the local widget.
         self._preview.setEnabled(False)
+        # Preview frames are decoded on a thread of this panel's own; a clear
+        # bumps the generation so a frame still being decoded is not painted.
+        self._preview_decoder = LatestDecoder(self, decode_jpeg, self._on_preview_decoded)
+        self._preview_generation = 0
+        self._preview_source: Optional[bytes] = None
         self._start_btn: Optional[QPushButton] = None
         self._stop_btn: Optional[QPushButton] = None
         self._copy_id_btn: Optional[QPushButton] = None
@@ -113,7 +137,7 @@ class _HostPanel(TranslatableMixin, QWidget):
         """
         self._view.retire()
         release_resources(self._host_op)
-        release_resources(self)
+        release_resources(self, self._preview_decoder.stop)
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
@@ -134,6 +158,8 @@ class _HostPanel(TranslatableMixin, QWidget):
         set_role(warning, "warning")
         self._tr(warning, "rd_host_security_warning")
         root.addWidget(warning)
+        self._refusal = RefusalLabel()
+        root.addWidget(self._refusal)
 
         root.addWidget(self._build_card())
         root.addWidget(self._build_basics())
@@ -170,7 +196,7 @@ class _HostPanel(TranslatableMixin, QWidget):
         id_row.addWidget(self._badge)
         form.addRow(self._tr(QLabel(), "rd_host_id_label"), id_row)
         token_row = QHBoxLayout()
-        token_row.addWidget(self._token, stretch=1)
+        token_row.addWidget(SecretField(self._token, self._tr), stretch=1)
         gen_btn = self._tr(QPushButton(), "rd_token_generate")
         gen_btn.clicked.connect(self._generate_token)
         token_row.addWidget(gen_btn)
@@ -211,7 +237,10 @@ class _HostPanel(TranslatableMixin, QWidget):
             form.addRow(self._tr(QLabel(), label_key), row)
         adv_layout.addLayout(form)
         adv_layout.addLayout(flow_of(*(field_pair(self._tr(QLabel(), key), field) for key, field in (
-            ("rd_fps_label", self._fps), ("rd_quality_label", self._quality)))))
+            ("rd_fps_label", self._fps), ("rd_quality_label", self._quality),
+            ("rd_max_pending_label", self._max_pending), ("rd_auth_timeout_label", self._auth_timeout)))))
+        self._tr(self._max_pending, "rd_max_pending_tooltip", setter="setToolTip")
+        self._tr(self._auth_timeout, "rd_auth_timeout_tooltip", setter="setToolTip")
         adv_layout.addWidget(self._tr(self._enable_audio, "rd_enable_audio"))
         advanced.set_body_layout(adv_layout)
         return advanced
@@ -274,31 +303,31 @@ class _HostPanel(TranslatableMixin, QWidget):
         if path:
             self._tls_key.setText(path)
 
-    def _build_ssl_context(self) -> Optional[ssl.SSLContext]:
+    def _tls_paths(self) -> Optional[tuple[str, str]]:
+        """The certificate and key to serve TLS with, or ``None`` for neither; the files are read by the start."""
         cert_path = self._tls_cert.text().strip()
         key_path = self._tls_key.text().strip()
         if not cert_path and not key_path:
             return None
         if not cert_path or not key_path:
             raise ValueError(_t("rd_tls_both_required"))
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-        ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
-        return ctx
+        return cert_path, key_path
 
     def _start(self) -> None:
         if self._host_op.busy:          # a start or stop is still out; a second click is ignored
+            return
+        transport = self._transport.currentText()
+        if not self._refusal.allows("AC_start_ws_host" if transport == "WebSocket" else "AC_start_remote_host"):
             return
         token = self._token.text().strip()
         if not token:
             self._generate_token()
             token = self._token.text().strip()
         try:
-            ssl_context = self._build_ssl_context()
-        except (OSError, ValueError) as error:
+            tls = self._tls_paths()
+        except ValueError as error:
             QMessageBox.warning(self, _t("rd_host_start"), str(error))
             return
-        transport = self._transport.currentText()
         host_cls = (WebSocketDesktopHost if transport == "WebSocket"
                     else RemoteDesktopHost)
         bind = self._bind.text().strip() or "127.0.0.1"
@@ -309,20 +338,25 @@ class _HostPanel(TranslatableMixin, QWidget):
             port=self._port.value(),
             fps=float(self._fps.value()),
             quality=self._quality.value(),
-            ssl_context=ssl_context,
+            max_pending_handshakes=self._max_pending.value(),
+            auth_timeout=float(self._auth_timeout.value()),
+            ssl_context=None,
             audio_config=AudioCaptureConfig(
                 enabled=self._audio_available and self._enable_audio.isChecked(),
             ),
         )
         # The transport a viewer picks: with a certificate, TCP is TLS and
         # WebSocket is WSS, which the share text used to call TCP / WebSocket.
-        if ssl_context is not None:
+        on_displaced = self._view.callback("_on_displaced")
+        work = functools.partial(replace_host, self._owner, build, on_displaced)
+        if tls is not None:
             transport = {"TCP": "TLS", "WebSocket": "WSS"}[transport]
+            # The chain is read on the start's worker, before the running host is stopped.
+            work = functools.partial(replace_tls_host, self._owner, *tls, build, on_displaced)
         self._starting = {"bind": bind, "transport": transport, "token": token}
         self._pending_key = "gui_op_starting"
         self._host_op.run(
-            functools.partial(replace_host, self._owner, build, self._view.callback("_on_displaced")),
-            on_done=self._on_started, on_error=self._on_start_failed,
+            work, on_done=self._on_started, on_error=self._on_start_failed,
             discard=functools.partial(release_host, self._owner))
         self._refresh_status()
 
@@ -332,7 +366,8 @@ class _HostPanel(TranslatableMixin, QWidget):
         self._refresh_status()
 
     def _on_start_failed(self, error: Exception) -> None:
-        self._shared = None
+        if not isinstance(error, HostTlsError):     # a certificate that did not load stopped nothing
+            self._shared = None
         self._refresh_status()
         QMessageBox.warning(self, _t("rd_host_start"), str(error))
 
@@ -341,6 +376,9 @@ class _HostPanel(TranslatableMixin, QWidget):
         # that one: a visible "running" with a Stop that does nothing would be
         # worse on a remote-access surface. Its owner is told.
         if self._host_op.busy:          # a second click while the first is still stopping
+            return
+        # Either transport's host may be the one running; both commands need the same capability.
+        if not self._refusal.allows("AC_stop_remote_host", "AC_stop_ws_host"):
             return
         self._pending_key = "gui_op_stopping"
         self._host_op.run(functools.partial(stop_host, self._owner), on_done=self._on_stopped,
@@ -387,11 +425,16 @@ class _HostPanel(TranslatableMixin, QWidget):
             return
         host = registry.host
         if host is None or not host.is_running:
+            self._preview_generation += 1
+            self._preview_source = None
             self._preview.clear()
             return
         frame = host.latest_frame()
-        if frame is None:
-            return
-        image = decoded_image(frame, "JPEG")
-        if not image.isNull():
+        if frame is None or frame is self._preview_source:
+            return                          # nothing new since the last tick
+        self._preview_source = frame
+        self._preview_decoder.submit(frame, self._preview_generation)
+
+    def _on_preview_decoded(self, generation: int, image: QImage) -> None:
+        if generation == self._preview_generation and not image.isNull():
             self._preview.set_image(image)

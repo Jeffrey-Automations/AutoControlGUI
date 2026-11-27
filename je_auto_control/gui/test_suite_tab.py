@@ -2,7 +2,9 @@
 
 Thin wrapper over :func:`je_auto_control.run_suite`, the JUnit/Allure
 report writers, and the quarantine store. Holds no business logic. A suite
-runs off the GUI thread as a stoppable executor run, one at a time.
+runs off the GUI thread as a stoppable executor run, one at a time. Loading a
+spec and writing a report are a tab task of their own, and so is every
+quarantine change (a locked JSON file, read back after each change).
 """
 import functools
 import json
@@ -10,7 +12,7 @@ from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QFileDialog, QLabel, QListWidget,
+    QAbstractItemView, QFileDialog, QLabel, QListWidget, QListWidgetItem,
     QPlainTextEdit, QTableWidget, QTableWidgetItem, QVBoxLayout,
     QWidget,
 )
@@ -25,7 +27,7 @@ from je_auto_control.gui.language_wrapper.multi_language_wrapper import (
 )
 import je_auto_control as ac
 from je_auto_control.utils.quarantine import (
-    auto_quarantine_from_flakiness, default_quarantine_store,
+    QuarantineEntry, auto_quarantine_from_flakiness, default_quarantine_store,
 )
 from je_auto_control.utils.test_suite import TestSuiteResult
 
@@ -42,6 +44,29 @@ def _run_suite(spec: Any) -> Any:
     return ac.run_suite(spec)
 
 
+def _read_spec(path: str) -> str:
+    """Worker thread: the text of a suite spec file (``ValueError`` when it is not UTF-8)."""
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
+
+
+def _change_quarantine(change: Optional[Callable[[], Any]]) -> list[QuarantineEntry]:
+    """Worker thread: make ``change`` to the quarantine store (when given), then list it."""
+    if change is not None:
+        change()
+    return list(default_quarantine_store().list())
+
+
+def _release(name: str) -> None:
+    """Worker thread: take one case out of quarantine."""
+    default_quarantine_store().remove(name)
+
+
+def _clear_quarantine() -> None:
+    """Worker thread: empty the quarantine."""
+    default_quarantine_store().clear()
+
+
 class TestSuiteTab(TranslatableMixin, QWidget):
     """Run suites, render scored cases, and manage the quarantine list."""
 
@@ -56,11 +81,18 @@ class TestSuiteTab(TranslatableMixin, QWidget):
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setStretchLastSection(True)
         self._summary = QLabel()
+        self._summary_text = self._keyed(self._summary)
         self._quarantine = QListWidget()
         self._last_result: Optional[Any] = None
         self._runs = TabTask(self)
         self._runs.result.connect(self._show_run_result)
         self._runs.error.connect(self._show_run_error)
+        self._files = TabTask(self)         # loading a spec, writing a report
+        self._files.result.connect(self._on_file_done)
+        self._files.error.connect(self._show_run_error)
+        self._store = TabTask(self, details=False)      # the quarantine store: change, then list
+        self._store.result.connect(self._show_quarantine)
+        self._store.error.connect(self._show_run_error)
         self._apply_headers()
         self._build_layout()
         self._refresh_quarantine()
@@ -110,31 +142,37 @@ class TestSuiteTab(TranslatableMixin, QWidget):
 
     def _on_load_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, _t("suite_load_file"))
-        if not path:
+        if path:
+            # A non-UTF-8 or unreadable file is shown as an error once the read reports.
+            self._start_file(functools.partial(_read_spec, path), "load")
+
+    def _start_file(self, work: Callable[[], Any], tag: str) -> None:
+        if not self._files.start(work, tag=tag):
+            self._summary_text.show("task_busy")
             return
-        try:
-            with open(path, encoding="utf-8") as handle:
-                self._spec.setPlainText(handle.read())
-        except (OSError, ValueError) as err:
-            # ValueError covers UnicodeDecodeError on a non-UTF-8 file; OSError
-            # covers unreadable/permission errors. Surface instead of escaping
-            # the Actions slot into the Qt event loop.
-            self._summary.setText(_t("suite_error").replace("{error}", str(err)))
+        self._summary_text.show("task_running")
+
+    def _on_file_done(self, result: Any) -> None:
+        if self._files.tag == "load":
+            self._spec.setPlainText(result)
+            self._summary_text.clear()
+        elif self._last_result is not None:
+            self._render_result(self._last_result)      # the summary again, in place of "running"
 
     def _on_run(self) -> None:
         try:
             spec = self._parse_spec()
         except (ValueError, TypeError) as err:
-            self._summary.setText(_t("suite_error").replace("{error}", str(err)))
+            self._summary_text.show("suite_error", error=err)
             return
         if not self._runs.start_script(functools.partial(_run_suite, spec)):
-            self._summary.setText(_t("task_busy"))
+            self._summary_text.show("task_busy")
             return
-        self._summary.setText(_t("task_running"))
+        self._summary_text.show("task_running")
 
     def _on_stop(self) -> None:
         if self._runs.stop():
-            self._summary.setText(_t("task_stopping"))
+            self._summary_text.show("task_stopping")
 
     def _show_run_result(self, result: Any) -> None:
         self._last_result = result
@@ -142,9 +180,9 @@ class TestSuiteTab(TranslatableMixin, QWidget):
 
     def _show_run_error(self, error: object) -> None:
         if was_stopped(error):
-            self._summary.setText(_t("task_stopped"))
+            self._summary_text.show("task_stopped")
             return
-        self._summary.setText(_t("suite_error").replace("{error}", str(error)))
+        self._summary_text.show("suite_error", error=error)
 
     def _render_result(self, result: TestSuiteResult) -> None:
         self._table.setRowCount(len(result.cases))
@@ -155,13 +193,8 @@ class TestSuiteTab(TranslatableMixin, QWidget):
                 item = QTableWidgetItem(text)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(row, col, item)
-        self._summary.setText(
-            _t("suite_summary")
-            .replace("{passed}", str(result.passed))
-            .replace("{failed}", str(result.failed))
-            .replace("{errored}", str(result.errored))
-            .replace("{skipped}", str(result.skipped)),
-        )
+        self._summary_text.show("suite_summary", passed=result.passed, failed=result.failed,
+                                errored=result.errored, skipped=result.skipped)
 
     def _on_junit(self) -> None:
         if self._last_result is None:
@@ -169,33 +202,41 @@ class TestSuiteTab(TranslatableMixin, QWidget):
         path, _ = QFileDialog.getSaveFileName(self, _t("suite_junit"),
                                               "junit.xml")
         if path:
-            ac.write_junit_xml(self._last_result, path)
+            self._export(functools.partial(ac.write_junit_xml, self._last_result, path))
 
     def _on_allure(self) -> None:
         if self._last_result is None:
             return
         directory = QFileDialog.getExistingDirectory(self, _t("suite_allure"))
         if directory:
-            ac.write_allure_results(self._last_result, directory)
+            self._export(functools.partial(ac.write_allure_results, self._last_result, directory))
 
-    def _refresh_quarantine(self) -> None:
+    def _export(self, write: Callable[[], Any]) -> None:
+        """Write one report off the GUI thread; a target that cannot be written is shown in the summary."""
+        self._start_file(write, "export")
+
+    def _refresh_quarantine(self, change: Optional[Callable[[], Any]] = None) -> None:
+        """Make ``change`` to the quarantine (when given) and list it again, off the GUI thread."""
+        if not self._store.start(functools.partial(_change_quarantine, change)):
+            self._summary_text.show("task_busy")
+
+    def _show_quarantine(self, entries: list[QuarantineEntry]) -> None:
         self._quarantine.clear()
-        for entry in default_quarantine_store().list():
+        for entry in entries:
             label = entry.name
             if entry.reason:
                 label += f"  ({entry.reason})"
-            self._quarantine.addItem(label)
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, entry.name)     # the label is not parsed back
+            self._quarantine.addItem(item)
 
     def _on_auto_quarantine(self) -> None:
-        auto_quarantine_from_flakiness()
-        self._refresh_quarantine()
+        self._refresh_quarantine(auto_quarantine_from_flakiness)
 
     def _on_release_selected(self) -> None:
         item = self._quarantine.currentItem()
         if item is not None:
-            default_quarantine_store().remove(item.text().split("  (")[0])
-            self._refresh_quarantine()
+            self._refresh_quarantine(functools.partial(_release, str(item.data(Qt.ItemDataRole.UserRole))))
 
     def _on_clear_quarantine(self) -> None:
-        default_quarantine_store().clear()
-        self._refresh_quarantine()
+        self._refresh_quarantine(_clear_quarantine)

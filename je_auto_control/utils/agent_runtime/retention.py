@@ -7,7 +7,10 @@ from typing import Any
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.policy import owns_task
 from je_auto_control.utils.agent_runtime.dag_retention import prune_batches, protects_task
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.rbac.authorization import current_authorization
+
+_ERRORS = (AutoControlException, OSError, RuntimeError, ValueError, TypeError, LookupError)
 
 
 def prune_tasks(runtime: Any, keep_days: int = 30) -> dict[str, Any]:
@@ -23,26 +26,38 @@ def prune_tasks(runtime: Any, keep_days: int = 30) -> dict[str, Any]:
         identifiers = [row[0] for row in connection.execute(
             "SELECT id FROM agent_tasks WHERE state IN ('succeeded','failed','cancelled','timed_out') "
             "AND updated<? ORDER BY updated LIMIT 1000", (cutoff,))]
-    deleted = []
+    return {"deleted": _prune_each(runtime, identifiers, identity), "keep_days": keep_days, **batches}
+
+
+def _prune_each(runtime: Any, identifiers: list[str], identity: Any) -> list[str]:
+    deleted: list[str] = []
+    failure: Exception | None = None
     for task_id in identifiers:
-        with runtime._lock(task_id):
-            row = runtime.store.get(task_id)
-            if not owns_task(row["owner"], identity):
-                continue
-            if _preserve_task(runtime, task_id):
-                continue
-            # pylint: disable-next=protected-access  # reason: reap retained context before removing its source identity
-            runtime._retained_browsers.discard(task_id)
-            runtime.evidence.remove(task_id)
-            _remove_metadata(runtime.store, task_id)
-            runtime._tokens.pop(task_id, None)
-            runtime._stop_final.pop(task_id, None)
-            runtime._observations.pop(task_id, None)
-            runtime._observation_times.pop(task_id, None)
-            # pylint: disable-next=protected-access  # reason: prune the same runtime-owned cache as its expired task
-            runtime._completion_targets.pop(task_id, None)
-            deleted.append(task_id)
-    return {"deleted": deleted, "keep_days": keep_days, **batches}
+        try:
+            if _prune_task(runtime, task_id, identity):
+                deleted.append(task_id)
+        except _ERRORS as error:  # a task needing review stays; it must not hold back the ones after it
+            failure = failure or error
+    if failure is not None:
+        raise failure
+    return deleted
+
+
+def _prune_task(runtime: Any, task_id: str, identity: Any) -> bool:
+    # pylint: disable-next=protected-access  # reason: prune under the same task lock as every lifecycle transition
+    with runtime._lock(task_id):
+        row = runtime.store.get(task_id)
+        if not owns_task(row["owner"], identity) or _preserve_task(runtime, task_id):
+            return False
+        # pylint: disable-next=protected-access  # reason: reap retained context before removing its source identity
+        runtime._retained_browsers.discard(task_id)
+        runtime.evidence.remove(task_id)
+        _remove_metadata(runtime.store, task_id)
+        # pylint: disable-next=protected-access  # reason: drop only this expired task's runtime-owned caches
+        for cache in (runtime._tokens, runtime._stop_final, runtime._observations, runtime._observation_times,
+                      runtime._completion_targets):
+            cache.pop(task_id, None)
+        return True
 
 
 def _preserve_task(runtime: Any, task_id: str) -> bool:

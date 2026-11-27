@@ -58,6 +58,10 @@ fails at the first failed action. An action list the executor would refuse
 
 Executor command: ``AC_generate_code``. CLI: ``je_auto_control codegen``.
 
+The executor substitutes known ``${var}`` placeholders in ``source`` (a path
+included) but leaves ``${secrets.NAME}`` and names not bound yet in the
+generated code as written.
+
 
 HTTP / API
 ==========

@@ -1179,7 +1179,11 @@ def AC_costs_record(
 def AC_costs_summary(limit: int = ...) -> Dict[str, Any]:
     """Executor adapter: aggregate cost events by model / provider / day."""
 
-def AC_create_project(project_path: str | None = ..., parent_name: str = ...) -> None:
+def AC_create_project(
+    project_path: str | None = ...,
+    parent_name: str = ...,
+    overwrite: bool = ...,
+) -> Dict[str, List[str]]:
     """Create project directory structure and templates."""
 
 def AC_create_signing_keypair(private_path: str, public_path: str, passphrase: str | None = ...) -> Dict[str, Any]:
@@ -1988,6 +1992,9 @@ def AC_ios_install_app(path: str, url: str | None = ..., device_timeout_s: float
 def AC_ios_launch_app(app_id: str, url: str | None = ..., device_timeout_s: float | None = ...) -> Any:
     """Launch an app; returns its state."""
 
+def AC_ios_list_simulators() -> List[Dict[str, str]]:
+    """Booted iOS Simulators; empty where ``xcrun simctl`` is unavailable."""
+
 def AC_ios_long_press(
     x: int,
     y: int,
@@ -2074,6 +2081,9 @@ def AC_ios_tap(x: int, y: int, url: str | None = ...) -> Dict[str, int]:
 
 def AC_ios_type(text: str, url: str | None = ...) -> str:
     ...
+
+def AC_ios_use_simulator(udid: str | None = ...) -> Dict[str, Any]:
+    """Route iOS install / files / pasteboard / recording through ``xcrun simctl`` for one Simulator."""
 
 def AC_ios_wait_for_app(
     app_id: str,
@@ -2904,6 +2914,9 @@ def AC_replay_timeline(events: List[Dict[str, Any]], speed: float = ...) -> Dict
 def AC_replay_trace(trace: Any) -> Dict[str, Any]:
     """Adapter: replay a trajectory by running each step's action via the executor."""
 
+def AC_reset_native_input() -> dict[str, object]:
+    """Retire this process's cached Wayland input session/refusal; elsewhere a no-op. Requests no consent."""
+
 def AC_resize_element(
     width: Any,
     height: Any,
@@ -3373,6 +3386,8 @@ def AC_start_remote_host(
     quality: int = ...,
     region: List[int] | None = ...,
     max_clients: int = ...,
+    max_pending_handshakes: int = ...,
+    auth_timeout: float = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: start the singleton remote-desktop host."""
 
@@ -3390,6 +3405,8 @@ def AC_start_ws_host(
     quality: int = ...,
     region: List[int] | None = ...,
     max_clients: int = ...,
+    max_pending_handshakes: int = ...,
+    auth_timeout: float = ...,
 ) -> Dict[str, Any]:
     """Executor adapter: start the singleton WebSocket-transport host."""
 

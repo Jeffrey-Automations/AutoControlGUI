@@ -86,6 +86,7 @@ def server():
 def _send(server, actions):
     """Send one command; return the reply up to the end-of-reply marker."""
     with socket.create_connection(server.server_address[:2], timeout=_WAIT) as connection:
+        connection.sendall(f"AUTH {server.token}\n".encode("utf-8"))
         connection.sendall((json.dumps(actions) + "\n").encode("utf-8"))
         reply = b""
         while _END.encode("utf-8") not in reply:
@@ -95,7 +96,7 @@ def _send(server, actions):
             reply += chunk
     text = reply.decode("utf-8")
     assert _END in text, "the server always ends its answer with the marker"
-    return text.split(_END)[0]
+    return text.split(_END)[0].removeprefix("AUTH_OK\n")
 
 
 def _run_file(server, path):

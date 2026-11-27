@@ -365,3 +365,12 @@ def test_a_teardown_ungrab_that_fails_does_not_escape(backend, display):
 
 def test_the_backend_names_the_protocol_it_uses(backend):
     assert backend.name == "linux-x11"
+
+
+def test_a_key_the_keymap_does_not_bind_is_refused(display, backend):
+    """Keycode 0 is ``AnyKey``: grabbing it took every Ctrl+key from every application."""
+    display.keycodes = {}
+    with pytest.raises(ValueError, match="no key"):
+        _combo_to_x11("ctrl+k")
+    backend._sync(display, display.screen().root, [_binding(combo="ctrl+k")])
+    assert backend._registered == {}

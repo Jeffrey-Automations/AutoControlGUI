@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
     QPushButton, QSpinBox, QTextEdit, QVBoxLayout,
 )
 
+from je_auto_control.gui._i18n_helpers import KeyedText
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -78,8 +80,10 @@ class _ViewerUiMixin(_ViewerPanelPart):
     def _build_session_card(self) -> Card:
         """Status, the in-session actions and the live link statistics."""
         card = Card()
-        self._status_label = QLabel(_t("rd_webrtc_status_idle"))
+        self._status_label = QLabel()
         self._status_label.setWordWrap(True)
+        self._status = KeyedText(self._status_label)
+        self._status.show("rd_webrtc_status_idle")
         set_role(self._status_label, "hint")
         card.add(self._status_label)
         self._cad_btn = self._tr(QPushButton(), "rd_webrtc_send_cad")
@@ -107,9 +111,12 @@ class _ViewerUiMixin(_ViewerPanelPart):
         self._quality_dot.setStyleSheet(
             _QUALITY_DOT_STYLE,
         )
-        self._quality_dot.setToolTip(_t("rd_webrtc_quality_unknown"))
+        self._quality_tip = KeyedText(self._quality_dot, "setToolTip")
+        self._quality_tip.show("rd_webrtc_quality_unknown")
         stats_row.addWidget(self._quality_dot)
-        self._stats_label = QLabel(_t("rd_webrtc_stats_idle"))
+        self._stats_label = QLabel()
+        self._stats_text = KeyedText(self._stats_label)
+        self._stats_text.show("rd_webrtc_stats_idle")
         self._stats_label.setStyleSheet("font-family: 'Consolas', monospace;")
         set_role(self._stats_label, "hint")
         self._stats_label.setWordWrap(True)
@@ -196,6 +203,7 @@ class _ViewerUiMixin(_ViewerPanelPart):
         tag_form.addRow(self._tr(QLabel(), "rd_webrtc_tag_filter"), self._tag_filter_combo)
         layout.addLayout(tag_form)
         self._address_list = AddressBookList()
+        self._tr_cells(self._address_list)
         self._address_list.chosen.connect(self._on_address_chosen)
         self._address_list.deleted.connect(self._on_address_removed)
         self._address_list.favorite_toggled.connect(self._on_address_favorite)
@@ -227,8 +235,7 @@ class _ViewerUiMixin(_ViewerPanelPart):
         self._host_id_edit = self._tr(QLineEdit(), "rd_webrtc_host_id_placeholder")
         form.addRow(self._tr(QLabel(), "rd_webrtc_host_id_label"), self._host_id_edit)
         self._secret_edit = QLineEdit()
-        self._secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        form.addRow(self._tr(QLabel(), "rd_webrtc_secret_label"), self._secret_edit)
+        form.addRow(self._tr(QLabel(), "rd_webrtc_secret_label"), SecretField(self._secret_edit, self._tr))
         self._connect_btn = self._tr(QPushButton(), "rd_webrtc_connect_via_server")
         self._connect_btn.clicked.connect(self._on_connect_via_server)
         self._lan_browse_btn = self._tr(QPushButton(), "rd_webrtc_lan_browse")
@@ -242,10 +249,10 @@ class _ViewerUiMixin(_ViewerPanelPart):
         layout = QVBoxLayout()
         form = QFormLayout()
         self._token_edit = self._tr(QLineEdit(), "rd_token_placeholder")
-        form.addRow(self._tr(QLabel(), "rd_token_label"), self._token_edit)
+        form.addRow(self._tr(QLabel(), "rd_token_label"), SecretField(self._token_edit, self._tr))
         self._bandwidth_combo = QComboBox()
-        for key, info in BANDWIDTH_PRESETS.items():
-            self._bandwidth_combo.addItem(info["label"], key)
+        for key in BANDWIDTH_PRESETS:
+            self._bandwidth_combo.addItem(_t(f"rd_webrtc_bandwidth_{key}"), key)
         form.addRow(self._tr(QLabel(), "rd_webrtc_bandwidth_label"), self._bandwidth_combo)
         layout.addLayout(form)
         self._share_my_screen_check = self._tr(

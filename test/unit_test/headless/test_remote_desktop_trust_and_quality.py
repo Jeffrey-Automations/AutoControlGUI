@@ -457,3 +457,46 @@ def test_a_stats_snapshot_crosses_the_json_boundary():
     snapshot = StatsSnapshot(rtt_ms=12.5, fps=30.0, bitrate_kbps=900.0,
                              packet_loss_pct=0.2, jitter_ms=3.0)
     assert json.loads(json.dumps(snapshot.to_dict()))["rtt_ms"] == 12.5
+
+
+# === A pinned certificate must be the only one the offer can connect with ====
+
+_PINNED_LINE = "a=fingerprint:sha-256 AB:CD:EF:01\r\n"
+_OTHER_LINE = "a=fingerprint:sha-256 66:66:66:66\r\n"
+_VIDEO = "m=video 9 UDP/TLS/RTP/SAVPF 96\r\n"
+_DATA = "m=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\n"
+
+
+@pytest.mark.parametrize("offer", [
+    # Not bundled: aiortc gives each section its own DTLS transport, checked
+    # against that section's fingerprints alone.
+    "v=0\r\n" + _VIDEO + _PINNED_LINE + _DATA + _OTHER_LINE,
+    "v=0\r\n" + _DATA + _OTHER_LINE + _VIDEO + _PINNED_LINE,
+    # The data section's certificate is only named under another digest.
+    "v=0\r\n" + _VIDEO + _PINNED_LINE + _DATA + "a=fingerprint:sha-512 66:66\r\n",
+    # aiortc splits lines as str.splitlines() does, the old check only at \n.
+    "v=0\r\n" + _VIDEO + _PINNED_LINE + "a=x\x0b" + _DATA.rstrip() + "\x0b" + _OTHER_LINE,
+    # A value the old pattern did not match, but aiortc reads.
+    "v=0\r\n" + _VIDEO + _PINNED_LINE + _DATA + "a=fingerprint: sha-256 66:66:66:66\r\n",
+], ids=["second-section", "first-section", "other-digest", "hidden-line", "spaced"])
+def test_verification_refuses_an_offer_naming_a_second_certificate(offer):
+    """A hijacked signaling slot can copy the pinned line; it cannot be the only one that counts."""
+    with pytest.raises(FingerprintMismatchError):
+        verify_dtls_fingerprint(offer, "AB:CD:EF:01")
+
+
+@pytest.mark.parametrize("offer", [
+    "v=0\r\n" + _PINNED_LINE + _VIDEO + _DATA,
+    "v=0\r\n" + _VIDEO + _PINNED_LINE + _DATA + _PINNED_LINE,
+    "v=0\r\n" + _VIDEO + _PINNED_LINE + "a=fingerprint:sha-384 11:22\r\n" + _DATA + _PINNED_LINE,
+], ids=["session-level", "every-section", "with-another-digest"])
+def test_verification_accepts_an_offer_pinned_throughout(offer):
+    verify_dtls_fingerprint(offer, "ab:cd:ef:01")
+
+
+def test_a_host_fingerprint_file_that_is_not_text_is_replaced(tmp_path):
+    target = tmp_path / "host_fingerprint"
+    target.write_bytes(b"\xff\xfe\x00damaged")
+    fingerprint = load_or_create_host_fingerprint(target)
+    assert len(fingerprint) == 64
+    assert target.read_text(encoding="utf-8") == fingerprint

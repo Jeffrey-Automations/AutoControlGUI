@@ -11,7 +11,7 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.native_errors import error_reply
 from je_auto_control.utils.agent_runtime.browser_target import BrowserTarget
 from je_auto_control.utils.agent_runtime.browser_retirement import refuse_browser_tool
-from je_auto_control.utils.agent_runtime.models import AgentTaskSpec
+from je_auto_control.utils.agent_runtime.models import AgentTaskSpec, thaw
 from je_auto_control.utils.agent_runtime.policy import TaskPolicy, durable_payload
 from je_auto_control.utils.agent_runtime.targets import DesktopTarget
 from je_auto_control.utils.exception.exceptions import AutoControlException
@@ -25,7 +25,7 @@ from je_auto_control.utils.agent_runtime.context import (
 )
 from je_auto_control.utils.agent_runtime.presence_frames import presence_body
 from je_auto_control.utils.agent_runtime.presence_reader import PresenceReader
-from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
+from je_auto_control.utils.agent_runtime.presence_endpoint_wire import endpoint_from_wire, endpoint_to_wire
 from je_auto_control.utils.agent_runtime.observation_report import REPORT_VERSION
 from je_auto_control.utils.agent_runtime.semantic_target import SemanticTarget
 from je_auto_control.utils.agent_runtime.service_target import ServiceTarget
@@ -47,6 +47,7 @@ class NativeWorker:
         self._target: Any = target if target is not None else DesktopTarget()
         self._custom_target = target is not None
         self._profile_kind = ""
+        self._profile_settings: Any = {}
         self._spec: AgentTaskSpec | None = None
         self._owner: AuthorizationContext | None = None
         self._request_id = ""
@@ -244,7 +245,8 @@ class NativeWorker:
             self._target = FileTarget()
         if not self._custom_target and self._profile_kind == "browser":
             if not isinstance(self._target, BrowserTarget):
-                self._target = BrowserTarget()
+                self._target = BrowserTarget(target_id=spec.target,
+                                             semantic_fields=self._profile_settings.get("semantic_fields"))
         self._configure_presence(payload)
 
     def _check_semantic_pin(self, spec: AgentTaskSpec, owner: AuthorizationContext | None) -> None:
@@ -288,6 +290,7 @@ class NativeWorker:
         if self._spec.options.get("target_profile") != pin:
             raise AgentTaskError("native target profile pin is invalid")
         self._profile_kind = profile.kind
+        self._profile_settings = thaw(profile.settings)
 
     def _check_activity(self) -> None:
         if self._activity is not None:

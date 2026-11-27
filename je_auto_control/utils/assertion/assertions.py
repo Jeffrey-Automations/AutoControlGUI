@@ -27,6 +27,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 from je_auto_control.utils.exception.exceptions import (
     AutoControlAssertionException, AutoControlException,
 )
+from je_auto_control.utils.exception.control_signals import raise_if_run_interrupted
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 _DEFAULT_THRESHOLD = 0.9
@@ -49,7 +50,7 @@ class AssertionResult:
 
 
 def _capture_failure_screenshot(kind: str) -> Optional[str]:
-    """Best-effort screenshot of the failing screen; never raises."""
+    """Best-effort screenshot of the failing screen; its failure never replaces the verdict."""
     try:
         from je_auto_control.wrapper.auto_control_screen import screenshot
     except ImportError as error:
@@ -61,7 +62,11 @@ def _capture_failure_screenshot(kind: str) -> Optional[str]:
         path = target / f"assert_{kind}_{int(time.time() * 1000)}.png"
         screenshot(file_path=str(path))
         return str(path)
-    except (OSError, RuntimeError, ValueError) as error:
+    # AutoControlException: a locked or absent screen is an
+    # AutoControlScreenException, and raising it in the assertion's place let
+    # raise_on_error=False swallow the failed assertion.
+    except (AutoControlException, OSError, RuntimeError, ValueError) as error:
+        raise_if_run_interrupted(error)
         autocontrol_logger.warning("assert screenshot failed: %r", error)
         return None
 
@@ -95,6 +100,18 @@ def _region_text(region: Optional[Sequence[int]], lang: str,
     return " ".join(match.text for match in matches)
 
 
+def _compiled(pattern: Any, ignore_case: bool = False) -> "re.Pattern[str]":
+    """``pattern`` compiled; a bad one is a ``ValueError``.
+
+    ``re.error`` derives from ``Exception`` alone, so it escaped the executor's
+    containment and ended the whole action list.
+    """
+    try:
+        return re.compile(str(pattern), re.IGNORECASE if ignore_case else 0)
+    except re.error as error:
+        raise ValueError(f"invalid regular expression {pattern!r}: {error}") from error
+
+
 def assert_text(text: str,
                 region: Optional[Sequence[int]] = None,
                 lang: str = "eng",
@@ -112,6 +129,7 @@ def assert_text(text: str,
         False the assertion passes only when the text is absent.
     """
     if regex:
+        _compiled(text)     # refused here, before any capture or OCR
         from je_auto_control.utils.ocr.ocr_engine import find_text_regex
         # ignore_case (default True) applies to a pattern too, as it does
         # in assert_clipboard; the regex branch matched case-sensitively.
@@ -146,25 +164,36 @@ def assert_image(template_path: str,
                  present: bool = True,
                  raise_on_fail: bool = True,
                  capture_on_fail: bool = False) -> AssertionResult:
-    """Assert that the template image is (or is not) on screen."""
+    """Assert that the template image is (or is not) on screen.
+
+    A screen that could not be searched fails the assertion either way: it
+    used to count as "not found", so ``present=False`` passed without looking.
+    So does a template the search cannot use (missing, unreadable, single
+    colour) or a threshold outside 0-1: ``present=False`` passed on a typo.
+    """
     from je_auto_control.utils.exception.exceptions import (
-        ImageNotFoundException,
+        ImageNotFoundException, ImageSearchInputException,
     )
     from je_auto_control.wrapper.auto_control_image import locate_image_center
     coords: Optional[Any] = None
+    unsearched = ""
     try:
         coords = locate_image_center(template_path, threshold)
         found = True
-    except (ImageNotFoundException, OSError, RuntimeError, ValueError,
-            TypeError):
+    except ImageNotFoundException:
         found = False
-    passed = (found == present)
+    except ImageSearchInputException as error:
+        found, unsearched = False, f"; the template could not be used: {error}"
+    except (OSError, RuntimeError, ValueError, TypeError) as error:
+        raise_if_run_interrupted(error)
+        found, unsearched = False, f"; the screen was not searched: {error!r}"
+    passed = not unsearched and found == present
     state = "present" if present else "absent"
     message = (
         f"assert_image passed: {template_path!r} is {state}"
         if passed else
         f"assert_image failed: expected {template_path!r} to be {state} "
-        f"(threshold={threshold})"
+        f"(threshold={threshold}){unsearched}"
     )
     return _finalize(
         "image", passed, message,
@@ -247,9 +276,7 @@ def _clipboard_matches(observed: str, text: str,
                        mode: str, ignore_case: bool) -> bool:
     """Return True when ``observed`` satisfies ``text`` under ``mode``."""
     if mode == "regex":
-        import re
-        flags = re.IGNORECASE if ignore_case else 0
-        return re.search(text, observed, flags) is not None
+        return _compiled(text, ignore_case).search(observed) is not None
     left = observed.lower() if ignore_case else observed
     right = text.lower() if ignore_case else text
     if mode == "contains":
@@ -510,7 +537,6 @@ def assert_by_description(description: str,
 
 def _variable_satisfies(value: Any, op: str, expected: Any) -> bool:
     """Return True when ``value op expected`` holds (eq/ne/contains/...)."""
-    import re
     comparators = {
         "eq": lambda a, b: a == b,
         "ne": lambda a, b: a != b,
@@ -521,7 +547,7 @@ def _variable_satisfies(value: Any, op: str, expected: Any) -> bool:
         "contains": lambda a, b: b in a,
         "startswith": lambda a, b: isinstance(a, str) and a.startswith(b),
         "endswith": lambda a, b: isinstance(a, str) and a.endswith(b),
-        "regex": lambda a, b: re.search(str(b), str(a)) is not None,
+        "regex": lambda a, b: _compiled(b).search(str(a)) is not None,
     }
     comparator = comparators.get(op)
     if comparator is None:

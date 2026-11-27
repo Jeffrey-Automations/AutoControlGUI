@@ -32,7 +32,8 @@ _WORKER_PREFIX = "chatops-slack-"
 class _FakeSlack:
     """The two Slack calls the bot makes, answered from memory."""
 
-    def __init__(self):
+    def __init__(self, state_path):
+        self.state_path = state_path  # where the bot saves its position
         self._changed = threading.Condition()
         self._pending = []
         self.posts = []
@@ -112,8 +113,8 @@ def root(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def slack():
-    return _FakeSlack()
+def slack(tmp_path_factory):
+    return _FakeSlack(tmp_path_factory.mktemp("slack-state") / "C1.json")
 
 
 @pytest.fixture
@@ -130,8 +131,11 @@ def bot(slack, script, root, monkeypatch):
 
 
 def _make_bot(slack, monkeypatch, router, **options):
+    # A position is given: with none, the first poll only records where the
+    # channel is and runs nothing (the history is never replayed).
     made = SlackBot(token="xoxb-fake", channel_id="C1", router=router,
-                    poll_interval_s=1.0, **options)
+                    poll_interval_s=1.0, last_seen_ts="0",
+                    state_path=str(slack.state_path), **options)
     monkeypatch.setattr(made, "_api_get", slack.api_get)
     monkeypatch.setattr(made, "_api_post", slack.api_post)
     return made

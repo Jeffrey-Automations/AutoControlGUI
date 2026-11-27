@@ -17,21 +17,39 @@ poll thread, as before.
 Three pieces of state are tracked per channel:
 
 * ``last_seen_ts`` — the Slack timestamp of the most-recent message we
-  have already routed; persisted across ``poll_once`` calls;
+  have already routed. It is saved to ``state_path`` (default
+  ``~/.je_auto_control/chatops/slack_<channel>.json``, written atomically and
+  0600 on POSIX) *before* the message's command runs, so a restart resumes
+  after it and a crash cannot run a command twice. With no position given and
+  none saved, the first poll only records the newest message as the start: the
+  channel's history is never replayed. A message at or before the position is
+  never routed;
 * ``bot_user_id`` — the bot's own user id, looked up lazily so we
   don't loop on our own replies;
 * ``error_backoff_s`` — multiplicative back-off on consecutive
   failures, capped so the poller stays responsive.
+
+The loop polls every ``poll_interval_s`` (5 s) when idle and every
+``run_poll_interval_s`` (1 s) while a background command runs, so a ``/stop``
+lands within about a second. The fast interval applies from the wait right
+after the run starts. A Slack ``429`` holds every poll back until its
+``Retry-After`` has passed, whichever interval is in force.
 """
 from __future__ import annotations
 
+import math
+import re
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
-from typing import Any, Dict, FrozenSet, List, Optional
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from typing import Any, Callable, Dict, FrozenSet, List, Optional
 
+from je_auto_control.utils.bulkhead.bulkhead import parse_retry_after
 from je_auto_control.utils.chatops.handlers import chatops_run_id
 from je_auto_control.utils.chatops.router import (
     ChatOpsError, CommandResult, CommandRouter,
@@ -39,6 +57,9 @@ from je_auto_control.utils.chatops.router import (
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.executor.run_control import StopToken, stoppable_run
 from je_auto_control.utils.http_client.http_client import build_call, perform_call
+from je_auto_control.utils.json_store.json_store import (
+    load_json_or_quarantine, write_json_dict,
+)
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 
@@ -47,6 +68,10 @@ _HTTP_TIMEOUT = 15.0
 _MIN_POLL_INTERVAL = 1.0
 _MAX_PAGES = 20  # 1000 messages per poll
 _MAX_BACKOFF = 60.0
+#: The longest ``Retry-After`` honoured; a larger one is cut to this.
+_MAX_RETRY_AFTER = 3600.0
+#: The HTTP status Slack answers a rate-limited call with.
+_RATE_LIMITED = 429
 #: How long the poll thread waits for a started command to be listed as a run.
 _START_WAIT = 10.0
 #: How long :meth:`SlackBot.stop` waits for the running command by default.
@@ -60,8 +85,27 @@ _ROUTE_ERRORS = (RuntimeError, ValueError, TypeError, LookupError, AttributeErro
                  ImportError, ArithmeticError, OSError, AutoControlException)
 
 
+#: What the saved position is logged as.
+_STATE_LABEL = "chatops slack position"
+
+
 class SlackError(AutoControlException, RuntimeError):
     """Raised when the Slack API returns ``ok: false`` or HTTP fails."""
+
+
+def _default_state_path(channel_id: str) -> Path:
+    """``~/.je_auto_control/chatops/slack_<channel>.json``, resolved at call time."""
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", channel_id)
+    return Path.home() / ".je_auto_control" / "chatops" / f"slack_{safe}.json"
+
+
+def _ts_value(ts: Any) -> Optional[Decimal]:
+    """A Slack timestamp as a number, or ``None``; strings compared "10" < "9"."""
+    try:
+        value = Decimal(str(ts))
+    except InvalidOperation:
+        return None
+    return value if value.is_finite() else None
 
 
 @dataclass
@@ -70,6 +114,10 @@ class SlackBot:
 
     ``background_commands`` names the commands that run on a worker thread
     (case-insensitive, without the prefix); see the module docstring.
+    ``state_path`` is the file the position is saved to (``None``: the default
+    under ``~/.je_auto_control/chatops/``); a ``last_seen_ts`` passed here is
+    used instead of the saved one. ``run_poll_interval_s`` is the interval
+    while a background command runs (finite, > 0, at most ``poll_interval_s``).
     """
 
     token: str
@@ -80,6 +128,15 @@ class SlackBot:
     _bot_user_id: Optional[str] = None
     _stop: threading.Event = field(default_factory=threading.Event)
     background_commands: FrozenSet[str] = frozenset({"run"})
+    state_path: Optional[str] = None
+    run_poll_interval_s: float = 1.0
+    # Set to cut the poll loop's wait short: by stop() and when a run starts.
+    _wake: threading.Event = field(default_factory=threading.Event, init=False, repr=False)
+    # The clock (monotonic) reading before which Slack asked not to be called again.
+    _retry_at: float = field(default=0.0, init=False, repr=False)
+    _clock: Callable[[], float] = field(default=time.monotonic, init=False, repr=False)
+    # Whether the saved position has been read (only when none was passed).
+    _position_loaded: bool = field(default=False, init=False, repr=False)
     # The one background command in progress: its thread and its stop token.
     _worker: Optional[threading.Thread] = field(default=None, init=False, repr=False)
     _run_token: Optional[StopToken] = field(default=None, init=False, repr=False)
@@ -98,14 +155,25 @@ class SlackBot:
             raise SlackError("Slack token must start with 'xox' (bot token)")
         if not self.channel_id:
             raise SlackError("channel_id must be a non-empty string")
-        if self.poll_interval_s < _MIN_POLL_INTERVAL:
+        if not _is_finite_number(self.poll_interval_s)                 or self.poll_interval_s < _MIN_POLL_INTERVAL:
             raise SlackError(
                 f"poll_interval_s must be >= {_MIN_POLL_INTERVAL}",
             )
+        self.run_poll_interval_s = _check_run_interval(
+            self.run_poll_interval_s, self.poll_interval_s)
         if isinstance(self.background_commands, str):
             raise SlackError("background_commands must be a set of command names")
         self.background_commands = frozenset(
             str(name).strip().lower() for name in self.background_commands)
+        if self.last_seen_ts is not None and _ts_value(self.last_seen_ts) is None:
+            raise SlackError(f"last_seen_ts {self.last_seen_ts!r} is not a Slack timestamp")
+
+    @property
+    def state_file(self) -> Path:
+        """The file the position is saved to."""
+        if self.state_path:
+            return Path(self.state_path).expanduser()
+        return _default_state_path(self.channel_id)
 
     # --- polling -------------------------------------------------
 
@@ -113,30 +181,84 @@ class SlackBot:
         """Pull new messages, dispatch each through the router. Returns count.
 
         A background command counts once it is started (or refused); the call
-        returns without waiting for it.
+        returns without waiting for it. With no position yet, nothing is
+        dispatched: the newest message becomes the position (see the module
+        docstring).
         """
-        messages = self._fetch_messages()
-        if not messages:
+        if not self._has_position():
+            self._start_from_newest()
             return 0
-        # Slack returns newest-first; reverse so we route in chronological order.
-        ordered = list(reversed(messages))
         dispatched = 0
-        for msg in ordered:
-            ts = str(msg.get("ts") or "")
-            if not ts:
-                continue
-            # Commit progress *before* running the command. A command's side
-            # effects (running a script, taking a screenshot) happen exactly
-            # once inside _route_one; if the handler or the reply post then
-            # fails, the next poll must not re-execute it. Advancing last_seen_ts
-            # here (Slack's `oldest` is exclusive) guarantees at-most-once.
-            self.last_seen_ts = max(self.last_seen_ts or "0", ts)
-            if self._is_self(msg):
-                continue
-            text = str(msg.get("text") or "")
-            if self._handle(text, msg):
+        # Slack returns newest-first; reverse so we route in chronological order.
+        for msg in reversed(self._fetch_messages()):
+            if self._take(msg) and self._handle(str(msg.get("text") or ""), msg):
                 dispatched += 1
         return dispatched
+
+    def _take(self, msg: Dict[str, Any]) -> bool:
+        """Record ``msg`` as seen; whether it is a new message to route.
+
+        Progress is saved *before* the command runs. Its side effects (running
+        a script, taking a screenshot) happen inside _handle; if the handler,
+        the reply post or the process then fails, the next poll -- or the next
+        start -- must not run it again. A position that cannot be saved raises,
+        and the command is not run.
+        """
+        ts = str(msg.get("ts") or "")
+        value = _ts_value(ts)
+        current = _ts_value(self.last_seen_ts)
+        if value is None or (current is not None and value <= current):
+            return False
+        self._record_position(ts)
+        return not self._is_self(msg)
+
+    # --- the saved position --------------------------------------
+
+    def _has_position(self) -> bool:
+        """Whether a position is known, reading the saved one the first time."""
+        if self.last_seen_ts is None and not self._position_loaded:
+            self.last_seen_ts = self._load_position()
+            self._position_loaded = True
+        return self.last_seen_ts is not None
+
+    def _load_position(self) -> Optional[str]:
+        """The saved position, or ``None``; a damaged file is moved aside."""
+        path = self.state_file
+        try:
+            data = load_json_or_quarantine(path, _STATE_LABEL)
+        except OSError as error:
+            raise SlackError(f"cannot read the position in {path}: {error}") from error
+        if data is None:
+            return None
+        ts = data.get("last_seen_ts") if isinstance(data, dict) else None
+        if not isinstance(data, dict) or data.get("channel_id") != self.channel_id \
+                or _ts_value(ts) is None:
+            autocontrol_logger.warning(
+                f"chatops slack: {path} holds no position for {self.channel_id}; ignored")
+            return None
+        return str(ts)
+
+    def _start_from_newest(self) -> None:
+        """Make the newest message (or, in an empty channel, now) the position."""
+        body = self._api_get("conversations.history",
+                             {"channel": self.channel_id, "limit": 1})
+        stamps = [str(message.get("ts")) for message in body.get("messages") or []
+                  if isinstance(message, dict) and _ts_value(message.get("ts")) is not None]
+        ts = max(stamps, key=Decimal) if stamps else f"{time.time():.6f}"
+        self._record_position(ts)
+        autocontrol_logger.info(
+            f"chatops slack: no saved position for {self.channel_id}; starting after "
+            f"{ts}, earlier messages are not run")
+
+    def _record_position(self, ts: str) -> None:
+        """Save ``ts`` as the position, then adopt it -- never the other way round."""
+        path = self.state_file
+        try:
+            write_json_dict(path, {"channel_id": self.channel_id, "last_seen_ts": ts})
+        except OSError as error:
+            raise SlackError(
+                f"cannot save the position to {path}: {error}; message {ts} not run") from error
+        self.last_seen_ts = ts
 
     def run_forever(self, *, max_iterations: Optional[int] = None) -> None:
         """Poll on a loop until :meth:`stop` is called."""
@@ -156,7 +278,29 @@ class SlackBot:
             iteration += 1
             if max_iterations is not None and iteration >= max_iterations:
                 return
-            stop.wait(self.poll_interval_s + backoff)
+            self._pause(stop, backoff)
+
+    def _pause(self, stop: threading.Event, backoff: float) -> None:
+        """Wait until the next poll is due, or ``stop`` is set.
+
+        The due time is worked out again whenever the wait is woken, so a run
+        that starts meanwhile shortens it at once and ``stop()`` ends it.
+        """
+        began = self._clock()
+        while not stop.is_set():
+            left = self._poll_due(began, backoff) - self._clock()
+            if left <= 0:
+                return
+            self._wake.wait(left)
+            self._wake.clear()
+
+    def _poll_due(self, began: float, backoff: float) -> float:
+        """The clock reading the next poll is due at, for a wait that began at ``began``."""
+        with self._state_lock:
+            running = self._worker is not None and self._worker.is_alive()
+            retry_at = self._retry_at
+        interval = self.run_poll_interval_s if running else self.poll_interval_s
+        return max(began + interval + backoff, retry_at)
 
     def stop(self, timeout: float = _JOIN_TIMEOUT) -> bool:
         """End the poll loop, stop the running background command and join it.
@@ -173,6 +317,7 @@ class SlackBot:
         refused rather than started.
         """
         self._stop.set()
+        self._wake.set()
         with self._state_lock:
             worker, token = self._worker, self._run_token
         if worker is None or not worker.is_alive():
@@ -286,6 +431,7 @@ class SlackBot:
                     target=self._run_background, args=(text, message, token, listed),
                     name=f"{_WORKER_PREFIX}{token.run_id}", daemon=True)
                 self._worker.start()
+        self._wake.set()  # a waiting poll loop switches to the run interval now
         if refusal:
             self.post_message(refusal, thread_ts=str(message.get("ts") or ""))
             return
@@ -401,6 +547,7 @@ class SlackBot:
             response = perform_call(call)
         except (OSError, ValueError) as error:  # URLError, EgressBlocked
             raise SlackError(f"HTTP failure: {error}") from error
+        self._note_rate_limit(response)
         body = response["json"]
         if not isinstance(body, dict):
             # A list or string body raised AttributeError, which run_forever
@@ -413,17 +560,48 @@ class SlackBot:
             )
         return body
 
+    def _note_rate_limit(self, response: Dict[str, Any]) -> None:
+        """On a ``429``, hold every poll back until its ``Retry-After`` has passed."""
+        if response.get("status") != _RATE_LIMITED:
+            return
+        delay = parse_retry_after(response.get("headers") or {})
+        if delay is None:
+            return  # no advice: the error back-off applies
+        until = self._clock() + min(delay, _MAX_RETRY_AFTER)
+        with self._state_lock:
+            self._retry_at = max(self._retry_at, until)
+        autocontrol_logger.warning(f"chatops slack: rate limited; next poll in {delay:g}s")
+
+
+def _is_finite_number(value: Any) -> bool:
+    """Whether ``value`` is a real int or float (not a bool) and finite."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)         and math.isfinite(value)
+
+
+def _check_run_interval(value: Any, idle: float) -> float:
+    """``run_poll_interval_s`` as a float: finite, > 0 and at most ``idle``."""
+    if not _is_finite_number(value) or not 0 < value <= idle:
+        raise SlackError(
+            f"run_poll_interval_s must be a finite number > 0 and <= poll_interval_s "
+            f"({idle}); got {value!r}")
+    return float(value)
+
 
 def make_default_slack_bot(*, token: str, channel_id: str,
                            script_root: Optional[str] = None,
+                           state_path: Optional[str] = None,
                            ) -> SlackBot:
-    """Wire a :class:`SlackBot` with the default command set in one call."""
+    """Wire a :class:`SlackBot` with the default command set in one call.
+
+    ``state_path`` is where the bot saves its position (see :class:`SlackBot`).
+    """
     from je_auto_control.utils.chatops.handlers import (
         register_default_commands,
     )
     router = CommandRouter()
     register_default_commands(router)
-    bot = SlackBot(token=token, channel_id=channel_id, router=router)
+    bot = SlackBot(token=token, channel_id=channel_id, router=router,
+                   state_path=state_path)
     if script_root is not None:
         import os
         os.environ["JE_AUTOCONTROL_CHATOPS_SCRIPT_ROOT"] = script_root

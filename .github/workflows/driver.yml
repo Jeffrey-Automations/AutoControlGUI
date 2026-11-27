@@ -1,0 +1,91 @@
+name: Driver
+
+# Builds the AutoControl socket driver (autocontrol_driver/generate_autocontrol_driver.py) with
+# Nuitka: one windowless executable on Windows, one binary on Linux. The binaries are not kept in
+# the repository, so a driver can never ship an older socket server than the source. Each build is
+# started once and must refuse a command sent without the token, answer one sent with it, and exit
+# on quit_server. Builds are uploaded as artifacts, and attached to a published GitHub release.
+
+on:
+  push:
+    branches: ["dev", "main"]
+    paths:
+      - "autocontrol_driver/**"
+      - "je_auto_control/utils/socket_server/**"
+      - ".github/workflows/driver.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: driver-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            binary: AutoControlDriver.exe
+            artifact: AutoControlDriver-windows
+          - os: ubuntu-22.04
+            binary: AutoControlDriver
+            artifact: AutoControlDriver-linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install the build's Linux tools and a display
+        if: runner.os == 'Linux'
+        # patchelf for Nuitka's one-file build; the X11 backend opens a display at import time.
+        run: sudo apt-get update && sudo apt-get install -y patchelf xvfb
+
+      - name: Install the package and Nuitka
+        run: python -m pip install -e . nuitka==4.3.5 zstandard==0.25.0  # NOSONAR githubactions:S8544  # reason: installs the checked-out project itself; build tools pinned
+
+      - name: Build the driver
+        run: python autocontrol_driver/build_driver.py --output-dir dist
+
+      - name: Smoke-test the driver (Windows)
+        if: runner.os == 'Windows'
+        run: python autocontrol_driver/smoke_driver.py dist/${{ matrix.binary }}
+
+      - name: Smoke-test the driver (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a python autocontrol_driver/smoke_driver.py dist/${{ matrix.binary }}
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.binary }}
+          if-no-files-found: error
+
+  attach:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: drivers
+          merge-multiple: true
+
+      - name: Attach the drivers to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" drivers/* --repo "$GITHUB_REPOSITORY" --clobber

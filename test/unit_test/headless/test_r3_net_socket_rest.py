@@ -14,14 +14,25 @@ from je_auto_control.utils.exception.exceptions import (
 from je_auto_control.utils.socket_server import (
     auto_control_socket_server as ss,
 )
+from je_auto_control.utils.socket_server.socket_auth import SocketAuth
 from je_auto_control.utils.rest_api import rest_server as rs
+
+
+_TOKEN = "r3-token"
+_AUTH = f"AUTH {_TOKEN}".encode("utf-8") + bytes([10])
+
+
+class _Server:
+    """What the handler reads off its server: the authentication policy."""
+
+    socket_auth = SocketAuth(_TOKEN)
 
 
 class _FakeRequest:
     """Minimal socket stand-in: canned recv chunks + captured sendall bytes."""
 
-    def __init__(self, chunks) -> None:
-        self._chunks = list(chunks)
+    def __init__(self, chunks, authenticate=True) -> None:
+        self._chunks = ([_AUTH] if authenticate else []) + list(chunks)
         self.sent: list = []
 
     def settimeout(self, _timeout) -> None:
@@ -44,7 +55,7 @@ def test_read_command_reassembles_large_message():
     chunks = [payload[i:i + 8192].encode("utf-8")
               for i in range(0, len(payload), 8192)]
     chunks.append(b"\n")  # terminator arrives in a later read
-    request = _FakeRequest(chunks)
+    request = _FakeRequest(chunks, authenticate=False)
 
     result = ss._read_command(request)
 
@@ -62,7 +73,7 @@ def test_handle_sends_error_and_terminator_on_framework_exc(monkeypatch):
     handler = ss.TCPServerHandler.__new__(ss.TCPServerHandler)
     request = _FakeRequest([b'{"AC_bogus": {}}\n'])
     handler.request = request
-    handler.server = object()
+    handler.server = _Server()
 
     handler.handle()  # must not raise
 
@@ -132,7 +143,7 @@ def test_invalid_utf8_is_answered_not_dropped():
     handler = ss.TCPServerHandler.__new__(ss.TCPServerHandler)
     request = _FakeRequest([bytes([0xFF, 0xFE]) + b" not utf-8\n"])
     handler.request = request
-    handler.server = object()
+    handler.server = _Server()
 
     handler.handle()  # must not raise
 
@@ -165,3 +176,38 @@ def test_dispatch_contains_sqlite_error():
 
     assert sent["status"] == 500
     assert any(status == 500 for _, _, status in server.metrics.requests)
+
+
+def _answer(monkeypatch, error):
+    def boom(_payload):
+        raise error
+    monkeypatch.setattr(ss, "execute_action", boom)
+    handler = ss.TCPServerHandler.__new__(ss.TCPServerHandler)
+    handler.request = request = _FakeRequest([b'[["AC_x"]]' + bytes([10])])
+    handler.server = _Server()
+    handler.handle()
+    return b"".join(request.sent)
+
+
+def test_an_error_outside_the_framework_family_is_answered(monkeypatch):
+    """sqlite3 and cv2 errors derive from Exception alone; the client got a bare EOF."""
+    joined = _answer(monkeypatch, sqlite3.OperationalError("database is locked"))
+    assert b"database is locked" in joined
+    assert joined.endswith(b"Return_Data_Over_JE" + bytes([10]))
+
+
+def test_an_error_text_that_is_not_utf8_is_answered(monkeypatch):
+    joined = _answer(monkeypatch, AutoControlActionException("unknown command " + chr(0xD800)))
+    assert b"unknown command" in joined
+    assert joined.endswith(b"Return_Data_Over_JE" + bytes([10]))
+
+
+def test_a_result_that_is_not_utf8_is_sent_escaped(monkeypatch):
+    monkeypatch.setattr(ss, "execute_action", lambda _payload: {"a": "file" + chr(0xDC80), "b": "ok"})
+    handler = ss.TCPServerHandler.__new__(ss.TCPServerHandler)
+    handler.request = request = _FakeRequest([b'[["AC_x"]]' + bytes([10])])
+    handler.server = _Server()
+    handler.handle()
+    lines = b"".join(request.sent).split(bytes([10]))
+    assert lines[0] == b"AUTH_OK"
+    assert lines[2:4] == [b"ok", b"Return_Data_Over_JE"]

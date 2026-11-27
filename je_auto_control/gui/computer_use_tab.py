@@ -56,6 +56,7 @@ class ComputerUseTab(TranslatableMixin, QWidget):
         self._output = QTextEdit()
         self._output.setReadOnly(True)
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         # Stop ends the run before its next step; the tab stays busy until it has.
         self._run = TabTask(self)
         self._run.result.connect(self._on_worker_finished)
@@ -130,7 +131,7 @@ class ComputerUseTab(TranslatableMixin, QWidget):
             )
             return
         if self._run.running:
-            self._status.setText(_t("computer_use_already_running"))
+            self._status_text.show("computer_use_already_running")
             return
         params = {
             "goal": goal,
@@ -139,7 +140,7 @@ class ComputerUseTab(TranslatableMixin, QWidget):
             "wall_seconds": float(self._wall_seconds.value()),
             "max_tokens": int(self._max_tokens.value()),
         }
-        self._status.setText(_t("computer_use_running"))
+        self._status_text.show("computer_use_running")
         self._spawn_worker(params)
 
     def _spawn_worker(self, params: dict[str, Any]) -> None:
@@ -147,18 +148,18 @@ class ComputerUseTab(TranslatableMixin, QWidget):
 
     def _on_stop(self) -> None:
         if self._run.stop():
-            self._status.setText(_t("computer_use_stopping"))
+            self._status_text.show("computer_use_stopping")
 
     def _on_worker_finished(self, data: dict[str, Any]) -> None:
         ok = bool(data.get("succeeded"))
         key = "computer_use_success" if ok else "computer_use_failure"
-        self._status.setText(_t(key))
+        self._status_text.show(key)
         self._output.setPlainText(
             json.dumps(data, indent=2, ensure_ascii=False, default=str),
         )
 
     def _on_worker_failed(self, error: object) -> None:
-        self._status.setText(f"{_t('computer_use_error')}: {type(error).__name__}: {error}")
+        self._status_text.show_joined("computer_use_error", f"{type(error).__name__}: {error}")
 
 
 __all__ = ["ComputerUseTab"]

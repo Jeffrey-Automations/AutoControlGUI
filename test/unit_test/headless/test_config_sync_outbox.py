@@ -250,3 +250,60 @@ def test_full_sync_cannot_rewind_a_confirmed_peer():
     peers.register('desktop',full_revision=3)
     with pytest.raises(ConfigSyncError):
         peers.register('desktop',full_revision=2,full_resync=True)
+
+
+def test_conflicts_at_the_front_do_not_starve_later_edits(tmp_path):
+    from je_auto_control.utils.config_sync.contract import ConfigRevisionConflict
+    queue=SyncOutbox(tmp_path/'queue.sqlite3')
+    items=[operation(f'edit-{index}') for index in range(3)]
+    queue.enqueue_many(items)
+    def conflict(_item):
+        raise ConfigRevisionConflict(7)
+    policy=SyncRetryPolicy(max_batch=2,max_attempts=1)
+    queue.flush(conflict,endpoint=items[0].endpoint,user_id='alice',policy=policy)
+    assert queue.status(endpoint=items[0].endpoint,user_id='alice')['conflict']==2
+    sent=[]
+    report=queue.flush(lambda item:sent.append(item.operation_id) or 1,endpoint=items[0].endpoint,
+                       user_id='alice',policy=policy)
+    assert sent==['edit-2']
+    assert report.delivered==1
+    assert report.pending==2                       # the conflicts are kept for the user to resolve
+    assert [item.operation_id for item in queue.pending(endpoint=items[0].endpoint,user_id='alice')]==[
+        'edit-0','edit-1']
+
+
+def _delivered_ids(path):
+    import sqlite3
+    with sqlite3.connect(path) as connection:
+        return [row[0] for row in connection.execute(
+            "SELECT operation_id FROM sync_operations WHERE status='delivered' ORDER BY sequence")]
+
+
+def test_delivered_receipts_are_pruned_beyond_the_count_bound(tmp_path):
+    path=tmp_path/'queue.sqlite3'
+    queue=SyncOutbox(path,receipt_limit=2)
+    items=[operation(f'edit-{index}') for index in range(4)]
+    queue.enqueue_many(items)
+    queue.enqueue(operation('waiting',user_id='bob'))
+    assert queue.flush(lambda _item:1,endpoint=items[0].endpoint,user_id='alice').delivered==4
+    assert _delivered_ids(path)==['edit-2','edit-3']
+    assert queue.status(endpoint=items[0].endpoint,user_id='bob')['pending']==1   # undelivered work is never pruned
+
+
+def test_delivered_receipts_older_than_the_age_bound_are_pruned(tmp_path):
+    path=tmp_path/'queue.sqlite3'
+    now=[1_000_000.0]
+    queue=SyncOutbox(path,clock=lambda:now[0],receipt_max_age=60.0)
+    queue.enqueue(operation('old'))
+    queue.flush(lambda _item:1,endpoint=operation().endpoint,user_id='alice')
+    now[0]+=61.0
+    queue.enqueue(operation('new'))
+    queue.flush(lambda _item:1,endpoint=operation().endpoint,user_id='alice')
+    assert _delivered_ids(path)==['new']
+
+
+@pytest.mark.parametrize('bad',[{'receipt_limit':0},{'receipt_limit':True},{'receipt_max_age':0},
+                                {'receipt_max_age':float('nan')}])
+def test_receipt_bounds_are_validated(tmp_path,bad):
+    with pytest.raises(ConfigSyncError):
+        SyncOutbox(tmp_path/'queue.sqlite3',**bad)

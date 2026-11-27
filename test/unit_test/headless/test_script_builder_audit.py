@@ -114,7 +114,10 @@ def test_a_wrapped_file_keeps_its_other_keys(monkeypatch, tmp_path):
     monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args: (str(source), ""))
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args: (str(target), ""))
     tab = ScriptBuilderTab()
+    from headless._qt_settle import settle
     tab._on_load()
+    assert settle(tab._files, "task")               # read off the GUI thread
     tab._on_save()
+    assert settle(tab._files, "task")               # written off the GUI thread
     assert json.loads(target.read_text(encoding="utf-8")) == {
         "meta": {"owner": "qa"}, "auto_control": [["AC_click_mouse"]]}

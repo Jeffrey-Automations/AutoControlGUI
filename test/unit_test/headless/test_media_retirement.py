@@ -310,6 +310,7 @@ def test_host_audio_failure_does_not_skip_socket_or_client_cleanup():
     host._frame_cond = threading.Condition()
     host._clients_lock = threading.Lock()
     host._clients = [SimpleNamespace(stop=lambda: calls.append("client"))]
+    host._pending = {}
     host._file_receiver = None
     host._accept_thread = host._capture_thread = host._cursor_thread = None
     with pytest.raises(OSError):
@@ -582,3 +583,19 @@ def test_mic_stop_waiting_for_start_keeps_admission_closed(monkeypatch, kind):
     if kind == "sender":
         children[0].callback(b"late PCM")
         assert sent == []
+
+
+def test_a_session_with_odd_dimensions_is_recorded(tmp_path):
+    """yuv420p needs even sizes: the encoder refused, and the recording of an odd region was empty."""
+    av = pytest.importorskip("av")
+    np = pytest.importorskip("numpy")
+    from je_auto_control.utils.remote_desktop.session_recorder import SessionRecorder
+    path = tmp_path / "odd.mp4"
+    recorder = SessionRecorder(str(path), fps=10)
+    for index in range(5):
+        frame = av.VideoFrame.from_ndarray(np.zeros((75, 101, 3), dtype=np.uint8), format="bgr24")
+        frame.pts = index
+        recorder.write_frame(frame)
+    recorder.stop()
+    with av.open(str(path)) as container:
+        assert (container.streams.video[0].width, container.streams.video[0].height) == (100, 74)

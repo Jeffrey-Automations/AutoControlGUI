@@ -116,3 +116,16 @@ def test_facade_exports():
                  "GateConfig"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_a_nan_timeout_is_refused_instead_of_waiting_for_ever():
+    """``now >= nan`` is never true, and action JSON may hold NaN."""
+    polls = []
+
+    def sleep(_seconds):
+        polls.append(1)
+        if len(polls) > 5:
+            raise AssertionError("still polling")
+
+    with pytest.raises(ValueError, match="timeout_s"):
+        wait_actionable(lambda: None, config=GateConfig(timeout_s=float("nan"), sleep=sleep))

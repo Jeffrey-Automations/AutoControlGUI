@@ -66,14 +66,33 @@ For OpenAI agent integrations, expose a focused allow-list with `export_openai_t
 
 | Surface | Start it with | Notes |
 |---|---|---|
-| **MCP server** | `je_auto_control_mcp` (stdio) or `AC_start_mcp_http_server` | 820 tools for Claude Desktop / Claude Code / custom tool loops: the full `ac_*` surface plus short model-friendly aliases for common GUI actions. Speaks the stateless MCP 2026-07-28 beside the `initialize`-based revisions. Bearer auth, TLS, audit log, rate limit, plugin hot-reload, CI fake backend. |
+| **MCP server** | `je_auto_control_mcp` (stdio) or `AC_start_mcp_http_server` | 823 tools for Claude Desktop / Claude Code / custom tool loops: the full `ac_*` surface plus short model-friendly aliases for common GUI actions. Speaks the stateless MCP 2026-07-28 beside the `initialize`-based revisions. Bearer auth, TLS, audit log, rate limit, plugin hot-reload, CI fake backend. |
 | **REST API** | `je_auto_control start-rest` | Bearer token, per-IP rate limit + lockout, SQLite audit hook, `/metrics`, `/openapi.json`, `/docs` Swagger UI, `/dashboard`. |
-| **TCP socket server** | `je_auto_control start-server` | Newline-framed JSON action lists. Binds `127.0.0.1` by default. |
+| **TCP socket server** | `je_auto_control start-server` | Newline-framed JSON action lists after an `AUTH <token>` handshake (see below). Binds `127.0.0.1` by default. |
 | **pytest plugin** | installed automatically | Fixtures plus a Gherkin step library for pytest-bdd / behave. |
 | **Language server** | `python -m autocontrol_lsp.server` | Completion and diagnostics for `AC_*` action JSON, generated from the live command table. |
 | **Remote desktop** | `RemoteDesktopHost` / GUI | TCP, WebSocket, or WebRTC; TOTP, trust list, TURN config, file/clipboard/audio sync. |
 
 All servers bind to `127.0.0.1` unless you opt in explicitly.
+
+**TCP socket server authentication.** The first line of every connection must be `AUTH <token>`; the server answers `AUTH_OK` and then reads one command as before. A command sent without it, `quit_server` included, is refused with `authentication required` and does not run.
+
+- **Server token** (RBAC off): `start_autocontrol_socket_server(token=...)` / `--token`, else `JE_AUTOCONTROL_SOCKET_TOKEN`, else a random `secrets.token_urlsafe(32)`. It is written atomically to `~/.je_auto_control/socket_server_<port>.token` (`--token-file` / `token_path` overrides it), readable by its owner only (0600 on POSIX, a current-user-only access list on Windows), and deleted when the server closes. The CLI prints the path, never the token.
+- **RBAC on** (`JE_AUTOCONTROL_RBAC_USERS`): only users' tokens authenticate; the server token is refused and no file is written. Each command runs under that user's role: an action list needs `drive_input` and is checked whole before it runs, nested action files are checked by the executor, and `quit_server` needs `manage_hosts`.
+- **Limits:** 10 seconds to authenticate, 3 wrong tokens per connection before it is closed, and failed attempts rate-limited per client address (after 8 failures a minute wrong tokens get `too many failed attempts`; a valid token is never locked out).
+- **Opt-out:** `--no-auth` / `require_auth=False` keeps the unauthenticated protocol and logs a warning that any process able to reach the server can run any command.
+
+The client helper reads the token for you:
+
+```python
+import je_auto_control as ac
+
+print(ac.send_socket_command([["AC_screen_size"]], port=9938))  # token file, or JE_AUTOCONTROL_SOCKET_TOKEN
+ac.send_socket_command("quit_server", port=9938, token="<an admin's token under RBAC>")
+```
+
+`read_socket_token(port)` and `authenticate_connection(connection, stream, token)` cover clients that open their own socket. An existing client must send `AUTH <token>` and read the `AUTH_OK` line before its reply, or the server must be started with `--no-auth`.
+**Resource subscriptions over HTTP.** On the MCP HTTP transport a handshake-era `resources/subscribe` belongs to the session that sent it: send the `Mcp-Session-Id` that `initialize` returned, and open that session's standing `GET` stream (`Accept: text/event-stream`) to receive `notifications/resources/updated`. Each session holds its own subscriptions, an update that arrives while the session has no stream open is dropped, and ending the session (`DELETE`, idle sweep or eviction) releases them. A request without a session has no stream to deliver on, so `resources/subscribe` is refused with JSON-RPC error `-32600` rather than answered `{}`. Stateless 2026-07-28 clients use `subscriptions/listen`; the stdio transport is unchanged.
 
 The MCP window-state tools `ac_window_minimize`, `ac_window_maximize` and `ac_window_restore` return the window handle on accepted requests and `isError: true` on backend refusal (including a stale handle or rejected activation). Raw Win32 `ShowWindow` previous visibility is normalized by the backend.
 
@@ -86,6 +105,8 @@ The REST GUI shows RBAC mode and disables the shared-token field while a user st
 RBAC viewers do not receive the named sensitive-read tools, even when their MCP `readOnlyHint` is true: clipboard/history, local document/data/SQL and dotenv reads, reference resolution, credential generation, persistent store readers, outbound checks, microphone capture and external VLM requests require operator/admin. Assertion containers also require operator because their specs can read those resources. Screen observation and pure input parsing keep their existing classification. `ac_realize_item`, `ac_idempotency_begin` and `ac_rate_limit` change state and are excluded from `--read-only` mode.
 
 Delayed interval/cron jobs, triggers, hotkeys, watchdog rules, webhooks, e-mail triggers and observer callbacks retain their registrant’s identity. Store-backed users and roles are checked again on dispatch; deleted users, unavailable stores and viewers cannot execute deferred work. Starting a daemon does not transfer its registrations to the starter. Ownership metadata retains no RBAC bearer token; explicit Python `AuthorizationContext` values without `store_path` keep their captured role, and work registered outside RBAC clears worker identity. Observer/watchdog callbacks get fresh variable scopes, and failed watchdog actions do not count as dismissed popups. Nested callbacks retain the caller’s failure count; a webhook with a revoked owner returns HTTP 403 and `fired: false`.
+
+Voice commands and macros are stored action lists that someone else sets off. `AC_voice_register` and `AC_define_macro` (and `ac_voice_register`) capture the registrant; `AC_voice_dispatch` / `AC_call_macro` (and `ac_voice_dispatch`) run each step, nested bodies and `AC_parallel` branches included, only if both the registrant and the current caller have the capability it needs. A refused step is recorded as an `AuthorizationError` and the list continues as it would for any failed step. A store-backed registrant is re-read at dispatch, so a deleted user's commands no longer run. The executor's macro table is shared by every server, so a principal may redefine only its own macros; trusted local code (no RBAC scope) may redefine any macro, and a macro it defined cannot be replaced by a user. Anonymous MCP sessions already act as an `mcp:<session>` operator, so even with RBAC off their voice commands and macros keep operator limits when the GUI or Python dispatches them, and a reconnected session cannot redefine the previous session's macro. With RBAC off and no MCP session nothing changes.
 
 ### How the remote-desktop wire protocol works
 
@@ -129,4 +150,4 @@ RemoteDesktopHost(token="tok", ip_allowlist=["10.0.0.0/8", "192.168.1.100"])
 
 ---
 
-The internal presence transport can carry an owned Linux source endpoint through the private host/helper configuration. Lease and endpoint are pinned together; public task options cannot choose that endpoint. Standard desktop admission remains Windows-only. Linux socket execution and native desktop acceptance remain unverified.
+The internal presence transport can carry an owned Linux or macOS source endpoint through the private host/helper configuration. Lease and endpoint are pinned together; public task options cannot choose that endpoint. Standard desktop admission remains Windows-only. Linux socket execution, macOS beyond the CI square and native desktop acceptance remain unverified.

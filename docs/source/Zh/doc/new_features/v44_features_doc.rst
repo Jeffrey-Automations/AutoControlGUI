@@ -49,3 +49,5 @@
 ``actions`` 接受清單或 JSON 字串清單(因此視覺化建構器可用)。相同操作亦提供為 MCP 工具
 (``ac_voice_register`` / ``ac_voice_dispatch`` / ``ac_voice_list`` /
 ``ac_voice_clear``),以及 Script Builder 中 **Agent** 分類下的指令。
+
+指令保留註冊者的權限：觸發時，每個步驟必須註冊者與目前呼叫端都有權執行才會執行。

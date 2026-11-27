@@ -28,6 +28,7 @@ class _Lifecycle:
 
     closed: bool = False
     busy: bool = False
+    maintaining: bool = False
     deadline: float = 0.0
     importer: Any = None
     evidence: Any = None
@@ -82,18 +83,26 @@ class AgentTransfers:
 
     def maintain(self) -> None:
         """Retain runtime ownership through serialized source and import cleanup, independently of observers."""
-        with self._mutex:
+        # Wait for another maintainer, but not for an operation, which can be on a remote peer:
+        # lease maintenance shares this thread.
+        while not self._mutex.acquire(timeout=0.05):
+            with self._state:
+                if not self._life.maintaining:
+                    return
+        try:
             with self._state:
                 if self._life.closed or self._life.busy:
                     return
-                self._life.busy = True
+                self._life.busy = self._life.maintaining = True
             try:
                 self.source.maintain()
                 self._life.evidence.maintain()
                 self._life.importer.maintain()
             finally:
                 with self._state:
-                    self._life.busy = False
+                    self._life.busy = self._life.maintaining = False
+        finally:
+            self._mutex.release()
 
     def _invoke(self, operation: str, request: Mapping[str, Any], *, peer: bool) -> dict[str, Any]:
         with self._mutex:

@@ -4,7 +4,19 @@ We can't actually run Docker in CI, but we can:
 - verify the files exist and are parseable
 - assert the entrypoint covers every documented mode
 - assert the compose file references the built image and the published ports
+- run both service entrypoints under ``sh`` with their daemons stubbed, so the
+  command each would exec is checked against the real argument parsers
 """
+import argparse
+import ast
+import fnmatch
+import importlib.util
+import os
+import shutil
+import subprocess  # nosec B404  # reason: runs the entrypoint under sh with stubbed daemons
+import sys
+import tomllib
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -15,6 +27,40 @@ _DOCKER_DIR = _REPO_ROOT / "docker"
 #: Spelled from ``chr`` so this file stays byte-identical under any
 #: checkout normalisation that might rewrite a literal in it.
 CRLF = (chr(13) + chr(10)).encode()
+_SERVICE_ENTRYPOINTS = ("entrypoint.sh", "entrypoint-xfce.sh")
+#: What the entrypoints start before the service; each stub records that it ran.
+_DAEMON_STUBS = ("Xvfb", "startxfce4", "x11vnc", "sleep")
+
+
+def _write_stub(path: Path, body: str) -> None:
+    path.write_bytes(("#!/bin/sh\n" + body).encode())
+    path.chmod(0o755)
+
+
+def _run_entrypoint(script: str, tmp_path: Path, *args: str, env=None):
+    """Run an entrypoint with its daemons and ``python`` replaced by stubs.
+
+    Returns the completed process, the argv the entrypoint exec'd ``python``
+    with (empty when it never got that far) and the daemons that started.
+    """
+    shell = shutil.which("sh")
+    if shell is None:
+        pytest.skip("no POSIX sh to run the entrypoint with")
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    started = tmp_path / "started.log"
+    for name in _DAEMON_STUBS:
+        _write_stub(stubs / name, f'echo {name} >> "{started.as_posix()}"\n')
+    _write_stub(stubs / "python", 'for a in "$@"; do printf "%s\\n" "$a"; done\n')
+    full_env = {key: value for key, value in os.environ.items()
+                if key not in ("AC_TOKEN", "AC_PORT")}
+    full_env.update(env or {})
+    full_env["PATH"] = str(stubs) + os.pathsep + os.environ.get("PATH", "")
+    done = subprocess.run(  # nosec B603  # reason: fixed argv, the script is a repository file
+        [shell, (_DOCKER_DIR / script).as_posix(), *args],
+        capture_output=True, text=True, env=full_env, timeout=30, check=False)
+    daemons = started.read_text().split() if started.exists() else []
+    return done, done.stdout.splitlines(), daemons
 
 
 def test_dockerfile_exists_and_uses_python_base():
@@ -323,3 +369,221 @@ def test_docs_run_in_ci_page_exists_and_covers_both_pipelines():
     for needle in ("GitHub Actions", "GitLab CI", "Kubernetes",
                     "Dockerfile.xfce", "JE_AUTOCONTROL_LINUX_DISPLAY_SERVER"):
         assert needle in raw, f"docs page missing section: {needle}"
+
+
+# --- remote-host credential (R06) -----------------------------------
+
+@pytest.mark.parametrize("script", _SERVICE_ENTRYPOINTS)
+@pytest.mark.parametrize("token", [None, "", "  \t "])
+def test_remote_host_refuses_a_missing_or_blank_token(script, token, tmp_path):
+    """No token means no host: a fixed fallback is one secret for every container.
+
+    The refusal has to come before anything listens -- in the XFCE image that
+    includes the VNC server, which binds every interface.
+    """
+    env = {} if token is None else {"AC_TOKEN": token}
+    done, argv, daemons = _run_entrypoint(script, tmp_path, "remote-host", env=env)
+    assert done.returncode != 0, f"{script} started remote-host without a token"
+    assert "AC_TOKEN" in done.stderr
+    assert argv == [], f"{script} exec'd the host anyway: {argv}"
+    assert daemons == [], f"{script} started {daemons} before refusing"
+
+
+@pytest.mark.parametrize("script", _SERVICE_ENTRYPOINTS)
+def test_remote_host_uses_the_token_it_was_given(script, tmp_path):
+    done, argv, _daemons = _run_entrypoint(
+        script, tmp_path, "remote-host", env={"AC_TOKEN": "s3cret-value"})
+    assert done.returncode == 0, done.stderr
+    assert argv[0] == "-c"
+    code = "\n".join(argv[1:])
+    assert "os.environ['AC_TOKEN']" in code
+    assert "change-me" not in code
+
+
+@pytest.mark.parametrize("script", _SERVICE_ENTRYPOINTS)
+def test_entrypoints_carry_no_fixed_token(script):
+    """The static half of the check above, for a machine without ``sh``."""
+    raw = (_DOCKER_DIR / script).read_text(encoding="utf-8")
+    assert "change-me" not in raw
+    assert "os.environ.get('AC_TOKEN'" not in raw
+
+
+# --- service commands against the real parsers (D01) ----------------
+
+class _Started(Exception):
+    """Raised by the stand-in server so a test stops at the bind."""
+
+
+def _parser_from_source(module_path: Path, name: str):
+    """Compile one function out of a module whose imports are not installed.
+
+    The signaling server needs its extra (FastAPI) to import at all; its
+    argument parser does not, so the exact source is compiled on its own.
+    """
+    tree = ast.parse(module_path.read_text(encoding="utf-8"))
+    func = next(node for node in tree.body
+                if isinstance(node, ast.FunctionDef) and node.name == name)
+    namespace = {"argparse": argparse, "_DEFAULT_TTL_S": 300.0}
+    code = compile(ast.Module(body=[func], type_ignores=[]), str(module_path), "exec")
+    exec(code, namespace)  # nosec B102  # reason: compiles a function from repository source
+    return namespace[name]
+
+
+def _signaling_listen(argv, _monkeypatch):
+    try:
+        from je_auto_control.utils.remote_desktop.signaling_server import _build_arg_parser
+    except ImportError:  # the [signaling] extra is not installed here
+        _build_arg_parser = _parser_from_source(
+            _REPO_ROOT / "je_auto_control" / "utils" / "remote_desktop" / "signaling_server.py",
+            "_build_arg_parser")
+    args = _build_arg_parser().parse_args(argv)
+    return args.bind, args.port
+
+
+def _rest_listen(argv, monkeypatch):
+    from je_auto_control.utils.rest_api import rest_server
+    seen = {}
+
+    def _record(**kwargs):
+        seen.update(kwargs)
+        raise _Started
+
+    monkeypatch.setattr(rest_server, "start_rest_api_server", _record)
+    with pytest.raises(_Started):
+        rest_server._main(argv)
+    return seen["host"], seen["port"]
+
+
+_SERVICE_MODES = {
+    "rest": ("je_auto_control.utils.rest_api.rest_server", _rest_listen, 9939),
+    "signaling": ("je_auto_control.utils.remote_desktop.signaling_server", _signaling_listen, 8765),
+}
+
+
+def _service_listen(script, mode, tmp_path, monkeypatch, env=None):
+    """Run ``mode`` through the entrypoint and parse what it exec'd."""
+    module, listen, _port = _SERVICE_MODES[mode]
+    done, argv, _daemons = _run_entrypoint(script, tmp_path, mode, env=env)
+    assert done.returncode == 0, done.stderr
+    assert argv[:2] == ["-m", module], argv
+    return listen(argv[2:], monkeypatch)
+
+
+@pytest.mark.parametrize("script", _SERVICE_ENTRYPOINTS)
+@pytest.mark.parametrize("mode", sorted(_SERVICE_MODES))
+def test_service_modes_exec_a_command_their_parser_accepts(script, mode, tmp_path, monkeypatch):
+    """A flag the parser rejects is an image that exits on start."""
+    address, port = _service_listen(script, mode, tmp_path, monkeypatch)
+    assert address == "0.0.0.0"  # nosec B104  # reason: a container service is reached from outside it
+    assert port == _SERVICE_MODES[mode][2]
+
+
+@pytest.mark.parametrize("dockerfile", ["Dockerfile", "Dockerfile.xfce"])
+def test_dockerfiles_install_the_signaling_extra(dockerfile):
+    """The signaling mode is in every entrypoint, so its extra is in every image."""
+    pyproject = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert pyproject["project"]["optional-dependencies"]["signaling"]
+    raw = (_DOCKER_DIR / dockerfile).read_text(encoding="utf-8")
+    # Built into the wheelhouse, which the runtime stage installs from with
+    # --no-index: an extra missing from the wheelhouse cannot be installed.
+    assert 'pip wheel --no-cache-dir --wheel-dir /wheels ".[signaling]"' in raw
+    assert '"je_auto_control[signaling]"' in raw
+
+
+@pytest.mark.parametrize("script", _SERVICE_ENTRYPOINTS)
+@pytest.mark.parametrize("mode", sorted(_SERVICE_MODES))
+def test_service_modes_listen_on_ac_port(script, mode, tmp_path, monkeypatch):
+    """The Helm chart passes a non-default port as AC_PORT, as remote-host has."""
+    _address, port = _service_listen(script, mode, tmp_path, monkeypatch, env={"AC_PORT": "19123"})
+    assert port == 19123
+
+
+# --- the builder stage packages what pyproject declares (D07) -------
+
+def _builder_sources(dockerfile: str) -> list:
+    """Context paths the ``builder`` stage copies, in order."""
+    sources, in_builder = [], False
+    for line in (_DOCKER_DIR / dockerfile).read_text(encoding="utf-8").splitlines():
+        if line.startswith("FROM "):
+            in_builder = line.rstrip().endswith(" AS builder")
+        elif in_builder and line.startswith("COPY ") and "--from" not in line:
+            sources.extend(line.split()[1:-1])
+    return sources
+
+
+def _dockerignored(name: str) -> bool:
+    """Whether ``.dockerignore`` drops a top-level path; the last match wins."""
+    ignored = False
+    for line in (_REPO_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines():
+        pattern = line.strip()
+        if not pattern or pattern.startswith("#"):
+            continue
+        if fnmatch.fnmatchcase(name, pattern.lstrip("!").rstrip("/")):
+            ignored = not pattern.startswith("!")
+    return ignored
+
+
+def _packaged_top_level_files() -> list:
+    project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    modules = [f"{name}.py" for name in project["tool"]["setuptools"]["py-modules"]]
+    return modules + project["project"]["license-files"] + [project["project"]["readme"]["file"]]
+
+
+@pytest.mark.parametrize("dockerfile", ["Dockerfile", "Dockerfile.xfce"])
+def test_docker_builders_copy_what_pyproject_packages(dockerfile):
+    """A file the build cannot see is quietly left out of the wheel, not an error."""
+    sources = _builder_sources(dockerfile)
+    for name in _packaged_top_level_files():
+        assert name in sources, f"{dockerfile} builder never copies {name}"
+        assert not _dockerignored(name), f".dockerignore keeps {name} from the build"
+
+
+def _copy_builder_inputs(dockerfile: str, src: Path) -> None:
+    """Copy the builder's top-level inputs; a package keeps only its marker.
+
+    What is checked is the top-level files, which the builder copies one by
+    one. Each copied directory is reduced to its ``__init__.py``: the full
+    1,600-module tree turns a two-second build into minutes and decides
+    nothing about the files at the root.
+    """
+    src.mkdir()
+    for name in _builder_sources(dockerfile):
+        origin = _REPO_ROOT / name
+        if _dockerignored(name):
+            continue
+        if not origin.is_dir():
+            shutil.copy2(origin, src / name)
+            continue
+        (src / name).mkdir()
+        if (origin / "__init__.py").is_file():
+            shutil.copy2(origin / "__init__.py", src / name / "__init__.py")
+
+
+def _require_declared_setuptools() -> None:
+    """Skip unless the installed setuptools meets ``build-system.requires`` (a CI runner may carry an older one)."""
+    import setuptools  # pylint: disable=import-outside-toplevel  # reason: only when a wheel is built
+    project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    floor = next(item.split(">=", 1)[1] for item in project["build-system"]["requires"]
+                 if item.startswith("setuptools>="))
+
+    def version(text: str) -> tuple:
+        return tuple(int(part) for part in text.split(".")[:3] if part.isdigit())
+    if version(setuptools.__version__) < version(floor):
+        pytest.skip(f"setuptools {setuptools.__version__} is older than the declared {floor}")
+
+
+def test_wheel_from_the_docker_builder_inputs_ships_the_plugin_and_license(tmp_path):
+    """Build the wheel from what the builder stage would see at the root."""
+    if importlib.util.find_spec("setuptools") is None:
+        pytest.skip("setuptools is not installed, so no wheel can be built")
+    _require_declared_setuptools()
+    src, out = tmp_path / "src", tmp_path / "wheels"
+    _copy_builder_inputs("Dockerfile", src)
+    built = subprocess.run(  # nosec B603  # reason: fixed argv, builds repository source into a temp dir
+        [sys.executable, "-c", "import sys, setuptools.build_meta as b; b.build_wheel(sys.argv[1])", str(out)],
+        cwd=src, capture_output=True, text=True, timeout=600, check=False)
+    assert built.returncode == 0, built.stdout[-2000:] + built.stderr[-3000:]
+    with zipfile.ZipFile(next(out.glob("je_auto_control-*.whl"))) as wheel:
+        names = wheel.namelist()
+    assert "je_auto_control_pytest.py" in names, "the pytest11 entry point names a missing module"
+    assert any(name.endswith(".dist-info/licenses/LICENSE") for name in names), "LICENSE is not in the wheel"

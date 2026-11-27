@@ -90,3 +90,65 @@ def test_a_log_pruned_before_the_anchor_existed_still_verifies(tmp_path):
     _tamper(path, "DROP TABLE chain_meta")
     _tamper(path, "PRAGMA user_version = 0")
     assert _verify(path).ok
+
+
+def test_text_sqlite_cannot_store_is_still_logged(tmp_path):
+    """A lone surrogate raised out of log() with the write transaction left open.
+
+    A peer chooses ``viewer_id``, so a refused login could both skip its own
+    audit row and lose the next one to the stuck transaction.
+    """
+    log = AuditLog(tmp_path / "surrogate.db")
+    try:
+        log.log("auth_fail", viewer_id="evil\ud800", detail="x\udfff")
+        log.log("auth_ok", viewer_id="v")
+        rows = log.query()
+        assert [row["event_type"] for row in rows] == ["auth_ok", "auth_fail"]
+        assert rows[1]["viewer_id"].startswith("evil")
+        assert log.verify_chain().ok
+    finally:
+        log.close()
+
+
+def test_another_process_cannot_prune_inside_a_prune(tmp_path, monkeypatch):
+    """The anchor read before the other process pruned was stored after it, and verified as tampering."""
+    monkeypatch.setattr(audit_module, "_MAX_ROWS", 6)
+    monkeypatch.setattr(audit_module, "_PRUNE_TARGET", 3)
+    path = tmp_path / "shared.db"
+    log = AuditLog(path)
+    other = AuditLog(path)
+    other._conn.execute("PRAGMA busy_timeout = 0")
+    set_anchor = log._set_anchor_locked
+
+    def interleaved(value):
+        other.log("event", detail="from the other process")
+        set_anchor(value)
+
+    monkeypatch.setattr(log, "_set_anchor_locked", interleaved)
+    try:
+        for index in range(7):
+            log.log("event", detail=str(index))
+        assert log.verify_chain().ok
+    finally:
+        other.close()
+        log.close()
+
+
+def test_a_clear_that_cannot_record_itself_clears_nothing(tmp_path, monkeypatch):
+    """The rows used to go even when the event saying so could not be written."""
+    log = AuditLog(tmp_path / "clear.db")
+    try:
+        log.log("auth_ok", viewer_id="v")
+
+        def refuse(*_args, **_kwargs):
+            raise sqlite3.OperationalError("database is locked")
+
+        with monkeypatch.context() as patch:
+            patch.setattr(log, "_insert_locked", refuse, raising=False)
+            patch.setattr(log, "log", refuse)
+            with pytest.raises((sqlite3.Error, audit_module.AuditLogError)):
+                log.clear()
+        assert [row["event_type"] for row in log.query()] == ["auth_ok"]
+        assert log.verify_chain().ok
+    finally:
+        log.close()

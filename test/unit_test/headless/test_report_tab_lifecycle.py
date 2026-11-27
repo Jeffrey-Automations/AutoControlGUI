@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
 from shiboken6 import isValid  # noqa: E402
 from headless._qt_settle import pump_until  # noqa: E402
 from je_auto_control.gui import _report_tab  # noqa: E402
+from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper  # noqa: E402
 from je_auto_control.gui.tab_registry import TAB_SPECS, TabEntry, TabRegistry, lazy_factory  # noqa: E402
 from je_auto_control.utils.test_record.record_test_class import TestRecord as Recorder  # noqa: E402
 
@@ -143,7 +144,7 @@ def test_close_while_generating_keeps_new_page_free_of_late_results(app, recorde
     timer.start()
     try:
         page.report_name_input.setText("original")
-        monkeypatch.setattr(_report_tab.language_wrapper, "translate",
+        monkeypatch.setattr(language_wrapper, "translate",
                             lambda key, fallback: "localized running" if key == "task_running" else fallback)
         page.report_result_text.setText("previous result")
         page._gen_html()

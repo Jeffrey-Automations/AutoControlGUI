@@ -29,6 +29,7 @@ def server(monkeypatch):
 
 def _exchange(server, *parts, pause=0.0):
     with socket.create_connection(server.server_address, timeout=10) as sock:
+        sock.sendall(f"AUTH {server.token}".encode() + bytes([10]))
         for part in parts:
             sock.sendall(part)
             time.sleep(pause)

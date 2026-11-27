@@ -60,6 +60,7 @@ class MediaChecksTab(TranslatableMixin, QWidget):
         self._video_expect = self._tr(QCheckBox(), "media_video_expect")
         self._video_expect.setChecked(True)
         self._result = QLabel()
+        self._result_text = self._keyed(self._result)
         self._result.setWordWrap(True)
         self._runs = TabTask(self)
         self._runs.result.connect(self._show_result)
@@ -120,10 +121,10 @@ class MediaChecksTab(TranslatableMixin, QWidget):
 
     def _start(self, work: Any) -> None:
         if self._runs.start(work):
-            self._result.setText(_t("task_running"))
+            self._result_text.show("task_running")
 
     def _show_error(self, error: object) -> None:
-        self._result.setText(str(error))
+        self._result_text.show_plain(str(error))
 
     def _show_result(self, result: Any) -> None:
-        self._result.setText(result.message)
+        self._result_text.show_plain(result.message)

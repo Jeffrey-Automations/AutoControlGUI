@@ -1,5 +1,6 @@
 """Tests for USB passthrough Phase 2a (round 37)."""
 import json
+import threading
 
 import pytest
 
@@ -400,6 +401,69 @@ def test_backend_handle_close_is_idempotent():
     handle = FakeUsbHandle(FakeUsbBackend(), 1, _SAMPLE_DEVICE)
     handle.close()
     handle.close()  # second call must not raise
+
+
+# --- release while a transfer is still inside the backend -------------------
+
+
+def _gated_handle(session, backend):
+    """Open a claim whose transfers wait for the returned gate; count its closes."""
+    claim_id = json.loads(session.handle_frame(_make_open_frame())[0].payload)["claim_id"]
+    handle = next(iter(backend._open_handles.values()))
+    gate, entered, closes = threading.Event(), threading.Event(), []
+
+    def _wait(_kind, _kwargs):
+        entered.set()
+        if not gate.wait(10):
+            raise RuntimeError("gate never opened")
+        return b"ok"
+
+    real_close = handle.close
+    handle.transfer_hook = _wait
+    handle.close = lambda: (closes.append(1), real_close())
+    return claim_id, gate, entered, closes
+
+
+def _transfer_in_thread(session, claim_id):
+    out = []
+    frame = Frame(op=Opcode.BULK, claim_id=claim_id, payload=json.dumps(
+        {"endpoint": 0x81, "direction": "in", "length": 2}).encode("utf-8"))
+    thread = threading.Thread(target=lambda: out.append(session.handle_frame(frame)), daemon=True)
+    thread.start()
+    return thread, out
+
+
+def test_close_all_during_a_transfer_closes_the_handle_once_after_it_returns():
+    backend = FakeUsbBackend(devices=[_SAMPLE_DEVICE])
+    session = UsbPassthroughSession(backend)
+    claim_id, gate, entered, closes = _gated_handle(session, backend)
+    thread, out = _transfer_in_thread(session, claim_id)
+    assert entered.wait(5)
+    session.close_all()
+    assert session.active_claim_count == 0
+    assert closes == []                  # never closed under a running transfer
+    gate.set()
+    thread.join(5)
+    assert out == [[]]                   # the late result is discarded
+    assert closes == [1]
+    session.close_all()
+    assert closes == [1]
+
+
+def test_close_frame_during_a_transfer_defers_the_close_to_the_transfer():
+    backend = FakeUsbBackend(devices=[_SAMPLE_DEVICE])
+    session = UsbPassthroughSession(backend)
+    claim_id, gate, entered, closes = _gated_handle(session, backend)
+    thread, out = _transfer_in_thread(session, claim_id)
+    assert entered.wait(5)
+    closed = session.handle_frame(Frame(op=Opcode.CLOSE, claim_id=claim_id))
+    assert [reply.op for reply in closed] == [Opcode.CLOSED]
+    assert closes == []
+    gate.set()
+    thread.join(5)
+    assert out == [[]]
+    assert closes == [1]
+    assert backend.open_handle_count == 0
 
 
 # ---------------------------------------------------------------------------

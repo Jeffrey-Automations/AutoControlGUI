@@ -35,7 +35,8 @@ class TaskPolicy:
             if criterion.get("kind") == "browser":
                 from je_auto_control.utils.agent_runtime.browser_verification import validate_browser_scope
                 validate_browser_scope(spec, criterion)
-            if criterion.get("kind", "").startswith("file_"):
+            kind = criterion.get("kind")
+            if isinstance(kind, str) and kind.startswith("file_"):
                 self.path(criterion.get("path"))
         for action in spec.actions:
             self.check(action.get("tool", ""), action.get("arguments", {}))
@@ -81,7 +82,7 @@ class TaskPolicy:
             )
             url = arguments["url"]
             _bounded(url, "URL", 4096)
-            origins = {_url_origin(value) for value in self.spec.options.get("allowed_origins", ())}
+            origins = {_url_origin(value) for value in _task_origins(self.spec)}
             if _url_origin(url) not in origins:
                 raise AgentTaskError("browser URL is outside the reviewed task origins")
         self._walk_paths(arguments)
@@ -96,6 +97,13 @@ class TaskPolicy:
         elif isinstance(value, (tuple, list)):
             for item in value:
                 self._walk_paths(item)
+
+
+def _task_origins(spec: AgentTaskSpec) -> tuple[str, ...]:
+    origins = spec.options.get("allowed_origins", ())
+    if not isinstance(origins, (tuple, list)) or not all(isinstance(item, str) for item in origins):
+        raise AgentTaskError("task origins must be a list of text")
+    return tuple(origins)
 
 
 def durable_payload(value: Any) -> Any:

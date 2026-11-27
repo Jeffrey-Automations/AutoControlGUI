@@ -162,3 +162,89 @@ def test_idempotency_ttl_runs_from_completion():
     store.complete("k", {"r": 1})
     now[0] = 15.0
     assert store.begin("k") == {"status": "completed", "response": {"r": 1}}
+
+
+def _control_signals():
+    from concurrent.futures import CancelledError
+    from je_auto_control.utils.exception.control_signals import OperationCancelledError
+    from je_auto_control.utils.executor.run_control import ExecutionStopped
+    return [ExecutionStopped("run"), OperationCancelledError("request"), CancelledError()]
+
+
+def test_retry_policy_never_retries_a_stop_or_cancel():
+    for signal in _control_signals():
+        calls, slept = [], []
+
+        def func(raised=signal, seen=calls):
+            seen.append(1)
+            raise raised
+
+        with pytest.raises(type(signal)):
+            RetryPolicy(max_attempts=3).run(func, sleep=slept.append)
+        assert (len(calls), slept) == (1, [])
+
+
+def test_a_retry_back_off_wakes_on_a_stop():
+    from je_auto_control.utils.executor.run_control import ExecutionStopped, StopToken, stoppable_run
+    token = StopToken("retry-stop")
+    calls = []
+
+    def func():
+        calls.append(1)
+        token.stop("test")
+        raise ValueError("transient")
+
+    with stoppable_run(token=token):
+        with pytest.raises(ExecutionStopped):
+            RetryPolicy(max_attempts=2, backoff=30.0).run(func)
+    assert len(calls) == 1
+
+
+def test_run_with_budget_never_retries_a_stop_or_cancel():
+    """With no limits and a zero delay a stopped run was retried forever."""
+    from je_auto_control.utils.retry_budget.retry_budget import RetryBudget, run_with_budget
+    for signal in _control_signals():
+        calls = []
+
+        def func(raised=signal, seen=calls):
+            seen.append(1)
+            if len(seen) < 5:
+                raise raised
+            return "retried"
+
+        with pytest.raises(type(signal)):
+            run_with_budget(func, RetryBudget(max_attempts=None, base_delay_s=0.0))
+        assert len(calls) == 1
+
+
+def test_a_stop_or_cancel_is_not_a_circuit_failure():
+    """Stopping a run opened the circuit for every other caller of that name."""
+    for signal in _control_signals():
+        breaker = CircuitBreaker(failure_threshold=1, reset_timeout=30.0)
+
+        def func(raised=signal):
+            raise raised
+
+        with pytest.raises(type(signal)):
+            breaker.call(func)
+        assert breaker.state == "closed"
+
+
+def test_a_stopped_trial_frees_the_half_open_slot():
+    from je_auto_control.utils.executor.run_control import ExecutionStopped
+    now = [0.0]
+    breaker = CircuitBreaker(failure_threshold=1, reset_timeout=1.0, clock=lambda: now[0])
+
+    def down():
+        raise ValueError("down")
+
+    def stopped():
+        raise ExecutionStopped("run")
+
+    with pytest.raises(ValueError):
+        breaker.call(down)
+    now[0] = 2.0
+    with pytest.raises(ExecutionStopped):
+        breaker.call(stopped)
+    assert breaker.call(lambda: "up") == "up"
+    assert breaker.state == "closed"

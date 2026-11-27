@@ -9,6 +9,7 @@ and tracking the outstanding gaps and high-water mark per stream.
 Pure standard library; imports no ``PySide6``. State is in-memory and fully
 injectable, so detection is deterministic in CI.
 """
+import threading
 from typing import Any, Dict, List
 
 
@@ -21,11 +22,14 @@ class SequenceTracker:
     bound. The outstanding gaps are capped at ``max_gap``: a jump from 0 to
     5,000,000 stored five million numbers in one call (a reset or a corrupt
     value, not five million lost messages) and now raises ``ValueError``.
+    Safe to share between threads: ``AC_sequence_observe`` does, and two that
+    observed one number at once were both told ``ok``.
     """
 
     def __init__(self, *, max_gap: int = 100_000) -> None:
         self._streams: Dict[str, Dict[str, Any]] = {}
         self._max_gap = int(max_gap)
+        self._lock = threading.Lock()
 
     def _state(self, stream_id: str) -> Dict[str, Any]:
         return self._streams.setdefault(
@@ -47,13 +51,11 @@ class SequenceTracker:
         ``reorder`` (a late earlier number). ``missing`` is the outstanding
         gap list.
         """
-        state = self._state(stream_id)
         seq = int(seq)
-        if self._is_duplicate(state, seq):
-            return {"status": "duplicate", "seq": seq,
-                    "missing": sorted(state["gaps"])}
-        status = self._advance(state, seq)
-        return {"status": status, "seq": seq, "missing": sorted(state["gaps"])}
+        with self._lock:
+            state = self._state(stream_id)
+            status = "duplicate" if self._is_duplicate(state, seq) else self._advance(state, seq)
+            return {"status": status, "seq": seq, "missing": sorted(state["gaps"])}
 
     def _advance(self, state: Dict[str, Any], seq: int) -> str:
         high = state["high"]
@@ -79,8 +81,10 @@ class SequenceTracker:
 
     def gaps(self, stream_id: str) -> List[int]:
         """The outstanding missing sequence numbers for ``stream_id``."""
-        return sorted(self._state(stream_id)["gaps"])
+        with self._lock:
+            return sorted(self._state(stream_id)["gaps"])
 
     def high_water(self, stream_id: str) -> Any:
         """The highest sequence number observed for ``stream_id`` (or ``None``)."""
-        return self._state(stream_id)["high"]
+        with self._lock:
+            return self._state(stream_id)["high"]

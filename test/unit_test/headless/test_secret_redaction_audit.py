@@ -47,3 +47,25 @@ def test_the_mcp_audit_file_holds_no_secret(tmp_path, tool, arguments):
     text = path.read_text(encoding="utf-8")
     assert FAKE not in text
     assert json.loads(text)["tool"] == tool
+
+
+@pytest.mark.parametrize("action", [
+    # The executor accepts a positional argument list as well; its secrets
+    # were masked only when named, so these reached the log and record keys.
+    ["AC_jwt_encode", [{"sub": "x"}, FAKE]],
+    ["AC_jwt_decode", [FAKE, "k"]],
+    ["AC_sign_action_file", ["a.json", FAKE]],
+    ["AC_sign_action_file", ["a.json", None, "key.pem", FAKE]],
+    ["AC_decrypt_action_file", ["a.enc", FAKE]],
+    ["AC_notify_webhook", ["https://hooks.example.invalid/" + FAKE, "hi"]],
+    ["AC_loop", {"times": 1, "body": [["AC_encrypt_action_file", ["a.json", FAKE]]]}],
+])
+def test_positional_secret_arguments_never_reach_the_description(action):
+    assert FAKE not in describe_action(action)
+
+
+def test_positional_arguments_that_are_not_secret_stay_readable():
+    redacted = redact_actions(["AC_sign_action_file", ["a.json", FAKE]])
+    assert redacted == ["AC_sign_action_file", ["a.json", "***"]]
+    assert describe_action(["AC_hold_key", ["shift", 1]]) == "['AC_hold_key', ['shift', 1]]"
+    assert describe_action(["AC_no_such_command", ["x", FAKE]]).count(FAKE) == 1

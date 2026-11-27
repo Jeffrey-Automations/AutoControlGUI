@@ -209,7 +209,11 @@ class _WebhookHandler(BaseHTTPRequestHandler):
 
     def _dispatch(self, method: str) -> None:
         registry: WebhookTriggerServer = self.server.webhook_owner  # type: ignore[attr-defined]
-        parsed = urlparse(self.path)
+        try:
+            parsed = urlparse(self.path)
+        except ValueError:  # an absolute-form target such as ``http://[``
+            self.send_error(HTTPStatus.BAD_REQUEST, "invalid request target")
+            return
         declared_length = parse_content_length(self.headers)
         trigger = registry.match(parsed.path, method)
         if trigger is None:
@@ -381,6 +385,11 @@ class WebhookTriggerServer:
             )
             return None
         try:
+            # Removed or disabled while this request waited its turn: its token
+            # may have been revoked with it.
+            with self._lock:
+                if self._triggers.get(trigger.webhook_id) is not trigger or not trigger.enabled:
+                    return None
             run_id = default_history_store.start_run(
                 SOURCE_TRIGGER, f"webhook:{trigger.webhook_id}",
                 trigger.script_path,
@@ -403,7 +412,7 @@ class WebhookTriggerServer:
                             trigger.last_status = int(HTTPStatus.FORBIDDEN)
                     raise
             finally:
-                finish_history_run(default_history_store, run_id, outcome, capture_error_snapshot)
+                self._finish_history(trigger, run_id, outcome)
             with self._lock:
                 live = self._triggers.get(trigger.webhook_id)
                 if live is not None:
@@ -412,6 +421,19 @@ class WebhookTriggerServer:
             return run_id
         finally:
             self._fire_lock.release()
+
+    @staticmethod
+    def _finish_history(trigger: WebhookTrigger, run_id: int, outcome: RunOutcome) -> None:
+        """Settle the history row of a run that has happened, whatever the store says.
+
+        A store failing here was answered ``fired: false``, and a sender that
+        retries on 500 ran the script again.
+        """
+        try:
+            finish_history_run(default_history_store, run_id, outcome, capture_error_snapshot)
+        except AutoControlException as error:
+            autocontrol_logger.error("webhook %s run %s not settled in history: %r",
+                                     trigger.webhook_id, run_id, error)
 
     def start(self, host: str = _DEFAULT_BIND, port: int = 0) -> Tuple[str, int]:
         """Start the HTTP server; idempotent if already running."""

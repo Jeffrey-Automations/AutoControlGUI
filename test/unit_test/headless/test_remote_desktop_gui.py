@@ -25,7 +25,7 @@ pytest.importorskip("aiortc")
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from je_auto_control.utils.remote_desktop.registry import registry  # noqa: E402
-from headless._qt_settle import settle  # noqa: E402
+from headless._qt_settle import pump_until, settle  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -171,8 +171,8 @@ def test_a_frame_that_beats_the_connect_result_is_shown(qapp):
     panel = _ViewerPanel()
     try:
         panel._on_frame_main(_make_jpeg())  # noqa: SLF001  # before any window
+        assert pump_until(lambda: panel._early_frame is not None)  # noqa: SLF001  # decoded off the GUI thread
         assert panel._screen_window is None  # noqa: SLF001
-        assert panel._early_frame is not None  # noqa: SLF001
         shown = []
         window = panel._ensure_screen_window()  # noqa: SLF001
         window.show = lambda: shown.append("show")

@@ -202,3 +202,76 @@ def test_an_address_book_whose_hosts_is_not_a_list_loads_empty(tmp_path):
 
 def test_a_missing_parent_package_is_reported_not_raised():
     assert PackageManager().check_package("no_such_parent_pkg_x.child") is None
+
+
+# --- 2026-11-26 review ---------------------------------------------------------
+
+@pytest.mark.parametrize("prefix", ["../../x/", "ab:cd/..", "..\\..\\x\\", "١" * 8, "a\x00b"])
+def test_a_transfer_id_that_is_not_plain_text_is_refused(tmp_path, prefix):
+    """The part file is named after it: a separator raised past the receive loop on both sides."""
+    tid = (prefix + "0" * ft.TRANSFER_ID_LEN)[:ft.TRANSFER_ID_LEN]
+    receiver, done = _receiver()
+    with pytest.raises(ft.FileTransferError):
+        receiver.handle_begin(ft.encode_begin(tid, str(tmp_path / "f.bin"), 1))
+    with pytest.raises(ft.FileTransferError):
+        receiver.handle_end(ft.encode_end(tid))
+    assert done == []
+    assert os.listdir(tmp_path) == []
+
+
+def test_a_transfer_aborted_while_a_chunk_is_written_fails_once(tmp_path):
+    """The write hit a closed file: ValueError, which ended the connection's receive thread."""
+    receiver, done = _receiver()
+    tid = ft.new_transfer_id()
+    receiver.handle_begin(ft.encode_begin(tid, str(tmp_path / "f.bin"), 4))
+    incoming = receiver._active[tid]
+
+    class _AbortedMidWrite:
+        def write(self, _chunk):
+            receiver.abort(tid, "cancelled by the operator")
+            raise ValueError("write to closed file")
+
+        def close(self):
+            real.close()
+
+    real, incoming.handle = incoming.handle, _AbortedMidWrite()
+    receiver.handle_chunk(ft.encode_chunk(tid, b"ab"))
+    receiver.handle_end(ft.encode_end(tid))
+    assert done == [(False, "cancelled by the operator")]
+    assert os.listdir(tmp_path) == []
+
+
+def test_a_progress_callback_that_raises_does_not_end_the_transfer(tmp_path):
+    def progress(*_args):
+        raise RuntimeError("the window is gone")
+
+    done = []
+    receiver = ft.FileReceiver(on_progress=progress,
+                               on_complete=lambda tid, ok, err, dst: done.append((ok, err)))
+    _transfer(receiver, tmp_path / "f.bin", [b"abcd"], 4)
+    assert done == [(True, None)]
+
+
+@pytest.mark.parametrize("end", ["disconnect", "peer-closed"])
+def test_a_viewer_drops_the_files_its_host_never_finished(tmp_path, end):
+    from je_auto_control.utils.remote_desktop.viewer import RemoteDesktopViewer
+
+    class _Closed:
+        def read_typed(self):
+            raise ConnectionError("peer closed connection")
+
+        def close(self):
+            pass
+
+    receiver, done = _receiver()
+    viewer = RemoteDesktopViewer(host="h", port=1, token="t")
+    viewer.set_file_receiver(receiver)
+    viewer._channel = channel = _Closed()
+    tid = ft.new_transfer_id()
+    receiver.handle_begin(ft.encode_begin(tid, str(tmp_path / "f.bin"), 4))
+    if end == "disconnect":
+        viewer.disconnect(timeout=1.0)
+    else:
+        viewer._recv_loop(channel, threading.Event())
+    assert done == [(False, "connection ended")]
+    assert os.listdir(tmp_path) == []

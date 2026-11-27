@@ -9,7 +9,12 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.models import TERMINAL
 from je_auto_control.utils.agent_runtime.runner import run_task
 from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.work_queue.work_queue import WorkQueue
+
+_ERRORS = (AutoControlException, OSError, RuntimeError, TypeError, ValueError, LookupError)
+# A failed worker cannot overwrite a stop someone requested or a pause that already took effect.
+_STOPPING = TERMINAL | {"pausing", "paused", "cancelling"}
 
 
 class BackgroundTasks:
@@ -50,7 +55,7 @@ class BackgroundTasks:
 
     def _drain(self) -> None:
         while not self._stop.is_set():
-            item = self._queue.get_next()
+            item = self._next_item()
             if item is None:
                 self._stop.wait(0.1)
                 continue
@@ -62,6 +67,13 @@ class BackgroundTasks:
                 self._running.add(task_id)
             self._run_item(item)
 
+    def _next_item(self) -> Any:
+        try:
+            return self._queue.get_next()
+        except AutoControlException as error:  # a busy database must not cost the pool a worker
+            autocontrol_logger.warning("agent work queue needs review: %s", type(error).__name__)
+            return None
+
     def _run_item(self, item: Any) -> None:
         task_id = item.data["task_id"]
         try:
@@ -72,12 +84,21 @@ class BackgroundTasks:
             else:
                 self._queue.complete(item.id, claim=item.claim, output=outcome.to_dict())
                 self._handoff_resume(task_id)
-        except (AutoControlException, OSError, RuntimeError, TypeError, ValueError) as error:
-            self._queue.fail(item.id, type(error).__name__, kind="business", claim=item.claim)
-            self._review_failure(task_id)
+        except _ERRORS as error:
+            self._fail_item(item, error)
         finally:
             with self._lock:
                 self._running.discard(task_id)
+
+    def _fail_item(self, item: Any, error: Exception) -> None:
+        try:
+            self._queue.fail(item.id, type(error).__name__, kind="business", claim=item.claim)
+        except _ERRORS as failure:  # the delivery record cannot keep the task itself from review
+            autocontrol_logger.warning("agent delivery record needs review: %s", type(failure).__name__)
+        try:
+            self._review_failure(item.data["task_id"])
+        except _ERRORS as failure:  # a failed cleanup keeps its lease and must not end the worker
+            autocontrol_logger.warning("agent input retirement needs review: %s", type(failure).__name__)
 
     def _handoff_resume(self, task_id: str) -> None:
         with self._runtime.store.connection() as connection:
@@ -90,8 +111,9 @@ class BackgroundTasks:
             row = connection.execute("SELECT state FROM agent_tasks WHERE id=?", (task_id,)).fetchone()
         if row is None:
             return
-        if row["state"] not in TERMINAL:
-            self._runtime.store.update(task_id, "waiting_user", reason="background work requires review")
+        if row["state"] not in _STOPPING:
+            self._runtime.store.transition(task_id, row["state"], "waiting_user",
+                                           reason="background work requires review")
         self._runtime._retire(task_id)
 
     def close(self) -> None:

@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QPushButton, QSizePolicy, QSpinBox, QTableWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._i18n_helpers import KeyedText
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui.adaptive.flow_layout import flow_of
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -49,11 +51,22 @@ class _HostUiMixin(_HostPanelPart):
         layout.addWidget(build_trusted_group(self))
         layout.addWidget(self._build_sessions_card(), stretch=1)
 
+    def _apply_session_headers(self) -> None:
+        self._sessions_table.setHorizontalHeaderLabels([
+            "",  # quality dot column
+            _t("rd_webrtc_sess_col_id"),
+            _t("rd_webrtc_sess_col_viewer"),
+            _t("rd_webrtc_sess_col_state"),
+            _t("rd_webrtc_sess_col_connected"),
+        ])
+
     def _build_sessions_card(self) -> Card:
         """Status line, the live sessions table and what can be done to a session."""
         card = Card()
-        self._status_label = QLabel(_t("rd_webrtc_status_idle"))
+        self._status_label = QLabel()
         self._status_label.setWordWrap(True)
+        self._status = KeyedText(self._status_label)
+        self._status.show("rd_webrtc_status_idle")
         set_role(self._status_label, "hint")
         card.add(self._status_label)
         sessions_row = QHBoxLayout()
@@ -62,19 +75,15 @@ class _HostUiMixin(_HostPanelPart):
         self._host_quality_dot.setStyleSheet(
             _QUALITY_DOT_STYLE,
         )
-        self._host_quality_dot.setToolTip(_t("rd_webrtc_quality_unknown"))
+        self._host_quality_tip = KeyedText(self._host_quality_dot, "setToolTip")
+        self._host_quality_tip.show("rd_webrtc_quality_unknown")
         sessions_row.addWidget(self._host_quality_dot)
         self._sessions_label = QLabel(_t("rd_webrtc_sessions_count").format(n=0))
         sessions_row.addWidget(self._sessions_label, stretch=1)
         card.add(sessions_row)
         self._sessions_table = QTableWidget(0, 5)
-        self._sessions_table.setHorizontalHeaderLabels([
-            "",  # quality dot column
-            _t("rd_webrtc_sess_col_id"),
-            _t("rd_webrtc_sess_col_viewer"),
-            _t("rd_webrtc_sess_col_state"),
-            _t("rd_webrtc_sess_col_connected"),
-        ])
+        self._tr_cells(self._sessions_table)
+        self._apply_session_headers()
         self._sessions_table.setColumnWidth(0, 18)
         self._sessions_table.horizontalHeader().setSectionResizeMode(
             2, QHeaderView.ResizeMode.Stretch,
@@ -120,8 +129,7 @@ class _HostUiMixin(_HostPanelPart):
         regen.clicked.connect(self._on_regen_id)
         form.addRow(self._tr(QLabel(), "rd_webrtc_host_id_label"), _row(self._host_id_edit, regen))
         self._secret_edit = QLineEdit()
-        self._secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        form.addRow(self._tr(QLabel(), "rd_webrtc_secret_label"), self._secret_edit)
+        form.addRow(self._tr(QLabel(), "rd_webrtc_secret_label"), SecretField(self._secret_edit, self._tr))
         self._publish_btn = self._tr(
             QPushButton(), "rd_webrtc_publish_via_server",
         )
@@ -164,7 +172,7 @@ class _HostUiMixin(_HostPanelPart):
         group = self._tr(QGroupBox(), "rd_webrtc_config_group")
         form = QFormLayout()
         self._token_edit = self._tr(QLineEdit(), "rd_token_placeholder")
-        form.addRow(self._tr(QLabel(), "rd_token_label"), self._token_edit)
+        form.addRow(self._tr(QLabel(), "rd_token_label"), SecretField(self._token_edit, self._tr))
         self._monitor_combo = QComboBox()
         self._populate_monitor_combo()
         self._monitor_combo.currentIndexChanged.connect(

@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -16,11 +17,14 @@ from je_auto_control.utils.agent_runtime.evidence_cache import EvidenceCache
 from je_auto_control.utils.agent_runtime.models import AgentTaskSpec, TERMINAL
 from je_auto_control.utils.agent_runtime.policy import durable_payload
 from je_auto_control.utils.agent_runtime.receipts import row_report
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.json_store.json_store import atomic_write_text
+from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.run_history.history_store import HistoryStore
 from je_auto_control.utils.sqlite_support import last_row_id
 
 _JOURNAL_NAME = 'journal.jsonl'
+_ERRORS = (AutoControlException, OSError, RuntimeError, ValueError, TypeError, LookupError)
 
 
 class TaskEvidence:
@@ -31,6 +35,9 @@ class TaskEvidence:
         path = Path(store.path)
         self.cache = EvidenceCache(store)
         self.history = HistoryStore(path)
+        self._clock = time.monotonic
+        self._retry_lock = threading.Lock()
+        self._retry: dict[str, tuple[int, float]] = {}  # task id -> (failures, monotonic time it is due again)
 
     @property
     def root(self) -> Path:
@@ -108,18 +115,56 @@ class TaskEvidence:
                                    [(identifier,) for identifier in task_ids])
 
     def flush(self, limit: int = 8) -> None:
-        """Publish a bounded batch; interrupted publication remains durable for the next service owner."""
+        """Publish up to ``limit`` reports; interrupted publication remains durable for the next service owner.
+
+        A report that fails to publish stays pending but backs off (30 seconds, doubling to an hour,
+        in this process only), and its failure does not use up the batch: healthy reports behind it
+        are still published this round. At most ``4 * limit`` failures are tried per round.
+        """
+        published = failed = 0
+        while published < limit and failed < 4 * limit:
+            identifiers = self._due(limit - published)
+            if not identifiers:
+                return
+            for task_id in identifiers:
+                if self._publish_pending(task_id):
+                    published += 1
+                else:
+                    failed += 1
+
+    def _due(self, count: int) -> list[str]:
+        """Pending reports not waiting out a back-off; a due entry no longer pending is forgotten."""
+        now = self._clock()
+        with self._retry_lock:
+            waiting = {task_id for task_id, (_failures, due) in self._retry.items() if due > now}
         with self.store.connection() as connection:
-            identifiers = [row[0] for row in connection.execute("SELECT task_id FROM agent_evidence_pending LIMIT ?",
-                                                               (limit,))]
-        for task_id in identifiers:
+            rows = [row[0] for row in connection.execute("SELECT task_id FROM agent_evidence_pending LIMIT ?",
+                                                         (count + len(waiting),))]
+        if len(rows) < count + len(waiting):  # the whole table was read
+            with self._retry_lock:
+                for task_id in set(self._retry) - waiting - set(rows):
+                    del self._retry[task_id]
+        return [task_id for task_id in rows if task_id not in waiting][:count]
+
+    def _publish_pending(self, task_id: str) -> bool:
+        try:
             self.publish(task_id)
+        except _ERRORS as error:  # it stays pending; one damaged record cannot stop the rest of maintenance
+            autocontrol_logger.warning("agent task report needs review: %s", type(error).__name__)
+            with self._retry_lock:
+                failures = self._retry.get(task_id, (0, 0.0))[0] + 1
+                self._retry[task_id] = (failures, self._clock() + min(3600.0, 30.0 * 2 ** min(failures - 1, 7)))
+            return False
+        with self._retry_lock:
+            self._retry.pop(task_id, None)
+        return True
 
     def action(self, task_id: str, receipt: dict[str, Any], *, finished: bool = False) -> None:
         """Mirror receipt certainty into the existing append-only action journal."""
         self.ensure(task_id)
         journal = self.cache.file(task_id, _JOURNAL_NAME)
         self.cache.file(task_id, 'journal.jsonl.lock')
+        self.cache.file(task_id, 'journal.jsonl.lock.guard')
         status: EventStatus = "incomplete"
         if finished:
             status = "ok" if receipt["status"] == "confirmed" else "error"
@@ -191,7 +236,8 @@ class TaskEvidence:
 def _owned_artifact(path: Path) -> bool:
     if path.is_symlink() or not path.is_file():
         return False
-    return path.name in {_JOURNAL_NAME, "journal.jsonl.lock", "report.json"} or (
+    # The journal's lock file and the never-deleted guard beside it (json_store's file lock).
+    return path.name in {_JOURNAL_NAME, "journal.jsonl.lock", "journal.jsonl.lock.guard", "report.json"} or (
         re.fullmatch(r"[0-9a-f]{32}\.jpg", path.name) is not None)
 
 

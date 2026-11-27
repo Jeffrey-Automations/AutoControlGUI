@@ -119,7 +119,7 @@ class ConfigBundleExporter:
             return None
         try:
             text = path.read_text(encoding="utf-8")
-        except OSError as error:
+        except (OSError, UnicodeDecodeError) as error:
             autocontrol_logger.warning(
                 "config bundle export %s: %r", path, error,
             )
@@ -186,7 +186,7 @@ class ConfigBundleImporter:
             raise ConfigBundleError("bundle.files is missing or invalid")
         try:
             version = int(manifest.get("version", 0))
-        except (TypeError, ValueError) as error:
+        except (TypeError, ValueError, OverflowError) as error:
             raise ConfigBundleError(
                 f"bundle.manifest.version is not an int: {error}",
             ) from error
@@ -247,13 +247,13 @@ class ConfigBundleImporter:
         if fmt == "json":
             if not isinstance(entry["content"], (dict, list)):
                 raise ConfigBundleError("json entry content must be an object or a list")
-            return json.dumps(
+            return _encodable(json.dumps(
                 entry["content"], ensure_ascii=False, indent=2,
-            )
+            ))
         content = entry.get("content")
         if not isinstance(content, str):
             raise ConfigBundleError("text entry content must be a string")
-        return content
+        return _encodable(content)
 
     def _write_with_backup(self, *, target: Path, body: str,
                            relative: str, report: ImportReport,
@@ -284,6 +284,20 @@ class ConfigBundleImporter:
             report.skipped.append(relative)
             return
         report.written.append(relative)
+
+
+def _encodable(text: str) -> str:
+    """``text`` if it can be written as UTF-8.
+
+    A lone surrogate (a ``"\\ud800"`` escape in the bundle) failed in the
+    write, which ended the import part-way with no report of the files
+    already replaced and where their backups are.
+    """
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise ConfigBundleError(f"entry content is not valid text: {error}") from error
+    return text
 
 
 def _unused_backup_path(target: Path, backup_stamp: int) -> Path:

@@ -170,14 +170,24 @@ def _load_excel(source: Dict[str, Any]) -> List[Dict[str, Any]]:
     try:
         sheet_name = source.get("sheet")
         worksheet = workbook[sheet_name] if sheet_name else workbook.active
+        return _excel_rows(worksheet, path)
+    finally:
+        workbook.close()
+
+
+def _excel_rows(worksheet: Any, path: Path) -> List[Dict[str, Any]]:
+    """The sheet's rows as dicts. A read-only sheet is parsed here, not when the file is opened."""
+    try:
         rows_iter = worksheet.iter_rows(values_only=True)
         header = next(rows_iter, None)
         if header is None:
             return []
         keys = [str(cell) for cell in header]
         return [dict(zip(keys, values)) for values in rows_iter]
-    finally:
-        workbook.close()
+    except OSError:
+        raise
+    except Exception as error:  # noqa: BLE001  # reason: a damaged sheet raises ParseError (a SyntaxError), zlib.error or BadZipFile; re-raised as the action family
+        raise AutoControlActionException(f"Excel {path}: {error}") from error
 
 
 def _load_inline(source: Dict[str, Any]) -> List[Dict[str, Any]]:

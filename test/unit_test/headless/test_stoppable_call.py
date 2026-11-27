@@ -104,7 +104,7 @@ def test_a_stop_ends_an_image_search_stuck_in_its_match(monkeypatch):
     token = StopToken("image-stop")
     _later(lambda: token.stop("test"))
     started = time.monotonic()
-    needle = np.zeros((10, 10), dtype=np.uint8)
+    needle = np.arange(100, dtype=np.uint8).reshape(10, 10)     # a single-colour one is refused before the match
     with stoppable_run(token=token), pytest.raises(ExecutionStopped):
         template_detection.find_image(needle, detect_threshold=0.9)
     assert time.monotonic() - started < 2

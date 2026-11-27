@@ -18,6 +18,7 @@ family whichever backend failed.
 """
 from __future__ import annotations
 
+import math
 import threading
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
@@ -47,6 +48,14 @@ DEFAULT_TIMEOUT_S = 30.0
 _POLL_S = 0.02
 
 _Result = TypeVar("_Result")
+
+
+def _stop_checkpoint() -> None:
+    """Raise if the caller's stoppable run was stopped or its cancellation scope cancelled."""
+    from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+    from je_auto_control.utils.executor.run_control import checkpoint
+    cancellation_checkpoint()
+    checkpoint()
 
 
 class DeviceError(AutoControlException, RuntimeError):
@@ -161,8 +170,7 @@ class DeviceContext:
         if self.platform not in MOBILE_PLATFORMS:
             raise DeviceError(
                 f"unknown device platform {self.platform!r}; expected one of {MOBILE_PLATFORMS}")
-        if not isinstance(self.timeout_s, (int, float)) or self.timeout_s <= 0:
-            raise DeviceError(f"timeout_s must be a positive number, got {self.timeout_s!r}")
+        _require_timeout(self.timeout_s)
 
     @property
     def name(self) -> str:
@@ -186,9 +194,37 @@ class DeviceContext:
             platform=platform,
             device_id=str(spec.get(key) or spec.get("device_id") or ""),
             adb_path=str(adb_path) if adb_path else None,
-            timeout_s=float(spec.get("timeout_s") or DEFAULT_TIMEOUT_S),
+            timeout_s=_spec_timeout(spec.get("timeout_s")),
             label=str(spec.get("label") or ""),
         )
+
+
+def _require_timeout(value: Any) -> float:
+    """``value`` as seconds; a :class:`DeviceError` unless it is a finite number above zero.
+
+    NaN and infinity would disable the deadline check of :meth:`DeviceSession.invoke`.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise DeviceError(f"timeout_s must be a finite number greater than 0, got {value!r}")
+    try:
+        seconds = float(value)
+    except OverflowError:
+        seconds = math.inf
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise DeviceError(f"timeout_s must be a finite number greater than 0, got {value!r}")
+    return seconds
+
+
+def _spec_timeout(raw: Any) -> float:
+    """A spec's ``timeout_s``: the default when absent, else that value -- an explicit 0 is refused."""
+    if raw is None:
+        return DEFAULT_TIMEOUT_S
+    if isinstance(raw, str):
+        try:
+            raw = float(raw)
+        except ValueError as error:
+            raise DeviceError(f"timeout_s must be a finite number greater than 0, got {raw!r}") from error
+    return _require_timeout(raw)
 
 
 def _non_negative(name: str, value: float) -> None:
@@ -426,10 +462,15 @@ class DeviceSession:
 
         A call that outlives the timeout leaves the device in a state nobody
         observed, so the session is closed rather than left to send the next
-        step on top of it.
+        step on top of it. A stop of the stoppable run the caller is in, or a
+        cancellation of its scope, ends the wait the same way: the call runs
+        on in the background, its result is discarded, the session is closed
+        for the same reason, and ``ExecutionStopped`` / ``CancelledError``
+        propagates.
         """
+        budget = float(self._context.timeout_s) if timeout_s is None else _require_timeout(timeout_s)
         self.check_usable()
-        budget = float(timeout_s) if timeout_s is not None else float(self._context.timeout_s)
+        _stop_checkpoint()
         call = _Call(function)
         threading.Thread(target=call.run, name=f"device-{self._context.name}",
                          daemon=True).start()
@@ -438,6 +479,7 @@ class DeviceSession:
             if self._cancel.is_set():
                 raise DeviceCancelledError(
                     f"{operation} on {self._context.name}: session cancelled")
+            self._stop_unless_running(operation)
             if monotonic() >= deadline:
                 self._break(f"{operation} did not finish within {budget:g}s")
                 raise DeviceTimeoutError(
@@ -446,6 +488,14 @@ class DeviceSession:
         if call.error is not None:
             raise call.error
         return call.result
+
+    def _stop_unless_running(self, operation: str) -> None:
+        """Raise a requested stop; the call still running leaves the device unobserved."""
+        try:
+            _stop_checkpoint()
+        except BaseException:
+            self._break(f"{operation} was still running when the run was stopped")
+            raise
 
     def check_usable(self) -> None:
         """Raise unless the session can still send operations."""

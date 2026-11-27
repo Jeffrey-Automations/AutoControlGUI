@@ -1,5 +1,6 @@
 """A buffered clipboard message cannot outlive its connection, permissions or original control signals."""
 import asyncio
+import time
 from concurrent.futures import CancelledError
 from threading import Condition, Event, Thread
 from types import SimpleNamespace
@@ -271,6 +272,12 @@ def test_explicit_two_viewer_broadcasts_do_not_echo_or_discard_deliberate_repeat
     assert first[1] == second[1] == []
     for _ in range(2):
         assert getattr(host, 'broadcast_clipboard_' + kind)(value) == 2
+    # Each viewer is sent on its own sender thread: wait for both deliveries.
+    deadline = time.monotonic() + 3.0
+    while (len(first[1]) < 2 or len(second[1]) < 2) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    for handler in host._clients:
+        handler._shutdown.set()
     assert first[1] == second[1] == [(kind, value)] * 2
     assert applied == [(kind, value)] * 2
     assert len(first[2]) == 2

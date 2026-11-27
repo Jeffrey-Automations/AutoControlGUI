@@ -1,4 +1,9 @@
-"""Webhooks tab: bind HTTP requests to action scripts."""
+"""Webhooks tab: bind HTTP requests to action scripts.
+
+Starting and stopping the server and adding or removing a webhook first ask
+RBAC for ``AC_webhook_start`` / ``_stop`` / ``_add`` / ``_remove``; a refusal
+is shown in the tab and the server is not touched.
+"""
 from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer, Qt
@@ -8,8 +13,11 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel
 from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._qt_typed import kept_selection
 from je_auto_control.gui._slow_op import SlowOp
 from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -32,6 +40,9 @@ def _t(key: str) -> str:
 class WebhooksTab(TranslatableMixin, QWidget):
     """GUI front-end for :data:`default_webhook_server`."""
 
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_webhook_start", "AC_webhook_stop", "AC_webhook_add", "AC_webhook_remove")
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
@@ -40,6 +51,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
         self._port_input.setRange(0, 65535)
         self._port_input.setValue(0)
         self._status_label = QLabel()
+        self._refusal = RefusalLabel()
         self._server_op = SlowOp(self)
         self._path_input = QLineEdit()
         self._path_input.setPlaceholderText("/jobs")
@@ -52,6 +64,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
         self._method_checks["POST"].setChecked(True)
         self._table = QTableWidget(0, 6)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._tr_cells(self._table)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.verticalHeader().setVisible(False)
         self._table.horizontalHeader().setSectionResizeMode(
@@ -76,7 +89,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
         self._apply_table_headers()
-        self._refresh()
+        self._apply_status()
 
     def _apply_table_headers(self) -> None:
         self._table.setHorizontalHeaderLabels([
@@ -99,6 +112,7 @@ class WebhooksTab(TranslatableMixin, QWidget):
         self._status_label.setWordWrap(True)
         set_role(self._status_label, "hint")
         server_layout.addWidget(self._status_label)
+        server_layout.addWidget(self._refusal)
         root.addWidget(server_box)
 
         add_box = self._tr(QGroupBox(), "wh_add_group")
@@ -128,6 +142,8 @@ class WebhooksTab(TranslatableMixin, QWidget):
     def _on_start(self) -> None:
         if self._server_op.busy:        # still stopping: the port is not free yet
             return
+        if not self._refusal.allows("AC_webhook_start"):
+            return
         host = self._host_input.text().strip() or "127.0.0.1"
         port = int(self._port_input.value())
         try:
@@ -146,6 +162,8 @@ class WebhooksTab(TranslatableMixin, QWidget):
     def _on_stop(self) -> None:
         # stop() shuts the HTTP server down and joins its thread (up to 2 s),
         # which used to hold the GUI thread; a second Stop is ignored.
+        if not self._refusal.allows("AC_webhook_stop"):
+            return
         if self._server_op.run(default_webhook_server.stop, on_done=self._on_server_stopped,
                                on_error=self._on_server_stopped, retain_failure=True):
             self._refresh()
@@ -164,6 +182,8 @@ class WebhooksTab(TranslatableMixin, QWidget):
         return [m for m, c in self._method_checks.items() if c.isChecked()]
 
     def _on_register(self) -> None:
+        if not self._refusal.allows("AC_webhook_add"):
+            return
         path = self._path_input.text().strip()
         script = self._script_input.text().strip()
         if not path or not script:
@@ -188,12 +208,17 @@ class WebhooksTab(TranslatableMixin, QWidget):
         if row < 0:
             return
         item = self._table.item(row, 0)
-        if item is None:
+        if item is None or not self._refusal.allows("AC_webhook_remove"):
             return
         default_webhook_server.remove(item.text())
         self._refresh()
 
     def _refresh(self) -> None:
+        self._apply_status()
+        with kept_selection(self._table):
+            self._fill_table()
+
+    def _apply_status(self) -> None:
         bound = default_webhook_server.bound_address
         if self._server_op.busy:
             self._status_label.setText(_t("gui_op_stopping"))
@@ -205,6 +230,8 @@ class WebhooksTab(TranslatableMixin, QWidget):
             )
         else:
             self._status_label.setText(_t("wh_stopped"))
+
+    def _fill_table(self) -> None:
         rows = default_webhook_server.list_webhooks()
         self._table.setRowCount(len(rows))
         for row, trigger in enumerate(rows):
@@ -214,9 +241,9 @@ class WebhooksTab(TranslatableMixin, QWidget):
                 ",".join(trigger.methods),
                 trigger.script_path,
                 str(trigger.fired),
-                _t("wh_yes") if trigger.token else _t("wh_no"),
             )
-            for col, text in enumerate(values):
-                item = QTableWidgetItem(text)
+            items = [QTableWidgetItem(text) for text in values]
+            items.append(keyed_cell("wh_yes" if trigger.token else "wh_no"))
+            for col, item in enumerate(items):
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(row, col, item)

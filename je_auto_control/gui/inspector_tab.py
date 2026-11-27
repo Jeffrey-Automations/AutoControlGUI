@@ -1,4 +1,8 @@
-"""WebRTC inspector tab: live summary + recent stat samples."""
+"""WebRTC inspector tab: live summary + recent stat samples.
+
+The samples are ``AC_inspector_summary`` / ``AC_inspector_recent`` data: a
+role that may not read them sees the refusal in the summary line instead.
+"""
 from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer
@@ -7,6 +11,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import refusal
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -30,6 +35,9 @@ def _t(key: str) -> str:
 
 class InspectorTab(TranslatableMixin, QWidget):
     """Read-only view over :data:`default_webrtc_inspector`."""
+
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_inspector_summary", "AC_inspector_recent")
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -67,6 +75,11 @@ class InspectorTab(TranslatableMixin, QWidget):
         """
         release_resources(self)
 
+    def retranslate(self) -> None:
+        TranslatableMixin.retranslate(self)
+        self._apply_table_headers()
+        self._refresh()
+
     def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
         return [
@@ -94,6 +107,13 @@ class InspectorTab(TranslatableMixin, QWidget):
         ])
 
     def _refresh(self) -> None:
+        refused = refusal("AC_inspector_summary", "AC_inspector_recent")
+        if refused is not None:
+            self._summary_label.setText(refused)
+            self._table.setRowCount(0)
+            for label in self._metric_labels.values():
+                label.setText("-")
+            return
         inspector = default_webrtc_inspector()
         summary = inspector.summary()
         self._summary_label.setText(_t("inspector_summary_text").format(

@@ -18,6 +18,24 @@ from je_auto_control.wrapper.device_context import (
 _DEFAULT_TIMEOUT_S = 30.0
 
 
+def _run_adb(cmd: List[str], input_bytes: Optional[bytes],
+             timeout_s: float) -> subprocess.CompletedProcess[bytes]:
+    """Run one adb command; inside a stoppable run or a cancellation scope a stop ends it.
+
+    Outside both it is the plain ``subprocess.run`` it always was. Inside, the
+    wait wakes every 0.1 s, and a stop or a cancellation kills the adb client
+    (only the client: the adb server it may have started is a shared daemon)
+    and propagates instead of waiting out the timeout.
+    """
+    from je_auto_control.utils.exception.cancellation import current_cancellation_token
+    from je_auto_control.utils.executor.run_control import current_stop_token
+    if current_stop_token() is None and current_cancellation_token() is None:
+        return subprocess.run(  # nosec B603  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit  # reason: argv list, no shell, adb path resolved by shutil.which / explicit override
+            cmd, input=input_bytes, capture_output=True, timeout=timeout_s, check=False)
+    from je_auto_control.utils.shell_process.shell_exec import run_captured
+    return run_captured(cmd, timeout_s, input_bytes, kill_tree=False)
+
+
 class AdbError(DeviceError):
     """Raised when adb returns a non-zero exit code."""
 
@@ -156,11 +174,7 @@ class AdbClient:
             cmd.extend(["-s", target])
         cmd.extend(args)
         try:
-            result = subprocess.run(  # nosec B603  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit  # reason: argv list, no shell, adb path resolved by shutil.which / explicit override
-                cmd, input=input_bytes,
-                capture_output=True, timeout=timeout or self._timeout,
-                check=False,
-            )
+            result = _run_adb(cmd, input_bytes, timeout or self._timeout)
         except subprocess.TimeoutExpired as error:
             # Not str(error): TimeoutExpired quotes the whole argv, typed text included.
             raise AdbTimeoutError(

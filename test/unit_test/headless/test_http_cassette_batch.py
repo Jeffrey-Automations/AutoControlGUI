@@ -97,3 +97,35 @@ def test_facade_exports():
     for attr in ("Cassette", "CassetteMissError"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+# --- want_bytes: the undecoded body is recorded, masked, and replayed as bytes
+
+def _bytes_inner(content):
+    def inner(call):
+        return {"status": 200, "ok": True, "headers": {}, "text": content.decode("utf-8", "replace"),
+                "json": None, "url": call["url"], "content": content}
+    return inner
+
+
+def test_a_binary_body_saves_and_replays_as_the_same_bytes(tmp_path):
+    raw = bytes(range(256))
+    cassette = Cassette()
+    call = build_call("https://api.example.com/logo.png", "GET")
+    live = cassette.recording_transport(_bytes_inner(raw))(call)
+    assert live["content"] == raw   # the live caller still gets bytes
+    path = cassette.save(str(tmp_path / "cas.json"))
+    replayed = Cassette.load(path).replay(build_call("https://api.example.com/logo.png", "GET"))
+    assert replayed["content"] == raw
+
+
+def test_a_json_byte_body_is_masked_like_a_text_body(tmp_path):
+    secret = "fixture-only-token"  # NOSONAR S2068 reason: masking test fixture, not a credential
+    raw = json.dumps({"access_token": secret, "id": 7}).encode("utf-8")
+    cassette = Cassette()
+    cassette.recording_transport(_bytes_inner(raw))(build_call("https://api.example.com/t", "POST"))
+    path = cassette.save(str(tmp_path / "cas.json"))
+    saved = (tmp_path / "cas.json").read_text(encoding="utf-8")
+    assert secret not in saved
+    content = Cassette.load(path).replay(build_call("https://api.example.com/t", "POST"))["content"]
+    assert json.loads(content) == {"access_token": "<redacted>", "id": 7}

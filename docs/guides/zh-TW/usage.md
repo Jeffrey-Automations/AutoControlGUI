@@ -6,7 +6,7 @@
 
 - **一套 API，七個平台。** `wrapper/platform_wrapper.py` 在匯入時挑選後端；同一份腳本在
   Windows、macOS、X11 與 Wayland 上都不需要改寫。
-- **不寫 Python 也能腳本化。** 911 個 `AC_*` 指令涵蓋全部功能，因此一個 JSON 檔能做到函式庫
+- **不寫 Python 也能腳本化。** 914 個 `AC_*` 指令涵蓋全部功能，因此一個 JSON 檔能做到函式庫
   能做的任何事——包含迴圈、分支、try/catch、巨集與變數。
 - **預設無頭執行。** `import je_auto_control` 絕不會載入 Qt。GUI 是選用套件，包在同一個無頭核心之外。
   公開匯出項目在被存取時才載入來源模組。`__all__` 與 `dir()` 可列出名稱，不必載入全部功能；
@@ -108,7 +108,7 @@ python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 | 自然語言規劃 | `plan_actions`、`run_from_description` | `AC_llm_plan` | LLM Planner |
 | Computer-use agent | `AgentLoop`、`run_agent` | `AC_run_agent` | Computer Use |
 | 錄製與重播 | `record`、`stop_record` | `AC_record`、`AC_stop_record` | Record |
-| JSON 腳本 | `execute_action`、`execute_files` | 全部 911 個指令 | Script、Script Builder |
+| JSON 腳本 | `execute_action`、`execute_files` | 全部 914 個指令 | Script、Script Builder |
 | 變數與流程控制 | `execute_action_with_vars` | `AC_set_var`、`AC_loop`、`AC_for_each`、`AC_try`、`AC_retry` | Variables |
 | 資料驅動執行 | — | `AC_for_each_row`（CSV／JSON／SQLite／Excel） | Data Sources |
 | 斷言 | `assert_text`、`assert_image` | `AC_assert_text` 等 21 個 | Assertions |
@@ -127,6 +127,10 @@ python -c "import je_auto_control; je_auto_control.start_autocontrol_gui()"
 | 指標與追蹤 | `default_metric_registry`、`render_metrics_text` | — | — |
 | 系統診斷 | `run_diagnostics` | `AC_diagnose` | Diagnostics |
 | 測試碼產生 | `generate_code` | — | — |
+
+**影像搜尋：不在畫面上與輸入不能用。** `ImageNotFoundException` 代表搜尋跑過、範本不在畫面上。搜尋無法使用的輸入改拋 `ImageSearchInputException`：範本檔不存在或讀不出、單一顏色的範本（到處都會比對成功）、`detect_threshold`／`threshold` 超出 0–1、是 NaN 或不是數字，或 OpenCV 無法比對的影像。兩者在 `AutoControlException` 底下是兄弟，所以攔其中一個的處理器不會攔到另一個。不存在檢查因此遇到打錯的路徑會失敗，不再通過：`AC_assert_image` 加 `present: false` 以「the template could not be used」失敗，`AC_wait_image_gone` 與 `ac_wait_for_image` 直接拋出而不是等待，`AC_if_image_found` 記成失敗而不是執行 `else` 分支。範本不能用的影像觸發器會被停用並記錄；觀察者規則、狀態機的 `if_image_found` 守衛與 anchor locator 會拋出例外。自我修復仍會退回 VLM 步驟，並回報範本失敗的原因。
+
+**框架以外的錯誤。** executor 會記下失敗的動作並執行下一個（`raise_on_error=False`）。現在這也包含拋出 `cv2.error`、`sqlite3.Error` 或外掛自訂例外類別的指令：它在拋出的那個動作被包成 `AutoControlForeignException`（`original` 與 `__cause__` 是原例外），所以 `AC_try` 會攔到、`AC_retry` 會重試、迴圈逐輪記錄、`AC_parallel` 記在它的分支裡。`raise_on_error=True` 時拋出的是這個包裝。不論 `raise_on_error` 怎麼設都從不收納的有：斷言失敗（`AutoControlAssertionException` 與外掛自己的 `AssertionError`）、`AC_break`／`AC_continue`、停止請求、取消、`KeyboardInterrupt` 與 `SystemExit`。
 
 自癒定位器會在後備或點擊前原樣傳遞取消。稽核記錄在寫入或回傳記錄前遮蔽本次執行已解析的秘密值；回傳的定位結果保留原值，讀取時不改寫既有紀錄檔。
 
@@ -179,6 +183,10 @@ Run History 提供唯讀日誌檢視。使用 **操作 → 使用所選執行的
 
 `${secrets.NAME}` 解析後的值會在 executor 執行期間的應用程式診斷中遮罩，包含巢狀動作及本機 parallel／DAG。CLI／REST／MCP 請求與排程、trigger、hotkey、email 執行會將遮罩保留到錯誤處理及 audit／history 寫入完成；報表紀錄保存遮罩後的快照。DAG 會將擁有者的遮罩保留到 node 診斷完成，包含獨立呼叫與自訂 local runner。watchdog、observer 與 callback executor 會將遮罩保留到最後的錯誤處理；獨立規則彼此隔離。CLI stderr 會遮罩，API 結果、拋出的例外與 CLI 結果資料保留原始值。遮罩於擁有者的請求或執行結束時清除。中止的 history 記為 `error`，journal 步驟維持 `cancelled`，不再擷取錯誤截圖。取消會穿過非嚴格執行、復原／重試、回呼與本機 worker；history 結算失敗也不會取代原始硬中止訊號。
 
+產生的文件保留參照本身。`AC_generate_sop`（`actions`、`title`）與 `AC_generate_code`（`source`）會代換已知的 `${var}`，包含以變數組成的 `source` 路徑；但 `${secrets.NAME}`、尚未綁定的名稱（文件描述的步驟自己設定的迴圈變數）、巢狀佔位符，以及存放本次執行已解析為機密之值的變數，都照原樣寫出，不會展開機密，也不會因 *Unknown variable* 失敗。`AC_resolve_ref`／`AC_resolve_refs`（以及 `ac_resolve_ref`／`ac_resolve_refs`）取得的 `env://` 值原樣回傳給呼叫端，但會像保險庫的值一樣登記到本次執行的遮罩，所以該次執行剩下的期間日誌、journal 與 MCP 稽核都顯示 `***`；`AC_resolve_ref` 的 `value` 與 `AC_resolve_refs` 的 `resolved` 在記錄的結果與 Script Builder 結果窗格中也會遮罩，窗格可顯示一次原值。`file://` 的值不會登記。
+
+`AC_cas_put`／`AC_cas_get`、`AC_dedup_check`、`AC_idempotency_begin`／`_complete`／`_release`、`AC_bulkhead_run`、`AC_sequence_observe` 與 `AC_outbox_enqueue`／`AC_outbox_pending`（以及對應的 MCP 工具）背後的具名記憶體 registry，每個最多保存 `MAX_REGISTRY_NAMES`（1,024）個名稱。達到上限時既有名稱照常運作，也不會淘汰任何狀態；新名稱（包含讀取從未寫入過的名稱）會拋出指出該 registry 的 `RegistryFullError`。這些 registry 都沒有刪除或重設指令，名稱在程序結束時釋放。
+
 ## 命令列介面
 
 每次 `je_auto_control run`（包括 `--dry-run` 與未帶 `--var`）使用獨立變數範圍。頂層 `run_from_description` 與 `StateMachine.run()` 也會隔離變數，同一次執行內的動作與狀態仍可共享；巢狀呼叫沿用已有的執行範圍。自行建立的 `Executor()` 保留自己的變數。
@@ -192,7 +200,7 @@ je_auto_control record out.json [--duration 5]
 je_auto_control codegen script.json --target pytest -o test_flow.py
 je_auto_control failure-bundle failure.zip --error "login timed out"
 je_auto_control list-jobs
-je_auto_control start-server --port 9938      # TCP socket 伺服器
+je_auto_control start-server --port 9938      # TCP socket 伺服器（AUTH token；--token、--token-file、--no-auth）
 je_auto_control start-rest   --port 9939      # REST API
 je_auto_control version
 ```

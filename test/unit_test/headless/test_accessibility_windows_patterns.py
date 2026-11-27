@@ -231,6 +231,26 @@ def test_setting_a_value_the_control_refuses_fails(backend, found):
     assert backend.set_value("x", name="Field") is False
 
 
+@pytest.mark.parametrize("act, pattern_id, interface_name", [
+    (lambda backend: backend.set_value("x", name="Field"), VALUE, "IUIAutomationValuePattern"),
+    (lambda backend: backend.invoke(name="OK"), INVOKE, "IUIAutomationInvokePattern"),
+    (lambda backend: backend.toggle(name="Box"), TOGGLE, "IUIAutomationTogglePattern"),
+])
+def test_a_write_passes_the_stop_gate_after_finding_and_before_acting(backend, found, monkeypatch,
+                                                                     act, pattern_id, interface_name):
+    pattern = _with(found, pattern_id, interface_name)
+    seen = []
+
+    def gate():
+        seen.append(list(pattern.calls))
+        raise RuntimeError("stopped at the gate")
+    monkeypatch.setattr(backend_module, "begin_act", gate)
+    assert backend.gates_writes is True
+    with pytest.raises(RuntimeError, match="stopped at the gate"):
+        act(backend)
+    assert seen == [[]] and pattern.calls == []  # found and queried, never acted
+
+
 # --- invoke and toggle --------------------------------------------------------
 
 def test_invoking_presses_the_control(backend, found):

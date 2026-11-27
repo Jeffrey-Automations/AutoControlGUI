@@ -1,12 +1,12 @@
 """A missing arm64 wheel must say so, not raise ModuleNotFoundError. No Qt.
 
-`cryptography`, `opencv-python` and `je_open_cv` publish no `win_arm64`
-wheel, so `pyproject.toml` marks them off that one platform and everything
-else in the package keeps working there. That trade is only honest if the
-features that *do* need them fail legibly: on Windows arm64 the package is
-installed and correct, so a bare `ModuleNotFoundError: No module named 'cv2'`
-reads like a broken install and sends the user to reinstall something that
-cannot exist.
+`cryptography` publishes no `win_arm64` wheel at our floor, so `pyproject.toml`
+marks it off that one platform and everything else in the package keeps
+working there. That trade is only honest if the features that *do* need it
+fail legibly: on Windows arm64 the package is installed and correct, so a bare
+`ModuleNotFoundError` reads like a broken install and sends the user to
+reinstall something that cannot exist. `opencv-python` and `je_open_cv` install
+everywhere now, but their accessors still name the wheel when it is absent.
 
 These tests make the missing import fail on a machine that has the wheels,
 by putting `None` in `sys.modules` — the import system raises `ImportError`
@@ -77,7 +77,7 @@ def test_encrypting_an_action_file_surfaces_the_same_message(
 ])
 def test_the_image_stack_doors_name_their_wheel(
         monkeypatch, accessor_name: str, blocked: str, needle: str) -> None:
-    """Both image-stack accessors explain the platform, not just the module."""
+    """Both image-stack accessors name the wheel to install, not just the module."""
     from je_auto_control.utils.cv2_utils import optional
 
     accessor: Callable = getattr(optional, accessor_name)
@@ -87,7 +87,8 @@ def test_the_image_stack_doors_name_their_wheel(
 
     message = str(caught.value)
     assert needle in message
-    assert "Windows arm64" in message
+    assert "pip install" in message
+    assert "Windows arm64" not in message, "the image stack installs on Windows arm64 now"
     assert isinstance(caught.value.__cause__, ImportError)
 
 

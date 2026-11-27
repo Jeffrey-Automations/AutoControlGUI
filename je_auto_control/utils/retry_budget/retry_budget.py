@@ -22,7 +22,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
-from je_auto_control.utils.executor.run_control import pause
+from je_auto_control.utils.exception.control_signals import is_run_interruption
+from je_auto_control.utils.executor.run_control import ExecutionStopped, pause
 
 # A uniform sampler: ``(low, high) -> float`` in ``[low, high)``.
 Uniform = Callable[[float, float], float]
@@ -142,7 +143,8 @@ def run_with_budget(func: Callable[..., Any], budget: RetryBudget, *,
 
     Stops at whichever of ``max_attempts`` / ``deadline_s`` is hit first and
     never sleeps past the deadline. Exceptions outside ``budget.exceptions``
-    propagate immediately. ``clock`` / ``sleep`` / ``uniform`` are injectable.
+    propagate immediately, and so does a stop or cancellation, which is never
+    retried. ``clock`` / ``sleep`` / ``uniform`` are injectable.
     """
     call_kwargs = kwargs if kwargs is not None else {}
     start = clock()
@@ -153,6 +155,8 @@ def run_with_budget(func: Callable[..., Any], budget: RetryBudget, *,
         try:
             return func(*args, **call_kwargs)
         except budget.exceptions as error:
+            if isinstance(error, ExecutionStopped) or is_run_interruption(error):
+                raise
             last_error = error
         wait = _sleep_before_retry(budget, attempt, clock() - start, uniform)
         if wait is None:

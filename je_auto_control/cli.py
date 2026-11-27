@@ -18,7 +18,7 @@ Usage::
     je_auto_control failure-bundle failure.zip [--error "message"]
     je_auto_control version
     je_auto_control list-jobs
-    je_auto_control start-server --port 9938
+    je_auto_control start-server --port 9938 [--token-file PATH] [--token T] [--no-auth]
     je_auto_control start-rest --port 9939
     je_auto_control users [--users users.json] add alice --role admin
     je_auto_control users list | set-role ID ROLE | rotate-token ID | remove ID
@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 from contextlib import AbstractContextManager, ExitStack, closing, contextmanager, nullcontext
+from pathlib import Path
 from types import FrameType
 from typing import Callable, Dict, Iterator, List, Optional, Sequence
 
@@ -276,10 +277,15 @@ def cmd_start_server(args: argparse.Namespace) -> int:
     from je_auto_control.utils.socket_server.auto_control_socket_server import (
         start_autocontrol_socket_server,
     )
-    server = start_autocontrol_socket_server(args.host, args.port)
+    server = start_autocontrol_socket_server(
+        args.host, args.port, token=args.token, require_auth=not args.no_auth,
+        token_path=args.token_file)
     # The bound address: with --port 0 the requested one said nothing.
     port = server.server_address[1]
     sys.stdout.write(f"Socket server listening on {args.host}:{port}\n")
+    if server.token_path is not None:
+        # Where clients find the token; the token itself is not printed.
+        sys.stdout.write(f"Socket server token file: {server.token_path}\n")
     _run_until_signal(server.shutdown)
     server.server_close()
     return 0
@@ -402,6 +408,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_srv = sub.add_parser("start-server", help="Start the TCP socket server")
     p_srv.add_argument("--host", default="127.0.0.1")
     p_srv.add_argument("--port", type=_port, default=9938)
+    p_srv.add_argument("--token", default=None,
+                       help="token clients must send (default: $JE_AUTOCONTROL_SOCKET_TOKEN, "
+                            "else a random one)")
+    p_srv.add_argument("--token-file", type=Path, default=None,
+                       help="owner-only file the token is written to "
+                            "(default: ~/.je_auto_control/socket_server_<port>.token)")
+    p_srv.add_argument("--no-auth", action="store_true",
+                       help="legacy: accept commands without AUTH (any local process may run any command)")
     p_srv.set_defaults(func=cmd_start_server)
 
     p_rest = sub.add_parser("start-rest", help="Start the REST API server")

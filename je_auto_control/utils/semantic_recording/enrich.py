@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Sequence
 
+from je_auto_control.utils.exception.control_signals import raise_if_run_interrupted
+
 if TYPE_CHECKING:
     from je_auto_control.utils.accessibility.element import AccessibilityElement
 
@@ -30,7 +32,8 @@ class AnchorResolver:
         """Return an anchor dict for the element at ``(x, y)`` or ``None``."""
         try:
             element = self._backend(int(x), int(y))
-        except (RuntimeError, OSError):
+        except (RuntimeError, OSError) as error:
+            raise_if_run_interrupted(error)  # a cancelled MCP call is a RuntimeError
             return None
         if not element:
             return None

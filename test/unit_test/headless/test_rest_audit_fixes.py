@@ -78,3 +78,12 @@ def test_a_corrupt_audit_database_does_not_stop_the_server(tmp_path, monkeypatch
     monkeypatch.setattr(audit_log, "default_audit_log", lambda: audit_log.AuditLog(broken))
     server = RestApiServer(host="127.0.0.1", port=0, token=TOKEN, enable_audit=True)
     assert server._audit_log is None
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_an_unparseable_request_target_is_answered(server, method):
+    """An absolute-form target urlparse refuses raised in the handler thread."""
+    import socket
+    with socket.create_connection(server.address, timeout=5) as client:
+        client.sendall(f"{method} http://[ HTTP/1.0".encode("ascii") + bytes([13, 10, 13, 10]))
+        assert b" 400 " in client.recv(4096)

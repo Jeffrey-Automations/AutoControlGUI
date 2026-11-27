@@ -39,7 +39,7 @@ every surface that takes JSON actions works.
     ├── background.js        — service worker; recording state machine
     ├── content_script.js    — DOM event capture + CSS-selector builder
     ├── popup.html / popup.js — toolbar UI
-    └── icons/               — drop your own .pngs here
+    └── icons/               — toolbar icons (16, 48 and 128 px PNGs)
 
 The `actionFor()` helper in `background.js` is a pure function and
 is unit-tested from Python (`test_browser_extension_scaffold.py`).

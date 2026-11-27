@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+from je_auto_control.utils.agent_runtime.runtime_stop import refuse_while_fencing
 from je_auto_control.utils.rbac.authorization import AuthorizationContext
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
@@ -18,6 +19,7 @@ class DagServiceClient:
 
     def check(self) -> None:
         """Refresh the registrant and approver, and reject a fenced or replaced coordinator attempt."""
+        refuse_while_fencing(self.runtime, self.started["batch_id"])  # a stop's pause may still be pending
         with self.actor.scope(), self.owner.scope(), self.runtime.store.connection() as connection:
             row = connection.execute("SELECT state,attempt FROM agent_dag_batches WHERE id=?",
                                      (self.started["batch_id"],)).fetchone()

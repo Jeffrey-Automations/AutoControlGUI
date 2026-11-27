@@ -66,3 +66,20 @@ def test_facade_exports():
     for name in ("edge_match", "edge_match_all", "chamfer_distance"):
         assert hasattr(ac, name)
         assert name in ac.__all__
+
+
+def test_edge_match_all_caps_the_candidates_before_nms(monkeypatch):
+    """Every position above a low min_score went into the quadratic overlap removal."""
+    import importlib
+    module = importlib.import_module("je_auto_control.utils.edge_match.edge_match")
+    seen = []
+
+    def count(matches, _iou):
+        seen.append(len(matches))
+        return matches
+
+    monkeypatch.setattr(module, "_nms", count)
+    found = edge_match_all(_template_different_fill(), haystack=_scene(), min_score=0.0,
+                           max_results=5)
+    assert len(found) == 5
+    assert seen == [250]

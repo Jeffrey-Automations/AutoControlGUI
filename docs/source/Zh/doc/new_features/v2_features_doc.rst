@@ -411,8 +411,8 @@ Chat-ops 機器人
 ``/stop <run-id>`` 要求指名的那一個停止，不論它從哪裡啟動。
 
 Slack adapter（``SlackBot``）把 ``/run`` 放到工作執行緒上執行，執行期間繼續輪詢，所以
-**貼到頻道的** ``/stop`` **停得掉 bot 自己的執行**：它在下一次輪詢被讀到
-（``poll_interval_s``，預設 5 秒、最少 1 秒），回覆 ``stop requested: <run-id>``，
+**貼到頻道的** ``/stop`` **停得掉 bot 自己的執行**：它在下一次輪詢被讀到，
+回覆 ``stop requested: <run-id>``，
 接著那次執行在自己的討論串回覆 ``run stopped. (stopped from chat by <使用者>)``——
 一定是這個順序。``/run`` 的回覆因此是在腳本結束時送出，而不是在讀下一則訊息之前。
 每個 bot 同時只執行一個 ``/run``：執行中再送一個不會排隊，而是回覆
@@ -422,8 +422,22 @@ Slack adapter（``SlackBot``）把 ``/run`` 放到工作執行緒上執行，執
 同樣成為名稱為 ``chatops-<第一個參數>-<id>`` 的可停止執行。``bot.stop(timeout=10.0)``
 結束輪詢、停止執行中的命令、最多等 ``timeout`` 秒讓工作執行緒結束，並回傳是否已沒有
 工作執行緒；``bot.wait_idle(timeout)`` 只等待、不停止任何東西；``bot.running_run_id``
-是執行中的 run id。工作執行緒的回覆送不出去時只記錄在 log（沒有輪詢執行緒可以往上拋），
+是執行中的 run id。
+在指令 handler 裡呼叫 ``stop()``／``wait_idle()`` 會立刻回 ``False``，不會等待自己所屬的 run。工作執行緒的回覆送不出去時只記錄在 log（沒有輪詢執行緒可以往上拋），
 命令不會被重新執行。
+
+bot 閒置時每 ``poll_interval_s``（預設 5 秒、最少 1 秒）輪詢一次，背景命令執行期間改為每
+``run_poll_interval_s``（預設 1 秒；必須是有限數、大於 0 且不大於 ``poll_interval_s``，
+否則拋 ``SlackError``）輪詢一次，所以 ``/stop`` 大約一秒內就會被讀到。快速間隔從執行開始後的
+那一次等待就生效，迴圈當時已在閒置等待中也一樣；執行結束後回到閒置間隔；``stop()`` 會立刻
+結束等待。Slack 回 ``429`` 並帶 ``Retry-After`` 時，在該延遲（最多一小時）過去前不會再輪詢，
+不論當時是哪個間隔；沒有 ``Retry-After`` 的 ``429`` 則照錯誤退避處理。
+
+bot 不會重播頻道歷史。沒有給 ``last_seen_ts`` 也沒有存檔時，第一次輪詢只把最新一則訊息記為起點，
+不執行任何命令。位置在每則訊息的命令執行**之前**存到 ``state_path``（預設
+``~/.je_auto_control/chatops/slack_<頻道>.json``，原子寫入，POSIX 上權限 0600），所以重啟會從它之後接續，
+當機也不會讓同一個命令執行兩次；位置存不進去時命令不會執行。損壞的狀態檔會改名為 ``.corrupt-<時間>``，
+bot 從最新一則訊息開始。
 
 ``/screenshot [name]`` 寫進 context 的 ``screenshot_dir``
 （預設為暫存目錄下的 ``je_auto_control_chatops``），給的名稱只保留檔名。
@@ -497,6 +511,11 @@ acceptance remains pending.
 實際操作仍重驗權限。快取 libei 須完成握手，且鍵盤／絕對指標／按鈕／滾輪種類都在運作才回報可用；
 部分授權維持未驗證，事件種類暫停或必要裝置移除則回報暫停／撤銷。XWayland 一律 ``desktop_wide=False``；其他範圍仍受授權區域限制，
 不代表已驗證每個螢幕。
+
+輸入狀態為 ``needs_permission``、``revoked`` 或 ``failed`` 時，``reset_native_input()``（亦即
+``AC_reset_native_input``、``ac_reset_native_input`` 與 **Diagnostics → Actions → 重設原生輸入工作階段**）
+會退休快取的 Wayland 輸入工作階段與記錄的拒絕，並回傳更新後的快照。它本身不要求任何授權；下一次真正的
+輸入操作才可能開新的 portal 工作階段與同意對話框。需要 ``drive_input``，Wayland 以外不做任何事。
 
 Context 複製前置資料，可由擁有者提供無原生物件的觀測，但不授權。AC／MCP 不接受外部觀測；
 預設本機結果不含環境值、命令參數、執行檔路徑或原生錯誤文字。拒絕／暫停／撤銷／失敗不代表改走 CLI；
@@ -615,7 +634,13 @@ VS Code 擴充
 
 REST URL 與 bearer token 來自 VS Code settings
 (``autocontrolLsp.rest.url`` / ``autocontrolLsp.rest.token``)，
-若空則 fallback 到 ``$AC_TOKEN`` 環境變數。
+若空則 fallback 到 ``$AC_TOKEN`` 環境變數。截圖命令送出 ``GET /screenshot`` 並開啟回傳的 PNG。
+
+只診斷動作檔：符合 ``autocontrolLsp.actionFiles`` 的檔案（預設 ``**/*.ac.json`` 與
+``**/actions/**/*.json``；修改後請重新載入視窗）。其他 LSP 客戶端以
+``initializationOptions.actionFiles`` 傳入相同的 glob。診斷與補全使用 executor 的完整指令集
+（含流程指令），並和 executor 一樣接受位置參數清單；欄位以協定規定的 UTF-16 計算，
+含 emoji 的行上 hover 與編輯範圍仍然正確。
 
 
 瀏覽器擴充錄製器
@@ -626,6 +651,12 @@ REST URL 與 bearer token 來自 VS Code settings
 驅動的 AutoControl JSON action 檔。CSS selector 會優先使用
 ``data-testid`` / ``data-cy`` / ``name`` / ``nth-of-type``
 路徑，貼近實務寫法。
+
+錄製只跟著按下 Start 的那個分頁，跨導航延續，分頁關閉即結束；沒有作用中分頁時拒絕 Start。
+敏感欄位（``type=password``、``current-password`` ／ ``one-time-code`` ／ ``cc-*`` 等 autocomplete
+提示，或 ``password`` ／ ``otp`` ／ ``cvv`` ／ ``pin`` 之類的 name 或 id）的值從不讀取，記成
+``${secrets.NAME}``：NAME 取欄位的 name、id 或提示，其他字元換成 ``_``（都沒有時為 ``password``），
+重播前請先在 vault 以該名稱存入值。
 
 
 pytest plugin + Gherkin BDD

@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from je_auto_control.utils.agent_runtime.activity import ActivityGate, physical_event
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+from je_auto_control.utils.exception.exceptions import AutoControlRecordException
 
 
 def _interactive() -> bool:
@@ -52,20 +53,25 @@ def _listener(callback: Callable[[], None]) -> Any:
     class PresenceHook(Win32InputHook):
         """Keep only presence metadata and own the hook thread through retirement."""
 
+        stop_timeout = 1.0
+
         def start(self) -> None:
-            self._thread = threading.Thread(target=self._run, name="AgentPresence", daemon=True)
-            self._thread.start()
-            if not self._ready.wait(5) or self.error or not self._thread.is_alive():
+            thread = threading.Thread(target=self._run, name="AgentPresence", daemon=True)
+            self._thread = thread
+            thread.start()
+            if not self._ready.wait(5) or self.error or not thread.is_alive():
+                self._request_stop()    # a worker that comes up late must not pump
                 raise AgentTaskError("physical activity hooks did not become ready")
 
         def alive(self) -> bool:
-            return self._thread.is_alive() and not self.error
+            thread = self._thread
+            return thread is not None and thread.is_alive() and not self.error
 
         def stop(self) -> list[dict[str, Any]]:
-            super().stop()
-            self._thread.join(timeout=1)
-            if self._thread.is_alive():
-                raise AgentTaskError("physical activity hooks have not retired")
+            try:
+                super().stop()      # joins the hook thread for up to stop_timeout
+            except AutoControlRecordException as error:
+                raise AgentTaskError("physical activity hooks have not retired") from error
             return []
 
         def _keyboard_proc(self, user32: Any) -> Any:

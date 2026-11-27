@@ -1,6 +1,7 @@
 """Durable account/endpoint-scoped edits with leased, bounded and cancellable retry delivery."""
 from __future__ import annotations
 
+import functools
 import json
 import math
 import time
@@ -38,11 +39,34 @@ _Sender = Callable[[SyncOperation], int | CausalReceipt]
 _Cancelled = Optional[Callable[[], bool]]
 _BEGIN_IMMEDIATE = "BEGIN IMMEDIATE"
 _SELECT = "SELECT wire, digest, prepared FROM sync_operations WHERE endpoint = ? AND user_id = ? AND operation_id = ?"
+_OPEN_ROWS = ("SELECT wire,digest,prepared FROM sync_operations WHERE endpoint = ? AND user_id = ? "
+              "AND status NOT IN ('delivered','retired') ORDER BY sequence LIMIT ?")
+# What a drain may claim: conflict and blocked rows wait for the user, so a
+# batch skips past them instead of being filled by them.
+_SENDABLE_ROWS = ("SELECT wire,digest,prepared FROM sync_operations WHERE endpoint = ? AND user_id = ? "
+                  "AND status IN ('pending','offline','sending') ORDER BY sequence LIMIT ?")
+# A delivered row is the edit's receipt; only the newest ``limit`` younger than the cutoff are kept.
+_PRUNE_RECEIPTS = ("DELETE FROM sync_operations WHERE endpoint=? AND user_id=? AND status='delivered' "
+                   "AND (last_attempt < ? OR sequence NOT IN (SELECT sequence FROM sync_operations "
+                   "WHERE endpoint=? AND user_id=? AND status='delivered' ORDER BY sequence DESC LIMIT ?))")
+_RECEIPT_LIMIT = 1000
+_RECEIPT_MAX_AGE_S = 7 * 24 * 3600.0
 
 
 def _scope(endpoint: str, user_id: str) -> _Scope:
     _identifier(user_id, "user_id")
     return normalize_sync_endpoint(endpoint), user_id
+
+
+def _receipt_bounds(limit: int, max_age: float) -> tuple[int, float]:
+    """Validate the delivered-row bounds: at least one row, a positive finite age in seconds."""
+    _revision(limit)
+    if limit < 1:
+        raise ConfigSyncError("receipt_limit must be at least 1")
+    if isinstance(max_age, bool) or not isinstance(max_age, (int, float)) or not math.isfinite(max_age) \
+            or max_age <= 0:
+        raise ConfigSyncError("receipt_max_age must be a positive finite number of seconds")
+    return limit, float(max_age)
 
 
 def _operation(row: tuple[object, ...]) -> SyncOperation:
@@ -65,9 +89,17 @@ class SyncOutbox:
     the durable prepared request and server receipts for that purpose.
     """
 
-    def __init__(self, path: Optional[str | Path] = None, *, clock: _Clock = time.time) -> None:
-        self._database = SyncDatabase(path, "AUTOCONTROL_SYNC_OUTBOX", "config-outbox.sqlite3", initialize_outbox)
+    def __init__(self, path: Optional[str | Path] = None, *, clock: _Clock = time.time,
+                 receipt_limit: int = _RECEIPT_LIMIT, receipt_max_age: float = _RECEIPT_MAX_AGE_S) -> None:
+        """``receipt_limit`` / ``receipt_max_age`` (seconds) bound the delivered rows kept per namespace.
+
+        The same bounds apply to peer-control receipts, except that one younger
+        than ``CONTROL_RECEIPT_RETRY_WINDOW_S`` is always kept (see ``control_store``).
+        """
+        self._receipt_limit, self._receipt_max_age = _receipt_bounds(receipt_limit, receipt_max_age)
         self._clock = clock
+        self._database = SyncDatabase(path, "AUTOCONTROL_SYNC_OUTBOX", "config-outbox.sqlite3",
+                                      functools.partial(initialize_outbox, clock=self._now))
 
     def _now(self) -> float:
         try:
@@ -112,14 +144,14 @@ class SyncOutbox:
         _revision(limit)
         if not 1 <= limit <= 1000:
             raise ConfigSyncError("pending view limit must be 1–1000")
-        scope = _scope(endpoint, user_id)
+        return self._read(_OPEN_ROWS, _scope(endpoint, user_id), limit)
+
+    def _read(self, query: str, scope: _Scope, limit: int) -> tuple[SyncOperation, ...]:
+        """Load up to ``limit`` rows of ``query`` in enqueue order, within the sixteen MiB view budget."""
         values: list[SyncOperation] = []
         size = 0
         with self._database.connection() as connection:
-            rows = connection.execute("SELECT wire,digest,prepared FROM sync_operations WHERE endpoint = ? "
-                                      "AND user_id = ? AND status NOT IN ('delivered','retired') "
-                                      "ORDER BY sequence LIMIT ?", (*scope, limit))
-            for row in rows:
+            for row in connection.execute(query, (*scope, limit)):
                 size += len(row[0]) + len(row[2] or "")
                 if size > 16 * 1024 * 1024:
                     if not values:
@@ -239,13 +271,15 @@ class SyncOutbox:
         return self._controls().status(_scope(endpoint, user_id))
 
     def _controls(self) -> ControlStore:
-        return ControlStore(self._database, self._now, self._save_snapshot)
+        return ControlStore(self._database, self._now, self._save_snapshot,
+                            receipts=(self._receipt_limit, self._receipt_max_age))
 
     def flush(self, sender: _Sender, *, endpoint: str, user_id: str,
                  policy: Optional[SyncRetryPolicy] = None, cancelled: _Cancelled = None) -> SyncDrainResult:
         """Attempt bounded due work; backoff is persisted without sleeping and cancellation never discards edits."""
         policy = policy or SyncRetryPolicy()
-        operations = self.pending(endpoint=endpoint, user_id=user_id, limit=policy.max_batch)
+        scope = _scope(endpoint, user_id)
+        operations = self._read(_SENDABLE_ROWS, scope, policy.max_batch)
         delivered, failed, stopped = 0, 0, False
         for operation in operations:
             owner = uuid4().hex
@@ -255,8 +289,18 @@ class SyncOutbox:
             if result[2]:
                 stopped = True
                 break
+        if delivered:
+            self._prune_receipts(scope)
         count = cast(int, self.status(endpoint=endpoint, user_id=user_id)["pending"])
         return SyncDrainResult(delivered, count, failed, stopped)
+
+    def _prune_receipts(self, scope: _Scope) -> None:
+        """Drop delivered rows beyond the count bound or older than the age bound; open work is never touched."""
+        cutoff = self._now() - self._receipt_max_age
+        with self._database.connection() as connection:
+            connection.execute(_BEGIN_IMMEDIATE)
+            connection.execute(_PRUNE_RECEIPTS, (*scope, cutoff, *scope, self._receipt_limit))
+            connection.execute("COMMIT")
 
     def _attempt(self, operation: SyncOperation, sender: _Sender, policy: SyncRetryPolicy,
                     owner: str, cancelled: _Cancelled) -> tuple[int, int, bool]:

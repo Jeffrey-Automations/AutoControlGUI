@@ -192,3 +192,47 @@ def test_cmd_unlink_replies_ret_unlink():
 def test_peek_transfer_length_rejects_short_input():
     with pytest.raises(UsbIpError):
         peek_transfer_length(b"\x00" * 4, b"\x00" * 28)
+
+
+def test_an_aborted_connection_does_not_end_the_usbip_accept_loop():
+    import threading
+
+    class _Flaky:
+        calls = 0
+
+        def accept(self):
+            _Flaky.calls += 1
+            if _Flaky.calls == 1:
+                raise ConnectionAbortedError("aborted before accept")
+            stop.set()
+            raise socket.timeout()
+
+    server = UsbIpServer(FakeUrbBackend())
+    stop = threading.Event()
+    server._listen_sock = _Flaky()
+    server._accept_loop(stop)
+    server._listen_sock = None
+    assert _Flaky.calls == 2
+
+
+def test_a_backend_that_fails_outside_oserror_only_drops_its_client(monkeypatch):
+    """pyusb without libusb raises NoBackendError, a ValueError; it ended the worker with a traceback."""
+    import threading
+    escaped = []
+    monkeypatch.setattr(threading, "excepthook", lambda args: escaped.append(args.exc_value))
+    backend = FakeUrbBackend()
+
+    def fail():
+        raise ValueError("No backend available")
+
+    monkeypatch.setattr(backend, "list_devices", fail)
+    near, far = socket.socketpair()
+    far.sendall(struct.pack("!HHI", PROTOCOL_VERSION, 0x8005, 0))
+    try:
+        UsbIpServer(backend)._handle_client(near, threading.Event())
+        far.settimeout(2)
+        assert far.recv(16) == b""
+        assert escaped == []
+    finally:
+        near.close()
+        far.close()

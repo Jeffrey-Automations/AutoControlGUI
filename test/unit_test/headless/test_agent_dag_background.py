@@ -10,6 +10,7 @@ from je_auto_control.utils.agent_runtime import AgentRuntime, AgentTaskError
 from je_auto_control.utils.agent_runtime.service import AgentRuntimeService
 from je_auto_control.utils.rbac.authorization import AuthorizationContext, authorization_scope
 from je_auto_control.utils.rbac.users import UserStore
+from je_auto_control.utils.work_queue.work_queue import WorkQueueError
 from .test_agent_dag_batch_loopback import service as service, Target
 from .test_agent_dag_batches import graph
 from .test_agent_dag_continuation import stopped as stopped, review, approval
@@ -218,3 +219,21 @@ def test_service_background_keeps_local_ownership_and_never_forwards_it_to_remot
         assert "origin_policies" not in remote_row["spec"]["options"]
     finally:
         remote.close()
+
+
+def test_a_busy_queue_database_does_not_end_the_coordinator_workers(service, monkeypatch):
+    client, instance, _target = service
+    original, failed = instance._dag_jobs.queue.get_next, threading.Event()
+
+    def busy_once(*args, **kwargs):
+        if not failed.is_set():
+            failed.set()
+            raise WorkQueueError("database is locked")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(instance._dag_jobs.queue, "get_next", busy_once)
+    batch = client.call("dag", {"operation": "register", "request": {"definition": graph()}})
+    submit(client, batch, graph())
+    result = until(lambda: finished(instance, batch))
+    assert failed.is_set() and result["state"] == "succeeded"
+    assert all(worker.is_alive() for worker in instance._dag_jobs._workers)

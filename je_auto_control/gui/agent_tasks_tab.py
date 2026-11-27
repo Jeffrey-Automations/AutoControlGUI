@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (  # pylint: disable=no-name-in-module  # reason: 
     QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import refused_on
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui.adaptive.responsive import ResponsiveBox
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
@@ -44,6 +45,10 @@ def _translate(key: str) -> str:
     return language_wrapper.translate(key, key)
 
 
+#: The operations that change the host's own runtime, and the ``AC_*`` command each stands for.
+_PRIVILEGED = {"start": "AC_agent_runtime_start", "stop": "AC_agent_runtime_stop", "target": "AC_agent_target"}
+
+
 def _request(operation: str, payload: dict[str, Any], token: CancellationToken) -> dict[str, Any]:
     token.checkpoint()
     if operation == "start":
@@ -59,6 +64,9 @@ def _request(operation: str, payload: dict[str, Any], token: CancellationToken) 
 
 class AgentTasksTab(TranslatableMixin, QWidget):
     """Review authorization and completion criteria before submitting a managed task."""
+
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = tuple(_PRIVILEGED.values())
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -76,6 +84,7 @@ class AgentTasksTab(TranslatableMixin, QWidget):
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
         self._table = QTableWidget(0, 4)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.cellClicked.connect(self._select)
         self._status = QLabel()
         self._task_id.textChanged.connect(self._clear_observation)
@@ -261,6 +270,10 @@ class AgentTasksTab(TranslatableMixin, QWidget):
         """Detach transfer observers without stopping service-owned imports or revoking grants."""
         self._transfer.detach()
         super().closeEvent(event)
+
+    def dispose(self) -> None:
+        """Drop an observation image still being decoded; service-owned work keeps running, as on close."""
+        self._observation.dispose()
 
     def _lookup(self) -> None:
         self._dispatch("lookup", {"idempotency_key": self._request_key.text()})
@@ -501,6 +514,8 @@ class AgentTasksTab(TranslatableMixin, QWidget):
         return request
 
     def _dispatch(self, operation: str, payload: dict[str, Any] | None = None) -> None:
+        if operation in _PRIVILEGED and refused_on(self._status, _PRIVILEGED[operation]):
+            return
         if self._handle is not None and self._handle.outcome is None:
             if operation not in {"pause", "cancel", "stop", "stop_all"}:
                 return

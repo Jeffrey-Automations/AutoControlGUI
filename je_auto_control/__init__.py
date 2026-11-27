@@ -73,6 +73,7 @@ if _TYPE_CHECKING:
     from je_auto_control.utils.cv2_utils.screenshot import pil_screenshot
     from je_auto_control.utils.cv2_utils.video_recording import RecordingThread
     from je_auto_control.utils.exception.exceptions import AutoControlActionException
+    from je_auto_control.utils.exception.exceptions import AutoControlForeignException
     from je_auto_control.utils.exception.exceptions import (
         AutoControlActionNullException,
     )
@@ -91,6 +92,8 @@ if _TYPE_CHECKING:
         AutoControlFlatTemplateException,
     )
     from je_auto_control.utils.exception.exceptions import ImageNotFoundException
+    from je_auto_control.utils.exception.exceptions import ImageSearchInputException
+    from je_auto_control.utils.accessibility.walker import AccessibilityWriteOutcomeUnknown
     from je_auto_control.utils.executor.action_executor import add_command_to_executor
     from je_auto_control.utils.executor.action_executor import execute_action
     from je_auto_control.utils.executor.action_executor import execute_action_with_vars
@@ -1600,6 +1603,7 @@ if _TYPE_CHECKING:
         CapabilitySnapshot,
         CapabilityStatus,
         probe_capabilities,
+        reset_native_input,
     )
     from je_auto_control.utils.diagnostics import (
         Check,
@@ -1846,6 +1850,11 @@ if _TYPE_CHECKING:
     from je_auto_control.utils.socket_server.auto_control_socket_server import (
         start_autocontrol_socket_server,
     )
+    from je_auto_control.utils.socket_server.socket_client import (
+        authenticate_connection,
+        read_socket_token,
+        send_socket_command,
+    )
     from je_auto_control.utils.start_exe.start_another_process import start_exe
     from je_auto_control.utils.test_record.record_test_class import test_record_instance
     from je_auto_control.wrapper.auto_control_image import locate_all_image
@@ -1943,11 +1952,17 @@ if _TYPE_CHECKING:
         dismiss_alert, launch_app, mobile_extension,
         register_mobile_extension, stop_app, wait_for_app,
     )
+    from je_auto_control.ios.simctl import (
+        SimctlExtension, list_ios_simulators, use_ios_simulator,
+    )
     from je_auto_control.utils.codegen.robot_check import (
         RobotStructureError, check_robot_structure,
     )
     from je_auto_control.linux_wayland.global_shortcuts import (
         ShortcutPermissionError, ShortcutUnavailable, StopShortcutSession,
+    )
+    from je_auto_control.utils.executor.named_registry import (
+        MAX_REGISTRY_NAMES, RegistryFullError,
     )
     from je_auto_control.utils.rbac.admin import (
         add_user as rbac_add_user, list_users as rbac_list_users, remove_user as rbac_remove_user,
@@ -2014,8 +2029,9 @@ __all__ = [
     "CriticalExit", "AutoControlException", "AutoControlKeyboardException",
     "AutoControlMouseException", "AutoControlCantFindKeyException",
     "AutoControlScreenException", "AutoControlFlatTemplateException",
-    "ImageNotFoundException", "AutoControlJsonActionException",
-    "AutoControlRecordException", "AutoControlActionNullException", "AutoControlActionException", "record",
+    "ImageNotFoundException", "ImageSearchInputException", "AutoControlJsonActionException",
+    "AutoControlRecordException", "AutoControlActionNullException", "AutoControlActionException",
+    "AutoControlForeignException", "AccessibilityWriteOutcomeUnknown", "record",
     "stop_record", "stop_record_timeline",
     "read_action_json", "read_executable_action_json", "write_action_json", "format_action_json",
     "execute_action", "execute_files", "executor",
@@ -2478,7 +2494,7 @@ __all__ = [
     "UsbAcl",
     "enable_usb_passthrough", "is_usb_passthrough_enabled",
     # System diagnostics
-    "BackendContext", "CapabilitySnapshot", "CapabilityStatus", "probe_capabilities",
+    "BackendContext", "CapabilitySnapshot", "CapabilityStatus", "probe_capabilities", "reset_native_input",
     "CancellationToken", "TaskProgress", "cancellation_scope",
     "Check", "DiagnosticsReport", "run_diagnostics",
     # Config bundle
@@ -2700,6 +2716,7 @@ __all__ = [
     "default_virtual_gamepad", "is_virtual_gamepad_available",
     "generate_html", "generate_html_report", "generate_json", "generate_json_report", "generate_xml",
     "generate_xml_report", "get_dir_files_as_list", "create_project_dir", "start_autocontrol_socket_server",
+    "send_socket_command", "read_socket_token", "authenticate_connection",
     "callback_executor", "package_manager", "ShellManager", "default_shell_manager",
     "RecordingThread", "send_key_event_to_window", "send_mouse_event_to_window", "windows_window_manage",
     "ScreenRecorder", "get_pixel",
@@ -2717,8 +2734,10 @@ __all__ = [
     "launch_app", "list_input_devices", "mobile_capability_matrix", "mobile_extension",
     "open_device", "rbac_add_user", "rbac_list_users", "rbac_remove_user",
     "rbac_rotate_user_token", "rbac_set_user_role", "register_mobile_extension", "run_mobile_command",
+    "SimctlExtension", "list_ios_simulators", "use_ios_simulator",
     "stop_app", "stop_execution", "stoppable_run", "use_device",
     "wait_for_app",
+    "MAX_REGISTRY_NAMES", "RegistryFullError",
     "start_autocontrol_gui"
 ]
 

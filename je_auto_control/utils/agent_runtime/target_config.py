@@ -24,8 +24,10 @@ def reviewed_tools(kind: str) -> frozenset[str]:
     from je_auto_control.utils.agent_runtime.browser_commands import BROWSER_ADAPTER_TOOLS
     from je_auto_control.utils.agent_runtime.fixture_commands import FIXTURE_COMMAND
     from je_auto_control.utils.agent_runtime.service_observation import SERVICE_TOOLS
+    from je_auto_control.utils.agent_runtime.android_profile import ANDROID_PROFILE_TOOLS
     kinds = {"files": FILE_TOOLS, "desktop": DESKTOP_TOOLS, "browser": BROWSER_ADAPTER_TOOLS,
-             "fixture": frozenset({FIXTURE_COMMAND}), "uia_fixture": frozenset(), "service": frozenset(SERVICE_TOOLS)}
+             "fixture": frozenset({FIXTURE_COMMAND}), "uia_fixture": frozenset(), "service": frozenset(SERVICE_TOOLS),
+             "android": ANDROID_PROFILE_TOOLS}
     if kind not in kinds:
         raise AgentTaskError("target kind does not have an implemented managed adapter")
     return kinds[kind]
@@ -60,6 +62,9 @@ class AgentTargetProfile:
         for name in ("allowed_tools", "roots", "apps"):
             object.__setattr__(self, name, getattr(spec, name))
         object.__setattr__(self, "settings", freeze(_settings(self.kind, self.settings)))
+        if self.kind == "android":
+            from je_auto_control.utils.agent_runtime.android_profile import check_android_apps
+            check_android_apps(self.apps, thaw(self.settings))
         encoded = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
         object.__setattr__(self, "_digest", hashlib.sha256(encoded).hexdigest())
 
@@ -119,25 +124,36 @@ def _settings(kind: str, value: Mapping[str, Any]) -> dict[str, Any]:
     data = detached(value)
     if not isinstance(data, dict):
         raise AgentTaskError("target profile settings must be an object")
+    if kind == "android":
+        from je_auto_control.utils.agent_runtime.android_profile import android_settings
+        return android_settings(data)
     if kind in {"fixture", "uia_fixture", "service"}:
         from .service_deployment import service_settings
         parsers = {"fixture": deployment_settings, "uia_fixture": deployment_settings, "service": service_settings}
         return parsers[kind](data)
     allowed = {"allowed_origins"} | ({"platform"} if kind == "desktop" else set())
     if kind == "browser":
-        allowed.add("helper_python")
+        allowed |= {"helper_python", "semantic_fields"}
     if set(data) - allowed:
         raise AgentTaskError("unreviewed target profile settings")
     if kind == "desktop" and data.get("platform") not in {"windows", "macos", "x11", "wayland"}:
         raise AgentTaskError("desktop profiles require an explicit platform")
     _normalize_origins(data)
     if kind == "browser":
-        data["allowed_origins"] = browser_origins(value.get("allowed_origins", ()))
-        if "helper_python" in data:
-            # pylint: disable-next=import-outside-toplevel  # reason: optional helper selection stays lazy
-            from je_auto_control.utils.agent_runtime.helper_environment import normalize_helper_python
-            data["helper_python"] = normalize_helper_python(data["helper_python"])
+        _browser_settings(data, value)
     return data
+
+
+def _browser_settings(data: dict[str, Any], value: Mapping[str, Any]) -> None:
+    data["allowed_origins"] = browser_origins(value.get("allowed_origins", ()))
+    if "helper_python" in data:
+        # pylint: disable-next=import-outside-toplevel  # reason: optional helper selection stays lazy
+        from je_auto_control.utils.agent_runtime.helper_environment import normalize_helper_python
+        data["helper_python"] = normalize_helper_python(data["helper_python"])
+    if "semantic_fields" in data:
+        # pylint: disable-next=import-outside-toplevel  # reason: browser field parsing stays lazy
+        from je_auto_control.utils.agent_runtime.dom_observation import dom_fields
+        data["semantic_fields"] = [item.to_dict() for item in dom_fields(data["semantic_fields"])]
 
 
 def _normalize_origins(data: dict[str, Any]) -> None:
@@ -156,8 +172,14 @@ def _check_resource_scope(kind: str, spec: AgentTaskSpec) -> None:
         raise AgentTaskError("file target profiles require explicit roots and no desktop applications")
     if kind == "desktop" and not spec.apps:
         raise AgentTaskError("desktop target profiles require explicit application names")
-    if kind == "browser":
-        _browser_resource_scope(spec)
+    scoped = {"browser": _browser_resource_scope, "android": _android_resource_scope}.get(kind)
+    if scoped is not None:
+        scoped(spec)
+
+
+def _android_resource_scope(spec: AgentTaskSpec) -> None:
+    if spec.roots or len(spec.apps) != 1:
+        raise AgentTaskError("Android target profiles grant one app package and no filesystem roots")
 
 
 def _browser_resource_scope(spec: AgentTaskSpec) -> None:

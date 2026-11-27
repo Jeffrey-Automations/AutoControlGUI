@@ -24,6 +24,9 @@ class _MetricsHandler(http.server.BaseHTTPRequestHandler):
 
     server_version = "AutoControlObservability/1.0"
     sys_version = ""
+    # Bound every read: without it a client that connects and sends nothing
+    # holds a server thread for ever, and each silent connection one more.
+    timeout = 30.0
 
     def do_GET(self) -> None:  # noqa: N802 BaseHTTPRequestHandler protocol
         if self.path not in ("/", "/metrics"):

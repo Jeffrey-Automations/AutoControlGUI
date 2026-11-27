@@ -68,7 +68,7 @@ _COORDS_SCREEN = 0
 _STATE_ACTIVE = 1
 _STATE_ENABLED = 8
 _STATE_FOCUSED = 12
-_STATE_SELECTED = 25
+_STATE_SELECTED = 23     # 25 is SHOWING, set on everything on screen
 
 #: How many accessibles one focus search may examine. The search only enters
 #: active windows, but a window can still hold a table with thousands of rows,

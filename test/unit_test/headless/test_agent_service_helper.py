@@ -310,7 +310,7 @@ def test_proxy_never_rebinds_after_restart(tmp_path):
     assert not target._supports_bootstrap({"protocol": 1, "service": binding | {"binding_id": "replacement"}})
 
 
-@pytest.mark.parametrize("key", ["非ASCII", "bad/name", "bad\\name", "x\0y", "", "x" * 257])
+@pytest.mark.parametrize("key", ["hidden\u200bname", "bad/name", "bad\\name", "x\0y", "", "x" * 257])
 def test_unsupported_keys_fail_before_helper_launch(tmp_path, key):
     with pytest.raises(ServiceQueryError, match="unsupported"):
         proxy(tmp_path, key=key)

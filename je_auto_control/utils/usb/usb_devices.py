@@ -91,6 +91,8 @@ def _try_pyusb() -> Optional[UsbEnumerationResult]:
         devices = list(usb.core.find(find_all=True))
     except (OSError, RuntimeError, ValueError) as error:
         autocontrol_logger.info("pyusb enumerate failed: %r", error)
+        if isinstance(error, getattr(usb.core, "NoBackendError", ())):
+            return None  # pyusb without libusb: the OS tool is the backend
         return UsbEnumerationResult(backend="pyusb", devices=[],
                                     error=str(error))
     parsed = [_pyusb_to_device(dev) for dev in devices]

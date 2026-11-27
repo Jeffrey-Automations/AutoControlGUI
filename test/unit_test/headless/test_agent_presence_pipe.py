@@ -268,3 +268,24 @@ def test_connection_only_sends_bounded_immutable_bytes(monkeypatch, raw):
             connection.recv_bytes(4097)
     finally:
         connection.close()
+
+
+def test_a_client_that_left_before_accept_does_not_fail_the_listener(monkeypatch):
+    api, native, _ = factory(monkeypatch)
+    listener = api.listen()
+    gone = OSError('the pipe is being closed')
+    gone.winerror = 232
+
+    def departed(_handle, *, overlapped):
+        assert overlapped is True
+        raise gone
+
+    native.async_api.ConnectNamedPipe = Function(departed)
+    connection = listener.accept()
+    assert connection.fileno() == 0x100000001
+    gone.winerror = 6
+    with pytest.raises(OSError):
+        listener.accept()
+    connection.close()
+    listener.close()
+    assert not native.handles

@@ -9,7 +9,10 @@ an environment, read back with type coercion, and ``credential`` assets hold a
 value through an injected resolver — so the secret never lands in a plain
 ``get``/executor record.
 
-JSON-backed (or in-memory); pure standard library; imports no ``PySide6``.
+JSON-backed (or in-memory); pure standard library; imports no ``PySide6``. A
+file that is not a JSON object (a hand edit with a syntax error) is never
+overwritten: it is moved aside as ``<name>.corrupt-<time>`` and the call that
+found it raises ``JsonStoreDamagedError``.
 """
 import functools
 import math
@@ -94,8 +97,10 @@ class AssetStore:
                  ) -> None:
         """``secret_resolver(name)`` resolves ``credential`` references lazily."""
         # Re-read and locked per change, so processes sharing the file do
-        # not overwrite each other's assets.
-        self._state = SharedJsonDict(db_path)
+        # not overwrite each other's assets. The file is user-authored: a
+        # damaged one read as {} and the next set() erased every asset, so it
+        # is moved aside and reported instead (JsonStoreDamagedError).
+        self._state = SharedJsonDict(db_path, quarantine_label="asset store")
         self._resolver = secret_resolver
 
     def set(self, name: str, value: Any, *, asset_type: str = TYPE_TEXT,

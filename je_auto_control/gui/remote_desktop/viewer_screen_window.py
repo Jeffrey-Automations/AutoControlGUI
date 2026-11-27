@@ -32,6 +32,10 @@ class ViewerScreenWindow(QDialog):
         self._display = _FrameDisplay()
         layout.addWidget(self._display)
 
+    def retranslate(self) -> None:
+        """Re-read the window title in the active language."""
+        self.setWindowTitle(_t("rd_webrtc_viewer_screen_title"))
+
     def set_image(self, image: Optional[QImage]) -> None:
         if image is not None:
             self._display.set_image(image)

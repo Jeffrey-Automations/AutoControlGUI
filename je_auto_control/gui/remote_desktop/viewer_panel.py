@@ -16,12 +16,14 @@ from je_auto_control.gui.adaptive.flow_layout import field_pair, flow_of
 from je_auto_control.gui.adaptive.surfaces import set_role
 from je_auto_control.gui.remote_desktop.view_lifetime import ViewLifetime
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
-from je_auto_control.gui._qt_typed import decoded_image
+from je_auto_control.gui._latest_decoder import LatestDecoder, decode_jpeg
+from je_auto_control.gui._qt_typed import as_plain
+from je_auto_control.gui._secret_field import SecretField
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui.remote_desktop._connect_task import connect_viewer
 from je_auto_control.gui.remote_desktop._helpers import (
     _CollapsibleSection, _StatusBadge, _build_insecure_client_context,
-    _build_verifying_client_context, _t,
+    _build_verifying_client_context, _t, trust_loader,
     wire_remote_input,
 )
 from je_auto_control.gui.remote_desktop.remote_screen_window import (
@@ -95,6 +97,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             self._enable_audio.setEnabled(False)
         self._badge = _StatusBadge()
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         set_role(self._status, "hint")
         # _screen_window is created lazily on connect — the AnyDesk-style
         # popout. While disconnected we hold ``None`` and the panel
@@ -113,12 +116,15 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         # can be delivered ahead of the connect's own result: dropped, the
         # window stayed blank until something moved on the host.
         self._early_frame: Optional[QImage] = None
+        # Frames are decoded on a thread of this panel's own; the newest one wins.
+        self._decoder = LatestDecoder(self, decode_jpeg, self._on_frame_decoded)
         # The connect in progress, off the GUI thread; None once it answered.
         self._connect_task: Optional[TaskHandle] = None
         self._audio_player: Optional[AudioPlayer] = None
         self._progress_bar = QProgressBar()
         self._progress_bar.setVisible(False)
         self._progress_label = QLabel()
+        self._progress_text = self._keyed(self._progress_label)
         self._progress_label.setVisible(False)
         self._active_progress_id: Optional[str] = None
         self._build_layout()
@@ -171,7 +177,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             ("rd_transport_label", self._transport)))))
 
         token_form = QFormLayout()
-        token_form.addRow(self._tr(QLabel(), "rd_token_label"), self._token)
+        token_form.addRow(self._tr(QLabel(), "rd_token_label"), SecretField(self._token, self._tr))
         card_layout.addLayout(token_form)
 
         card.setLayout(card_layout)
@@ -240,7 +246,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         """
         self._view.retire()
         release_resources(self, self._cancel_pending_connect, self._retire_audio_player,
-                          self._close_screen_window)
+                          self._close_screen_window, self._decoder.stop)
 
     def _connect(self) -> None:
         host = self._host_field.text().strip()
@@ -296,8 +302,10 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             return
         # The connect itself (TCP, TLS / WebSocket upgrade, auth: up to five
         # seconds each) held the GUI thread for all of it.
+        # The CA store a verifying TLS context needs is read there too, before the connect.
         self._connect_task = connect_viewer(
-            self, viewer, on_connected=self._on_connected, on_failed=self._on_connect_failed, before=previous)
+            self, viewer, on_connected=self._on_connected, on_failed=self._on_connect_failed, before=previous,
+            prepare=trust_loader(ssl_context))
         self._connect_task.finished.connect(self._on_connect_finished)
         self._refresh_status()
 
@@ -358,7 +366,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             player = AudioPlayer()
             player.start()
         except (OSError, RuntimeError) as error:
-            self._status.setText(f"{_t('rd_viewer_audio_play')}: {error}")
+            self._status_text.show_joined('rd_viewer_audio_play', error)
             return
         self._audio_player = player
 
@@ -385,7 +393,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         if self._own_viewer() is not None:
             return  # reconnected since; the notice is about the old session
         self._disconnect()
-        self._status.setText(_t("rd_viewer_displaced"))
+        self._status_text.show("rd_viewer_displaced")
 
     def _disconnect(self) -> None:
         self._session += 1                  # whatever the closed session still sends is dropped
@@ -399,7 +407,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         self._early_frame = None
         self._close_screen_window()
         self._progress_bar.setVisible(False)
-        self._progress_label.setText("")
+        self._progress_text.clear()
         self._active_progress_id = None
         self._refresh_status()
 
@@ -467,9 +475,11 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             self._on_error_main(message)
 
     def _on_frame_main(self, payload: bytes) -> None:
-        image = decoded_image(payload, "JPEG")
-        if image.isNull():
-            return
+        self._decoder.submit(payload, self._session)    # decoded off the GUI thread
+
+    def _on_frame_decoded(self, session: int, image: QImage) -> None:
+        if session != self._session or image.isNull():
+            return                          # a frame of a session since replaced or closed
         if self._screen_window is None:
             self._early_frame = image       # shown by _on_connected
             return
@@ -479,7 +489,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         # The session is over: the window stayed open on its last frame and
         # the audio player kept running until the operator clicked Disconnect.
         self._disconnect()
-        QMessageBox.warning(self, _t("rd_viewer_error"), message)
+        QMessageBox.warning(self, _t("rd_viewer_error"), as_plain(message))     # the host worded it
 
     def _on_audio_main(self, payload: bytes) -> None:
         player = self._audio_player
@@ -496,9 +506,9 @@ class _ViewerPanel(TranslatableMixin, QWidget):
                 return
         except (OSError, RuntimeError, AutoControlException) as error:
             raise_caused_run_interruption(error)
-            self._status.setText(f"{_t('rd_viewer_error')}: {error}")
+            self._status_text.show_joined('rd_viewer_error', error)
             return
-        self._status.setText(_t("rd_viewer_clipboard_received"))
+        self._status_text.show("rd_viewer_clipboard_received")
 
     def _clipboard_peer_active(self, peer: object) -> bool:
         """Queued clipboard metadata never adopts another panel's or a replacement viewer's connection."""
@@ -517,11 +527,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             self._progress_bar.setValue(min(bytes_done, total))
         else:
             self._progress_bar.setRange(0, 0)
-        self._progress_label.setText(
-            _t("rd_progress_label")
-            .replace("{done}", str(bytes_done))
-            .replace("{total}", str(total))
-        )
+        self._progress_text.show("rd_progress_label", done=bytes_done, total=total)
 
     def _received_file_complete(self, transfer_id: str, success: bool, error: str | None, dest: str) -> None:
         self._on_file_complete_main(transfer_id, bool(success), error or "", dest)
@@ -533,13 +539,9 @@ class _ViewerPanel(TranslatableMixin, QWidget):
         self._progress_bar.setVisible(False)
         self._progress_label.setVisible(True)
         if success:
-            self._progress_label.setText(
-                _t("rd_progress_done").replace("{path}", dest_path)
-            )
+            self._progress_text.show("rd_progress_done", path=dest_path)
         else:
-            self._progress_label.setText(
-                _t("rd_progress_failed").replace("{error}", error)
-            )
+            self._progress_text.show("rd_progress_failed", error=error)
 
     # --- input forwarding ---------------------------------------------
 
@@ -567,7 +569,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
                     return
                 text = QGuiApplication.clipboard().text()
             if not text:
-                self._status.setText(_t("rd_clipboard_empty"))
+                self._status_text.show("rd_clipboard_empty")
                 return
             delivery = ClipboardDelivery(viewer, 'text', text, authority)
             sent = delivery.dispatch(self._clipboard_peer_active,
@@ -579,7 +581,7 @@ class _ViewerPanel(TranslatableMixin, QWidget):
             QMessageBox.warning(self, _t("rd_viewer_push_clipboard"),
                                 str(error))
             return
-        self._status.setText(_t("rd_clipboard_sent"))
+        self._status_text.show("rd_clipboard_sent")
 
     def _on_send_file_clicked(self) -> None:
         viewer = self._own_viewer()

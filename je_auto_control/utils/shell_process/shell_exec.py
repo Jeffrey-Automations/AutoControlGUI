@@ -15,6 +15,7 @@ from je_auto_control.utils.exception.cancellation import (
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
 from je_auto_control.utils.executor.run_control import checkpoint, current_stop_token
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.logging.secret_scope import SecretLogScope, current_secret_scope
 
 
 def console_encoding() -> str:
@@ -93,7 +94,12 @@ def _kill_tree(process: subprocess.Popen[bytes]) -> None:
     """Kill ``process`` and everything it started."""
     if sys.platform == "win32":
         taskkill = [_taskkill_path(), "/T", "/F", "/PID", str(process.pid)]
-        subprocess.run(taskkill, capture_output=True, timeout=10, check=False)  # nosec B603  # nosemgrep  # reason: fixed system tool, our child's pid
+        try:
+            subprocess.run(taskkill, capture_output=True, timeout=10, check=False)  # nosec B603  # nosemgrep  # reason: fixed system tool, our child's pid
+        # Its failure replaced the stop or timeout being raised, and the
+        # program itself was then not killed below.
+        except (OSError, subprocess.SubprocessError) as error:
+            autocontrol_logger.error("taskkill failed: %r", error)
     else:
         try:
             os.killpg(process.pid, signal.SIGKILL)
@@ -105,7 +111,18 @@ def _kill_tree(process: subprocess.Popen[bytes]) -> None:
         pass
 
 
+def _kill_program(process: subprocess.Popen[bytes]) -> None:
+    """Kill ``process`` alone, leaving anything it started running."""
+    try:
+        process.kill()
+    except OSError:
+        pass
+
+
 _STOP_POLL_SECONDS = 0.1
+#: Output lines a manager keeps until they are read; the oldest make room.
+MAX_QUEUED_LINES = 10_000
+_READER_JOIN_SECONDS = 1.0
 
 
 def _communicate_stoppable(process: subprocess.Popen[bytes], argv: str | List[str], timeout_s: float,
@@ -128,7 +145,8 @@ def _communicate_stoppable(process: subprocess.Popen[bytes], argv: str | List[st
 
 
 def run_captured(argv: str | List[str], timeout_s: float,
-                 input_bytes: Optional[bytes] = None) -> subprocess.CompletedProcess[bytes]:
+                 input_bytes: Optional[bytes] = None, *,
+                 kill_tree: bool = True) -> subprocess.CompletedProcess[bytes]:
     """Run ``argv`` (no shell), capturing stdout and stderr as bytes, for at most ``timeout_s``.
 
     ``subprocess.run(timeout=...)`` kills only the program itself and then
@@ -141,6 +159,10 @@ def run_captured(argv: str | List[str], timeout_s: float,
     ``_STOP_POLL_SECONDS``: a stop or a cancellation kills the tree the same
     way and propagates (``ExecutionStopped`` / the token's own error) instead
     of holding the caller until the program or the timeout ends.
+
+    ``kill_tree=False`` ends only the program itself, as ``subprocess.run``
+    does, for a tool such as ``adb`` whose first call starts a shared daemon
+    as its child: killing the tree would take that daemon down with it.
     """
     # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
     process = subprocess.Popen(argv, stdin=subprocess.PIPE if input_bytes is not None else None,  # nosec B603  # reason: argv list or CreateProcess line, never a shell
@@ -150,7 +172,7 @@ def run_captured(argv: str | List[str], timeout_s: float,
     try:
         stdout, stderr = _communicate_stoppable(process, argv, timeout_s, input_bytes)
     except BaseException:  # reason: end the tree on a timeout, a stop or any other escape, then re-raise
-        _kill_tree(process)
+        (_kill_tree if kill_tree else _kill_program)(process)
         try:
             process.communicate(timeout=5)
         except subprocess.TimeoutExpired:
@@ -213,20 +235,14 @@ class ShellManager:
             )
 
             self.still_run_shell = True
-
-            self.read_program_output_from_thread = Thread(
-                target=self._read_stream,
-                args=(self.process.stdout, self.run_output_queue),
-                daemon=True,
-            )
-            self.read_program_output_from_thread.start()
-
-            self.read_program_error_output_from_thread = Thread(
-                target=self._read_stream,
-                args=(self.process.stderr, self.run_error_queue),
-                daemon=True,
-            )
-            self.read_program_error_output_from_thread.start()
+            # The readers outlive this run: what the program prints after the
+            # run has ended is masked with the run's own values, which they
+            # hold until their stream ends, before it is queued for the log.
+            mask = current_secret_scope()
+            self.read_program_output_from_thread = self._start_reader(
+                self.process.stdout, self.run_output_queue, mask)
+            self.read_program_error_output_from_thread = self._start_reader(
+                self.process.stderr, self.run_error_queue, mask)
 
         except (OSError, ValueError) as error:
             raise AutoControlActionException(
@@ -252,7 +268,17 @@ class ShellManager:
             pass
 
         if self.process and self.process.poll() is not None:
+            self._join_readers()
             self.exit_program()
+
+    def _join_readers(self) -> None:
+        """Let the readers finish what an ended program left in its pipes.
+
+        Bounded: a program of its own that it left running can hold them open.
+        """
+        for reader in (self.read_program_output_from_thread, self.read_program_error_output_from_thread):
+            if reader is not None:
+                reader.join(timeout=_READER_JOIN_SECONDS)
 
     def exit_program(self) -> None:
         """
@@ -296,17 +322,55 @@ class ShellManager:
         self.run_output_queue = queue.Queue()
         self.run_error_queue = queue.Queue()
 
-    def _read_stream(self, stream: Optional[IO[bytes]], target_queue: queue.Queue[str]) -> None:
+    def _start_reader(self, stream: Optional[IO[bytes]], target_queue: queue.Queue[str],
+                      mask: Optional[SecretLogScope]) -> Thread:
+        """Start a reader for ``stream`` that holds ``mask`` until the stream ends."""
+        held = mask if mask is not None and mask.retain() else None
+        reader = Thread(target=self._read_and_release, args=(stream, target_queue, held), daemon=True)
+        try:
+            reader.start()
+        except BaseException:  # reason: a reader that never ran must not keep the mask
+            if held is not None:
+                held.release()
+            raise
+        return reader
+
+    def _read_and_release(self, stream: Optional[IO[bytes]], target_queue: queue.Queue[str],
+                          mask: Optional[SecretLogScope]) -> None:
+        try:
+            self._read_stream(stream, target_queue, mask)
+        finally:
+            if mask is not None:
+                mask.release()
+
+    def _read_stream(self, stream: Optional[IO[bytes]], target_queue: queue.Queue[str],
+                     mask: Optional[SecretLogScope] = None) -> None:
 
         """
-        Read stream line by line and put into queue.
+        Read stream line by line and put into queue, keeping the newest ``MAX_QUEUED_LINES``.
         讀取輸出流並放入 queue
+
+        Nothing reads the queue of a program ``start_exe`` launched, so a
+        chatty one grew it in memory for as long as it ran. Each line is
+        masked with ``mask`` before it is queued: the queue is logged later,
+        often by another run whose mask does not know these values.
         """
         while self.still_run_shell and stream:
             line = stream.readline(self.program_buffer)
             if not line:
                 break
-            target_queue.put_nowait(line.decode(self.program_encoding, "replace"))
+            text = line.decode(self.program_encoding, "replace")
+            _make_room(target_queue)
+            target_queue.put_nowait(text if mask is None else mask.scrub(text))
+
+
+def _make_room(lines: queue.Queue[str]) -> None:
+    """Drop the oldest lines until one more fits in ``MAX_QUEUED_LINES``."""
+    while lines.qsize() >= MAX_QUEUED_LINES:
+        try:
+            lines.get_nowait()
+        except queue.Empty:
+            return
 
 
 default_shell_manager = ShellManager()

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from je_auto_control.gui.remote_desktop.webrtc_panel_state import _ViewerPanelPart
 
+import functools
 from typing import Optional
 
 
@@ -127,20 +128,9 @@ class _ViewerMediaMixin(_ViewerPanelPart):
             path=str(recorder.output_path), error=error))
 
     def _on_stats(self, snapshot: StatsSnapshot) -> None:
-        parts = []
-        if snapshot.fps is not None:
-            parts.append(f"FPS {snapshot.fps:.1f}")
-        if snapshot.bitrate_kbps is not None:
-            parts.append(f"{snapshot.bitrate_kbps:.0f} kbps")
-        if snapshot.rtt_ms is not None:
-            parts.append(f"RTT {snapshot.rtt_ms:.0f} ms")
-        if snapshot.packet_loss_pct is not None:
-            parts.append(f"loss {snapshot.packet_loss_pct:.1f}%")
-        if snapshot.jitter_ms is not None:
-            parts.append(f"jitter {snapshot.jitter_ms:.1f}ms")
-        if not parts:
+        if not _stats_line(snapshot):
             return
-        self._stats_label.setText(" | ".join(parts))
+        self._stats_text.show_rendered(functools.partial(_stats_line, snapshot))
         self._update_quality_dot(snapshot)
         if hasattr(self, "_rtt_spark"):
             self._rtt_spark.push(snapshot.rtt_ms)
@@ -164,7 +154,7 @@ class _ViewerMediaMixin(_ViewerPanelPart):
         self._quality_dot.setStyleSheet(
             f"background-color: {color}; border-radius: 7px;",
         )
-        self._quality_dot.setToolTip(_t(tip_key))
+        self._quality_tip.show(tip_key)
 
     def _on_toggle_share_my_screen(self, value: bool) -> None:
         if self._viewer is None:
@@ -250,15 +240,31 @@ class _ViewerMediaMixin(_ViewerPanelPart):
         if self._stats_poller is not None:
             self._stats_poller.stop()
             self._stats_poller = None
-        self._stats_label.setText(_t("rd_webrtc_stats_idle"))
+        self._stats_text.show("rd_webrtc_stats_idle")
         if hasattr(self, "_quality_dot"):
             self._quality_dot.setStyleSheet(
                 _QUALITY_DOT_STYLE,
             )
-            self._quality_dot.setToolTip(_t("rd_webrtc_quality_unknown"))
+            self._quality_tip.show("rd_webrtc_quality_unknown")
         if hasattr(self, "_rtt_spark"):
             self._rtt_spark.clear()
             self._bitrate_spark.clear()
+
+
+def _stats_line(snapshot: StatsSnapshot) -> str:
+    """The viewer's statistics line for ``snapshot`` in the active language; empty when it has nothing."""
+    parts = []
+    if snapshot.fps is not None:
+        parts.append(f"FPS {snapshot.fps:.1f}")
+    if snapshot.bitrate_kbps is not None:
+        parts.append(f"{snapshot.bitrate_kbps:.0f} kbps")
+    if snapshot.rtt_ms is not None:
+        parts.append(f"RTT {snapshot.rtt_ms:.0f} ms")
+    if snapshot.packet_loss_pct is not None:
+        parts.append(_t("rd_webrtc_stat_loss").replace("{pct}", f"{snapshot.packet_loss_pct:.1f}"))
+    if snapshot.jitter_ms is not None:
+        parts.append(_t("rd_webrtc_stat_jitter").replace("{ms}", f"{snapshot.jitter_ms:.1f}"))
+    return " | ".join(parts)
 
 
 __all__ = ["_ViewerMediaMixin"]

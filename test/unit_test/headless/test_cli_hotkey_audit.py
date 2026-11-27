@@ -9,8 +9,10 @@ and an error from an injected executor or the run history ended the listener.
 """
 import json
 import os
+import queue
 import subprocess  # nosec B404  # reason: runs this package's own entry point
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -68,6 +70,34 @@ def test_a_recording_that_cannot_start_leaves_the_file_alone(tmp_path, monkeypat
     with pytest.raises(AutoControlException, match="not written"):
         auto_control_record.record_to_json(str(target), stop_event=None, timeout=0)
     assert target.read_text(encoding="utf-8") == '[["AC_keep"]]'
+
+
+def _stopping_recorder(monkeypatch, stop_record):
+    monkeypatch.setattr(auto_control_record, "record", lambda: True)
+    monkeypatch.setattr(auto_control_record, "record_action_to_list", lambda *a, **k: None)
+    monkeypatch.setattr(auto_control_record, "recorder", types.SimpleNamespace(stop_record=stop_record))
+
+
+def test_a_recording_that_cannot_stop_fails_the_cli_and_leaves_the_file_alone(tmp_path, monkeypatch):
+    # The failure used to become [], which then replaced the file, and exit 0.
+    target = tmp_path / "precious.json"
+    original = b'[["AC_keep", {"x": 1}]]\r\n'
+    target.write_bytes(original)
+
+    def _explode():
+        raise RuntimeError("hook thread did not exit")
+
+    _stopping_recorder(monkeypatch, _explode)
+    assert cli.main(["record", str(target), "--duration", "0"]) == 1
+    assert target.read_bytes() == original
+
+
+def test_a_recording_of_nothing_that_stops_cleanly_is_still_written(tmp_path, monkeypatch):
+    target = tmp_path / "empty.json"
+    target.write_text('[["AC_old"]]', encoding="utf-8")
+    _stopping_recorder(monkeypatch, queue.Queue)
+    assert cli.main(["record", str(target), "--duration", "0"]) == 0
+    assert json.loads(target.read_text(encoding="utf-8")) == []
 
 
 def test_the_legacy_entry_point_reports_a_missing_directory(tmp_path):

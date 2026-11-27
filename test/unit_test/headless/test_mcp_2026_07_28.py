@@ -273,6 +273,18 @@ def test_signed_states_expire_and_resist_tampering():
     assert signer.redeem(fresh, "tools/call", "act", {"x": 1})
 
 
+@pytest.mark.parametrize("state", ["é.abc", "abc.é", "\ud800.x"])
+def test_a_state_that_is_not_ascii_is_invalid_params(gated, state):
+    # The MAC is ASCII, so such a state is a forgery: it was answered -32603
+    # with a UnicodeEncodeError, and redeem() raised instead of saying no.
+    server, calls = gated
+    assert not RequestStateSigner().redeem(state, "tools/call", "act", {"x": 5})
+    reply = _call(server, {"elicitation": {}}, requestState=state,
+                  inputResponses={"confirm": {"action": "accept"}})
+    assert reply["error"]["code"] == -32602
+    assert calls == []
+
+
 # --- notifications only on request ------------------------------------------
 
 def _capture_bridge(server):

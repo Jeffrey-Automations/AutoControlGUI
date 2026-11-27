@@ -69,6 +69,30 @@ Executing a JSON File
 
    execute_action(read_action_json("actions.json"))
 
+Errors and ``raise_on_error``
+=============================
+
+``execute_action`` records a failed action as its ``repr`` and runs the next
+one; ``raise_on_error=True`` raises at the first failure instead. Contained
+this way are the ``AutoControlException`` family and the builtin ``OSError``,
+``RuntimeError``, ``ArithmeticError``, ``AttributeError``, ``TypeError``,
+``ValueError``, ``LookupError`` and ``ImportError``.
+
+A command that raises anything else -- ``cv2.error``, ``sqlite3.Error``, a
+plugin's own exception class -- is wrapped at that action in
+``AutoControlForeignException``, whose ``original`` attribute and
+``__cause__`` hold the original error. It is then recorded like any other
+failure, ``AC_try`` catches it, ``AC_retry`` retries it, ``AC_loop`` records it
+per pass and ``AC_parallel`` records it in its branch. With
+``raise_on_error=True`` the wrapper is what is raised, so code that caught
+``cv2.error`` or ``sqlite3.Error`` around ``execute_action`` should catch
+``AutoControlForeignException`` and read ``original``.
+
+Never contained, whatever ``raise_on_error`` says: assertion failures
+(``AutoControlAssertionException``, and a plugin's own ``AssertionError``),
+``AC_break`` / ``AC_continue``, stop requests (``ExecutionStopped``),
+cancellation, ``KeyboardInterrupt`` and ``SystemExit``.
+
 Executing All JSON Files in a Directory
 =======================================
 
@@ -156,3 +180,66 @@ To inspect the current executor command dictionary:
    from je_auto_control import executor
 
    print(executor.event_dict)
+
+
+Stored Action Lists, Named Registries and Generated Documents
+=============================================================
+
+**Voice commands and macros run with both authorities.** ``AC_voice_register``
+and ``AC_define_macro`` record who registered the action list. When
+``AC_voice_dispatch`` or ``AC_call_macro`` runs it, every step -- nested bodies
+and ``AC_parallel`` branches included -- runs only if both that registrant and
+the current caller have the capability the step needs; a refused step is
+recorded as an ``AuthorizationError``. A stored list therefore neither borrows
+an administrator's rights nor runs unchecked when the GUI or Python dispatches
+it. A store-backed registrant is re-read at dispatch, so a deleted user's lists
+stop running. The macro table is shared by every server: a principal may
+redefine only its own macros, while trusted local code (no RBAC scope) may
+redefine any and its macros cannot be replaced by a user. Anonymous MCP
+sessions act as an ``mcp:<session>`` operator, so this applies to them even with
+RBAC off; outside RBAC and MCP nothing changes.
+
+**Named registries are capped.** The stores behind ``AC_cas_put`` /
+``AC_cas_get``, ``AC_dedup_check``, ``AC_idempotency_begin`` / ``_complete`` /
+``_release``, ``AC_bulkhead_run``, ``AC_sequence_observe`` and
+``AC_outbox_enqueue`` / ``AC_outbox_pending`` hold at most
+``MAX_REGISTRY_NAMES`` (1,024) names each. At the cap an existing name keeps
+working and nothing is evicted; a new name, including a read of a name never
+written, raises ``RegistryFullError`` naming the registry. None has a delete or
+reset command, so names are released when the process ends.
+
+**Generated documents keep references.** ``AC_generate_sop`` (``actions``,
+``title``) and ``AC_generate_code`` (``source``) substitute known ``${var}``
+placeholders -- a ``source`` path built from variables included -- but write
+``${secrets.NAME}``, names not bound yet (a loop variable the documented steps
+set), nested placeholders and variables holding a value the run resolved as a
+secret exactly as written.
+
+**Resolved env:// values are masked.** ``AC_resolve_ref`` and
+``AC_resolve_refs`` still return ``env://`` values to the caller, but register
+them with the run's secret mask, so the log, the journal and the MCP audit show
+``***`` for the rest of the run. ``AC_resolve_ref``'s ``value`` and
+``AC_resolve_refs``'s ``resolved`` are masked in the logged result and the
+Script Builder result pane. ``file://`` values are not registered.
+
+Stopping a run
+--------------
+
+A stop (or a cancellation) ends the wait of the command in progress with ``ExecutionStopped``:
+waits and pauses, shell commands that capture output, the shared HTTP client, template matching,
+OCR, VLM and LLM requests, read-only accessibility reads, adb commands, the USB and Wayland
+capture tools, mobile device calls and find-element waits, ``AC_wait_for_port`` probes,
+``AC_send_email`` (the message may or may not have been delivered), ``AC_feature_match``, each
+model call of ``AC_agent_run`` / ``AC_computer_use``, ``AC_assert_audio`` / ``AC_assert_video``
+and the admin console's poll and broadcast (hosts not reached yet are skipped). A mobile device
+session caught mid-call is closed, as on a timeout. A native call that cannot be interrupted keeps
+running in the background and its result is discarded.
+
+Accessibility writes (set value / invoke / toggle) run inside a run as one job on the accessibility
+walker thread: a stop that arrives before the write acts prevents it, and one that arrives while it
+acts waits up to 5 seconds, then returns the result or raises ``AccessibilityWriteOutcomeUnknown``.
+On Windows the check sits between finding the element and acting; other backends count the whole
+call as the act. Outside a run nothing changes.
+
+Still not interruptible: the join of ``AC_parallel`` (held keys are released only once every
+branch has ended) and the finalisation of a screen recording.

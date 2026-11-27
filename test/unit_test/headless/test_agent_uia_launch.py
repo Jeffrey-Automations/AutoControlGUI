@@ -10,7 +10,7 @@ from je_auto_control.utils.agent_runtime.errors import AgentTaskError
 from je_auto_control.utils.agent_runtime.uia_channel import OwnedUiaChannel
 from je_auto_control.utils.agent_runtime.uia_launch import OwnedUiaLauncher
 from je_auto_control.utils.exception.control_signals import OperationCancelledError
-from je_auto_control.utils.process_memory.models import MemoryObservationError
+from je_auto_control.utils.process_memory.models import FailureReason, MemoryObservationError
 from je_auto_control.utils.process_memory.windows_window import WindowOwnerQuery
 from headless.test_process_memory_launch import LaunchKernel, attest, pin
 from headless.test_process_memory_windows import Function
@@ -23,6 +23,15 @@ class WindowApi:
     def __init__(self):
         self.pid, self.thread = 42, 8
         self.GetWindowThreadProcessId = Function(self.query)
+        self.children = ()
+        self.EnumChildWindows = Function(self.enumerate)
+
+    def enumerate(self, hwnd, callback, _value):
+        assert hwnd == 101
+        for child in self.children:
+            if not callback(child, None):
+                break
+        return 1
 
     def query(self, hwnd, pid):
         assert hwnd == 101
@@ -253,3 +262,23 @@ def test_close_reentered_from_bootstrap_checkpoint_cannot_publish():
     finally:
         launcher.close()
         launch.close()
+
+
+def test_the_binding_lists_current_child_windows_only_while_its_window_lives():
+    _, api, _, _, launcher = setup()
+    query = WindowOwnerQuery(api)
+    api.children = (201, 202)
+    assert query.children(101) == (201, 202)
+    api.thread = 0
+    with pytest.raises(MemoryObservationError):
+        query.children(101)
+    launcher.close()
+
+
+def test_too_many_child_windows_are_refused_instead_of_truncated():
+    _, api, _, _, launcher = setup()
+    api.children = tuple(range(1, 4099))
+    with pytest.raises(MemoryObservationError) as error:
+        WindowOwnerQuery(api).children(101)
+    assert error.value.reason is FailureReason.BUDGET_EXCEEDED
+    launcher.close()

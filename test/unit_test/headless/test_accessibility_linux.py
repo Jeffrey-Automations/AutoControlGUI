@@ -355,7 +355,8 @@ def test_a_focus_grab_that_fails_on_the_bus_reports_failure(backend):
 
 
 def test_get_state_reports_the_three_bits_it_reads(backend):
-    backend.connection.states[BUTTON] = (1 << 8) | (1 << 12) | (1 << 25)
+    # AT-SPI's numbering: ENABLED 8, FOCUSED 12, SELECTED 23.
+    backend.connection.states[BUTTON] = (1 << 8) | (1 << 12) | (1 << 23)
     state = backend.get_state(name="OK")
     assert state == {"enabled": True, "focused": True, "selected": True}
 
@@ -527,3 +528,9 @@ def test_get_value_is_scoped_to_the_named_window(monkeypatch):
     instance.connection = connection
     assert instance.get_value(name="Name", window_title="Firefox") == "from firefox"
     assert instance.get_value(name="Name") == "from gedit", "unscoped still takes the first"
+
+
+def test_a_control_that_is_only_showing_is_not_selected(backend):
+    """Bit 25 is SHOWING. Read as SELECTED, every control on screen was selected."""
+    backend.connection.states[BUTTON] = (1 << 8) | (1 << 25)
+    assert backend.get_state(name="OK")["selected"] is False

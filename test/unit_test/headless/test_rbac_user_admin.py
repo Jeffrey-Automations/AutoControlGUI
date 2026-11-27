@@ -515,3 +515,77 @@ def test_status_reports_rbac_instead_of_a_token_that_is_refused(users):
         stopped = rest_api_registry.stop()
     assert stopped["rbac"] is False
     assert stopped["token"] is None
+
+
+def test_a_store_opened_before_another_change_keeps_that_change(users):
+    """Each surface opens its own store; saving a stale copy brought a removed user back."""
+    from je_auto_control.utils.rbac.users import UserStore
+    stale = UserStore(users.path)
+    UserStore(users.path).remove_user("viewer-user")
+    UserStore(users.path).add_user(user_id="dana", display_name="", role=Role.VIEWER)
+    stale.rotate_token("operator-user")
+    kept = {record.user_id for record in UserStore(users.path).list_users()}
+    assert "viewer-user" not in kept
+    assert "dana" in kept
+
+
+def test_two_admins_demoted_at_once_still_leave_one(users, monkeypatch):
+    import threading
+    path = str(users.path)
+    admin.set_user_role("operator-user", Role.ADMIN, users_path=path)
+    both_checked = threading.Barrier(2)
+    original = admin._keep_an_admin
+
+    def slow(store, user_id, action):
+        original(store, user_id, action)
+        try:
+            both_checked.wait(0.5)
+        except threading.BrokenBarrierError:
+            pass
+    monkeypatch.setattr(admin, "_keep_an_admin", slow)
+    refused = []
+
+    def demote(user_id):
+        try:
+            admin.set_user_role(user_id, Role.VIEWER, users_path=path)
+        except UserAuthError:
+            refused.append(user_id)
+    threads = [threading.Thread(target=demote, args=(name,)) for name in ("admin-user", "operator-user")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10)
+    roles = {row["user_id"]: row["role"] for row in admin.list_users(users_path=path)}
+    assert len(refused) == 1
+    assert [name for name, role in roles.items() if role == Role.ADMIN] == refused
+
+
+# --- changes from other processes: the store file's own lock -----------------
+
+def test_a_change_waits_for_another_process_holding_the_store(users, monkeypatch):
+    """The CLI and a server editing one file: each change takes the file's lock."""
+    from je_auto_control.utils.json_store import json_store
+    monkeypatch.setattr(json_store, "_LOCK_WAIT_S", 0.2)
+    before = users.path.read_text(encoding="utf-8")
+    with json_store._file_lock(users.path):   # held by "another process"
+        with pytest.raises(UserAuthError, match="busy"):
+            UserStore(users.path).add_user(user_id="dana", display_name="", role=Role.VIEWER)
+        with pytest.raises(UserAuthError, match="busy"):
+            admin.remove_user("viewer-user", users_path=str(users.path))
+    assert users.path.read_text(encoding="utf-8") == before
+    admin.remove_user("viewer-user", users_path=str(users.path))   # free again
+    assert UserStore(users.path).get("viewer-user") is None
+
+
+def test_a_change_starts_from_what_another_process_just_saved(users, monkeypatch):
+    """Another process's save in the same clock tick, at the same size, is not lost."""
+    stale = UserStore(users.path)
+    body = json.loads(users.path.read_text(encoding="utf-8"))
+    body["users"].append({"user_id": "from-the-cli", "display_name": "", "role": Role.VIEWER,
+                          "token_hash": "0" * 64, "tags": []})
+    monkeypatch.setattr(UserStore, "_stamp", lambda self: (1, 1))   # one tick, one size
+    stale._loaded_stamp = (1, 1)
+    users.path.write_text(json.dumps(body), encoding="utf-8")   # not through this process
+    stale.add_user(user_id="from-the-server", display_name="", role=Role.VIEWER)
+    kept = {record.user_id for record in UserStore(users.path).list_users()}
+    assert {"from-the-cli", "from-the-server"} <= kept

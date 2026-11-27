@@ -128,7 +128,9 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
         self._default_client_capabilities: Dict[str, Any] = {}
         self._client_caps_by_conn: Dict[Any, Dict[str, Any]] = {}
         self._caps_lock = threading.Lock()
-        self._resource_subscriptions: Dict[str, Any] = {}
+        # Keyed by (connection_id, uri): over HTTP a subscription is its session's.
+        self._resource_subscriptions: Dict[Any, Any] = {}
+        self._resource_sinks: Dict[Any, Any] = {}  # transports that deliver them
         self._subscriptions_lock = threading.Lock()
         self._listeners: Dict[Any, Any] = {}  # open subscriptions/listen, by (connection, id)
         self._listeners_lock = threading.Lock()
@@ -235,6 +237,7 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
         with self._caps_lock:
             self._client_caps_by_conn.pop(connection_id, None)
         self._end_listeners(lambda conn: conn == connection_id, graceful=False)
+        self._drop_resource_subscriptions(connection_id)
         with self._calls_lock:
             stale = [key for key in self._active_calls
                      if isinstance(key, tuple) and key[0] == connection_id]
@@ -420,9 +423,13 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
         # connection or be dropped as "no writer" — a reply belongs to the
         # transport that accepted the request.
         writer = self._writer
+        call_key = (self._connection_id, msg_id)
 
         def worker() -> None:
-            payload = self._build_response(msg_id, _TOOLS_CALL_METHOD, params)
+            try:
+                payload = self._build_response(msg_id, _TOOLS_CALL_METHOD, params)
+            finally:
+                self._release_call(call_key)
             if payload is None:
                 return
             if writer is None:
@@ -437,6 +444,9 @@ class MCPServer(ToolCallMixin, StatelessDispatchMixin, SubscriptionMixin, Client
             if writer is not None:
                 writer(_error_response(msg_id, -32602, str(error)))
             return
+        # On the reader's thread: a cancel on the very next line must find the call.
+        with self._calls_lock:
+            self._active_calls[call_key] = ToolCallContext(request_id=msg_id)
         thread = threading.Thread(target=target, daemon=True, name=f"MCPCall-{msg_id}")
         with self._workers_lock:
             self._workers = [live for live in self._workers if live.is_alive()]

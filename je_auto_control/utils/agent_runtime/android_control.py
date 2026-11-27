@@ -21,6 +21,10 @@ class AndroidCommandLease:
     A host-only lock, context manager, shell return or local process exit cannot implement that
     contract. No default provider is supplied. Settlement must independently certify this exact
     request ID, boot and epoch, released input and an empty queue of remote writes.
+
+    ``dispatch``, when a provider supplies it, sends the command through the provider's own
+    device-side writer (the helper's ``begin``) instead of a host ``adb shell input`` command, so
+    the device itself enforces the epoch the command was begun under.
     """
 
     proposal: AndroidActionProposal = field(repr=False)
@@ -29,6 +33,8 @@ class AndroidCommandLease:
     device_fence: Callable[[], ContextManager[None]] = field(repr=False)
     checkpoint: Callable[[], None] = field(repr=False)
     settle: Callable[[AndroidActionResult], dict[str, Any]] = field(repr=False)
+    dispatch: Callable[[str, dict[str, Any], float, Callable[[], None]], AndroidActionResult] | None = field(
+        default=None, repr=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.proposal, AndroidActionProposal) or self.proposal.input_evidence is None:
@@ -38,6 +44,8 @@ class AndroidCommandLease:
         _token(self.epoch, "Android control epoch")
         if any(not callable(part) for part in (self.device_fence, self.checkpoint, self.settle)):
             raise AgentTaskError("Android control lease requires trusted device-fence and settlement providers")
+        if self.dispatch is not None and not callable(self.dispatch):
+            raise AgentTaskError("Android control lease dispatch must be a trusted device-side writer")
 
 
 class AndroidControlProvider(Protocol):

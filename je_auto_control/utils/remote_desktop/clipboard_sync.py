@@ -28,7 +28,9 @@ class ClipboardSyncError(AutoControlException, ValueError):
 
 
 def _fingerprint(kind: str, data: Any) -> str:
-    raw = data.encode("utf-8") if isinstance(data, str) else bytes(data)
+    # surrogatepass: JSON can carry a lone surrogate, and this runs before
+    # the receive loop is ready for an error.
+    raw = data.encode("utf-8", "surrogatepass") if isinstance(data, str) else bytes(data)
     return f"{kind}:{hashlib.sha256(raw).hexdigest()}"
 
 
@@ -110,7 +112,7 @@ def decode(payload: bytes) -> Tuple[str, Any]:
     """
     try:
         envelope: Dict[str, Any] = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+    except (ValueError, RecursionError) as error:   # also the int-digit and nesting limits
         raise ClipboardSyncError(f"invalid CLIPBOARD JSON: {error}") from error
     if not isinstance(envelope, dict):
         raise ClipboardSyncError("CLIPBOARD payload must be a JSON object")

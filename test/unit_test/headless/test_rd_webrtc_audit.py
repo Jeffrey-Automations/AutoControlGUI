@@ -25,7 +25,7 @@ from je_auto_control.gui.remote_desktop import connection_screen, tray_icon, web
 from je_auto_control.gui.remote_desktop._helpers import _t  # noqa: E402
 from je_auto_control.utils.remote_desktop.registry import registry  # noqa: E402
 from je_auto_control.utils.remote_desktop.webrtc_stats import StatsSnapshot  # noqa: E402
-from headless._qt_settle import deleting, settle_op  # noqa: E402
+from headless._qt_settle import deleting, settle, settle_op  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -117,8 +117,18 @@ def test_a_trust_import_of_the_wrong_shape_is_reported(monkeypatch, tmp_path, qa
     path = tmp_path / "trust.json"
     path.write_bytes(content)
     monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args: (str(path), ""))
-    webrtc_panel._WebRTCHostPanel()._on_import_trust()
+    panel = webrtc_panel._WebRTCHostPanel()
+    panel._on_import_trust()
+    assert settle(panel, "_trust_task")             # the file is read off the GUI thread
     assert len(qapp.messages) == 1
+
+
+@pytest.mark.parametrize("panel_cls", ["_WebRTCHostPanel", "_WebRTCViewerPanel"])
+@pytest.mark.parametrize("field", ["_token_edit", "_secret_edit"])
+def test_webrtc_tokens_are_masked_with_reveal_and_copy(monkeypatch, panel_cls, field):
+    from headless._masked_secret import assert_masked_secret
+    panel = getattr(webrtc_panel, panel_cls)()
+    assert_masked_secret(getattr(panel, field), monkeypatch)
 
 
 # --- viewer side ------------------------------------------------------------------------------------------
@@ -140,6 +150,52 @@ def test_stop_cancels_a_pending_reconnect(monkeypatch, qapp):
         qapp.processEvents()
         time.sleep(0.02)
     assert reconnects == []
+
+
+class _FakeViewer:
+    """Stands in for ``WebRTCDesktopViewer``: keeps the callbacks the panel hands it."""
+
+    authenticated = False
+
+    def __init__(self, **kwargs):
+        self.callbacks = kwargs
+
+    def set_file_received_callback(self, callback):
+        self.file = callback
+
+    def set_inbox_listing_callback(self, callback):
+        self.listing = callback
+
+    def set_inbox_op_result_callback(self, callback):
+        self.operation = callback
+
+    def stop(self):
+        """Nothing to close."""
+
+
+def test_one_drop_uses_one_reconnect_attempt(monkeypatch, qapp):
+    from je_auto_control.gui.remote_desktop import webrtc_viewer_connection
+    monkeypatch.setattr(webrtc_viewer_connection, "WebRTCDesktopViewer", _FakeViewer)
+    monkeypatch.setattr(webrtc_panel._WebRTCViewerPanel, "_on_connect_via_server", lambda self: None)
+    panel = webrtc_panel._WebRTCViewerPanel()
+    panel._auto_reconnect_check.setChecked(True)
+    panel._server_edit.setText("http://127.0.0.1:9")  # NOSONAR never contacted
+    panel._host_id_edit.setText("123456789")
+    panel._token_edit.setText("tok")
+    panel._reconnect_delay_spin.value = lambda: 0
+    first = panel._viewer = panel._build_viewer("tok")
+    first.callbacks["on_state_change"]("disconnected")
+    first.callbacks["on_state_change"]("failed")      # the same drop, reported twice
+    qapp.processEvents()
+    assert panel._auto_reconnect_attempts == 1
+    second = panel._viewer = panel._build_viewer("tok")
+    first.callbacks["on_state_change"]("failed")      # the replaced viewer's late state
+    qapp.processEvents()
+    assert panel._auto_reconnect_attempts == 1
+    second.callbacks["on_state_change"]("failed")     # the reconnected session drops: a new attempt
+    qapp.processEvents()
+    assert panel._auto_reconnect_attempts == 2
+    assert panel._status_label.text() == _t("rd_webrtc_reconnecting").format(n=2, max=panel._reconnect_max_spin.value())
 
 
 def test_a_new_window_opens_with_the_pen_already_on():
@@ -167,6 +223,7 @@ def test_an_address_book_import_takes_strings_only(monkeypatch, tmp_path):
     panel._address_book = types.SimpleNamespace(upsert=lambda **kwargs: upserts.append(kwargs),
                                                 list_entries=lambda: [], all_tags=lambda: [])
     panel._on_ab_import()
+    assert settle(panel, "_book_task")              # read and added off the GUI thread
     assert [(entry["host_id"], entry["mac_address"]) for entry in upserts] == [("h", None)]
 
 

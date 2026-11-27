@@ -668,3 +668,35 @@ def test_the_device_matrix_run_leaves_the_gui_thread(qapp, monkeypatch):
     tab._on_run()
     assert tab._task is None
     assert len(threads) == 2
+
+
+@pytest.mark.parametrize("outcome", ["error", "result", "timeout"])
+def test_an_outcome_slot_that_opens_a_dialog_still_frees_the_tab(qapp, outcome):
+    """The worker's end arrives inside the dialog's event loop; ``finished`` must still follow."""
+    from PySide6.QtCore import QEventLoop
+    from je_auto_control.gui._tab_task import TabTask
+    owner = QWidget()
+    task = TabTask(owner)
+    finished, release = [], threading.Event()
+
+    def dialog(_value):
+        loop = QEventLoop()
+        release.set()
+        QTimer.singleShot(300, loop.quit)
+        loop.exec()
+
+    def work():
+        if outcome == "timeout":
+            release.wait(5.0)
+        if outcome == "error":
+            raise ValueError("no such key")
+
+    (task.result if outcome == "result" else task.error).connect(dialog)
+    task.finished.connect(lambda: finished.append(True))
+    assert task.start(work, timeout_s=0.1 if outcome == "timeout" else None)
+    try:
+        assert _pump(qapp, lambda: finished)
+        assert not task.running
+        assert _pump(qapp, lambda: task_controller().active_count() == 0)
+    finally:
+        _destroy(qapp, owner)

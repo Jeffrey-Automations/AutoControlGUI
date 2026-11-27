@@ -399,8 +399,20 @@ def _align(moment: _dt.datetime, dtstart: _dt.datetime) -> _dt.datetime:
     if not aware_start and aware_moment:
         # A naive DTSTART is local time: convert a UTC UNTIL to it rather
         # than dropping the offset (20240103T050000Z is 13:00 at +0800).
-        return moment.astimezone().replace(tzinfo=None)
+        return _to_local_naive(moment)
     return moment
+
+
+def _to_local_naive(moment: _dt.datetime) -> _dt.datetime:
+    """``moment`` as naive local time, or unconverted where the platform cannot convert it.
+
+    ``UNTIL=99991231T235959Z`` ("no end") raised ``OSError`` on Windows, which
+    converts nothing past the year 3000, and ``OverflowError`` east of UTC.
+    """
+    try:
+        return moment.astimezone().replace(tzinfo=None)
+    except (OSError, OverflowError, ValueError):
+        return moment.replace(tzinfo=None)
 
 
 def _normalize_until(until: Optional[_dt.datetime],

@@ -115,3 +115,19 @@ def test_facade_exports():
                  "seed_everything"):
         assert hasattr(ac, attr)
         assert attr in ac.__all__
+
+
+def test_a_database_that_cannot_be_opened_is_a_framework_error(tmp_path):
+    """sqlite3.Error derives from Exception alone and ended the whole script."""
+    from je_auto_control.utils.exception.exceptions import AutoControlException
+    with pytest.raises(AutoControlException):
+        AgentMemory(str(tmp_path))
+    path = tmp_path / "memory.db"
+    memory = AgentMemory(str(path))
+    memory.remember("goal")
+    path.write_bytes(b"not a database, but long enough to be read as one" * 40)
+    for call in (lambda: memory.remember("again"), lambda: memory.recall("goal"),
+                 lambda: memory.get(1), lambda: memory.forget(1),
+                 memory.recent, memory.stats):
+        with pytest.raises(AutoControlException):
+            call()

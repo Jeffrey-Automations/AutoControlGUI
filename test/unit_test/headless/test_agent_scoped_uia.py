@@ -49,10 +49,13 @@ class Automation:
         self.root = root
         self.RawViewWalker = self
         self.handles = []
+        self.windows = {}
         self.enumeration_error = None
         self.replacement = None
 
     def ElementFromHandle(self, hwnd):
+        if hwnd in self.windows:
+            return self.windows[hwnd]
         self.handles.append(hwnd)
         return self.replacement if len(self.handles) > 1 and self.replacement else self.root
 
@@ -73,10 +76,12 @@ class Automation:
         return node.parent
 
 
-def source(root, fields, *, verify=None, budget=4096):
+def source(root, fields, *, verify=None, budget=4096, windows=None):
     identity = ProcessIdentity("host", "session", 42, 1, "fixture", "1", "x64", 64)
-    binding = BoundUiaWindow(identity, 123, verify or (lambda check: check()))
+    binding = BoundUiaWindow(identity, 123, verify or (lambda check: check()),
+                             lambda: tuple(windows or ()))
     automation = Automation(root)
+    automation.windows = dict(windows or {})
     return ScopedUiaSource(binding, "fixture", fields, automation, budget=budget), automation
 
 
@@ -330,3 +335,52 @@ def test_unreadable_initial_root_does_not_establish_lifetime_baseline():
     assert isinstance(reader.capture(lambda: None), PartialObservation)
     automation.root = Node().add(Node("field"))
     assert isinstance(reader.capture(lambda: None), SemanticSnapshot)
+
+
+def hidden_child(root, node):
+    """A child of a hidden window: its ancestor is the window, but the window does not list it."""
+    node.parent = root
+    return node
+
+
+def test_children_a_hidden_window_does_not_list_are_read_from_their_own_windows():
+    root = Node()
+    children = {201: hidden_child(root, Node("a", value="17")), 202: hidden_child(root, Node("b", password=True))}
+    reader, _ = source(root, (UiaField("a", "a", "value"), UiaField("b", "b", "value")), windows=children)
+    result = reader.capture(lambda: None)
+    assert dict(result.fields) == {"a": "17"} and dict(result.failures) == {"b": "protected"}
+
+
+def test_a_child_both_listed_and_reached_by_its_window_counts_once():
+    node = Node("a", value="17")
+    reader, _ = source(Node().add(node), (UiaField("a", "a", "value"),), windows={201: node})
+    assert dict(reader.capture(lambda: None).fields) == {"a": "17"}
+
+
+def test_a_listed_and_an_unlisted_match_stay_ambiguous():
+    root = Node().add(Node("a"))
+    reader, _ = source(root, (UiaField("a", "a", "value"),), windows={201: hidden_child(root, Node("a"))})
+    assert dict(reader.capture(lambda: None).failures) == {"a": "ambiguous"}
+
+
+@pytest.mark.parametrize("stray", [Node("a"), Node("a", pid=43)])
+def test_a_child_window_outside_the_bound_window_or_process_is_refused(stray):
+    reader, _ = source(Node(), (UiaField("a", "a", "value"),), windows={201: stray})
+    with pytest.raises(AgentObservationStale):
+        reader.capture(lambda: None)
+
+
+def test_child_windows_share_the_node_budget():
+    root = Node()
+    children = {200 + index: hidden_child(root, Node(str(index))) for index in range(4)}
+    reader, _ = source(root, (UiaField("a", "a", "value"),), windows=children, budget=4)
+    assert dict(reader.capture(lambda: None).failures) == {"a": "budget_exceeded"}
+
+
+def test_nodes_without_an_automation_id_are_skipped_but_still_searched():
+    root = Node()
+    root.properties[30011] = UNSUPPORTED
+    pane = Node().add(Node("a", value="17"))
+    pane.properties[30011] = UNSUPPORTED
+    reader, _ = source(root.add(pane), (UiaField("a", "a", "value"),))
+    assert dict(reader.capture(lambda: None).fields) == {"a": "17"}

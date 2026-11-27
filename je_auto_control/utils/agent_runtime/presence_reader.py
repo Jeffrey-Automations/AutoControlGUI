@@ -14,7 +14,7 @@ from je_auto_control.utils.agent_runtime.presence_frames import (
 )
 from je_auto_control.utils.agent_runtime.presence_handshake import client_handshake
 from je_auto_control.utils.agent_runtime.presence_platform import default_presence_pipe, default_presence_security
-from je_auto_control.utils.agent_runtime.presence_pipe_linux import endpoint_from_wire, endpoint_to_wire
+from je_auto_control.utils.agent_runtime.presence_endpoint_wire import endpoint_from_wire, endpoint_to_wire
 
 
 @dataclass(eq=False)  # tracked by identity while it waits
@@ -53,9 +53,9 @@ class PresenceReader:
         self._binding = presence_body('check', binding)
         self._takeover = takeover
         if pipe is None:
-            if sys.platform.startswith('linux'):
+            if sys.platform.startswith('linux') or sys.platform == 'darwin':
                 if endpoint is None:
-                    raise AgentTaskError('Linux presence reader requires an owned launch endpoint')
+                    raise AgentTaskError('presence reader requires an owned launch endpoint on this platform')
             elif sys.platform != 'win32' or endpoint is not None:
                 raise AgentTaskError('presence reader transport is unsupported on this platform')
             pipe = default_presence_pipe()

@@ -7,7 +7,7 @@ the MCP specification requires servers to validate ``Origin`` for exactly
 this.
 """
 import os
-from typing import Any, FrozenSet
+from typing import Any, FrozenSet, Optional
 from urllib.parse import urlsplit
 
 #: Host names that mean this machine. ``urlsplit`` strips IPv6 brackets.
@@ -34,14 +34,21 @@ def origin_allowed(headers: Any, server_address: Any) -> bool:
     """
     origin = headers.get("Origin")
     if origin and origin not in allowed_origins():
-        if urlsplit(origin).hostname not in LOOPBACK_NAMES:
+        if _host_name(origin) not in LOOPBACK_NAMES:
             return False
     bound_host = server_address[0] if isinstance(server_address, tuple) else server_address
     if bound_host in LOOPBACK_NAMES:
-        host = urlsplit("//" + headers.get("Host", "")).hostname
-        if host not in LOOPBACK_NAMES:
+        if _host_name("//" + headers.get("Host", "")) not in LOOPBACK_NAMES:
             return False
     return True
+
+
+def _host_name(url: str) -> Optional[str]:
+    """The host ``url`` names; ``None`` when it names none or does not parse (``http://[``)."""
+    try:
+        return urlsplit(url).hostname
+    except ValueError:
+        return None
 
 
 __all__ = ["ALLOWED_ORIGINS_ENV", "LOOPBACK_NAMES", "allowed_origins", "origin_allowed"]

@@ -23,7 +23,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
-from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.exception.exceptions import AutoControlException, ImageSearchInputException
+from je_auto_control.utils.executor.run_control import ExecutionStopped
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.logging.secret_scope import secret_log_scope
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
@@ -207,14 +208,31 @@ class ScreenObserver:
             stop.wait(self._poll)
 
 
+def _raise_if_stopped(error: BaseException) -> None:
+    """Re-raise a stop or cancellation: it is not an answer of "absent".
+
+    Read as one, a stop during ``poll_once`` fired the watch's ``vanish``.
+    """
+    if isinstance(error, ExecutionStopped):
+        raise error
+    raise_if_run_interrupted(error)
+
+
 def image_predicate(image: str, threshold: float = 0.8) -> Callable[[], Any]:
-    """Predicate: the located image centre, or ``None`` when absent."""
+    """Predicate: the located image centre, or ``None`` when absent.
+
+    A template the search cannot use raises: read as "absent", a typo in the
+    path fired the rule's vanish transition. The observer logs the error.
+    """
     def predicate() -> Any:
         from je_auto_control.wrapper.auto_control_image import (
             locate_image_center)
         try:
             return locate_image_center(image, detect_threshold=float(threshold))
-        except _RULE_ERRORS:
+        except ImageSearchInputException:
+            raise
+        except _RULE_ERRORS as error:
+            _raise_if_stopped(error)
             return None
     return predicate
 
@@ -225,7 +243,8 @@ def text_predicate(text: str) -> Callable[[], Any]:
         from je_auto_control.utils.ocr.ocr_engine import locate_text_center
         try:
             return locate_text_center(text)
-        except _RULE_ERRORS:
+        except _RULE_ERRORS as error:
+            _raise_if_stopped(error)
             return None
     return predicate
 
@@ -236,7 +255,8 @@ def pixel_predicate(x: int, y: int) -> Callable[[], Any]:
         from je_auto_control.wrapper.auto_control_screen import get_pixel
         try:
             return tuple(get_pixel(int(x), int(y)))
-        except _RULE_ERRORS:
+        except _RULE_ERRORS as error:
+            _raise_if_stopped(error)
             return None
     return predicate
 

@@ -148,5 +148,44 @@ def _raiser(error):
     return _raise
 
 
+def test_a_missing_optional_package_is_one_failed_action():
+    """ImportError from a command's lazy import aborted every later action."""
+    engine = Executor()
+    engine.event_dict["AC_r3_missing"] = _raiser(ModuleNotFoundError("No module named 'aiortc'"))
+    engine.event_dict["AC_r3_next"] = lambda: "ran"
+    record = engine.execute_action([["AC_r3_missing"], ["AC_r3_next"]])
+    assert "ModuleNotFoundError" in str(record["execute: ['AC_r3_missing']"])
+    assert record["execute: ['AC_r3_next']"] == "ran"
+
+
+def test_try_catches_a_missing_optional_package():
+    engine = Executor()
+    engine.event_dict["AC_r3_missing"] = _raiser(ImportError("no backend"))
+    engine.execute_action([["AC_try", {
+        "body": [["AC_r3_missing"]], "catch": [["AC_set_var", {"name": "c", "value": "caught"}]]}]])
+    assert engine.variables.get("c") == "caught"
+
+
+def test_an_action_running_while_the_metrics_register_is_not_a_failure(monkeypatch):
+    """The second of two first actions found half the metric cache: KeyError, recorded as its failure."""
+    import je_auto_control.utils.observability as observability
+    from je_auto_control.utils.executor import action_executor
+    from je_auto_control.utils.observability.metrics import Histogram, MetricRegistry
+    engine, inner = Executor(), []
+    engine.event_dict["AC_r3_ok"] = lambda: "ok"
+
+    class _Registry(MetricRegistry):
+        def register(self, metric):
+            if isinstance(metric, Histogram) and not inner:
+                inner.append(None)
+                inner[0] = engine.execute_action([["AC_r3_ok"]])   # the other thread's first action
+            return super().register(metric)
+    registry = _Registry()
+    monkeypatch.setattr(observability, "default_registry", lambda: registry)
+    monkeypatch.setattr(action_executor, "_EXECUTOR_METRIC_CACHE", {})
+    assert list(engine.execute_action([["AC_r3_ok"]]).values()) == ["ok"]
+    assert list(inner[0].values()) == ["ok"]
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

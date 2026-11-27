@@ -53,9 +53,14 @@ def _combo_to_x11(combo: str) -> Tuple[int, int]:
         raise ValueError(f"unknown X keysym for key: {primary!r}")
     disp = xdisplay.Display()
     try:
-        return mask, disp.keysym_to_keycode(keysym)
+        keycode = disp.keysym_to_keycode(keysym)
     finally:
         disp.close()
+    if not keycode:
+        # 0 is AnyKey to XGrabKey: the grab took every key pressed with these
+        # modifiers away from every application, and matched no binding.
+        raise ValueError(f"the X keymap has no key for {primary!r}")
+    return mask, keycode
 
 
 class LinuxHotkeyBackend(HotkeyBackend):

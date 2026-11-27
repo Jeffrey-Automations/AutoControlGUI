@@ -1,11 +1,18 @@
 """Headless tests for lock_session (injected driver / probe / clock)."""
 import sys
+import threading
+import time
+
+import pytest
 
 import je_auto_control as ac
+from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.executor.run_control import ExecutionStopped, stoppable_run
 from je_auto_control.utils.lock_session import (
     classify_lock_transitions, lock_session, plan_lock_session,
     wait_for_lock, wait_for_unlock,
 )
+from je_auto_control.utils.lock_session.lock_session import LockSessionTimeout, _run_argv
 
 
 # --- lock action ----------------------------------------------------------
@@ -116,6 +123,31 @@ def test_default_driver_absent_off_windows():
     if not sys.platform.startswith("win") and sys.platform != "darwin":
         # Linux default is loginctl (callable built), so a driver exists.
         assert callable(_default_driver())
+
+
+_SLEEPER = [sys.executable, "-c", "import time; time.sleep(30)"]
+
+
+def test_run_argv_reports_the_exit_status():
+    assert _run_argv([sys.executable, "-c", "pass"], timeout_s=20) is True
+    assert _run_argv([sys.executable, "-c", "raise SystemExit(3)"], timeout_s=20) is False
+
+
+def test_run_argv_times_out_with_a_framework_error():
+    started = time.monotonic()
+    with pytest.raises(LockSessionTimeout) as caught:
+        _run_argv(_SLEEPER, timeout_s=0.5)
+    assert isinstance(caught.value, AutoControlException)
+    assert time.monotonic() - started < 10
+
+
+def test_run_argv_stops_on_a_stop():
+    started = time.monotonic()
+    with pytest.raises(ExecutionStopped):
+        with stoppable_run() as token:
+            threading.Timer(0.3, token.stop).start()
+            _run_argv(_SLEEPER, timeout_s=60)
+    assert time.monotonic() - started < 10
 
 
 def test_wiring():

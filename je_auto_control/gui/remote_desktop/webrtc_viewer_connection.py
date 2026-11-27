@@ -10,7 +10,7 @@ from je_auto_control.gui.remote_desktop.view_frames import ViewFrames
 from je_auto_control.gui.remote_desktop.webrtc_panel_state import _ViewerPanelPart
 
 import functools
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
@@ -26,6 +26,7 @@ from je_auto_control.gui.remote_desktop.webrtc_workers import (
     ViewerAnswerPushWorker, ViewerSignalingWorker,
     retire_worker,
 )
+from je_auto_control.gui._qt_typed import as_plain
 from je_auto_control.gui._slow_op import stop_each
 from je_auto_control.gui._weak_call import WeakCall, weak_slot
 from je_auto_control.gui.tab_task_controller import CancellationToken, task_controller
@@ -36,6 +37,7 @@ else:
     from je_auto_control.utils.remote_desktop import WebRTCDesktopViewer
 from je_auto_control.gui.remote_desktop.webrtc_panel_common import (
     _read_webrtc_config,
+    submit_panel_call,
 )
 
 if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
@@ -48,6 +50,19 @@ def _process_offer(viewer: WebRTCDesktopViewerT, offer_sdp: str, expected_dtls: 
     return viewer.process_offer(offer_sdp, expected_dtls_fingerprint=expected_dtls)
 
 
+def _remember_session(book: Any, known_hosts: Any, host_id: str, server_url: str) -> None:
+    """Worker thread: record an authenticated session's host in the address book and mark it seen."""
+    if server_url:
+        try:
+            book.upsert(host_id=host_id, server_url=server_url)
+        except (ValueError, OSError) as error:
+            autocontrol_logger.debug("address book upsert: %r", error)
+    try:
+        known_hosts.touch(host_id)
+    except OSError as error:
+        autocontrol_logger.debug("known_hosts touch: %r", error)
+
+
 class _ViewerConnectionMixin(_ViewerPanelPart):
     """Methods of ``_WebRTCViewerPanel``; the module docstring says which group."""
 
@@ -58,13 +73,17 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
     # Owned by the files and media groups; stopped here with the session.
     _sync_engine: Optional[FolderSyncEngine]
     _recorder: Optional[SessionRecorderT]
+    # One token per viewer built: its state callbacks carry it, so a stopped or
+    # replaced viewer's late states are dropped, and a drop is counted once.
+    _viewer_episode: object
+    _reconnect_counted_for: object
 
     def _on_connect_via_server(self) -> None:
         if not self._validate_required_fields(needs_server=True):
             return
         self._user_initiated_disconnect = False
         self._stop_viewer_if_any()
-        self._status_label.setText(_t("rd_webrtc_polling_offer"))
+        self._status.show("rd_webrtc_polling_offer")
         self._offer_worker = ViewerSignalingWorker(
             server_url=self._server_edit.text().strip(),
             host_id=self._host_id_edit.text().strip(),
@@ -80,7 +99,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         except (ValueError, RuntimeError, OSError) as error:
             self._show_error(error)
             return
-        self._status_label.setText(_t("rd_webrtc_creating_answer"))
+        self._status.show("rd_webrtc_creating_answer")
         QTimer.singleShot(0, self, lambda: self._answer_and_push(offer_sdp))
 
     def _answer_and_push(self, offer_sdp: str) -> None:
@@ -123,10 +142,11 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
                 extract_dtls_fingerprint,
             )
             new_fp = extract_dtls_fingerprint(offer_sdp)
-            if new_fp:
-                self._known_hosts.remember_dtls_fingerprint(host_id, new_fp)
+            if new_fp:          # the pin is a file write: off the GUI thread
+                submit_panel_call(self, functools.partial(
+                    self._known_hosts.remember_dtls_fingerprint, host_id, new_fp))
         self._answer_view.setPlainText(answer)
-        self._status_label.setText(_t("rd_webrtc_pushing_answer"))
+        self._status.show("rd_webrtc_pushing_answer")
         self._answer_worker = ViewerAnswerPushWorker(
             server_url=self._server_edit.text().strip(),
             host_id=self._host_id_edit.text().strip(),
@@ -138,11 +158,11 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         self._answer_worker.start()
 
     def _on_answer_pushed(self) -> None:
-        self._status_label.setText(_t("rd_webrtc_waiting_auth"))
+        self._status.show("rd_webrtc_waiting_auth")
 
     def _on_signaling_failed(self, message: str) -> None:
-        QMessageBox.warning(self, "WebRTC", message)
-        self._status_label.setText(_t("rd_webrtc_status_idle"))
+        QMessageBox.warning(self, "WebRTC", as_plain(message))      # may quote the signaling server
+        self._status.show("rd_webrtc_status_idle")
 
     def _on_create_answer(self) -> None:
         if not self._validate_required_fields(needs_server=False):
@@ -157,7 +177,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         except (ValueError, RuntimeError, OSError) as error:
             self._show_error(error)
             return
-        self._status_label.setText(_t("rd_webrtc_creating_answer"))
+        self._status.show("rd_webrtc_creating_answer")
         QTimer.singleShot(0, self, lambda: self._produce_answer(offer))
 
     def _require_viewer(self) -> WebRTCDesktopViewerT:
@@ -172,7 +192,7 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
 
     def _show_manual_answer(self, answer: str) -> None:
         self._answer_view.setPlainText(answer)
-        self._status_label.setText(_t("rd_webrtc_answer_ready"))
+        self._status.show("rd_webrtc_answer_ready")
 
     def _on_stop(self) -> None:
         self._user_initiated_disconnect = True
@@ -202,13 +222,14 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         return True
 
     def _build_viewer(self, token: str) -> WebRTCDesktopViewerT:
+        episode = self._viewer_episode = object()
         viewer = WebRTCDesktopViewer(
             token=token,
             config=_read_webrtc_config(self),
             viewer_id=self._viewer_id,
             on_frame=ViewFrames(self._view.callback("_on_frame_image"),
                                 self._view.getter(lambda owner: owner._recorder, None)),
-            on_state_change=self._view.callback("_on_state"),
+            on_state_change=self._view.tagged("_on_viewer_state", episode),
             on_auth_result=self._view.callback("_on_auth"),
         )
         bind_folder_receipts(viewer, self._view.getter(lambda owner: owner._viewer, None),
@@ -235,6 +256,8 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
                 self._sync_btn.setChecked(False)
                 self._sync_btn.setText(_t("rd_webrtc_sync_start"))
         self._stop_stats_polling()
+        if hasattr(self, "_mic_btn"):
+            self._mic_btn.setChecked(False)         # the next session starts with the microphone off
         if self._recorder is not None:
             stops.append(self._recorder.stop)
             self._recorder = None
@@ -243,29 +266,21 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         if self._viewer is not None:
             stops.append(self._viewer.stop)
             self._viewer = None
+            self._viewer_episode = None         # its late "disconnected"/"failed" no longer count
         if stops:
             self._stops.retire(functools.partial(stop_each, *stops))
 
     def _on_auth(self, ok: bool) -> None:
         key = "rd_webrtc_auth_ok" if ok else "rd_webrtc_auth_fail"
-        self._status_label.setText(_t(key))
+        self._status.show(key)
         if ok:
             self._auto_reconnect_attempts = 0  # reset on successful auth
             host_id = self._host_id_edit.text().strip()
             server_url = self._server_edit.text().strip()
-            if host_id and server_url:
-                try:
-                    self._address_book.upsert(
-                        host_id=host_id, server_url=server_url,
-                    )
-                    self._refresh_address_book()
-                except (ValueError, OSError) as error:
-                    autocontrol_logger.debug("address book upsert: %r", error)
-            if host_id:
-                try:
-                    self._known_hosts.touch(host_id)
-                except OSError as error:
-                    autocontrol_logger.debug("known_hosts touch: %r", error)
+            if host_id:         # file writes: off the GUI thread, then the book is repainted
+                submit_panel_call(self, functools.partial(
+                    _remember_session, self._address_book, self._known_hosts, host_id, server_url),
+                    self._on_book_changed)
             self._start_stats_polling()
             # AnyDesk-style: surface the live screen in its own window
             # so the workspace isn't fighting the control panel for
@@ -277,28 +292,33 @@ class _ViewerConnectionMixin(_ViewerPanelPart):
         else:
             self._stop_stats_polling()
 
+    def _on_viewer_state(self, episode: object, state: str) -> None:
+        """Pass on a state of the current viewer only; a stopped or replaced viewer's late states are dropped."""
+        if episode is self._viewer_episode:
+            self._on_state(state)
+
     def _maybe_schedule_auto_reconnect(self) -> None:
         if (not self._auto_reconnect_check.isChecked()
                 or self._user_initiated_disconnect):
             return
+        episode = self._viewer_episode
+        if episode is not None and episode is self._reconnect_counted_for:
+            return      # one drop reports "disconnected" then "failed": it uses one attempt
         max_attempts = int(self._reconnect_max_spin.value())
         base_delay_s = int(self._reconnect_delay_spin.value())
         if self._auto_reconnect_attempts >= max_attempts:
-            self._status_label.setText(_t("rd_webrtc_reconnect_giveup"))
+            self._status.show("rd_webrtc_reconnect_giveup")
             return
         if (not self._server_edit.text().strip()
                 or not self._host_id_edit.text().strip()
                 or not self._token_edit.text().strip()):
             return
         self._auto_reconnect_attempts += 1
+        self._reconnect_counted_for = episode
         delay_ms = min(
             60000, 1000 * base_delay_s * (2 ** (self._auto_reconnect_attempts - 1)),
         )
-        self._status_label.setText(
-            _t("rd_webrtc_reconnecting").format(
-                n=self._auto_reconnect_attempts, max=max_attempts,
-            ),
-        )
+        self._status.show("rd_webrtc_reconnecting", n=self._auto_reconnect_attempts, max=max_attempts)
         self._reconnect_timer.start(delay_ms)
 
 

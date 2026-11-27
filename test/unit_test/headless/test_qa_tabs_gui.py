@@ -16,6 +16,11 @@ from je_auto_control.gui.data_source_tab import DataSourceTab  # noqa: E402
 from je_auto_control.gui.flakiness_tab import FlakinessTab  # noqa: E402
 
 
+def _t_running():
+    from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
+    return language_wrapper.translate("task_running", "task_running")
+
+
 @pytest.fixture(scope="module")
 def app():
     return QApplication.instance() or QApplication([])
@@ -23,8 +28,11 @@ def app():
 
 def test_flakiness_tab_refreshes(app):
     tab = FlakinessTab()
+    assert settle(tab._reports, "task")     # the first report, computed off the GUI thread
     tab._refresh()
-    assert tab._status.text() != ""
+    assert settle(tab._reports, "task")
+    assert tab._status.text() not in ("", _t_running())
+    tab.dispose()
 
 
 def test_data_source_tab_loads_inline(app):
@@ -32,6 +40,7 @@ def test_data_source_tab_loads_inline(app):
     tab._kind.setCurrentText("inline")
     tab._inline.setPlainText('[{"u": "x"}, {"u": "y"}]')
     tab._on_load()
+    assert settle(tab._loads, "task")       # loaded off the GUI thread
     assert tab._table.rowCount() == 2
     assert tab._table.columnCount() == 1
 
@@ -41,7 +50,8 @@ def test_data_source_tab_reports_error(app):
     tab._kind.setCurrentText("csv")
     tab._path.setText("/no/such/file_zzz.csv")
     tab._on_load()
-    assert "fail" in tab._status.text().lower() or tab._status.text()
+    assert settle(tab._loads, "task")
+    assert tab._status.text() not in ("", _t_running())
 
 
 def test_assertions_tab_window_check(app, monkeypatch):

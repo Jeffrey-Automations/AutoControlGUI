@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from je_auto_control.gui.remote_desktop._webrtc_types import (
         AvFrameT, MultiViewerHostT, WebRTCDesktopViewerT, SessionRecorderT,
     )
+    from je_auto_control.gui._i18n_helpers import KeyedText
     from je_auto_control.gui.remote_desktop.annotation_overlay import HostAnnotationOverlay
     from je_auto_control.gui.remote_desktop.viewer_screen_window import ViewerScreenWindow
     from je_auto_control.gui.remote_desktop.remote_screen_window import RemoteScreenWindow
@@ -39,6 +40,7 @@ class _HostPanelPart(_PanelPart):
     _answer_input: QTextEdit
     _fps_spin: QSpinBox
     _host_quality_dot: QLabel
+    _host_quality_tip: KeyedText
     _hw_codec_combo: QComboBox
     _ip_whitelist_edit: QTextEdit
     _max_bitrate_spin: QSpinBox
@@ -135,6 +137,7 @@ class _ViewerPanelPart(_PanelPart):
     _on_send_cad: Callable[[], None]
     _on_send_file: Callable[[], None]
     _on_stop: Callable[[], None]
+    _on_state: Callable[[str], None]
     _on_sync_browse: Callable[[], None]
     _on_toggle_mic: Callable[[bool], None]
     _on_toggle_pen: Callable[[bool], None]
@@ -146,11 +149,14 @@ class _ViewerPanelPart(_PanelPart):
     _on_wake_on_lan: Callable[[], None]
     _pen_btn: QPushButton
     _quality_dot: QLabel
+    _quality_tip: KeyedText
+    _stats_text: KeyedText
     _reconnect_delay_spin: QSpinBox
     _reconnect_max_spin: QSpinBox
     _reconnect_timer: QTimer
     _record_btn: QPushButton
     _refresh_address_book: Callable[[], None]
+    _on_book_changed: Callable[[object], None]
     _remote_files_table: RemoteFilesTable
     _screen_window: Optional[RemoteScreenWindow]
     _show_error: Callable[[Exception], None]

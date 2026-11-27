@@ -17,12 +17,13 @@ and the config reader they share are in ``webrtc_panel_common``.
 """
 from __future__ import annotations
 
+import functools
 import logging
 from typing import TYPE_CHECKING, Any, Optional
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
-    QMessageBox, QWidget,
+    QAbstractButton, QMessageBox, QWidget,
 )
 
 from je_auto_control.gui.remote_desktop._webrtc_types import MultiViewerHostT, SessionRecorderT, WebRTCDesktopViewerT
@@ -50,7 +51,7 @@ from je_auto_control.gui.remote_desktop.webrtc_dialogs import (
 from je_auto_control.gui.remote_desktop.webrtc_workers import (
     HostPublishLoopWorker, ViewerAnswerPushWorker, ViewerSignalingWorker,
 )
-from je_auto_control.gui.tab_task_controller import TaskHandle
+from je_auto_control.gui.tab_task_controller import CancellationToken, TaskHandle, task_controller
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 from je_auto_control.utils.remote_desktop import (
     default_address_book,
@@ -90,9 +91,17 @@ if TYPE_CHECKING:  # imported lazily at runtime to keep startup cheap
     )
 
 
+def _turned_off(button: QAbstractButton) -> bool:
+    """Whether ``button`` itself was disabled; ``isEnabled()`` is also false inside a collapsed section."""
+    return button.testAttribute(Qt.WidgetAttribute.WA_ForceDisabled)
+
+
 class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSessionsMixin,
                        _HostConnectionMixin):
     """Host: stream this machine's screen and accept viewer input."""
+
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_start_webrtc_host", "AC_stop_webrtc_host")
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -103,6 +112,8 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         self._manual_session_id: Optional[str] = None
         self._answer_task: Optional[TaskHandle] = None     # the answer being applied, off-thread
         self._file_task: Optional[TaskHandle] = None       # the file push in progress, off-thread
+        self._trust_task: Optional[TaskHandle] = None      # a trust-list write, import or export, off-thread
+        self._admissions = 0                # accept-and-trust answers still recording the viewer, off-thread
         self._stops = StopQueue(self)
         self._stops.drained.connect(self._on_stops_drained)
         self._stopping_sessions: set[str] = set()
@@ -141,7 +152,7 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
             for widget in (self._generate_btn, self._apply_btn,
                            self._publish_btn):
                 widget.setEnabled(False)
-            self._status_label.setText(_t("rd_webrtc_unavailable"))
+            self._status.show("rd_webrtc_unavailable")
 
     def prefill(self, token: Optional[str] = None,
                 host_id: Optional[str] = None,
@@ -171,15 +182,19 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         offer or file push still out and the tray icon.
         """
         self._view.retire()
-        release_resources(self, self._stop_host_if_any, self._hide_tray)
+        release_resources(self, self._stop_host_if_any, self._hide_blanking, self._hide_tray)
+
+    def _hide_blanking(self) -> None:
+        # Its windows have no parent: left up, nothing on screen could take them down.
+        self._on_toggle_blanking(False)
 
     def _hide_tray(self) -> None:
         if self._tray is not None:
             self._tray.hide()
 
     def _on_tray_open(self) -> None:
-        # Not self.window(): for a few event-loop turns after a theme switch
-        # this page is parked outside the main window's tree.
+        # The page stays in the main window's tree, a theme switch included
+        # (test_gui_workspace_navigation.py), so its window is the main one.
         win = self.window()
         win.showNormal()
         win.raise_()
@@ -206,11 +221,11 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
         host = self._multi_host
         if host is None:
             return
+        if choice == PendingViewerDialog.AcceptAndTrust:
+            self._admit_and_trust(host, session_id)
+            return
         try:
-            if choice == PendingViewerDialog.AcceptAndTrust:
-                host.trust_pending_viewer(session_id)
-                self._refresh_trusted_list()
-            elif choice == PendingViewerDialog.AcceptOnce:
+            if choice == PendingViewerDialog.AcceptOnce:
                 host.approve_pending_viewer(session_id)
             else:
                 host.reject_pending_viewer(session_id)
@@ -219,16 +234,46 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
             return
         self._signals.session_count.emit(host.session_count())
 
+    def _admit_and_trust(self, host: MultiViewerHostT, session_id: str) -> None:
+        """Answer "accept and trust" on a worker: recording the viewer writes the trust-list file.
+
+        The whole ``trust_pending_viewer`` call goes there unsplit, so the
+        viewer is admitted by that call alone, after its write, exactly as
+        when it ran here. The trusted list is disabled until it returns.
+        """
+        self._admissions += 1
+        self._trusted_list.setEnabled(False)
+        task = task_controller().submit(functools.partial(_trust_and_admit, host, session_id), owner=self)
+        task.result.connect(self._on_viewer_admitted)
+        task.error.connect(self._on_admission_failed)
+        task.finished.connect(self._on_admission_done)
+
+    def _on_viewer_admitted(self, _outcome: object = None) -> None:
+        host = self._multi_host
+        if host is not None:                # stopped while the trust was being recorded
+            self._signals.session_count.emit(host.session_count())
+
+    def _on_admission_failed(self, error: object) -> None:
+        # KeyError: the session was torn down between the prompt and the answer.
+        if not isinstance(error, KeyError):
+            autocontrol_logger.warning("accept and trust viewer: %r", error)
+
+    def _on_admission_done(self) -> None:
+        self._admissions = max(0, self._admissions - 1)
+        if self._admissions == 0:
+            self._trusted_list.setEnabled(True)
+        self._refresh_trusted_list()
+
     def _set_hosting(self, hosting: bool) -> None:
         if self._tray is not None:
             self._tray.set_hosting(hosting)
 
     def _on_state(self, state: str) -> None:
-        self._status_label.setText(f"{_t('rd_webrtc_state_label')} {state}")
+        self._status.show_rendered(lambda: f"{_t('rd_webrtc_state_label')} {state}")
 
     def _on_auth(self, ok: bool) -> None:
         key = "rd_webrtc_auth_ok" if ok else "rd_webrtc_auth_fail"
-        self._status_label.setText(_t(key))
+        self._status.show(key)
 
     def _show_error(self, error: Exception) -> None:
         autocontrol_logger.warning("webrtc host panel error: %r", error)
@@ -236,6 +281,19 @@ class _WebRTCHostPanel(_HostUiMixin, _HostTrustMixin, _HostMediaMixin, _HostSess
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
+        self._apply_session_headers()
+        self._status.retranslate()
+        self._host_quality_tip.retranslate()
+        if self._tray is not None:
+            self._tray.retranslate()
+        if self._viewer_screen_window is not None:
+            self._viewer_screen_window.retranslate()
+        host = self._multi_host
+        self._sessions_label.setText(
+            _t("rd_webrtc_sessions_count").format(n=host.session_count() if host is not None else 0))
+        self._hw_codec_combo.setItemText(0, _t("rd_webrtc_hw_codec_off"))
+        if self._monitor_combo.itemText(0) != "#0":     # "#0": the monitors could not be listed
+            self._monitor_combo.setItemText(0, _t("rd_webrtc_monitor_all"))
 
 
 class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMixin, _ViewerMediaMixin,
@@ -248,6 +306,7 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
         self._view = ViewLifetime(self)
         self._viewer: Optional[WebRTCDesktopViewerT] = None
         self._file_task: Optional[TaskHandle] = None       # the upload in progress, off-thread
+        self._book_task: Optional[TaskHandle] = None       # an address-book write, import or export, off-thread
         self._offer_worker: Optional[ViewerSignalingWorker] = None
         self._answer_worker: Optional[ViewerAnswerPushWorker] = None
         self._stops = StopQueue(self)
@@ -264,6 +323,8 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
         self._stats_poller: Optional[StatsPoller] = None
         self._sync_engine: Optional["FolderSyncEngine"] = None
         self._auto_reconnect_attempts = 0
+        self._viewer_episode: object = None
+        self._reconnect_counted_for: object = None
         self._user_initiated_disconnect = False
         # One timer, so Stop can cancel a reconnect that is waiting out its
         # back-off: a singleShot could not be, and reconnected after Stop.
@@ -343,7 +404,7 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
         if not is_webrtc_available():
             for widget in (self._answer_btn, self._connect_btn):
                 widget.setEnabled(False)
-            self._status_label.setText(_t("rd_webrtc_unavailable"))
+            self._status.show("rd_webrtc_unavailable")
 
     def dispose(self) -> None:
         """Release what the panel holds beyond its widgets -- including the session it is in.
@@ -400,7 +461,7 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
             self._on_stop()
 
     def _on_state(self, state: str) -> None:
-        self._status_label.setText(f"{_t('rd_webrtc_state_label')} {state}")
+        self._status.show_rendered(lambda: f"{_t('rd_webrtc_state_label')} {state}")
         if state in ("failed", "disconnected"):
             self._maybe_schedule_auto_reconnect()
 
@@ -418,6 +479,25 @@ class _WebRTCViewerPanel(_ViewerUiMixin, _ViewerFilesMixin, _ViewerAddressBookMi
 
     def retranslate(self) -> None:
         TranslatableMixin.retranslate(self)
+        for text in (self._status, self._quality_tip, self._stats_text):
+            text.retranslate()
+        self._remote_files_table.retranslate()
+        self._tag_filter_combo.setItemText(0, _t("rd_webrtc_tag_all"))
+        for index in range(self._bandwidth_combo.count()):
+            self._bandwidth_combo.setItemText(index, _t(f"rd_webrtc_bandwidth_{self._bandwidth_combo.itemData(index)}"))
+        # The registered texts are the buttons' idle ones.
+        # A button turned off while its stop runs, not one inside a collapsed (so disabled) section.
+        if self._recorder is not None or _turned_off(self._record_btn):
+            self._record_btn.setText(_t("rd_webrtc_stop_recording" if self._recorder is not None
+                                        else "gui_op_stopping"))
+        if self._sync_engine is not None or _turned_off(self._sync_btn):
+            self._sync_btn.setText(_t("rd_webrtc_sync_stop" if self._sync_engine is not None else "gui_op_stopping"))
+        self._pen_btn.setText(_t("rd_webrtc_pen_on" if self._pen_btn.isChecked() else "rd_webrtc_pen_off"))
+
+
+def _trust_and_admit(host: MultiViewerHostT, session_id: str, _token: CancellationToken) -> None:
+    """Worker thread: record the pending viewer as trusted and admit it (one backend call)."""
+    host.trust_pending_viewer(session_id)
 
 
 __all__ = ["_PanelSignals", "_WebRTCHostPanel", "_WebRTCViewerPanel"]

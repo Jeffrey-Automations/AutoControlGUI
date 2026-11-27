@@ -2,7 +2,8 @@
 
 This x64 fixture supplies the schema-one buffers and correlated RPC contract used
 by the internal memory adapters. It is a separate build artifact from the Python
-fixture. Its runtime behavior and native memory acceptance have **not been run**.
+fixture. On 2026-11-26 the smoke round trip and the four page layouts below passed once
+on one x64 Windows 11 machine; full native memory acceptance has **not** been completed.
 
 The executable requires `--rpc --challenge <32 lowercase hex digits>`.
 It uses inherited input/output pipes, a 1,024-byte frame limit, and the closed
@@ -31,15 +32,15 @@ Each allocates two pages, copies the initial 16-byte payload across their bounda
 | `decommitted` | Read-only | Reserved, decommitted |
 
 Different readable protections in `split` prevent the two pages from forming one
-query region. Other layouts prepare reader refusals. All diagnostic modes allow
-bootstrap only and reject every control request before accessing the copied data.
+query region. Other layouts prepare reader refusals. Every diagnostic mode allows
+only bootstrap and the read-only `snapshot`, which reads the original static payload;
+any other request is rejected before accessing the copied data.
 The ordinary mode continues to use its original static payload and command ledger.
 Every exit path attempts to release the original allocation, including initialization
 and stdio failures; a failed release returns exit code 3.
 
-These layouts have been compiled and source-reviewed, not executed. The CLI below
-can select one with `--page-layout <layout>`. Selection alone remains static;
-execution still requires `--execute` after the native pause is lifted.
+The CLI below can select one with `--page-layout <layout>`. Selection alone remains static;
+execution still requires `--execute` while native acceptance is resumed in `Progress.md`.
 
 The page runner binds its private payload address only after launch/bootstrap
 validation. It observes the reader's existing region queries without adding OS
@@ -59,7 +60,7 @@ page cannot satisfy the case. Reports expose only the requested layout and close
 check booleans, never the private locations or memory contents. Page cases issue no
 state-changing control command. They require the expected read-only IPC snapshot
 and do not claim runtime task completion. The overall fault matrix
-stays unverified; only injected tests have exercised this runner so far.
+stays unverified.
 
 The allocation and protection rules follow Microsoft's
 [VirtualProtect](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotect)
@@ -150,8 +151,8 @@ path runs either executable.
 The UI fixture accepts only `--challenge <32 lowercase hex digits>`. A dedicated
 thread creates a parent without `WS_VISIBLE`, with `WS_EX_NOACTIVATE` and
 `WS_EX_TOOLWINDOW`, at off-screen coordinates. It never calls ShowWindow, focus
-or foreground APIs. The same thread creates, pumps and destroys these read-only
-EDIT controls:
+or foreground APIs. The same thread creates, pumps and destroys these EDIT controls,
+all read-only except 1007:
 
 | Child ID | Fixture value / purpose |
 | --- | --- |
@@ -161,6 +162,7 @@ EDIT controls:
 | 1004 | `disabled`, disabled control |
 | 1005 | Password-style control containing synthetic fixture text |
 | 1006, twice | Different values to test ambiguous selection |
+| 1007 | Empty and writable, the only target of the native accessibility write check |
 
 Both inherited stdin and stdout must be pipes. After initialization, stdout emits
 one JSON line with exactly `id` and `result`. The ID is the launch challenge;
@@ -179,10 +181,12 @@ The event-aware pump follows
 [MsgWaitForMultipleObjects](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjects).
 The parent styles follow Microsoft's
 [extended-window-style contract](https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles).
-Child IDs do not prove UIA AutomationId mapping or hidden-control exposure.
-Those properties, password behavior, cleanup and foreground noninterference remain
-unverified until native acceptance resumes. The internal `OwnedUiaLauncher` consumes that bootstrap through a receive-only
+Run natively on one Windows 11 machine on 2026-11-26: child IDs are the AutomationIds, and UIA does
+not list the children of the hidden parent, but an element taken from a child's own HWND is complete
+and has that parent as its ancestor, so the scoped reader also starts from the bound window's child
+windows. `uia_acceptance.py --build <dir> --sha256 <hash> --execute` repeats the check (it needs
+`comtypes`); it sends no input and fails if the fixture ever owned the foreground window. The internal `OwnedUiaLauncher` consumes that bootstrap through a receive-only
 owned channel. It rechecks process facts through the retained launch handle and
 the window owner through GetWindowThreadProcessId. Injected native calls and hidden
-Python helpers cover this binding, not native HWND behavior. The scoped UIA reader,
-managed assembly and per-field report results remain pending in Progress.md.
+Python helpers cover this binding in unit tests; worker deployment trust remains in
+Progress.md.

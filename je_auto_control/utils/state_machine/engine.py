@@ -1,12 +1,13 @@
 """Declarative finite-state-machine engine for action JSON."""
 from __future__ import annotations
 
+import math
 import time
 from contextlib import nullcontext
 from typing import Any, Callable, Dict, Mapping, Optional
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
-from je_auto_control.utils.executor.run_control import pause
+from je_auto_control.utils.executor.run_control import ExecutionStopped, pause
 from je_auto_control.utils.script_vars.execution import current_scope, execution_scope
 
 
@@ -55,7 +56,7 @@ class StateMachine:
         self._guard_eval = guard_eval or _default_guard_eval
         self._context: Dict[str, Any] = {}
         self._max_steps = int(spec.get("max_steps", _DEFAULT_MAX_STEPS))
-        self._global_timeout_s = float(
+        self._global_timeout_s = _timeout_s(
             spec.get("global_timeout_s", _DEFAULT_GLOBAL_TIMEOUT_S),
         )
 
@@ -143,6 +144,17 @@ class StateMachine:
         return target
 
 
+def _timeout_s(value: Any) -> float:
+    """``global_timeout_s`` as a float; NaN compared false and removed the limit."""
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError) as error:
+        raise StateMachineError(f"global_timeout_s must be a number, got {value!r}") from error
+    if math.isnan(seconds):
+        raise StateMachineError("global_timeout_s must be a number, not NaN")
+    return seconds
+
+
 _TIMER_POLL_S = 0.05
 
 
@@ -204,10 +216,14 @@ def _image_found_ok(transition: Mapping[str, Any], _context: Mapping[str, Any],
     image = spec.get("image") if isinstance(spec, Mapping) else spec
     # 1.0 is locate_image_center's own default (an exact match).
     threshold = float(spec.get("detect_threshold", 1.0)) if isinstance(spec, Mapping) else 1.0
-    from je_auto_control.utils.exception.exceptions import AutoControlException
+    from je_auto_control.utils.exception.exceptions import (
+        AutoControlException, ImageSearchInputException,
+    )
     from je_auto_control.wrapper.auto_control_image import locate_image_center
     try:
         locate_image_center(image, detect_threshold=threshold)
+    except (ExecutionStopped, ImageSearchInputException):
+        raise  # in the family, but not a guard that does not fire: a stop, or a typo
     except (AutoControlException, OSError, ValueError):
         return False  # not on screen (or unreadable): the guard does not fire
     return True

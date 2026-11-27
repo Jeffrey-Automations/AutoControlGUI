@@ -129,3 +129,38 @@ def test_each_editor_round_trips_and_commits_its_native_value(qapp, monkeypatch,
     else:
         editor.setText(edited)
     assert step_to_action(step) == [spec.command, {"value": expected, "extra": "preserved"}]
+
+
+def _edit_one_field(action, name, text):
+    """Select a step, type into one field, and give back the action Save would write."""
+    step = action_to_step(action)
+    view = StepFormView()
+    view.load_step(step)
+    view._editors[name].setText(text)
+    return step_to_action(step), step, view
+
+
+def test_editing_one_field_does_not_fill_in_the_optional_boxes_and_choices(qapp):
+    """``read_only: false`` overrode an environment that had made the server read-only."""
+    saved, step, view = _edit_one_field(["AC_start_mcp_server", {}], _first_text_field("AC_start_mcp_server"), "x")
+    assert "read_only" not in saved[1] and "disclosure" not in saved[1]
+    view._editors["read_only"].setChecked(True)
+    assert step.params["read_only"] is True
+    view._editors["read_only"].setChecked(False)               # said explicitly now
+    assert step.params["read_only"] is False
+
+
+def _first_text_field(command):
+    from je_auto_control.gui.script_builder.command_schema import COMMAND_SPECS, FieldType
+    return next(spec.name for spec in COMMAND_SPECS[command].fields
+                if spec.field_type in (FieldType.STRING, FieldType.JSON, FieldType.INT))
+
+
+def test_a_choice_made_in_an_optional_list_is_kept_and_can_go_back(qapp):
+    step = action_to_step(["AC_start_mcp_server", {}])
+    view = StepFormView()
+    view.load_step(step)
+    view._editors["disclosure"].setCurrentIndex(1)
+    assert step.params["disclosure"] == "progressive"
+    view._editors["disclosure"].setCurrentIndex(0)
+    assert step.params["disclosure"] == "full"

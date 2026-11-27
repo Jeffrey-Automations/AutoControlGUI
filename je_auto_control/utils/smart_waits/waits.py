@@ -23,7 +23,7 @@ import time
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-from je_auto_control.utils.executor.run_control import pause
+from je_auto_control.utils.executor.run_control import pause, stoppable_call
 
 _TIMEOUT_POSITIVE = "timeout_s must be positive"
 _POLL_POSITIVE = "poll_interval_s must be positive"
@@ -404,7 +404,11 @@ def wait_until_port(host: str, port: int, *,
     samples = 0
     while time.monotonic() < deadline:
         samples += 1
-        if probe(str(host), int(port), float(connect_timeout_s)):
+        # No longer than the time left: one connect held the wait past its cap.
+        left = max(deadline - time.monotonic(), 0.001)
+        # One connect to a host that drops SYNs blocks for its whole timeout;
+        # a stop ends the wait for it and the socket closes on its own.
+        if stoppable_call(probe, str(host), int(port), min(float(connect_timeout_s), left)):
             return _finish(True, f"port {host}:{port} open", started, samples)
         _pause(deadline, poll_interval_s)
     return _finish(False, f"timeout waiting for {host}:{port}",

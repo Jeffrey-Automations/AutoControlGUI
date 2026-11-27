@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, IO, List, Optional
 
 from je_auto_control.utils.exception.cancellation import CancellationToken, current_cancellation_token
+from je_auto_control.utils.executor.run_control import checkpoint, current_stop_token, shield_depth
 from je_auto_control.utils.json_store.json_store import load_json_or_quarantine, quarantine_file
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
@@ -37,12 +38,40 @@ _READ_CHUNK_BYTES = 65536
 NOT_SENT_STOPPED = "not sent: the broadcast was stopped"
 
 
+def _run_stop_probe() -> Callable[[], bool]:
+    """Whether the caller's stoppable run was stopped, askable from a pool thread.
+
+    Read in the caller's thread, which is the one inside the run. A stop seen
+    inside cleanup (``shielded``) counts only once it was requested twice,
+    as ``run_control.checkpoint`` does.
+    """
+    run = current_stop_token()
+    shield = shield_depth()
+
+    def stopped() -> bool:
+        return run is not None and run.stopped and (not shield or run.forced)
+    return stopped
+
+
 def _stop_requested(stop_event: Optional[threading.Event],
                     token: Optional[CancellationToken]) -> Callable[[], bool]:
     """Whether a broadcast should skip the hosts it has not sent to yet."""
+    run_stopped = _run_stop_probe()
+
     def stopped() -> bool:
-        return (stop_event is not None and stop_event.is_set()) or (token is not None and token.is_cancelled)
+        return ((stop_event is not None and stop_event.is_set())
+                or (token is not None and token.is_cancelled) or run_stopped())
     return stopped
+
+
+def _job_count(reply: Any) -> Optional[int]:
+    """How many jobs a ``/jobs`` reply lists; ``None`` when it has no list.
+
+    A host answering ``{"jobs": null}`` raised ``TypeError`` out of the pool,
+    which failed the round for every host.
+    """
+    jobs = reply.get("jobs", []) if isinstance(reply, dict) else None
+    return len(jobs) if isinstance(jobs, list) else None
 
 
 class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
@@ -139,7 +168,8 @@ class AdminConsoleClient:
 
         Inside a cancelled cancellation scope the hosts not probed yet are
         skipped and :class:`concurrent.futures.CancelledError` is raised once
-        the probes already out have returned.
+        the probes already out have returned; a stopped stoppable run does the
+        same and raises ``ExecutionStopped``.
         """
         targets = self._resolve_targets(labels)
         if not targets:
@@ -153,8 +183,8 @@ class AdminConsoleClient:
         Returns ``label → png_bytes`` (or ``None`` on a host that
         errored). The Cross-host Dashboard polls this on a timer and
         scales the resulting image down to a thumbnail tile. A cancelled
-        cancellation scope skips the hosts not reached yet and raises
-        :class:`concurrent.futures.CancelledError`, as :meth:`poll_all` does.
+        cancellation scope or a stopped run skips the hosts not reached yet
+        and raises, as :meth:`poll_all` does.
         """
         import base64
         targets = self._resolve_targets(labels)
@@ -183,16 +213,18 @@ class AdminConsoleClient:
 
     def _map_unless_cancelled(self, call: Callable[[AdminHost], Any], targets: List[AdminHost]) -> List[Any]:
         """``call`` over ``targets`` in the pool; a cancelled scope skips the rest and raises ``CancelledError``."""
-        # Read in the caller's thread: the pool's threads do not see its scope.
+        # Read in the caller's thread: the pool's threads do not see its scope or run.
         token = current_cancellation_token()
+        stopped = _stop_requested(None, token)
 
         def one(host: AdminHost) -> Any:
-            return None if token is not None and token.is_cancelled else call(host)
+            return None if stopped() else call(host)
 
         with ThreadPoolExecutor(max_workers=self._max_parallel) as pool:
             results = list(pool.map(one, targets))
         if token is not None:
             token.checkpoint()
+        checkpoint()
         return results
 
     def broadcast_execute(self, actions: List[Any],
@@ -209,10 +241,10 @@ class AdminConsoleClient:
 
         Every row says in ``sent`` whether the actions went to that host.
         Hosts are sent to in parallel, ``max_parallel`` at a time; once
-        ``stop_event`` is set, or the caller's cancellation scope is
-        cancelled, a host not yet sent to is skipped (``sent: false``,
-        ``error`` :data:`NOT_SENT_STOPPED`) and a host already being sent to
-        finishes and reports its result. An unknown label is ``sent: false`` too.
+        ``stop_event`` is set, the caller's cancellation scope is cancelled
+        or its stoppable run is stopped, a host not yet sent to is skipped
+        (``sent: false``, ``error`` :data:`NOT_SENT_STOPPED`) and a host
+        already being sent to finishes and reports its result. An unknown label is ``sent: false`` too.
         """
         targets = self._resolve_targets(labels)
         # A label that names no host is a failure to report, not a host to
@@ -268,7 +300,7 @@ class AdminConsoleClient:
         return HostStatus(
             label=host.label, base_url=host.base_url, healthy=True,
             latency_ms=latency, sessions=sessions,
-            job_count=len(jobs.get("jobs", [])) if isinstance(jobs, dict) else None,
+            job_count=_job_count(jobs),
         )
 
     def _safe_get(self, host: AdminHost, path: str) -> Optional[Dict[str, Any]]:

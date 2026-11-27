@@ -250,8 +250,85 @@ def test_remote_file_rows_survive_entries_of_the_wrong_shape():
     assert [table.item(row, 1).text() for row in range(2)] == ["big", "inf"]
 
 
+# --- tokens are masked like Quick Connect's ---------------------------------------------------------------------
+
+@pytest.mark.parametrize("build, field", [
+    (lambda: host_panel._HostPanel(), "_token"),
+    (lambda: viewer_panel._ViewerPanel(), "_token"),
+    (lambda: connection_screen.QuickConnectScreen(), "_host_token"),
+    (lambda: connection_screen.QuickConnectScreen(), "_connect_token"),
+], ids=["host", "viewer", "quick-host", "quick-viewer"])
+def test_remote_desktop_tokens_are_masked_with_reveal_and_copy(monkeypatch, build, field):
+    from headless._masked_secret import assert_masked_secret
+    panel = build()
+    try:
+        assert_masked_secret(getattr(panel, field), monkeypatch)
+    finally:
+        panel.dispose()
+        panel.deleteLater()
+
+
 def test_short_fingerprints_accept_any_stored_value():
     from je_auto_control.gui.remote_desktop._helpers import _format_last_seen, _short_fp
     assert _short_fp(12345) == "12345"
     # Windows cannot convert year 1 to local time; other platforms can.
     assert isinstance(_format_last_seen("0001-01-01T00:00:00+00:00"), str)
+
+
+class _KnownHosts:
+    def __init__(self, entries):
+        self.entries = dict(entries)
+
+    def list_entries(self):
+        return dict(self.entries)
+
+    def forget(self, host_id):
+        self.entries.pop(host_id, None)
+
+
+def test_forget_stale_takes_every_row_the_table_shows_as_stale(monkeypatch):
+    from je_auto_control.gui.remote_desktop import webrtc_known_hosts as module
+    old = datetime.now(timezone.utc) - timedelta(days=200)
+    known = _KnownHosts({"aware": {"last_seen": old.isoformat()},
+                         "naive": {"last_seen": old.replace(tzinfo=None).isoformat()},
+                         "fresh": {"last_seen": datetime.now(timezone.utc).isoformat()}})
+    monkeypatch.setattr(QMessageBox, "question", lambda *_args: QMessageBox.StandardButton.Yes)
+    dialog = module.KnownHostsDialog(known)
+    dialog._on_forget_stale()
+    assert settle(dialog, "_write_task")            # forgetting rewrites the file, off the GUI thread
+    assert sorted(known.entries) == ["fresh"]
+    dialog.deleteLater()
+
+
+@pytest.mark.parametrize("content", [b"\xff\xfe\x00\x01", b"[" * 100_000], ids=["not-utf8", "too-deep"])
+def test_a_known_hosts_file_that_cannot_be_read_is_reported(qapp, monkeypatch, tmp_path, content):
+    from je_auto_control.gui.remote_desktop import webrtc_known_hosts as module
+    path = tmp_path / "known.json"
+    path.write_bytes(content)
+    monkeypatch.setattr(module.QFileDialog, "getOpenFileName", lambda *_args: (str(path), ""))
+    dialog = module.KnownHostsDialog(_KnownHosts({}))
+    dialog._on_import()
+    assert settle(dialog, "_read_task")             # the file is read off the GUI thread
+    assert len(qapp.warnings) == 1
+    dialog.deleteLater()
+
+
+def test_remote_file_names_cannot_be_edited_under_pull_and_delete():
+    from PySide6.QtWidgets import QAbstractItemView
+    from je_auto_control.gui.remote_desktop.webrtc_dialogs import RemoteFilesTable
+    table = RemoteFilesTable()
+    assert table.editTriggers() == QAbstractItemView.EditTrigger.NoEditTriggers
+    table.deleteLater()
+
+
+_MARKUP = '<img src="file://host/share/x.png"><b>click here</b>'
+
+
+@pytest.mark.parametrize("panel_class, slot", [
+    (viewer_panel._ViewerPanel, "_on_error_main"), (connection_screen.QuickConnectScreen, "_on_error")])
+def test_an_error_the_remote_side_worded_is_shown_not_rendered(qapp, panel_class, slot):
+    panel = panel_class()
+    getattr(panel, slot)(_MARKUP)
+    assert len(qapp.warnings) == 1 and "<img" not in qapp.warnings[0]
+    panel.dispose()
+    panel.deleteLater()

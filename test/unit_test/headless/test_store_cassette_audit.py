@@ -99,3 +99,25 @@ def test_unknown_match_fields_are_refused_and_headers_are_compared():
                         match_on=("method", "url", "headers"))
     assert cassette.replay({"method": "GET", "url": "u", "headers": {"x-tenant": "A"}},
                            match_on=("method", "url", "headers"))["status"] == 200
+
+
+def test_the_recorded_response_url_is_masked_like_the_request(tmp_path):
+    cassette = Cassette()
+    url = f"https://api.example/v1?api_key={SECRET}&page=2"
+    cassette.record({"method": "GET", "url": url}, {"status": 200, "url": url, "text": "ok"})
+    path = cassette.save(str(tmp_path / "tape.json"))
+    with open(path, encoding="utf-8") as handle:
+        assert SECRET not in handle.read()
+    assert cassette.replay({"method": "GET", "url": url})["status"] == 200
+
+
+@pytest.mark.parametrize("recorded, live", [
+    ("https://api.example/q?name=a%20b", "https://api.example/q?name=a%20b"),
+    ("https://api.example/q?token=" + SECRET, "https://api.example/q?token=" + SECRET),
+])
+def test_a_cassette_not_written_by_this_version_still_replays(recorded, live):
+    """Only the live side was normalised, so these never matched themselves."""
+    cassette = Cassette([{"request": {"method": "get", "url": recorded, "body": '{"b":1,"a":2}'},
+                          "response": {"status": 200}}])
+    call = {"method": "GET", "url": live, "body": b'{"b":1,"a":2}'}
+    assert cassette.replay(call, match_on=("method", "url", "body")) == {"status": 200}

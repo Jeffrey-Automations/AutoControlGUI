@@ -16,6 +16,7 @@ from ctypes import wintypes
 from typing import Optional
 
 from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.windows.core.utils.win32_vk import WIN32_EXTENDED_VIRTUAL_KEYS
 
 
 class InterceptionUnavailable(AutoControlException, RuntimeError):
@@ -199,6 +200,9 @@ _user32.MapVirtualKeyW.restype = wintypes.UINT
 _user32.MapVirtualKeyW.argtypes = [wintypes.UINT, wintypes.UINT]
 
 _MAPVK_VK_TO_VSC_EX = 4   # returns the extended-scancode-prefixed value
+#: Set-1 keys with the 0xE0 prefix. NumLock is not one at this level: it is the
+#: plain 0x45, and Windows adds the extended bit to it afterwards.
+_E0_KEYS = WIN32_EXTENDED_VIRTUAL_KEYS - {0x90}
 
 
 def vk_to_scancode(vk_code: int) -> tuple[int, bool]:
@@ -206,12 +210,14 @@ def vk_to_scancode(vk_code: int) -> tuple[int, bool]:
 
     The Interception driver wants Set-1 scancodes; ``MapVirtualKeyW``
     with ``MAPVK_VK_TO_VSC_EX`` returns the high byte set to ``0xE0``
-    when the key needs the extended prefix (arrow keys, numeric pad
-    enter, etc.). We split that into ``(low_byte, extended_bool)``
+    for some keys that need the extended prefix (right Ctrl, keypad
+    divide) but not for the arrow and navigation keys (measured on
+    Windows 11: ``VK_LEFT`` gives ``0x4B``, the keypad's 4), so those
+    are named in ``_E0_KEYS``. Returned as ``(low_byte, extended_bool)``
     so the caller can choose ``KEY_E0``.
     """
     raw = int(_user32.MapVirtualKeyW(int(vk_code), _MAPVK_VK_TO_VSC_EX))
-    is_extended = (raw & 0xE000) == 0xE000
+    is_extended = (raw & 0xE000) == 0xE000 or int(vk_code) in _E0_KEYS
     return raw & 0x00FF, is_extended
 
 

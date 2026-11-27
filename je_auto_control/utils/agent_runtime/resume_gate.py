@@ -35,7 +35,8 @@ def validate_resume_conditions(conditions: Sequence[Mapping[str, Any]]) -> None:
     if len(conditions) > 32:
         raise AgentTaskError("a task may declare at most 32 resume conditions")
     for clause in conditions:
-        if clause.get("kind") not in RESUME_KINDS:
+        kind = clause.get("kind")
+        if not isinstance(kind, str) or kind not in RESUME_KINDS:
             raise AgentTaskError("resume conditions must be screen, browser or file checks on fresh state")
     validate_criteria(conditions)
 
@@ -44,6 +45,9 @@ def validate_task_conditions(spec: AgentTaskSpec) -> None:
     """Validate completion criteria and resume conditions before a task is admitted."""
     validate_criteria(spec.success_criteria)
     validate_resume_conditions(spec.resume_conditions)
+    for action in spec.actions:
+        if not all(isinstance(action.get(name), (str, type(None))) for name in ("capture", "expect_capture")):
+            raise AgentTaskError("workflow captures must be named by text")
 
 
 class ResumeGate:

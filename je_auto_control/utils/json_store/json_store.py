@@ -7,6 +7,8 @@ load/flush logic. Pure standard library; imports no ``PySide6``.
 import copy
 import json
 import os
+import secrets
+import sys
 import tempfile
 import threading
 import time
@@ -14,9 +16,17 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, Optional, TypeVar
 
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
 
 _Result = TypeVar("_Result")
+
+
+class JsonStoreDamagedError(AutoControlException, ValueError):
+    """A store file is not a UTF-8 JSON object; it was moved aside, not overwritten.
+
+    ``ValueError`` stays a base: a strict store raised that for the same file.
+    """
 
 
 def atomic_write_text(path: str | Path, text: str,
@@ -109,23 +119,51 @@ def read_json_dict(path: Optional[str | Path]) -> Dict[str, Any]:
     """Return the JSON object at ``path``, or ``{}`` if missing/unreadable."""
     if path is None:
         return {}
-    file_path = Path(path)
-    if not file_path.is_file():
-        return {}
     try:
-        # utf-8-sig: a file saved by an editor with a BOM read as unreadable,
-        # so the next update() wrote back only its own key.
-        data = json.loads(file_path.read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):
+        return _read_dict(Path(path))
+    except OSError:
+        return {}
+
+
+def _read_text(path: Path) -> Optional[str]:
+    """The file's text, ``None`` when there is no such file.
+
+    Opening a file another process is replacing is a ``PermissionError`` on
+    Windows, so it is tried again as :func:`_replace` does: a reader that gave
+    up at once saw an empty store.
+    """
+    deadline = time.monotonic() + _REPLACE_WAIT_S
+    while True:
+        try:
+            # utf-8-sig: a file saved by an editor with a BOM read as unreadable,
+            # so the next update() wrote back only its own key.
+            return path.read_text(encoding="utf-8-sig")
+        except (FileNotFoundError, NotADirectoryError, IsADirectoryError):
+            return None
+        except PermissionError:
+            if path.is_dir():
+                return None
+            if time.monotonic() > deadline:
+                raise
+            time.sleep(0.01)
+
+
+def _read_dict(path: Path) -> Dict[str, Any]:
+    """The JSON object at ``path``; ``{}`` when missing or damaged, ``OSError`` when it cannot be read."""
+    try:
+        text = _read_text(path)
+        data = json.loads(text) if text is not None else {}
+    except ValueError:
         return {}
     return data if isinstance(data, dict) else {}
 
 
 def _read_json_object(path: Path) -> Dict[str, Any]:
     """The JSON object at ``path`` (``{}`` if missing); anything else raises ``ValueError``."""
-    if not path.is_file():
+    text = _read_text(path)
+    if text is None:
         return {}
-    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    data = json.loads(text)
     if not isinstance(data, dict):
         raise ValueError(f"{path} does not hold a JSON object")
     return data
@@ -147,30 +185,123 @@ _LOCK_STALE_S = 30.0
 def _file_lock(path: Path) -> Iterator[None]:
     """Hold ``<path>.lock`` for the duration; several processes may contend.
 
-    Created with ``O_CREAT | O_EXCL``, which is atomic on every platform. A
-    lock older than ``_LOCK_STALE_S`` was left by a process that died holding
-    it and is taken over; waiting longer than ``_LOCK_WAIT_S`` raises
-    ``TimeoutError``.
+    Created with ``O_CREAT | O_EXCL``, which is atomic on every platform, and
+    holding a random token that names its owner. A lock older than
+    ``_LOCK_STALE_S`` was left by a process that died holding it and is taken
+    over; waiting longer than ``_LOCK_WAIT_S`` raises ``TimeoutError``.
+
+    A lock file is only ever removed under :func:`_lock_guard`, after reading
+    it again: two waiters that both judged one lock stale used to both delete
+    "it" -- the second deleting the fresh lock the first had just created --
+    and a holder that overran the stale limit deleted its successor's lock on
+    release. Now a takeover removes only a lock that is still stale and still
+    holds the token it judged, and a release only a lock holding its own.
     """
     lock = path.with_name(path.name + ".lock")
     lock.parent.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + _LOCK_WAIT_S
-    while True:
-        try:
-            os.close(os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
-            break
-        # Windows reports a lock file that is being deleted as PermissionError.
-        except (FileExistsError, PermissionError):
-            if _lock_is_stale(lock):
-                lock.unlink(missing_ok=True)
+    token = secrets.token_hex(16)
+    while not _create_lock(lock, token):
+        if _lock_is_stale(lock):
+            judged = _lock_owner(lock)
+            if judged is not None:
+                _remove_lock(lock, judged, deadline, only_if_stale=True)
                 continue
-            if time.monotonic() > deadline:
-                raise TimeoutError(f"{lock} is held by another process") from None
-            time.sleep(0.01)
+        if time.monotonic() > deadline:
+            raise TimeoutError(f"{lock} is held by another process")
+        time.sleep(0.01)
     try:
         yield
     finally:
+        try:
+            _remove_lock(lock, token, time.monotonic() + _LOCK_WAIT_S)
+        except TimeoutError:
+            autocontrol_logger.warning("%s not released: its guard stayed busy; it will go stale", lock)
+
+
+def _create_lock(lock: Path, token: str) -> bool:
+    """Create ``lock`` holding ``token``; ``False`` when it already exists."""
+    try:
+        handle_fd = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    # Windows reports a lock file that is being deleted as PermissionError.
+    except (FileExistsError, PermissionError):
+        return False
+    try:
+        os.write(handle_fd, token.encode("ascii"))
+    except OSError:
+        os.close(handle_fd)
+        lock.unlink(missing_ok=True)  # it holds no token: nobody could release it
+        raise
+    os.close(handle_fd)
+    return True
+
+
+def _lock_owner(lock: Path) -> Optional[str]:
+    """The token in ``lock`` (``""`` when it holds none); ``None`` when it cannot be read."""
+    try:
+        return lock.read_text(encoding="ascii", errors="replace")
+    except OSError:
+        return None  # released (or being released) meanwhile; try again
+
+
+def _remove_lock(lock: Path, owner: str, deadline: float, *, only_if_stale: bool = False) -> None:
+    """Remove ``lock`` if it still holds ``owner`` (and, if asked, is still stale)."""
+    with _lock_guard(lock, deadline):
+        if _lock_owner(lock) != owner:
+            return
+        if only_if_stale and not _lock_is_stale(lock):
+            return
         lock.unlink(missing_ok=True)
+
+
+@contextmanager
+def _lock_guard(lock: Path, deadline: float) -> Iterator[None]:
+    """Serialise every removal of ``lock`` across processes.
+
+    An OS lock on the sidecar ``<lock>.guard``, which is never deleted: the
+    operating system drops it when its holder dies, so unlike the lock file
+    it cannot go stale. It is held only for one read and one unlink.
+    """
+    handle_fd = os.open(lock.with_name(lock.name + ".guard"), os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        while not _try_os_lock(handle_fd):
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"{lock}.guard is held by another process")
+            time.sleep(0.005)
+        try:
+            yield
+        finally:
+            _os_unlock(handle_fd)
+    finally:
+        os.close(handle_fd)
+
+
+if sys.platform == "win32":
+    import msvcrt
+
+    def _try_os_lock(handle_fd: int) -> bool:
+        os.lseek(handle_fd, 0, os.SEEK_SET)
+        try:
+            msvcrt.locking(handle_fd, msvcrt.LK_NBLCK, 1)
+        except OSError:  # held by another handle
+            return False
+        return True
+
+    def _os_unlock(handle_fd: int) -> None:
+        os.lseek(handle_fd, 0, os.SEEK_SET)
+        msvcrt.locking(handle_fd, msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+
+    def _try_os_lock(handle_fd: int) -> bool:
+        try:
+            fcntl.flock(handle_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:  # held by another open file description
+            return False
+        return True
+
+    def _os_unlock(handle_fd: int) -> None:
+        fcntl.flock(handle_fd, fcntl.LOCK_UN)
 
 
 def _lock_is_stale(lock: Path) -> bool:
@@ -192,18 +323,35 @@ class SharedJsonDict:
 
     By default an unreadable file reads as empty. With ``strict`` it raises
     ``ValueError`` instead -- for stores of user-authored content (skills,
-    locators) where writing back an empty dict would erase the file.
+    locators) where writing back an empty dict would erase the file. With
+    ``quarantine_label`` a file that is not a UTF-8 JSON object is also moved
+    aside as ``<name>.corrupt-<time>`` (logged under that label) and every
+    read or update that finds it raises :class:`JsonStoreDamagedError`; the
+    next one starts from an empty file. An :meth:`update` that cannot read the
+    file at all (``OSError``: locked, no permission) raises either way, and
+    never moves it: that says nothing about what it holds.
     """
 
     def __init__(self, path: Optional[str | Path], *,
-                 strict: bool = False) -> None:
+                 strict: bool = False,
+                 quarantine_label: Optional[str] = None) -> None:
         self._path = Path(path) if path is not None else None
         self._memory: Dict[str, Any] = {}
         self._memory_lock = threading.Lock()
         self._strict = strict
+        self._quarantine_label = quarantine_label
 
     def _load(self, path: Path) -> Dict[str, Any]:
-        return _read_json_object(path) if self._strict else read_json_dict(path)
+        if self._quarantine_label is None:
+            return _read_json_object(path) if self._strict else read_json_dict(path)
+        try:
+            return _read_json_object(path)
+        except ValueError as error:  # JSON syntax, not UTF-8, not an object
+            moved = quarantine_file(path, self._quarantine_label, repr(error))
+            where = f"moved to {moved}" if moved is not None else "left in place (could not be moved)"
+            raise JsonStoreDamagedError(
+                f"{self._quarantine_label} {path} is unreadable ({error}); {where} "
+                "and nothing was written") from error
 
     def read(self) -> Dict[str, Any]:
         """Return the current contents, always a copy the caller may keep.
@@ -217,6 +365,12 @@ class SharedJsonDict:
                 return copy.deepcopy(self._memory)
         return self._load(self._path)
 
+    def _load_for_update(self, path: Path) -> Dict[str, Any]:
+        """What an update starts from; a file that cannot be read raises instead of reading as empty."""
+        if self._quarantine_label is not None:
+            return self._load(path)     # moves a damaged file aside and raises
+        return _read_json_object(path) if self._strict else _read_dict(path)
+
     def update(self, mutate: Callable[[Dict[str, Any]], _Result]) -> _Result:
         """Apply ``mutate`` to the current contents and persist them."""
         if self._path is None:
@@ -225,7 +379,7 @@ class SharedJsonDict:
             with self._memory_lock:
                 return mutate(self._memory)
         with _file_lock(self._path):
-            data = self._load(self._path)
+            data = self._load_for_update(self._path)
             result = mutate(data)
             write_json_dict(self._path, data)
         return result

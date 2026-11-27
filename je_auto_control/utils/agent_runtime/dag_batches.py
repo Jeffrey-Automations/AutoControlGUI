@@ -22,11 +22,13 @@ from je_auto_control.utils.agent_runtime.dag_continuation import DagContinuation
 from je_auto_control.utils.agent_runtime.dag_jobs import delivery_status
 from je_auto_control.utils.agent_runtime.local_evidence import runtime_evidence_scope
 from je_auto_control.utils.agent_runtime.dag_local import DagLocalTasks
+from je_auto_control.utils.agent_runtime.runtime_stop import mark_fencing, refuse_while_fencing, unmark_fencing
 from je_auto_control.utils.dag.batch_contract import batch_definition, bind_definition
 from je_auto_control.utils.dag.inspection import inspect_definition
 from je_auto_control.utils.dag.managed_tasks import (
     task_host_binding, registered_transfer_private_files, registered_transfer_binding, registered_host_transfer,
 )
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.rbac.authorization import AuthorizationContext, current_authorization
 from je_auto_control.utils.rbac.deferred import DeferredAuthorization
 
@@ -38,6 +40,10 @@ _FIELDS = {"register": {"definition"}, "get": {"batch_id"}, "list": set(),
            "inspect": {"batch_id"}, "run_background": {"batch_id", "definition", "max_parallel"},
            "local_task": {"batch_id", "attempt", "node_id", "operation", "body"}}
 _FIELDS.update(CONTINUATION_FIELDS)
+_ERRORS = (AutoControlException, OSError, RuntimeError, ValueError, TypeError, LookupError)
+# Operations that move a batch forward; a stop whose pause is still pending refuses them.
+_FENCED = frozenset({"begin", "claim", "run_background", "validate_node", "review_continuation",
+                     "approve_continuation", "start_continuation"})
 
 
 def _request(operation: Any, value: Any) -> dict[str, Any]:
@@ -152,6 +158,8 @@ class DagBatches:
                 raise AgentTaskError("batch_id must be a string")
             # pylint: disable-next=protected-access  # reason: serialize this runtime's batch lifecycle transitions
             with self.runtime._lock("dag:" + identifier):
+                if operation in _FENCED or (operation == "local_task" and request["operation"] == "submit"):
+                    refuse_while_fencing(self.runtime, identifier)
                 batch = self._row(identifier)
                 with runtime_evidence_scope(self.runtime):
                     if operation == "local_task":
@@ -196,15 +204,40 @@ class DagBatches:
         jobs.enqueue(started, batch["owner"], actor)
         return self._describe(self._row(batch["id"]))
 
-    def stop_all(self) -> None:
-        """Fence visible active/approved coordinators before stop-all snapshots destination tasks."""
+    def stop_all(self, deferred: list[str] | None = None) -> list[dict[str, str]]:
+        """Fence visible active/approved coordinators before stop-all snapshots destination tasks.
+
+        A batch that cannot be fenced is returned, not raised: it must not keep the tasks from stopping.
+        With ``deferred``, a batch whose lifecycle lock is busy is not awaited: it stays marked as
+        fencing, so its coordinators can make no further progress, and its id is appended for the
+        caller to pause once the lock is free (:mod:`.runtime_stop`).
+        """
+        errors: list[dict[str, str]] = []
         with self.runtime.store.connection() as connection:
             rows = connection.execute("SELECT id,owner FROM agent_dag_batches b "
                 "WHERE state IN ('running','approved') OR EXISTS (SELECT 1 FROM agent_dag_approvals a "
                 "WHERE a.batch_id=b.id AND a.state IN ('provisional','starting'))").fetchall()
         for row in rows:
             if owns_task(json.loads(row["owner"]), current_authorization()):
-                self.control("pause_batch", {"batch_id": row["id"]})
+                self._fence(row["id"], errors, deferred)
+        return errors
+
+    def _fence(self, identifier: str, errors: list[dict[str, str]], deferred: list[str] | None) -> None:
+        # pylint: disable-next=protected-access  # reason: probe the same lock every lifecycle transition takes
+        lock = self.runtime._lock("dag:" + identifier)
+        if deferred is not None:
+            mark_fencing(self.runtime, identifier)  # before the probe: whoever takes the lock next is refused
+            if not lock.acquire(blocking=False):
+                deferred.append(identifier)
+                return
+        try:
+            self.control("pause_batch", {"batch_id": identifier})
+        except _ERRORS as error:
+            errors.append({"batch_id": identifier, "error": type(error).__name__})
+        finally:
+            if deferred is not None:
+                unmark_fencing(self.runtime, identifier)
+                lock.release()
 
     def _row(self, identifier: str, *, connection: Any = None) -> dict[str, Any]:
         # pylint: disable-next=protected-access  # reason: closed runtimes cannot accept new coordinator work

@@ -90,13 +90,17 @@ def cmd_run(argv: List[str], context: Dict[str, Any]) -> CommandResult:
         )
     root = _require_script_root(context)
     script_path = _resolve_script(root, argv[0])
-    from je_auto_control.utils.executor.action_executor import execute_files
+    from je_auto_control.utils.executor.action_executor import execute_files, recorded_failures
     from je_auto_control.utils.script_vars.execution import execution_scope
     run_id = None if current_stop_token() is not None else chatops_run_id(script_path.name)
     with stoppable_run(run_id) as token, execution_scope():  # one /run, one variable scope
+        before = recorded_failures()
         result = execute_files([str(script_path)])
+        failed = recorded_failures() - before
+    count = sum(len(record) for record in result)
     return CommandResult(
-        text=f"ran {script_path.name}: {len(result)} action(s) executed",
+        text=f"ran {script_path.name}: {count} action(s) executed" + (f", {failed} failed" if failed else ""),
+        succeeded=not failed,
         metadata={"script": str(script_path), "results": _safe(result),
                   "run_id": token.run_id},
     )

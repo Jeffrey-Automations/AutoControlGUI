@@ -321,7 +321,13 @@ iOS 裝置不會用到任何 ``adb`` 的東西。要補上 iOS 缺少的功能�
 
     register_mobile_extension("ios", lambda session: MyTideviceAdapter(session))
 
-AutoControl 本身沒有附帶這樣的 adapter。
+針對 iOS **模擬器**，AutoControl 附帶一個：``use_ios_simulator(udid)``\ （亦即
+``AC_ios_use_simulator`` / ``ac_ios_use_simulator`` 與 Mobile 分頁、Script Builder 的 iOS 群組）會註冊
+``SimctlExtension``\ ，以 Xcode 的 ``xcrun simctl`` 提供安裝（建好的 ``.app`` bundle）、檔案
+（``"<bundle id>:<路徑>"``\ ，位於該 App 的資料容器內，解析後限制範圍，``..`` 或連結都出不去）、
+剪貼簿（讀取不必像 WDA 那樣切換 App）與錄影（``simctl io recordVideo``\ ，以 ``SIGINT`` 收尾）。
+空的 UDID 會移除註冊，``list_ios_simulators()`` / ``AC_ios_list_simulators`` 列出已開機的模擬器。
+``simctl`` 只能操作模擬器，實體裝置仍需自行註冊 adapter。
 
 指令、MCP 工具、Script Builder、GUI
 ===================================

@@ -1,0 +1,52 @@
+name: Windows UI Automation over real COM
+
+# The headless suite exercises the UIA backend against a fake comtypes. This job installs the
+# accessibility extra (real comtypes) on a Windows runner and runs the read-only real-COM tests:
+# element reads on the caller's thread and on the accessibility walker, a focus wait that ends by
+# its timeout, and a stop that wakes a focus wait. Nothing is clicked, typed or focused. If the
+# runner's session has no usable UI Automation the tests skip and say why.
+
+on:
+  push:
+    branches: ["dev", "main"]
+    paths:
+      - "je_auto_control/utils/accessibility/**"
+      - "je_auto_control/utils/ax_events/**"
+      - "je_auto_control/utils/system_volume/**"
+      - "test/unit_test/headless/test_accessibility_windows_real_com.py"
+      - ".github/workflows/windows-uia.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "je_auto_control/utils/accessibility/**"
+      - "je_auto_control/utils/ax_events/**"
+      - "je_auto_control/utils/system_volume/**"
+      - "test/unit_test/headless/test_accessibility_windows_real_com.py"
+      - ".github/workflows/windows-uia.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-uia-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-com:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install the package with the accessibility extra
+        run: python -m pip install -e ".[accessibility]" pytest==9.1.1 pytest-timeout==2.4.0  # NOSONAR githubactions:S8544  # reason: installs the checked-out project itself; test tools pinned as in dev_requirements.txt
+
+      - name: Run the real-COM UI Automation tests
+        run: python -m pytest test/unit_test/headless/test_accessibility_windows_real_com.py -v -rs --timeout 120

@@ -672,12 +672,12 @@ safe source strings/references and masks resolved input strings/dynamic keys.
 | `je_auto_control/gui/` | Optional PySide6 GUI (`[gui]` extra): `main_window.py` (menus, navigation dock, theme), `main_widget.py` (the configured compatibility subclass), `workspace.py` (injectable WorkspaceShell, identity-preserving scroll containers and vector close buttons), `workspace_details.py` (immutable execution snapshots and a passive details pane), `workspace_settings.py` (validated per-user QSettings, injectable in tests), the Qt-free `TabRegistry` in `tab_registry.py` (open caches panels; close detaches and schedules owned panels for destruction, retaining metadata and embedder-supplied widgets), `navigation.py`, `theme.py`, `script_builder/`, `remote_desktop/`, `language_wrapper/`. |
 | `autocontrol-lsp/` | Separate distribution: language server for `AC_*` action JSON, plus a `vscode/` client. |
 | `native/owner_service/` | Optional Linux owner service in C, not shipped in the wheel. A root guardian (epoch journal, cgroup v2 delegation, client verification, crash recovery) starts a service that authenticates every packet by pidfd, issues leases and runs each helper in its own protected cgroup tree. `build.sh` and an administrator-reviewed manifest build it; `tests/` holds the unprivileged and root acceptance. The Python side is `helper_owner_linux.py`, selected by `owned_channel_factory.py` through a root-owned binding file. |
-| `native/android_helper/` | Android device-side helper in Kotlin, not shipped in the wheel (stage 2 of 4): `core/` holds `FenceLedger` (the epoch fence and per-command settlement `AndroidCommandLease` requires) and `ProtocolHandler`, tested on the JVM; `app/` is the instrumentation (shell/root-only socket, fence-aware injector), built into an APK by `.github/workflows/android-helper.yml`. Not wired into the runtime yet; protocol in its `README.md`. |
+| `native/android_helper/` | Android device-side helper in Kotlin, not shipped in the wheel (stage 2 of 4): `core/` holds `FenceLedger` (the epoch fence and per-command settlement `AndroidCommandLease` requires, fenced by a never-repeating generation), `ProtocolHandler`, `PointerGesture` (a swipe fails on its first refused event and always releases the pointer) and `ClientLoop` (one client's I/O error ends only that client), tested on the JVM; `app/` is the instrumentation (shell/root-only socket, fence-aware injector), built into an APK by `.github/workflows/android-helper.yml`. Not wired into the runtime yet; protocol in its `README.md`. |
 | `test/` | `unit_test/headless/` (CI gate), `unit_test/flow_control/`, `integrated_test/`, `gui_test/`, `manual_test/`, `verify/`. |
 | `docs/` | Sphinx docs, `API_LIFECYCLE.md`, `CAPABILITY_MATRIX.md`. |
 | `examples/`, `benchmarks/` | Runnable example scripts; latency smoke benchmark. |
 | `docker/`, `k8s/helm/`, `ci_templates/` | Container images and backend verification harnesses, Helm chart, GitLab CI template. |
-| `browser-extension/`, `AutoControl/`, `exe/`, `autocontrol_driver/` | Manifest v3 companion extension, project-template sample, packaged GUI launcher, driver build script. |
+| `browser-extension/`, `AutoControl/`, `exe/`, `autocontrol_driver/` | Manifest v3 companion extension, project-template sample, packaged GUI launcher, socket driver (built with Nuitka by the `Driver` workflow, never committed as a binary). |
 | `scripts/` | Release tooling, not shipped: `dev_release.py` numbers and gates the dev-channel package, `stable_release.py` picks the version a push to `main` releases (§3). |
 
 ## 3. Entry points and public interfaces
@@ -688,9 +688,9 @@ safe source strings/references and masks resolved input strings/dynamic keys.
 | Stable API | `je_auto_control.api` → `api/core.py` | `CancellationToken`, `TaskProgress`, `cancellation_scope`, `BackendContext`, `CapabilitySnapshot`, `CapabilityStatus`, `probe_capabilities`, `FailureBundleOptions`, `create_failure_bundle`, `execute_action`, `execute_action_with_vars`, `failure_bundle_on_error`, `generate_code`, `run_diagnostics`. |
 | Main CLI | `je_auto_control` → `je_auto_control.cli:main` | Subcommands `run` (`--var`, `--dry-run`), `validate` / `lint`, `fmt`, `list-commands`, `record`, `codegen`, `failure-bundle`, `list-jobs`, `start-server`, `start-rest`, `version`. |
 | Legacy CLI | `python -m je_auto_control` (`__main__.py`) | Private `_main()` owns dispatch and error conversion. `-e/--execute_file FILE`, `-d/--execute_dir DIR`, `-c/--create_project PATH`, `--execute_str JSON`. `--execute_str` also accepts a double-encoded JSON string. Any error exits 1 with a log line rather than a traceback, and a `-d` path that is not a directory is an error. |
-| MCP server | `je_auto_control_mcp` → `utils/mcp_server/__main__.py:main` | stdio; `start_mcp_stdio_server()`; HTTP transport via the `AC_start_mcp_http_server` command. |
+| MCP server | `je_auto_control_mcp` → `utils/mcp_server/__main__.py:main` | stdio; `start_mcp_stdio_server()`; HTTP transport via the `AC_start_mcp_http_server` command. Over HTTP a `resources/subscribe` belongs to its session and its updates go down that session's GET stream. |
 | REST API | `je_auto_control start-rest`, `python -m je_auto_control.utils.rest_api`, `start_rest_api_server()` | Default `127.0.0.1:9939`, bearer token + rate limit. |
-| TCP server | `je_auto_control start-server`, `start_autocontrol_socket_server()` | `utils/socket_server/auto_control_socket_server.py`, default `127.0.0.1:9938`, JSON action lists. |
+| TCP server | `je_auto_control start-server [--token T] [--token-file PATH] [--no-auth]`, `start_autocontrol_socket_server()`; client `send_socket_command()` | `utils/socket_server/auto_control_socket_server.py`, default `127.0.0.1:9938`, JSON action lists. Authenticated by default (`utils/socket_server/socket_auth.py`): each connection opens with `AUTH <token>` (answered `AUTH_OK`); the server token comes from the argument, `JE_AUTOCONTROL_SOCKET_TOKEN` or is generated, and is written owner-only to `~/.je_auto_control/socket_server_<port>.token`. Under RBAC only user tokens authenticate and each command runs under that user's role. `--no-auth` restores the unauthenticated protocol. |
 | pytest plugin | `pytest11` entry point `je_auto_control_pytest` (top-level module, imports only pytest; `je_auto_control.utils.pytest_plugin` re-exports it) | Loaded automatically once the package is installed, without importing the package (see coverage rule in §7). |
 | LSP | `autocontrol-lsp` → `autocontrol_lsp.server.server:run`; `python -m autocontrol_lsp.server` | Command list is read from the live executor. |
 | GUI | `start_autocontrol_gui()` in `gui/__init__.py`; `exe/start_autocontrol_gui.py` | Needs `pip install je_auto_control[gui]`; PySide6 is imported only under `gui/`. |
@@ -724,7 +724,10 @@ action.json → utils/json/json_file.read_action_json
 ```
 
 Errors of the `AutoControlException` family are recorded, not raised (unless `raise_on_error=True`);
-`AutoControlAssertionException` always propagates. Every path that runs an action file from disk (`execute_files`,
+an error from outside it (`cv2.error`, `sqlite3.Error`, a plugin's own class) is wrapped at the innermost action
+as `AutoControlForeignException` (`utils/executor/containment.py`, original as `__cause__`) and recorded the same way.
+`AutoControlAssertionException` and a plugin's `AssertionError` always propagate, as do loop signals, stops,
+cancellation and `KeyboardInterrupt` / `SystemExit`. Every path that runs an action file from disk (`execute_files`,
 the CLI, the scheduler, triggers, hotkeys, webhooks, the MCP run tool, the GUI) loads it with
 `read_executable_action_json`, which reads it once and verifies those bytes against the `.sig` sidecar when
 `JE_AUTOCONTROL_REQUIRE_SIGNED_ACTIONS` is set (`utils/action_signing/`).
@@ -967,9 +970,12 @@ source-owner recovery evidence shares existing ACLs; cross-host evidence handoff
   propagating. → CLAUDE.md › Coding Standards › Project-specific rules
 - Validate at boundaries and reject unknown command names; servers bind `127.0.0.1` unless explicitly opted in. → same
 - `AC_add_package_to_executor` / `AC_add_package_to_callback_executor` pass the package gate in
-  `utils/package_manager/package_manager_class.py` before importing: `executor.allow_packages(...)` and
-  `executor.set_allow_arbitrary_packages(...)` are Python-only switches, never `AC_*` commands, so an action list
-  cannot open its own gate. Unconfigured, any package loads with a `DeprecationWarning` (workspace X-12).
+  `utils/package_manager/package_manager_class.py` before importing. Unconfigured, the gate allows no package and
+  refuses every load before anything is imported (workspace X-12). To allow one: list it in
+  `JE_AUTOCONTROL_ALLOWED_PACKAGES` (comma-separated, submodules included, read once when the process starts, honoured
+  by every entry point), pass `--allow-package NAME` to `je_auto_control run`, or call `executor.allow_packages(...)`
+  from Python; `executor.set_allow_arbitrary_packages(True)` allows every package. Those two calls are Python-only
+  switches, never `AC_*` commands, so an action list cannot open its own gate.
 - No `print()` or runtime `assert` in library code; lazy imports for optional and platform deps; release platform
   resources in `finally` / `with`; guard shared state with locks or queues; pin dependency versions. → same
 - Size limits (cyclomatic ≤ 10, cognitive ≤ 15, function ≤ 75 lines, file ≤ 750 lines, line ≤ 120) are a review
@@ -1069,7 +1075,7 @@ target_continuity.py rejects retained finite skill prefixes without their origin
 
 DesktopTarget now checks its live pinned scope before trusting a retained finite prefix. NativeDesktopTarget applies the same pure target_continuity validator to host-profiled desktop/browser targets and the built-in local desktop, before starting another channel; file profiles retain persistent evidence recovery. A fake semantic application proves that edited fields cannot be submitted after scope cleanup, while an uninterrupted flow still succeeds.
 
-Browser environment contract: host-only settings.helper_python selects a local absolute interpreter and preserves virtualenv executable symlinks; task options cannot override it. target_factory supplies fixed -I/-u/-m worker arguments for that interpreter. helper_environment.py probes dependencies in a separately owned, concurrency-bounded helper, without input-resource acquisition or reuse of a configured channel. NativeWorker accepts probe_browser only before configuration. browser_environment.py reuses the SDK readback/transfer contracts and delegates runtime imports to je_web_runner.webdriver.playwright_wrapper._require_playwright(); the returned factory is never started. This existing private SDK hook is now a cross-project dependency contract. Target management exposes probe on shared surfaces with host authority, keeps long probes outside the runtime mutex and publishes only bounded timestamped metadata. Python dependency success never establishes native/browser execution readiness or enables targets.
+Browser environment contract: host-only settings.helper_python selects a local absolute interpreter and preserves virtualenv executable symlinks; task options cannot override it. target_factory supplies fixed -I/-u/-m worker arguments for that interpreter. helper_environment.py probes dependencies in a separately owned, concurrency-bounded helper, without input-resource acquisition or reuse of a configured channel. NativeWorker accepts probe_browser only before configuration. browser_environment.py reuses the SDK readback/transfer contracts and delegates runtime imports to je_web_runner.webdriver.playwright_wrapper._require_playwright(); the returned factory is never started. This existing private SDK hook is now a cross-project dependency contract. Target management exposes probe on shared surfaces with host authority, keeps long probes outside the runtime mutex and publishes only bounded timestamped metadata. Python dependency success never establishes native/browser execution readiness or enables targets. Optional host-only settings.semantic_fields declare DOM reads; dom_observation.py turns them into a context-bound `dom` source of the shared observation report, and BrowserTarget publishes a projection without capture IDs or times so pre-action fingerprints stay comparable. It relies on the SDK's visible() reporting a missing element without faulting the session and on its fixed read-back refusal reasons.
 
 Remote-device prerequisite: remote_journal.py binds a physical platform/device identity (not an app,
 profile or endpoint) to durable controller/sequence begin/end events. OwnedChannel ACK follows fsync.
@@ -1570,6 +1576,13 @@ unfinished or failed cleanup stays unconfirmed. Unknown filesystem objects remai
 Pathname permissions do not isolate hostile processes sharing a UID. Bounded userspace waits
 do not promise hard realtime kernel syscall completion.
 
+macOS uses DarwinListener and DarwinChannel (presence_channel_darwin) with the same lease owner:
+a length-prefixed Unix stream under the per-user temporary directory, the connector named by its
+audit token, pinned by a kqueue NOTE_EXIT watch and identified by the boot-unique p_uniqueid.
+There are no per-message credentials, so the connector is authenticated per connection and checked
+alive before each delivery. presence_endpoint_wire picks the Linux or macOS endpoint schema from
+the metadata's shape, so either platform's channel refuses the other's endpoint.
+
 Trusted helper launch and endpoint transfer, expected-helper policy, presence challenge and lease
 integration, and login, seat, lock and physical-activity sources remain pending. Non-Windows shared
 desktop tasks remain unavailable. This transport is not full Linux application or native input acceptance.
@@ -1593,7 +1606,8 @@ only one correlated startup; `uia_launch.py` binds its HWND to retained launch
 facts and `windows_window.py` supplies the single typed owner query. The binding
 borrows the launcher and image leases; it cannot grant UIA action authority.
 
-`scoped_uia.py` reads fixed host selectors beneath that binding, verifies bounded
+`scoped_uia.py` reads fixed host selectors beneath that binding (also from its child windows,
+which UIA leaves out of a hidden window's tree), verifies bounded
 ancestry around field reads and retains the first verified root runtime identity.
 `capture_metadata.py` shares capture validation with complete snapshots and
 `partial_observation.py`; report version 3 preserves successful fields beside
@@ -1647,12 +1661,12 @@ separate observed-service operation. NativeWorker shares input/authority/retirem
 guards across explicit semantic and service targets, preserving their separate
 bootstrap and evidence contracts. `service_native_target.py` pins helper evidence
 to the original bootstrap binding and uses the existing non-display owned channel.
-`service_scope.py` derives a same-user resource lock from printable ASCII service
-keys, independent of target/configuration/database names. Typed service errors
-cross IPC before event interpretation. The service profile carries its ASCII key
-so registration/reload can remain independent of deployment-file availability.
+`service_scope.py` derives a same-user resource lock from service keys, independent
+of target/configuration/database names: ASCII keys fold ASCII case, other keys fold
+with the NT upcase table so every SCM spelling of one service shares one lock. Typed
+service errors cross IPC before event interpretation. The service profile carries its
+key so registration/reload can remain independent of deployment-file availability.
 `service_deployment.py` validates bounded pinned config and the operation ceiling;
 `service_entrypoint.py` validates profile/task/deployment identity before the shared
 worker accepts scope. The config digest and task profile digest remain distinct.
-Native deployment, Unicode key canonicalization and cross-account coordination
-remain pending.
+Native deployment and cross-account coordination remain pending.

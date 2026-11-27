@@ -142,6 +142,15 @@ Resources
   - ``autocontrol://screen/live`` — base64 PNG 直播,
     ``resources/subscribe`` 後當畫面有變化會推送通知。
 
+Resource 訂閱
+  stdio 上 ``notifications/resources/updated`` 送給對端。HTTP 上
+  ``resources/subscribe`` 屬於送出它的 session：請帶上 ``initialize`` 回傳的
+  ``Mcp-Session-Id``，並開啟該 session 常駐的 ``GET`` 串流
+  （``Accept: text/event-stream``），更新就送到那裡。每個 session 各自持有訂閱；
+  session 沒有開著串流時到達的更新會被丟棄；結束 session（``DELETE``、閒置清除或
+  被擠出）會釋放它們。沒有 session 的請求沒有可送達的串流，會以 JSON-RPC 錯誤
+  ``-32600`` 拒絕。無狀態 2026-07-28 的用戶端改用 ``subscriptions/listen``。
+
 Prompts
   五個內建範本:``automate_ui_task``、``record_and_generalize``、
   ``compare_screenshots``、``find_widget``、``explain_action_file``。
@@ -303,6 +312,9 @@ Bearer token 也可從 ``JE_AUTOCONTROL_MCP_TOKEN`` 環境變數讀取。
 存放檔、角色與建立使用者的方式見維運層 REST API 章節的「角色」；兩個伺服器可以共用
 同一個檔案。未設定存放檔的有效工具 session 會使用 operator 身分；主機管理工具需要
 已驗證的管理員。stdio 傳輸沒有 bearer token，其有效工具 session 也受相同 operator 範圍約束。
+
+session 存下的東西也保留這個身分：它註冊的語音指令（``ac_voice_register``）或定義的 macro，之後由 GUI 或
+Python 觸發時仍受 operator 限制，因為每個步驟必須註冊者與觸發者都有權執行；之後的 session 也不能重新定義它的 macro。
 
 - 工具預設依 ``readOnlyHint`` 使用 ``read_data``，否則為 ``drive_input``，另有明確
   的 capability 覆寫。敏感讀取需要 ``drive_input`` （operator／admin）：剪貼簿與歷史、
@@ -572,8 +584,11 @@ plugin 工具**\ (見下方「Plugin Hot-Reload」);你自己的程式以
 * ``ac_launch_process`` 的 ``argv`` 與 ``ac_shell`` 的 ``command``，這是刻意的：命令列就是
   一個程式，參數的意義由該程式決定，只拒絕看起來像路徑的參數並不能限制任何東西。不要把這些
   工具提供給你想限制的 client。
-* 自由格式物件裡的路徑（``ac_run_suite`` 的 ``spec``、``ac_run_dag`` 的 ``definition``、
-  ``ac_assert_all`` 的 ``specs``）。
+* 自由格式物件裡宣告路徑鍵以外的鍵。宣告的路徑鍵與一般 ``path`` 參數一樣受根目錄限制
+  （工具收到的是檢查過的標準化路徑）：``ac_run_dag`` 每個節點的 ``action_file``（遠端節點也算，
+  它的動作在本機載入後才送出）、``ac_run_suite`` 案例的 ``data.path``，以及
+  ``ac_assert_all``／``ac_assert_any``／``ac_assert_eventually`` spec 的 ``template_path``／``path``。
+  suite 或 DAG 裡的動作清單仍屬上一點的動作清單。
 * 外掛註冊的工具，除非它的 schema 也帶這個標記。
 
 ``ac_resolve_ref`` / ``ac_resolve_refs`` 的 ``file://`` 參照套用同一組根目錄；``env://``

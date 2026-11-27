@@ -4,6 +4,7 @@ The enumeration runs as a :class:`~je_auto_control.gui._tab_task.TabTask`:
 closing the tab cancels it, which ends the enumeration tool's process
 (PowerShell, ``lsusb``, ``system_profiler``) instead of leaving it to time out.
 """
+import functools
 from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QTimer
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._authorize import RefusalLabel, authorized
 from je_auto_control.gui._dispose import release_resources
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
 from je_auto_control.gui._tab_task import TabTask
@@ -34,12 +36,17 @@ def _t(key: str) -> str:
 class UsbDevicesTab(TranslatableMixin, QWidget):
     """Show currently connected USB devices via the headless enumerator."""
 
+    #: Checked against the active RBAC role when the page is shown.
+    REQUIRED_COMMANDS = ("AC_list_usb_devices",)
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._tr_init()
         self._backend_label = QLabel("-")
         self._error_label = QLabel("")
         self._events_label = QLabel("")
+        self._events_text = self._keyed(self._events_label)
+        self._refusal = RefusalLabel()
         self._auto_check = QCheckBox()
         self._auto_check.toggled.connect(self._on_auto_toggled)
         self._table = QTableWidget(0, 6)
@@ -76,6 +83,7 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
             label.setWordWrap(True)
             set_role(label, role)
             root.addWidget(label)
+        root.addWidget(self._refusal)
 
     def dispose(self) -> None:
         """Release what the tab holds beyond its widgets: its hotplug timer, its share of the USB watcher
@@ -84,6 +92,10 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
         Called by ``close_tab(key, release=True)`` before the widget is deleted; safe to call twice.
         """
         release_resources(self, self._hold.release)
+
+    def retranslate(self) -> None:
+        TranslatableMixin.retranslate(self)
+        self._apply_table_headers()
 
     def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
@@ -114,7 +126,9 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
 
     def _refresh(self) -> None:
         # One enumeration at a time; a tick during one is skipped.
-        if self._listing.start(list_usb_devices):
+        if not self._refusal.allows("AC_list_usb_devices"):
+            return
+        if self._listing.start(functools.partial(authorized, "AC_list_usb_devices", list_usb_devices)):
             self._listed = True
 
     def _show_list_error(self, error: object) -> None:
@@ -140,20 +154,18 @@ class UsbDevicesTab(TranslatableMixin, QWidget):
     def _update_event_summary(self) -> None:
         watcher = default_usb_watcher()
         if not watcher.is_running:
-            self._events_label.setText("")
+            self._events_text.clear()
             return
         events = watcher.recent_events(since=self._last_seen_seq, limit=10)
         if not events:
-            self._events_label.setText(_t("usb_events_idle"))
+            self._events_text.show("usb_events_idle")
             return
         self._last_seen_seq = events[-1]["seq"]
         summary_parts = [
             f"{event['kind']}: {event['device'].get('product') or '?'}"
             for event in events[-3:]
         ]
-        self._events_label.setText(
-            _t("usb_events_recent").format(text=" / ".join(summary_parts)),
-        )
+        self._events_text.show("usb_events_recent", text=" / ".join(summary_parts))
 
 
 class _WatcherHold:

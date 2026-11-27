@@ -210,3 +210,19 @@ def test_sync_merges_remote_into_local_and_pushes_result():
     assert merged.sections["hotkeys"]["hk1"]["combo"] == "ctrl+b"
     assert len(conflicts) == 1
     assert fetched == ["GET", "PUT"]
+
+
+@pytest.mark.parametrize("stamp", [10 ** 400, -10 ** 400], ids=["positive", "negative"])
+def test_a_stamp_no_float_can_hold_is_a_sync_error(stamp):
+    """OverflowError left the ConfigSyncError family, and answered 500 on the server."""
+    with pytest.raises(ConfigSyncError):
+        ConfigBucket.from_dict({"user_id": "u", "sections": {"s": {"e": {"last_modified": stamp}}}})
+
+
+@pytest.mark.parametrize("text", ["1" * 5000, "[" * 100_000], ids=["huge-int", "nested"])
+def test_a_reply_the_parser_gives_up_on_is_a_sync_error(text):
+    from je_auto_control.utils.http_client import http_client
+    client = ConfigSyncClient("http://127.0.0.1:9", user_id="u")  # NOSONAR python:S5332
+    with patch.object(http_client, "perform_call", lambda _call: {"status": 200, "text": text}):
+        with pytest.raises(ConfigSyncError):
+            client.fetch()

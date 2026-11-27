@@ -195,3 +195,15 @@ def test_stop_is_listed_in_help():
     text = _router().dispatch("/help").text
     assert "/stop" in text
     assert "/run" in text
+
+
+def test_the_reply_counts_actions_and_reports_the_failed_ones(script, root, monkeypatch):
+    """It counted files -- always 1 -- and called a run whose actions failed a success."""
+    def fail():
+        raise ValueError("boom")
+    monkeypatch.setitem(executor.event_dict, "AC_fake_chat_fail", fail)
+    (root / "mixed.json").write_text(json.dumps(
+        [["AC_fake_chat_mark"], ["AC_fake_chat_fail"], ["AC_fake_chat_mark"]]), encoding="utf-8")
+    reply = _router().dispatch("/run mixed.json", context={"script_root": str(root)})
+    assert not reply.succeeded
+    assert reply.text == "ran mixed.json: 3 action(s) executed, 1 failed"

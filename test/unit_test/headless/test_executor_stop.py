@@ -310,3 +310,43 @@ def test_facade_and_commands():
         assert hasattr(ac, name)
     assert issubclass(ac.ExecutionStopped, AutoControlException)
     assert {"AC_run_stoppable", "AC_stop_execution", "AC_list_executions"} <= ac.executor.known_commands()
+
+
+def test_dag_nodes_stop_with_the_run(fakes):
+    """DAG nodes run on pool threads, which never saw the run's stop token."""
+    token = StopToken("dag")
+    actions = [["AC_run_dag", {"definition": {"nodes": [
+        {"id": "a", "actions": [["AC_fake_mark"], ["AC_sleep", {"seconds": 3}], ["AC_fake", {"tag": "a"}]]},
+        {"id": "b", "actions": [["AC_fake", {"tag": "b"}]], "depends_on": ["a"]},
+    ]}}]]
+    thread, outcome = _run_in_thread(fakes, actions, token)
+    assert fakes.entered.wait(_WAIT)
+    token.stop("user")
+    thread.join(_WAIT)
+    assert not thread.is_alive()
+    assert isinstance(outcome.get("error"), ExecutionStopped)
+    assert fakes.calls == ["marked"]
+
+
+def test_a_dag_outside_a_run_is_unchanged(fakes):
+    record = fakes.executor.execute_action([["AC_run_dag", {"definition": {"nodes": [
+        {"id": "a", "actions": [["AC_fake", {"tag": "a"}]]}]}}]])
+    assert next(iter(record.values()))["succeeded"] is True
+    assert fakes.calls == ["a"]
+
+
+@pytest.mark.parametrize("cleanup", [
+    ["AC_parallel", {"branches": [[["AC_fake", {"tag": "cleaned"}]]]}],
+    ["AC_run_dag", {"definition": {"nodes": [{"id": "a", "actions": [["AC_fake", {"tag": "cleaned"}]]}]}}],
+])
+def test_threaded_cleanup_in_finally_still_runs_when_stopped(fakes, cleanup):
+    """The shield of an AC_try finally did not reach the threads its commands start."""
+    token = StopToken("cleanup")
+    thread, outcome = _run_in_thread(
+        fakes, [["AC_try", {"body": [["AC_fake_mark"], ["AC_sleep", {"seconds": 60}]], "finally": [cleanup]}]], token)
+    assert fakes.entered.wait(_WAIT)
+    token.stop()
+    thread.join(_WAIT)
+    assert not thread.is_alive()
+    assert isinstance(outcome["error"], ExecutionStopped)
+    assert fakes.calls == ["marked", "cleaned"]

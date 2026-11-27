@@ -9,6 +9,7 @@ import time
 from typing import Any, Callable, Iterator, Mapping, NoReturn, Protocol
 import uuid
 
+from .capture_checkpoint import capture_checkpoint
 from .context import TaskOperation, authorization_key, current_operation
 from .errors import AgentEffectUnknown, AgentObservationStale, AgentTaskError
 from .models import AgentTaskSpec
@@ -142,7 +143,8 @@ class ManagedServiceTarget(ServiceTarget):
         with self._admitted():
             operation = self._operation()
             started = time.perf_counter()
-            status = self._controller.read(timeout=1.0, checkpoint=lambda: self._checkpoint(operation))
+            status = self._controller.read(timeout=1.0, checkpoint=capture_checkpoint(
+                lambda: self._validate(operation), lambda: self._checkpoint(operation)))
             self._checkpoint(operation)
             value = ServiceObservation(self._binding, status, uuid.uuid4().hex, started, time.perf_counter())
             with self._publication:

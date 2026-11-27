@@ -15,7 +15,8 @@ Implements the AutoControl-specific surface:
 * ``textDocument/didOpen`` / ``didChange`` / ``didClose`` document
   tracking;
 * ``textDocument/publishDiagnostics`` notifications on every
-  open / change;
+  open / change of an action file (``initializationOptions.actionFiles``
+  globs, see :mod:`autocontrol_lsp.server.action_files`);
 * ``textDocument/completion`` for every registered ``AC_*`` command;
 * ``textDocument/hover`` + ``textDocument/signatureHelp`` resolved
   against the in-memory document store.
@@ -26,6 +27,7 @@ import json
 import sys
 from typing import Any, Dict, List, Optional
 
+from autocontrol_lsp.server.action_files import ActionFileFilter
 from autocontrol_lsp.server.documents import DocumentStore
 from autocontrol_lsp.server.handlers import (
     handle_completion, handle_did_change, handle_did_close,
@@ -42,6 +44,7 @@ class LspServer:
 
     def __init__(self) -> None:
         self._store = DocumentStore()
+        self._action_files = ActionFileFilter()
         self._pending_diagnostics: List[Dict[str, Any]] = []
 
     @property
@@ -52,6 +55,7 @@ class LspServer:
                  params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Route a request method to its reply payload, or None if unknown."""
         if method == "initialize":
+            self._action_files = ActionFileFilter.from_initialize_params(params)
             return handle_initialize(params)
         if method == "textDocument/completion":
             return handle_completion(params)
@@ -67,12 +71,12 @@ class LspServer:
                             params: Dict[str, Any]) -> None:
         """Apply a notification + queue diagnostics if needed."""
         if method == "textDocument/didOpen":
-            diags = handle_did_open(params, self._store)
+            diags = handle_did_open(params, self._store, self._action_files)
             self._pending_diagnostics.append(
                 _publish_payload(params, diags),
             )
         elif method == "textDocument/didChange":
-            diags = handle_did_change(params, self._store)
+            diags = handle_did_change(params, self._store, self._action_files)
             self._pending_diagnostics.append(
                 _publish_payload(params, diags),
             )

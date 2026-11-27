@@ -2,9 +2,14 @@
 
 Fire a template-first / VLM-fallback locate from the GUI and browse the
 audit log, or compare explicit versions on provided PNG samples without device effects.
+A locate or click -- a screen search, then a model request -- runs off the GUI
+thread (:class:`~je_auto_control.gui._tab_task.TabTask`), one at a time.
+Reading and clearing the audit log (a JSONL file) is a tab task of its own; a
+refresh asked for while a read is out runs once it reports.
 """
+import functools
 import json
-from typing import Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent
@@ -14,7 +19,10 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 
+from je_auto_control.gui._dispose import release_resources
+from je_auto_control.gui._i18n_cells import keyed_cell
 from je_auto_control.gui._i18n_helpers import TranslatableMixin
+from je_auto_control.gui._tab_task import TabTask
 from je_auto_control.gui.adaptive.responsive import fit_columns
 from je_auto_control.gui.adaptive.surfaces import Card, set_role
 from je_auto_control.gui.healing_evaluation_panel import HealingEvaluationPanel
@@ -27,11 +35,12 @@ from je_auto_control.utils.self_healing import (
     HealEvent, HealOutcome, default_heal_log, self_heal_click, self_heal_locate,
     SelfHealRequest, SelfHealRequestError, VerificationRequest, self_heal_run,
 )
-from je_auto_control.utils.exception.exceptions import AutoControlException
 
 
 _COLUMNS = ("timestamp", "method", "coordinates",
             "operation", "operation_status", "verified", "duration_ms", "template_path", "description")
+#: Stands for a verification that did not run: the cell reads "Unknown" in the active language.
+_UNKNOWN = object()
 
 
 def _t(key: str) -> str:
@@ -54,6 +63,18 @@ def _dispatch(inputs: tuple[Optional[str], Optional[str], float, Optional[list[i
 
 
 # pylint: disable-next=too-many-instance-attributes  # reason: the tab owns separate runtime and comparison controls
+def _read_log(*, clear: bool) -> list[HealEvent]:
+    """Worker thread: the newest 200 events of the audit log, after clearing it when asked."""
+    if clear:
+        default_heal_log.clear()
+    return default_heal_log.list_events(limit=200)
+
+
+def _hit_text(x: int, y: int, method: str) -> str:
+    """The status line for a template found at ``(x, y)`` by ``method``, in the active language."""
+    return _t("self_heal_hit").replace("{x}", str(x)).replace("{y}", str(y)) + f" ({method})"
+
+
 class SelfHealingTab(TranslatableMixin, QWidget):
     """Trigger self-heal attempts and browse the audit log."""
 
@@ -70,12 +91,22 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         self._threshold.setValue(0.9)
         self._click_check = QCheckBox()
         self._status = QLabel()
+        self._status_text = self._keyed(self._status)
         self._status.setTextFormat(Qt.TextFormat.PlainText)
         self._table = QTableWidget(0, len(_COLUMNS))
+        self._tr_cells(self._table)
         self._details = QPlainTextEdit()
         self._details.setReadOnly(True)
         self._group_box = QGroupBox()
         self._events: list[HealEvent] = []
+        self._task = TabTask(self)          # one locate or click at a time, off the GUI thread
+        self._task.result.connect(self._on_run_done)
+        self._task.error.connect(self._on_run_failed)
+        self._log = TabTask(self, details=False)    # reading (or clearing) the audit log file
+        self._log.result.connect(self._show_log)
+        self._log.error.connect(self._on_log_failed)
+        self._log.finished.connect(self._log_settled)
+        self._reread_log = False
         # pylint: disable-next=no-member  # reason: PySide binds this Qt signal at runtime
         self._table.itemSelectionChanged.connect(self._show_event)
         self._build_layout()
@@ -125,6 +156,13 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         form.addRow(QLabel(), self._verification_input)
         form.addRow(QLabel(), self._click_check)
         return group
+
+    def dispose(self) -> None:
+        """Release what the tab holds beyond its widgets: a locate or click still out, and its panels' readers.
+
+        Called by ``close_tab(key)`` before the widget is deleted; safe to call twice.
+        """
+        release_resources(self, self._source.cancel, self._candidates.dispose, self._evaluation.cancel)
 
     def menu_actions(self) -> list[tuple[str, Callable[[], None]]]:
         """Expose tab commands to the window-level Actions menu."""
@@ -181,7 +219,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         template = self._template_input.text().strip() or None
         description = self._description_input.text().strip() or None
         if template is None and description is None:
-            self._status.setText(_t("self_heal_inputs_required"))
+            self._status_text.show("self_heal_inputs_required")
             return None
         try:
             raw = self._region_input.text().strip()
@@ -189,7 +227,7 @@ class SelfHealingTab(TranslatableMixin, QWidget):
             if region is not None and not isinstance(region, list):
                 raise ValueError(_t("self_heal_region_placeholder"))
         except ValueError as error:
-            self._status.setText(f"{_t('self_heal_error')}: {error}")
+            self._status_text.show_joined('self_heal_error', error)
             return None
         return template, description, float(self._threshold.value()), region
 
@@ -203,27 +241,27 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         inputs = self._collect_inputs()
         if inputs is None:
             return
-        try:
-            outcome, verified = _dispatch(inputs, do_click or self._click_check.isChecked(),
-                                           self._verification_input.text().strip())
-        except (AutoControlException, OSError, ValueError, RuntimeError) as error:
-            self._status.setText(f"{_t('self_heal_error')}: {error}")
-            self.refresh_log()
-            return
+        work = functools.partial(_dispatch, inputs, do_click or self._click_check.isChecked(),
+                                 self._verification_input.text().strip())
+        self._status_text.show("task_running" if self._task.start(work) else "task_busy")
+
+    def _on_run_done(self, result: Any) -> None:
+        outcome, verified = result
         self._report_outcome(outcome)
         if verified is not None:
-            self._status.setText(_t("self_heal_verification_passed" if verified else "self_heal_verification_failed"))
+            self._status_text.show("self_heal_verification_passed" if verified else "self_heal_verification_failed")
+        self.refresh_log()
+
+    def _on_run_failed(self, error: object) -> None:
+        self._status_text.show_joined('self_heal_error', error)
         self.refresh_log()
 
     def _report_outcome(self, outcome: HealOutcome) -> None:
         if not outcome.found:
-            self._status.setText(_t("self_heal_miss"))
+            self._status_text.show("self_heal_miss")
             return
-        suffix = f" ({outcome.method})"
-        coords = outcome.coordinates or (0, 0)
-        text = _t("self_heal_hit").replace("{x}", str(coords[0])) \
-                                   .replace("{y}", str(coords[1]))
-        self._status.setText(text + suffix)
+        x, y = outcome.coordinates or (0, 0)
+        self._status_text.show_rendered(functools.partial(_hit_text, x, y, outcome.method))
 
     def _on_clear_log(self) -> None:
         reply = QMessageBox.question(
@@ -231,12 +269,22 @@ class SelfHealingTab(TranslatableMixin, QWidget):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-        default_heal_log.clear()
-        self.refresh_log()
+        if not self._log.start(functools.partial(_read_log, clear=True)):
+            self._status_text.show("task_busy")
 
     def refresh_log(self) -> None:
-        """Reload the table from the on-disk audit log."""
-        events = default_heal_log.list_events(limit=200)
+        """Reload the table from the on-disk audit log, read off the GUI thread."""
+        self._reread_log = not self._log.start(functools.partial(_read_log, clear=False))
+
+    def _log_settled(self) -> None:
+        if self._reread_log:
+            self._reread_log = False
+            self.refresh_log()
+
+    def _on_log_failed(self, error: object) -> None:
+        self._status_text.show_joined('self_heal_error', error)
+
+    def _show_log(self, events: list[HealEvent]) -> None:
         self._events = events
         self._table.setRowCount(len(events))
         for row, event in enumerate(events):
@@ -244,12 +292,12 @@ class SelfHealingTab(TranslatableMixin, QWidget):
                 event.timestamp, event.method,
                 _format_coordinates(event.coordinates),
                 event.operation, event.operation_status,
-                _t("self_heal_unknown") if event.verified is None else str(event.verified),
+                _UNKNOWN if event.verified is None else str(event.verified),
                 f"{event.duration_ms:.1f}",
                 event.template_path or "", event.description or "",
             )
             for col, text in enumerate(values):
-                item = QTableWidgetItem(str(text))
+                item = keyed_cell("self_heal_unknown") if text is _UNKNOWN else QTableWidgetItem(str(text))
                 item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                 self._table.setItem(row, col, item)
         fit_columns(self._table, capped=(_COLUMNS.index("template_path"), _COLUMNS.index("description")))
@@ -266,19 +314,20 @@ class SelfHealingTab(TranslatableMixin, QWidget):
     def _on_source(self) -> None:
         row = self._table.currentRow()
         if not 0 <= row < len(self._events):
-            self._status.setText(_t("self_heal_source_missing"))
+            self._status_text.show("self_heal_source_missing")
             return
         event = self._events[row]
         values = (event.journal_path, event.run_id, event.step_id)
         if not all(isinstance(value, str) and value for value in values):
-            self._status.setText(_t("self_heal_source_missing"))
+            self._status_text.show("self_heal_source_missing")
             return
         self._source.open_source(str(event.journal_path), str(event.run_id), str(event.step_id))
         self._views.setCurrentWidget(self._source)
 
     # pylint: disable-next=invalid-name  # reason: Qt override
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802  # reason: Qt override
-        """Cancel source inspection immediately when the owning tab closes."""
+        """Cancel a locate still out and source inspection immediately when the owning tab closes."""
+        self._task.stop()
         self._source.cancel()
         self._candidates.cancel()
         super().closeEvent(event)

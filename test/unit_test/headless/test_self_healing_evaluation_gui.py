@@ -60,6 +60,7 @@ def test_background_comparison_details_and_shared_exports(panel, app, tmp_path, 
         path = tmp_path / f"comparison.{suffix}"
         monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *_args, **_kwargs: (str(path), ""))
         getattr(panel, "export_" + suffix)()
+        until(app, lambda: not panel._exports.running)     # written off the GUI thread
         assert path.is_file()
         assert "frame_hash" in path.read_text(encoding="utf-8")
 
@@ -154,3 +155,28 @@ def test_cancel_keeps_the_panel_busy_until_the_comparison_unwinds(panel, app, mo
     until(app, lambda: not panel._task.running)
     assert panel._state == "cancelled"                  # the checkpoint after the read saw the stop
     assert panel._report is None
+
+
+def test_exporting_a_comparison_writes_off_the_gui_thread(panel, app, tmp_path, monkeypatch):
+    import threading
+    from je_auto_control.gui import healing_evaluation_panel as module
+    entered, release, threads = threading.Event(), threading.Event(), []
+
+    def gated(report, path):
+        threads.append(threading.get_ident())
+        entered.set()
+        release.wait(10)
+        return path
+
+    monkeypatch.setattr(module, "write_healing_report", gated)
+    panel._report = object()
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *_args, **_kwargs: (str(tmp_path / "c.json"), ""))
+    started = time.monotonic()
+    panel.export_json()
+    assert time.monotonic() - started < 5.0, "the slot held the GUI thread"
+    assert entered.wait(10)
+    panel.export_html()                             # one export at a time
+    assert panel._state == "busy"
+    release.set()
+    until(app, lambda: not panel._exports.running)
+    assert threads and threads[0] != threading.get_ident()

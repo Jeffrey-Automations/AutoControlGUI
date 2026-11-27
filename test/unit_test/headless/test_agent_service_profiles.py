@@ -71,7 +71,7 @@ def windows_host(monkeypatch):
 @pytest.mark.parametrize("change", [{"schema": True}, {"schema": 2}, {"kind": "fixture"},
     {"argv": []}, {"background_verified": True}, {"machine": "remote"}, {"operations": []},
     {"operations": ["start", "start"]}, {"operations": ["restart"]}, {"operations": [True]},
-    {"operations": "start"}, {"operations": [{}]}, {"target": "../bad"}, {"service_key": "服務"}])
+    {"operations": "start"}, {"operations": [{}]}, {"target": "../bad"}, {"service_key": "Owned\u200bFixture"}])
 def test_closed_deployment_refuses_before_factory(tmp_path, change):
     value = config(tmp_path, **change)
     with pytest.raises(AgentTaskError, match="service deployment is invalid"):

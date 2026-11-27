@@ -39,6 +39,7 @@ class IdempotencyStore:
         self._records: Dict[str, Dict[str, Any]] = {}
         self._clock = clock
         self._ttl = ttl
+        self._next_sweep: Optional[float] = None
         # The socket / REST / MCP servers call in concurrently; without it two
         # duplicates could both see "new" and both run the side effect.
         self._lock = threading.RLock()
@@ -52,6 +53,20 @@ class IdempotencyStore:
             return None
         return record
 
+    def _sweep_expired(self) -> None:
+        """Drop every expired record, at most once per TTL.
+
+        A key is normally used for one request only, so its expired record was
+        never looked up again and the store grew for the life of the process.
+        """
+        if self._ttl is None:
+            return
+        now = self._clock()
+        if self._next_sweep is None or now >= self._next_sweep:
+            self._next_sweep = now + self._ttl
+            for key in list(self._records):
+                self._live(key)
+
     def begin(self, key: str,
               request: Optional[str] = None) -> Dict[str, Any]:
         """Register ``key`` or return its existing state.
@@ -62,6 +77,7 @@ class IdempotencyStore:
         reused with a different ``request`` fingerprint.
         """
         with self._lock:
+            self._sweep_expired()
             record = self._live(key)
             if record is not None:
                 if (request is not None and record["request"] is not None

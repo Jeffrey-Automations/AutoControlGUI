@@ -154,3 +154,59 @@ def test_double_start_is_a_noop():
 
 def test_stop_without_start_is_a_noop():
     ResourceProfiler().stop()
+
+
+# --- bounded buffers ----------------------------------------------
+
+class _CountingStop:
+    """A stop event that ends the sample loop after ``limit`` samples, without waiting."""
+
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
+        self.calls = 0
+
+    def is_set(self) -> bool:
+        return self.calls >= self.limit
+
+    def wait(self, _timeout: float) -> bool:
+        self.calls += 1
+        return False
+
+
+class _FakeProcess:
+    def __init__(self) -> None:
+        self.cpu = 0.0
+
+    def cpu_percent(self, interval=None):
+        self.cpu += 1.0
+        return self.cpu
+
+    def memory_info(self):
+        return type("Mem", (), {"rss": 1000})()
+
+
+class _FakePsutil:
+    NoSuchProcess = OSError
+    AccessDenied = OSError
+
+
+def test_samples_are_a_ring_buffer_of_max_samples():
+    prof = ResourceProfiler(max_samples=4)
+    prof._psutil = _FakePsutil()  # noqa: SLF001
+    prof._proc = _FakeProcess()  # noqa: SLF001
+    prof._started_at = time.monotonic() - 1.0  # noqa: SLF001
+    prof._sample_loop(_CountingStop(10))  # noqa: SLF001
+    report = prof.report()
+    assert report.sample_count == 4
+    # The newest samples are kept: cpu values 7..10.
+    assert report.cpu_percent_max == pytest.approx(10.0)
+    assert report.cpu_percent_avg == pytest.approx(8.5)
+
+
+def test_frames_are_bounded_but_fps_counts_every_frame():
+    prof = ResourceProfiler(max_samples=4)
+    prof._started_at = time.monotonic() - 2.0  # noqa: SLF001
+    for _ in range(50):
+        prof.tick_frame()
+    assert len(prof._frames) == 4  # noqa: SLF001
+    assert 20 < prof.report().fps_avg < 35

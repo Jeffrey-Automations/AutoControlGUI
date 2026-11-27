@@ -45,12 +45,12 @@ def _wrap_in_scroll_area(panel: QWidget) -> QScrollArea:
     return scroll
 
 
-def _build_webrtc_placeholder() -> QWidget:
-    """Stand-in shown when the optional ``av``/``aiortc`` extras are missing."""
+def _build_webrtc_placeholder(owner: TranslatableMixin) -> QWidget:
+    """Stand-in shown when the optional ``av``/``aiortc`` extras are missing; ``owner`` re-translates its text."""
     widget = QWidget()
     layout = QVBoxLayout(widget)
     layout.setContentsMargins(24, 24, 24, 24)
-    message = QLabel(_t("rd_webrtc_missing_extras"))
+    message = owner._tr(QLabel(), "rd_webrtc_missing_extras")     # the tab owns the registry
     message.setWordWrap(True)
     message.setAlignment(Qt.AlignmentFlag.AlignCenter)
     set_role(message, "hint")
@@ -157,7 +157,7 @@ class RemoteDesktopTab(TranslatableMixin, QWidget):
             self._webrtc_host_panel = None
             self._webrtc_viewer_panel = None
             sub_panels.append(
-                (_build_webrtc_placeholder(), "rd_webrtc_unavailable_tab"),
+                (_build_webrtc_placeholder(self), "rd_webrtc_unavailable_tab"),
             )
         return sub_panels
 

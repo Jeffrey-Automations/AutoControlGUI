@@ -129,8 +129,10 @@ def add_user(user_id: str, role: str = Role.VIEWER, display_name: str = "",
 def remove_user(user_id: str, users_path: Optional[str] = None) -> Dict[str, Any]:
     """Remove a user; ``{"removed": False}`` when there was no such user."""
     store = management_store(users_path)
-    _keep_an_admin(store, str(user_id), "remove")
-    removed = store.remove_user(str(user_id))
+    # The check and the change, against every process: two admins could remove each other.
+    with store.exclusive():
+        _keep_an_admin(store, str(user_id), "remove")
+        removed = store.remove_user(str(user_id))
     if removed:
         _audit("user_removed", str(user_id), "")
     return {"user_id": str(user_id), "removed": removed}
@@ -140,9 +142,10 @@ def set_user_role(user_id: str, role: str,
                   users_path: Optional[str] = None) -> Dict[str, Any]:
     """Change a user's role; it applies to their next request and their deferred work."""
     store = management_store(users_path)
-    if role != Role.ADMIN:
-        _keep_an_admin(store, str(user_id), "demote")
-    store.set_role(str(user_id), str(role))
+    with store.exclusive():
+        if role != Role.ADMIN:
+            _keep_an_admin(store, str(user_id), "demote")
+        store.set_role(str(user_id), str(role))
     _audit("user_role_set", str(user_id), f"role={role}")
     return {"user_id": str(user_id), "role": str(role)}
 

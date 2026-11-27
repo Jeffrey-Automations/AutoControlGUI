@@ -138,3 +138,64 @@ def test_auto_quarantine_from_flakiness(tmp_path: Path):
         monkey.undo()
     assert any(e.name == "flaky.json" for e in added)
     assert store.is_quarantined("flaky.json")
+
+
+class _SignalExecutor:
+    """Runs a suite's lists; the ``boom`` list raises, every list is recorded."""
+
+    def __init__(self, signal=None):
+        self.signal = signal
+        self.ran = []
+
+    def execute_action(self, actions, raise_on_error=False):
+        assert raise_on_error
+        self.ran.append(actions[0][0])
+        if actions[0][0] == "boom" and self.signal is not None:
+            raise self.signal
+
+
+def test_a_cancelled_case_ends_the_suite_after_its_teardown():
+    """OperationCancelledError is a RuntimeError: it was scored as that case's error and the suite went on."""
+    from je_auto_control.utils.exception.control_signals import OperationCancelledError
+    runner = _SignalExecutor(OperationCancelledError("request-1"))
+    spec = {"cases": [{"name": "a", "actions": [["boom"]]}, {"name": "b", "actions": [["next"]]}],
+            "teardown": [["cleanup"]]}
+    with pytest.raises(OperationCancelledError):
+        run_suite(spec, executor=runner, respect_quarantine=False)
+    assert runner.ran == ["boom", "cleanup"]
+
+
+def test_teardown_runs_to_its_end_when_the_run_is_stopped(tmp_path):
+    """Teardown is "always run after", but a stop raised before its first action."""
+    from je_auto_control.utils.executor.action_executor import Executor
+    from je_auto_control.utils.executor.run_control import ExecutionStopped, StopToken, stoppable_run
+    token = StopToken("suite-stop")
+    executor = Executor()
+    executor.event_dict["AC_probe_stop"] = lambda: token.stop("test")
+    cleaned = []
+    executor.event_dict["AC_probe_cleanup"] = lambda: cleaned.append(True)
+    spec = {"cases": [{"name": "a", "actions": [["AC_probe_stop"], ["AC_probe_stop"]]}],
+            "teardown": [["AC_probe_cleanup"]]}
+    with stoppable_run(token=token):
+        with pytest.raises(ExecutionStopped):
+            run_suite(spec, executor=executor, respect_quarantine=False)
+    assert cleaned == [True]
+
+
+def test_a_missing_optional_package_scores_one_case_as_an_error():
+    """The executor re-raises ImportError with raise_on_error; it ended the suite with no results."""
+    runner = _SignalExecutor(ModuleNotFoundError("no module named 'openpyxl'"))
+    result = run_suite({"cases": [{"name": "a", "actions": [["boom"]]}, {"name": "b", "actions": [["next"]]}]},
+                       executor=runner, respect_quarantine=False)
+    assert [case.status for case in result.cases] == ["error", "passed"]
+
+
+def test_a_missing_data_source_package_scores_one_case_as_an_error(monkeypatch):
+    def unavailable(*_args, **_kwargs):
+        raise ModuleNotFoundError("no module named 'openpyxl'")
+
+    monkeypatch.setattr("je_auto_control.utils.data_source.load_rows", unavailable)
+    result = run_suite({"cases": [{"name": "a", "actions": [["next"]], "data": {"kind": "xlsx"}},
+                                  {"name": "b", "actions": [["next"]]}]},
+                       executor=_SignalExecutor(), respect_quarantine=False)
+    assert [case.status for case in result.cases] == ["error", "passed"]

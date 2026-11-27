@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from je_auto_control.ios.client import IOSDevice, default_ios_device, translate_device_errors
 from je_auto_control.utils.exception.exceptions import AutoControlException
+from je_auto_control.utils.executor.run_control import stoppable_call
 
 
 class ElementNotFoundError(AutoControlException, LookupError):
@@ -46,7 +47,9 @@ def find_element(name: Optional[str] = None,
     """Return the matched element's bounding rect ``(x1, y1, x2, y2)``."""
     handle = (device or default_ios_device()).handle
     query = _build_query(handle, name, class_name, predicate)
-    element = query.wait(timeout=float(timeout_s))
+    # facebook-wda polls WebDriverAgent for up to timeout_s; a stop ends the
+    # wait (the poll finishes in the background) and click_element never taps.
+    element = stoppable_call(query.wait, timeout=float(timeout_s))
     if not element:
         raise ElementNotFoundError(
             f"no XCUITest element matched name={name!r} "

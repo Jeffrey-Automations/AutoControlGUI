@@ -7,6 +7,7 @@ from typing import Any, Callable, Mapping, Sequence
 from concurrent.futures import CancelledError
 
 from je_auto_control.utils.agent_runtime.errors import AgentTaskError, AgentHumanReview
+from je_auto_control.utils.agent_runtime.models import thaw
 from je_auto_control.utils.rbac.authorization import AuthorizationError
 from je_auto_control.utils.agent_runtime.policy import TaskPolicy
 from je_auto_control.utils.postcondition import check_postcondition
@@ -158,7 +159,7 @@ def _last_result(clause: Mapping[str, Any], receipts: Sequence[Mapping[str, Any]
     result = confirmed[-1]["result"]
     if not isinstance(result, Mapping) or clause["key"] not in result:
         return None
-    return result[clause["key"]] == clause["value"]
+    return result[clause["key"]] == thaw(clause["value"])
 
 
 def _file_evidence(clause: Mapping[str, Any], policy: TaskPolicy) -> bool:

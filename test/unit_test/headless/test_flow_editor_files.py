@@ -43,8 +43,11 @@ def test_the_flow_editor_opens_a_file_with_a_bom_and_saves_its_keys(monkeypatch,
     monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args: (str(source), ""))
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args: (str(target), ""))
     tab = FlowEditorTab()
+    from headless._qt_settle import settle
     tab._on_open()
+    assert settle(tab._files, "task")               # read off the GUI thread
     tab._on_save()
+    assert settle(tab._files, "task")               # written off the GUI thread
     assert warnings == []
     assert json.loads(target.read_text(encoding="utf-8")) == _WRAPPED
     tab.deleteLater()

@@ -18,7 +18,8 @@ import math
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from je_auto_control.utils.executor.run_control import pause
+from je_auto_control.utils.exception.cancellation import cancellation_checkpoint
+from je_auto_control.utils.executor.run_control import checkpoint, pause
 
 
 def _sink_move(event: Dict[str, Any]) -> None:
@@ -229,12 +230,19 @@ def replay_timeline(events: List[Dict[str, Any]], *, speed: float = 1.0,
                 gap = min(gap, float(max_gap))
             if gap > 0:
                 sleeper(gap)
+            _check_stop()
             dispatch(event)
             played += 1
     except BaseException:
         dispatch.release_all()
         raise
     return played
+
+
+def _check_stop() -> None:
+    """Raise a pending stop or cancellation before an event; a macro need not wait anywhere."""
+    cancellation_checkpoint()
+    checkpoint()
 
 
 def _stoppable_sleep(seconds: float) -> None:
@@ -254,6 +262,7 @@ def _run_steps(steps: List[Dict[str, Any]], dispatch: Callable[[Dict[str, Any]],
             sleeper(max(0.0, _finite_seconds(step.get("ms", 0), "ms")))
             log.append({"op": "wait", "ms": step.get("ms", 0)})
         else:
+            _check_stop()
             dispatch(step)
             log.append(dict(step))
 

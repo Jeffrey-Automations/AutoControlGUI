@@ -54,9 +54,12 @@ def to_be_greater_than(threshold: Any) -> Matcher:
 
 
 def to_match_regex(pattern: str) -> Matcher:
-    """Match when ``str(value)`` contains a match for ``pattern``."""
+    """Match when ``str(value)`` contains a match for ``pattern``; a bad one is a ``ValueError``."""
     import re
-    regex = re.compile(pattern)
+    try:
+        regex = re.compile(pattern)
+    except re.error as error:   # derives from Exception alone: it ended the whole action list
+        raise ValueError(f"invalid regular expression {pattern!r}: {error}") from error
     return lambda value: bool(regex.search(str(value)))
 
 

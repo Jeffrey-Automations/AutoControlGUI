@@ -32,7 +32,7 @@ class ServiceDeployment:
 
 
 def service_settings(value: Any) -> dict[str, str]:
-    """Validate the pinned reference and ASCII ownership key without reading the file."""
+    """Validate the pinned reference and service ownership key without reading the file."""
     if not isinstance(value, dict) or set(value) != {"config_path", "config_sha256", "service_key"}:
         raise AgentTaskError("service settings require a pinned deployment and service key")
     service_scope(value["service_key"])

@@ -21,6 +21,7 @@ import ctypes
 import importlib
 import os
 import re
+import secrets
 import stat
 import sys
 import threading
@@ -86,6 +87,22 @@ def open_new_private_file(path: Path) -> int:
                 "it inherits its directory's permissions", path, error)
     return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 
+
+def write_private_text(path: Path, text: str) -> None:
+    """Replace ``path`` atomically with ``text``, readable by its owner only.
+
+    The text lands in a sibling made by :func:`open_new_private_file`, then
+    is renamed over ``path``: the secret is never in a file others can read,
+    and a failed write leaves the previous file whole.
+    """
+    temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+    descriptor = open_new_private_file(temporary)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 def exposure(path: Path) -> List[str]:
     """Who, besides its owner, can read the file at ``path``; empty when nobody.
@@ -286,4 +303,7 @@ def _windows_dacl_sddl(path: Path) -> str:
         _local_free(kernel32, descriptor)
 
 
-__all__ = ["broad_readers", "exposure", "open_new_private_file", "warn_if_exposed"]
+__all__ = [
+    "broad_readers", "exposure", "open_new_private_file", "warn_if_exposed",
+    "write_private_text",
+]

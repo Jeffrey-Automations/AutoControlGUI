@@ -40,9 +40,11 @@ class FailureBundleOptions:
 
 def _json_bytes(value: Any) -> bytes:
     # Redacted repr: an object the redactors cannot walk ("Conn(password=...)")
-    # was written through repr in clear text.
+    # was written through repr in clear text. backslashreplace: a lone surrogate
+    # (an undecodable file name) becomes the JSON escape that reads back as it.
     return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True,
-                      default=lambda item: redact_secret_text(repr(item))).encode("utf-8")
+                      default=lambda item: redact_secret_text(repr(item))
+                      ).encode("utf-8", errors="backslashreplace")
 
 
 def _safe_name(path: Path, used: set[str]) -> str:
@@ -138,13 +140,14 @@ def _collect_all(archive: zipfile.ZipFile, opts: FailureBundleOptions,
 
 
 def _plain(value: Any) -> Any:
-    """``value`` with every Mapping as a dict and every tuple or set as a list, at any depth.
+    """``value`` with every Mapping as a str-keyed dict and every tuple or set as a list, at any depth.
 
     The redaction walk enters dicts and lists only: a ``mappingproxy`` of
     headers and a tuple ``AC_secret_set`` action reached the manifest unmasked.
     """
     if isinstance(value, Mapping):
-        return {key: _plain(item) for key, item in value.items()}
+        # JSON has text keys only; sorting mixed ones raised and lost the bundle.
+        return {str(key): _plain(item) for key, item in value.items()}
     if isinstance(value, (list, tuple, set, frozenset)):
         return [_plain(item) for item in value]
     return value

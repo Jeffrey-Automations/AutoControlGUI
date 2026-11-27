@@ -22,6 +22,9 @@ configuration. The package is intentionally absent from the facade, executor,
 MCP, REST and GUI registries until those boundaries have real policy integration.
 
 The runtime adapter must pass its live `TaskOperation.checkpoint` into `observe`.
+It may also pass a lighter `poll` for use between identity and region queries; the
+full checkpoint still runs before the target is opened, before every read of its
+memory, before decoding and before a result is returned.
 The default checkpoint only checks cooperative cancellation; it is not an
 authorization check. Calling the internal reader does not authorize reading a
 process. Existing desktop foreground and input-presence gates are unchanged.
@@ -577,8 +580,10 @@ revalidate the captured operation and owner before and after each source boundar
 
 Tests use injected native calls/buffers, the actual reader and real hidden Python
 helper IPC. The scoped UIA reader described below preserves explicit field failures
-and best-effort capture metadata. Native UI deployment trust, DOM source
-identity and revision normalization remain pending. Existing foreground desktop or
+and best-effort capture metadata. Browser profiles with `semantic_fields` report
+host-declared DOM fields through the same schema as a `dom` source bound to the
+managed browser context (`dom_observation.py`); the DOM has no revision, so those
+captures stay best-effort. Native UI deployment trust remains pending. Existing foreground desktop or
 legacy DOM dictionaries are not converted automatically. This work is not native
 observation or background-application acceptance.
 
@@ -678,12 +683,14 @@ the reader. No raw executable bytes enter observations.
 Loaded addresses differ from file offsets, and relocations may change bytes; see
 Microsoft's [PE format specification](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format).
 This implementation rejects relocation of protected bytes instead of normalizing
-it. Padding to section alignment is conservatively projected as zero after raw
-data; its compatibility still requires native acceptance. A short read or padding
+it, with one exception the loader makes to every relocated image: the header's
+`ImageBase` must equal the measured base and is then compared as the file's value.
+Padding to section alignment is conservatively projected as zero after raw data;
+one x64 MSVC image has matched natively. A short read or padding
 mismatch refuses the image rather than dropping coverage. Matching these ranges
 is not atomic execution integrity, live page-protection evidence, DLL/source trust,
 or proof that no other executable mappings exist. x86/ARM64 image plans remain
-unsupported. Tests use synthetic mappings and static build-artifact inspection.
+unsupported. Unit tests use synthetic mappings and static build-artifact inspection.
 
 ### Owned fixture preparation
 
@@ -1027,23 +1034,31 @@ Service query errors cross IPC as fixed `ServiceFailure` codes. Unknown reasons,
 mixed error formats, extra fields and custom error text are rejected without
 echoing their contents. Error envelopes are checked before input events.
 
-For this helper version, service keys must be printable ASCII, at most 256
-characters, and contain no slash, backslash or NUL. Case aliases share one scope
-and resource path; whitespace is preserved. The resource key excludes target
+Service keys are at most 256 UTF-16 units and contain no slash, backslash or
+NUL. A printable ASCII key keeps its original ASCII-folded scope. Any other key
+must not contain control, format, surrogate, private-use or unassigned
+characters, or any separator other than the plain space, and is folded per
+UTF-16 unit with the NT upcase table (`RtlUpcaseUnicodeChar`), the table
+case-insensitive registry keys, and so service keys, are compared with. That
+table folds at least as much as SCM, so two spellings of one service cannot
+hold separate locks; it differs from Python's case mapping (`ß`, `ı`, the
+Kelvin sign and `µ` are left alone) and Python's is never used. A key that
+folds to printable ASCII shares that ASCII scope. Off Windows there is no such
+table and non-ASCII keys are unsupported. Case aliases share one scope and
+resource path; whitespace is preserved. The resource key excludes target
 name, configuration digest and database path. Two owners using the same lock
 root therefore contend for the same service, even with different task/profile
 names. The default root is the current user's `.je_auto_control/service_ownership`.
 Construction computes paths without launching a helper or acquiring a service.
 
-This is coordination between framework owners using that root. Unicode key
-canonicalization, coordination across Windows users and external SCM clients
-are not provided. The lower-level SCM reader's Unicode name support is unchanged.
+This is coordination between framework owners using that root. Coordination
+across Windows users and external SCM clients is not provided. The lower-level SCM reader's Unicode name support is unchanged.
 Hidden Python helper tests inject service calls and check actual child retirement;
 they do not establish native SCM compatibility or desktop noninterference.
 ### Pinned service profiles
 
 A host-reviewed `service` profile accepts exactly `config_path`, `config_sha256`
-and `service_key` settings. The ASCII key determines the same-service lock before
+and `service_key` settings. The key determines the same-service lock before
 helper launch. Registration, reload and probe do not open the deployment file,
 start a helper or access SCM. A missing deployment therefore does not prevent
 reopening the runtime to manage unrelated targets, including when the service

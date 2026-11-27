@@ -52,6 +52,9 @@
 
 執行器指令:``AC_generate_code``。CLI:``je_auto_control codegen``。
 
+executor 會代換 ``source``(包含路徑)中已知的 ``${var}``,但 ``${secrets.NAME}`` 與尚未綁定的名稱
+在產生的程式碼中照原樣保留。
+
 
 HTTP / API
 ==========

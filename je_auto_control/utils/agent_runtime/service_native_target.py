@@ -17,7 +17,7 @@ from .target_config import AgentTargetProfile
 
 
 class NativeServiceTarget(NativeDesktopTarget, ServiceTarget):
-    """Trusted host configuration selects one background helper and ASCII service ownership key."""
+    """Trusted host configuration selects one background helper and its service ownership key."""
 
     _display_helper: ClassVar[bool] = False
 

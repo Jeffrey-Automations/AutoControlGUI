@@ -183,3 +183,36 @@ def test_resume_token_is_consumed_after_use():
             v3.connect(timeout=2.0)
     finally:
         host.stop(timeout=1.0)
+
+
+def test_two_connections_cannot_both_spend_one_resume_token(monkeypatch):
+    """Both read the table before either removed the token; the removal's answer was ignored."""
+    from je_auto_control.utils.remote_desktop.auth import compute_response, make_nonce
+    host = RemoteDesktopHost(token="tok", bind="127.0.0.1", port=0, frame_provider=_jpeg)
+    token = host._resume_store.issue("full")
+    stale = host._resume_store.list_active()
+    monkeypatch.setattr(host._resume_store, "list_active", lambda: dict(stale))
+    grants = []
+    for _connection in range(2):
+        nonce = make_nonce()
+        grants.append(host._try_consume_resume(nonce, compute_response(token, nonce)))
+    assert grants == ["full", None]
+
+
+def test_stopping_the_host_invalidates_its_resume_tokens():
+    """The store promises a restart does; a stopped and started host kept honouring them."""
+    from je_auto_control.utils.remote_desktop.protocol import AuthenticationError
+    host = RemoteDesktopHost(token="tok", bind="127.0.0.1", port=0, fps=30.0, frame_provider=_jpeg)
+    host.start()
+    try:
+        viewer = RemoteDesktopViewer(host="127.0.0.1", port=host.port, token="tok")
+        viewer.connect(timeout=5.0)
+        saved = viewer.resume_token
+        viewer.disconnect(timeout=1.0)
+        host.stop(timeout=1.0)
+        host.start()
+        again = RemoteDesktopViewer(host="127.0.0.1", port=host.port, token=saved)
+        with pytest.raises(AuthenticationError):
+            again.connect(timeout=3.0)
+    finally:
+        host.stop(timeout=1.0)

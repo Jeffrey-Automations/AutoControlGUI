@@ -22,14 +22,21 @@ Rate limit:
   * Closed runtime stop routes use a second per-IP bucket with the same
     limits. Ordinary polling cannot consume its reserve; authentication and
     the failed-token lockout remain mandatory and shared between lanes.
+  * The tables are bounded. A bucket idle long enough to have refilled, and
+    whose failure window has closed, is exactly what a new client gets, so
+    it is forgotten. Past ``_MAX_TRACKED_CLIENTS`` active clients the least
+    recently seen is dropped as well: one host with many addresses (an IPv6
+    prefix) grew the table without limit. Dropping it gives that address
+    nothing a fresh address would not, so the limit per client holds.
 """
 from __future__ import annotations
 
 import secrets
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from je_auto_control.utils.rbac.authorization import AuthorizationContext, resolve_token
 from je_auto_control.utils.rbac.users import UserStore
@@ -40,6 +47,8 @@ _REQUESTS_PER_MINUTE = 120.0
 _BURST = 30.0
 _FAILED_AUTH_WINDOW_S = 60.0
 _FAILED_AUTH_THRESHOLD = 8
+#: Clients tracked per table (requests and the stop reserve) at most.
+_MAX_TRACKED_CLIENTS = 4096
 
 
 def generate_token() -> str:
@@ -91,9 +100,13 @@ class RestAuthGate:
         self._users = user_store
         self._rate_per_s = float(requests_per_minute) / 60.0
         self._burst = float(burst)
-        self._buckets: Dict[str, _Bucket] = {}
-        self._control_buckets: Dict[str, _Bucket] = {}
+        self._buckets: "OrderedDict[str, _Bucket]" = OrderedDict()
+        self._control_buckets: "OrderedDict[str, _Bucket]" = OrderedDict()
         self._lock = threading.Lock()
+        # After this long untouched a bucket is full again and its failure
+        # window closed: indistinguishable from a new one.
+        refill_s = self._burst / self._rate_per_s if self._rate_per_s > 0 else float("inf")
+        self._idle_s = max(refill_s, _FAILED_AUTH_WINDOW_S)
 
     @property
     def expected_token(self) -> str:
@@ -144,11 +157,8 @@ class RestAuthGate:
     def _consume_token(self, client_ip: str, *, control: bool = False) -> bool:
         now = time.monotonic()
         with self._lock:
-            buckets = self._control_buckets if control else self._buckets
-            bucket = buckets.get(client_ip)
-            if bucket is None:
-                bucket = _Bucket(tokens=self._burst, last_refill=now)
-                buckets[client_ip] = bucket
+            bucket = self._bucket_locked(
+                self._control_buckets if control else self._buckets, client_ip, now)
             elapsed = now - bucket.last_refill
             bucket.last_refill = now
             bucket.tokens = min(
@@ -158,6 +168,24 @@ class RestAuthGate:
                 bucket.tokens -= 1.0
                 return True
             return False
+
+    def _bucket_locked(self, buckets: "OrderedDict[str, _Bucket]",
+                       client_ip: str, now: float) -> _Bucket:
+        """``client_ip``'s bucket, now the most recently used; caller holds the lock."""
+        bucket = buckets.get(client_ip)
+        if bucket is not None:
+            buckets.move_to_end(client_ip)
+            return bucket
+        # Oldest first: stop at the first bucket still in use.
+        while buckets:
+            oldest = next(iter(buckets.values()))
+            last_seen = max(oldest.last_refill, oldest.failed_window_start)
+            if now - last_seen <= self._idle_s and len(buckets) < _MAX_TRACKED_CLIENTS:
+                break
+            buckets.popitem(last=False)
+        bucket = _Bucket(tokens=self._burst, last_refill=now)
+        buckets[client_ip] = bucket
+        return bucket
 
     def _is_locked_out(self, client_ip: str) -> bool:
         with self._lock:
@@ -172,11 +200,8 @@ class RestAuthGate:
 
     def _note_failure(self, client_ip: str) -> None:
         with self._lock:
-            bucket = self._buckets.setdefault(
-                client_ip,
-                _Bucket(tokens=self._burst, last_refill=time.monotonic()),
-            )
             now = time.monotonic()
+            bucket = self._bucket_locked(self._buckets, client_ip, now)
             if now - bucket.failed_window_start > _FAILED_AUTH_WINDOW_S:
                 bucket.failed = 0
                 bucket.failed_window_start = now
