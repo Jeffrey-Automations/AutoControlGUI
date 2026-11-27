@@ -8,6 +8,7 @@ extension evolves.
 """
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -46,6 +47,76 @@ def test_manifest_files_exist():
         relative_paths.extend(content.get("js", []))
     for path in relative_paths:
         assert (_EXT_DIR / path).is_file(), f"missing extension file: {path}"
+
+
+def _icon_paths(value) -> list:
+    """``default_icon`` / ``icons`` may be one path or a ``{size: path}`` map."""
+    if isinstance(value, str):
+        return [value]
+    return list((value or {}).values())
+
+
+def _manifest_resource_paths(pkg: dict) -> list:
+    """Every file path the manifest names, wherever MV3 lets one appear."""
+    paths = [pkg.get("background", {}).get("service_worker")]
+    action = pkg.get("action", {})
+    paths.append(action.get("default_popup"))
+    paths.extend(_icon_paths(action.get("default_icon")))
+    paths.extend(_icon_paths(pkg.get("icons")))
+    paths.extend([pkg.get("options_page"), pkg.get("options_ui", {}).get("page"),
+                  pkg.get("devtools_page"), pkg.get("side_panel", {}).get("default_path")])
+    for content in pkg.get("content_scripts", []):
+        paths.extend(content.get("js", []) + content.get("css", []))
+    for entry in pkg.get("web_accessible_resources", []):
+        paths.extend(entry.get("resources", []))
+    return [path for path in paths if path]
+
+
+def test_every_manifest_resource_path_exists():
+    """A fresh checkout loads unpacked only if every file the manifest names ships with it."""
+    pkg = _manifest()
+    paths = _manifest_resource_paths(pkg)
+    assert "icons/icon16.png" in paths  # the collector sees the icon maps
+    missing = [path for path in paths if not (_EXT_DIR / path).is_file()]
+    assert not missing, f"manifest names files the extension does not ship: {missing}"
+
+
+def test_manifest_resources_are_tracked_by_git():
+    """Existing on this disk is not enough: a clean checkout has only what git tracks."""
+    try:
+        listing = subprocess.run(
+            ["git", "ls-files", "--", "browser-extension"], cwd=_EXT_DIR.parent,
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        pytest.skip(f"git is not usable here: {error}")
+    if listing.returncode != 0:
+        pytest.skip("not a git checkout")
+    tracked = set(listing.stdout.splitlines())
+    untracked = [path for path in _manifest_resource_paths(_manifest())
+                 if f"browser-extension/{path}" not in tracked]
+    assert not untracked, f"manifest names files git does not track: {untracked}"
+
+
+_PNG_SIGNATURE =bytes([0x89]) + b"PNG\r\n\x1a\n"
+
+
+def _png_size(path: Path) -> tuple:
+    """(width, height) from a PNG's IHDR chunk; fails on anything that is not a PNG."""
+    raw = path.read_bytes()
+    assert raw[:8] == _PNG_SIGNATURE, f"{path.name} is not a PNG"
+    assert raw[12:16] == b"IHDR", f"{path.name} has no IHDR chunk first"
+    return int.from_bytes(raw[16:20], "big"), int.from_bytes(raw[20:24], "big")
+
+
+def test_manifest_icons_are_pngs_of_the_declared_size():
+    pkg = _manifest()
+    declared = dict(pkg["icons"])
+    assert declared == pkg["action"]["default_icon"]
+    for size, path in declared.items():
+        icon = _EXT_DIR / path
+        assert icon.is_file(), f"missing icon: {path}"
+        assert _png_size(icon) == (int(size), int(size))
 
 
 def test_manifest_action_popup_is_html():
