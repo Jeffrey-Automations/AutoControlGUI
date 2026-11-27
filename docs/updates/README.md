@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261127-03 | 2026-11-27 | Fix the browser extension findings of the code review | #done #fix #security #review | [2026-11-c](2026-11-c.md) |
 | U-20261127-02 | 2026-11-27 | Fix the web viewer findings of the code review | #done #fix #remote-desktop #review | [2026-11-c](2026-11-c.md) |
 | U-20261127-01 | 2026-11-27 | Fix the native findings of the code review | #done #fix #native #android #review | [2026-11-c](2026-11-c.md) |
 | U-20261126-43 | 2026-11-26 | Let a stop prevent an accessibility write that has not acted | #done #stop #accessibility #decide | [2026-11-c](2026-11-c.md) |

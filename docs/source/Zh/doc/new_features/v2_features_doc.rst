@@ -646,6 +646,12 @@ REST URL 與 bearer token 來自 VS Code settings
 ``data-testid`` / ``data-cy`` / ``name`` / ``nth-of-type``
 路徑，貼近實務寫法。
 
+錄製只跟著按下 Start 的那個分頁，跨導航延續，分頁關閉即結束；沒有作用中分頁時拒絕 Start。
+敏感欄位（``type=password``、``current-password`` ／ ``one-time-code`` ／ ``cc-*`` 等 autocomplete
+提示，或 ``password`` ／ ``otp`` ／ ``cvv`` ／ ``pin`` 之類的 name 或 id）的值從不讀取，記成
+``${secrets.NAME}``：NAME 取欄位的 name、id 或提示，其他字元換成 ``_``（都沒有時為 ``password``），
+重播前請先在 vault 以該名稱存入值。
+
 
 pytest plugin + Gherkin BDD
 ---------------------------

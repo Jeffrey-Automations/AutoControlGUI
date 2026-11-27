@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Browser extension: password and other sensitive fields are recorded as `${secrets.NAME}`, never as
+  their value; recording follows only the tab where Start was pressed (refused without one) and ends
+  when it closes; commands are applied one at a time so quick events are not lost; the declared icons
+  ship, so the extension loads unpacked from a clean checkout.
+
 - Web viewer: mouse and keyboard input now reaches the host (the host rejected every web event before);
   only the `ctrl` channel carries control, so a usb channel arriving later no longer takes auth and input;
   a microphone or screen share granted after a disconnect is stopped at once. New asset `viewer-session.js`.

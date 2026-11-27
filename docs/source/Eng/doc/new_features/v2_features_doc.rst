@@ -767,6 +767,15 @@ and exports them as an AutoControl JSON action file driveable by
 ``data-testid`` / ``data-cy`` / ``name`` / ``nth-of-type`` paths,
 mirroring how production-style locators are typically picked.
 
+Recording follows only the tab where Start was pressed, across its
+navigations, and ends when that tab closes; Start is refused without an
+active tab. A sensitive field (``type=password``, an autocomplete hint
+such as ``current-password`` / ``one-time-code`` / ``cc-*``, or a name
+or id like ``password`` / ``otp`` / ``cvv`` / ``pin``) is never read: it
+is recorded as ``${secrets.NAME}``, the field's name, id or hint with
+other characters turned into ``_`` (``password`` when it has none), so
+store a vault entry under that name before replaying.
+
 
 pytest plugin + Gherkin BDD
 ---------------------------
