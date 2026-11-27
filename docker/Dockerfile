@@ -9,6 +9,8 @@
 # stage. The runtime image then installs binaries only, so no dependency
 # gets to execute a setup script there and the resolved set is fixed at
 # build time instead of being re-resolved against PyPI.
+# The [signaling] extra (FastAPI, Uvicorn) is built in too: the entrypoint
+# offers a signaling mode, and the runtime install has no index to fetch it.
 FROM python:3.12-slim AS builder
 
 WORKDIR /src
@@ -16,7 +18,7 @@ COPY pyproject.toml README.md ./
 COPY je_auto_control ./je_auto_control
 COPY autocontrol-lsp ./autocontrol-lsp
 RUN pip install --no-cache-dir --only-binary :all: --upgrade "pip==26.0.1" \
-    && pip wheel --no-cache-dir --wheel-dir /wheels .
+    && pip wheel --no-cache-dir --wheel-dir /wheels ".[signaling]"
 
 
 FROM python:3.12-slim AS runtime
@@ -71,7 +73,7 @@ COPY README.md ./
 COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir --only-binary :all: --upgrade "pip==26.0.1" \
     && pip install --no-cache-dir --only-binary :all: --no-index \
-       --find-links=/wheels /wheels/je_auto_control-*.whl \
+       --find-links=/wheels "je_auto_control[signaling]" \
     && rm -rf /wheels
 
 ENV DISPLAY=:99 \

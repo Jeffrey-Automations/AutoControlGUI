@@ -67,7 +67,7 @@ print('listening on', h.port); \
         ;;
     signaling)
         exec python -m je_auto_control.utils.remote_desktop.signaling_server \
-            --host 0.0.0.0 --port 8765 "$@"
+            --bind 0.0.0.0 --port 8765 "$@"
         ;;
     shell)
         exec /bin/sh "$@"

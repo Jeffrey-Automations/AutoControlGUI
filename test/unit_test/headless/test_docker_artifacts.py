@@ -7,9 +7,12 @@ We can't actually run Docker in CI, but we can:
 - run both service entrypoints under ``sh`` with their daemons stubbed, so the
   command each would exec is checked against the real argument parsers
 """
+import argparse
+import ast
 import os
 import shutil
 import subprocess  # nosec B404  # reason: runs the entrypoint under sh with stubbed daemons
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -399,3 +402,85 @@ def test_entrypoints_carry_no_fixed_token(script):
     raw = (_DOCKER_DIR / script).read_text(encoding="utf-8")
     assert "change-me" not in raw
     assert "os.environ.get('AC_TOKEN'" not in raw
+
+
+# --- service commands against the real parsers (D01) ----------------
+
+class _Started(Exception):
+    """Raised by the stand-in server so a test stops at the bind."""
+
+
+def _parser_from_source(module_path: Path, name: str):
+    """Compile one function out of a module whose imports are not installed.
+
+    The signaling server needs its extra (FastAPI) to import at all; its
+    argument parser does not, so the exact source is compiled on its own.
+    """
+    tree = ast.parse(module_path.read_text(encoding="utf-8"))
+    func = next(node for node in tree.body
+                if isinstance(node, ast.FunctionDef) and node.name == name)
+    namespace = {"argparse": argparse, "_DEFAULT_TTL_S": 300.0}
+    exec(compile(ast.Module(body=[func], type_ignores=[]), str(module_path), "exec"),  # nosec B102  # reason: repository source
+         namespace)
+    return namespace[name]
+
+
+def _signaling_listen(argv, _monkeypatch):
+    try:
+        from je_auto_control.utils.remote_desktop.signaling_server import _build_arg_parser
+    except ImportError:  # the [signaling] extra is not installed here
+        _build_arg_parser = _parser_from_source(
+            _REPO_ROOT / "je_auto_control" / "utils" / "remote_desktop" / "signaling_server.py",
+            "_build_arg_parser")
+    args = _build_arg_parser().parse_args(argv)
+    return args.bind, args.port
+
+
+def _rest_listen(argv, monkeypatch):
+    from je_auto_control.utils.rest_api import rest_server
+    seen = {}
+
+    def _record(**kwargs):
+        seen.update(kwargs)
+        raise _Started
+
+    monkeypatch.setattr(rest_server, "start_rest_api_server", _record)
+    with pytest.raises(_Started):
+        rest_server._main(argv)
+    return seen["host"], seen["port"]
+
+
+_SERVICE_MODES = {
+    "rest": ("je_auto_control.utils.rest_api.rest_server", _rest_listen, 9939),
+    "signaling": ("je_auto_control.utils.remote_desktop.signaling_server", _signaling_listen, 8765),
+}
+
+
+def _service_listen(script, mode, tmp_path, monkeypatch, env=None):
+    """Run ``mode`` through the entrypoint and parse what it exec'd."""
+    module, listen, _port = _SERVICE_MODES[mode]
+    done, argv, _daemons = _run_entrypoint(script, tmp_path, mode, env=env)
+    assert done.returncode == 0, done.stderr
+    assert argv[:2] == ["-m", module], argv
+    return listen(argv[2:], monkeypatch)
+
+
+@pytest.mark.parametrize("script", _SERVICE_ENTRYPOINTS)
+@pytest.mark.parametrize("mode", sorted(_SERVICE_MODES))
+def test_service_modes_exec_a_command_their_parser_accepts(script, mode, tmp_path, monkeypatch):
+    """A flag the parser rejects is an image that exits on start."""
+    address, port = _service_listen(script, mode, tmp_path, monkeypatch)
+    assert address == "0.0.0.0"  # nosec B104  # reason: a container service is reached from outside it
+    assert port == _SERVICE_MODES[mode][2]
+
+
+@pytest.mark.parametrize("dockerfile", ["Dockerfile", "Dockerfile.xfce"])
+def test_dockerfiles_install_the_signaling_extra(dockerfile):
+    """The signaling mode is in every entrypoint, so its extra is in every image."""
+    pyproject = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert pyproject["project"]["optional-dependencies"]["signaling"]
+    raw = (_DOCKER_DIR / dockerfile).read_text(encoding="utf-8")
+    # Built into the wheelhouse, which the runtime stage installs from with
+    # --no-index: an extra missing from the wheelhouse cannot be installed.
+    assert 'pip wheel --no-cache-dir --wheel-dir /wheels ".[signaling]"' in raw
+    assert '"je_auto_control[signaling]"' in raw
