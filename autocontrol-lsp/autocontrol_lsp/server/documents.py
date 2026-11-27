@@ -4,6 +4,12 @@ LSP clients send ``textDocument/didOpen`` with the full file contents
 and ``didChange`` with either full or incremental updates. The server
 needs the *current* text whenever hover / completion / diagnostics is
 requested — that's what this module owns. Pure stdlib, thread-safe.
+
+LSP positions count ``character`` in UTF-16 code units, while a Python
+string index counts code points: an emoji or any other character outside
+the BMP is two units but one index. Every position is converted at this
+boundary (:func:`utf16_to_index`); using the column as an index put the
+cursor, and range edits, past the right spot on such a line.
 """
 from __future__ import annotations
 
@@ -14,7 +20,7 @@ from typing import Dict, List, Optional, Sequence
 
 @dataclass(frozen=True)
 class Position:
-    """Zero-based ``(line, character)`` LSP position."""
+    """Zero-based ``(line, character)`` LSP position; ``character`` is in UTF-16 units."""
 
     line: int
     character: int
@@ -37,10 +43,9 @@ class TextDocument:
         if position.line < 0 or position.line >= len(rows):
             return ""
         line = rows[position.line]
-        index = position.character
-        if index < 0 or index > len(line):
+        if position.character < 0 or position.character > utf16_length(line):
             return ""
-        return _word_around(line, min(index, len(line)))
+        return _word_around(line, utf16_to_index(line, position.character))
 
 
 class DocumentStore:
@@ -100,6 +105,29 @@ class DocumentStore:
 
 # --- helpers -------------------------------------------------
 
+def _utf16_units(char: str) -> int:
+    return 2 if ord(char) > 0xFFFF else 1
+
+
+def utf16_length(line: str) -> int:
+    """Length of ``line`` in UTF-16 code units, as an LSP client counts it."""
+    return sum(_utf16_units(char) for char in line)
+
+
+def utf16_to_index(line: str, units: int) -> int:
+    """Python index of the UTF-16 column ``units`` in ``line``.
+
+    Clamped to ``[0, len(line)]``, as LSP clamps a column past the line
+    end. A column inside a surrogate pair rounds to the character after it.
+    """
+    count = 0
+    for index, char in enumerate(line):
+        if count >= units:
+            return index
+        count += _utf16_units(char)
+    return len(line)
+
+
 def _resolve_next_version(override: Optional[int],
                            existing: Optional[TextDocument]) -> int:
     """Pick the next document version: explicit override → existing+1 → 0."""
@@ -147,13 +175,25 @@ def _apply_range_edit(text: str, lsp_range: Dict,
 
 
 def _offset_for(text: str, line: int, char: int) -> int:
-    current_line = 0
-    for index, ch in enumerate(text):
-        if current_line == line:
-            return min(len(text), index + char)
-        if ch == "\n":
-            current_line += 1
-    return len(text)
+    """Index in ``text`` of the LSP position ``(line, char)``.
+
+    A line past the end gives ``len(text)``; a column past the end of its
+    line stops at that line's end rather than running into the next one.
+    """
+    start = 0
+    for _ in range(max(0, line)):
+        newline = text.find("\n", start)
+        if newline < 0:
+            return len(text)
+        start = newline + 1
+    end = text.find("\n", start)
+    row = text[start:] if end < 0 else text[start:end]
+    if row.endswith("\r"):
+        row = row[:-1]
+    return start + utf16_to_index(row, char)
 
 
-__all__ = ["DocumentStore", "Position", "TextDocument"]
+__all__ = [
+    "DocumentStore", "Position", "TextDocument", "utf16_length",
+    "utf16_to_index",
+]
