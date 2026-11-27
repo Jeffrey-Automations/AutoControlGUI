@@ -37,6 +37,25 @@ def record() -> bool:
         return False
 
 
+_RECORD_ERRORS = (OSError, RuntimeError, AttributeError, TypeError, ValueError,
+                  AutoControlException)   # covers AutoControlJsonActionException, its subclass
+
+
+def _stop_and_convert() -> List[List[Any]]:
+    """Stop the recorder and shape its queue as actions; raises on failure."""
+    action_queue = recorder.stop_record()
+    if action_queue is None:
+        raise AutoControlJsonActionException("the recorder returned no action queue")
+    new_list = []
+    for action in list(action_queue.queue):
+        if action[0] == "AC_type_keyboard":
+            new_list.append([action[0], {"keycode": action[1]}])
+        else:
+            new_list.append([action[0], {"x": action[1], "y": action[2]}])
+    record_action_to_list("stop_record", None)
+    return new_list
+
+
 def stop_record() -> List[List[Any]]:
     """
     stop current record
@@ -49,20 +68,8 @@ def stop_record() -> List[List[Any]]:
     """
     autocontrol_logger.info("stop_record")
     try:
-        action_queue = recorder.stop_record()
-        if action_queue is None:
-            raise AutoControlJsonActionException
-        action_list = list(action_queue.queue)
-        new_list = []
-        for action in action_list:
-            if action[0] == "AC_type_keyboard":
-                new_list.append([action[0], {"keycode": action[1]}])
-            else:
-                new_list.append([action[0], {"x": action[1], "y": action[2]}])
-        record_action_to_list("stop_record", None)
-        return new_list
-    except (OSError, RuntimeError, AttributeError, TypeError, ValueError,
-            AutoControlException) as error:   # covers AutoControlJsonActionException, its subclass
+        return _stop_and_convert()
+    except _RECORD_ERRORS as error:
         record_action_to_list("stop_record", None, repr(error))
         autocontrol_logger.error(f"stop_record, failed: {repr(error)}")
         return []
@@ -119,6 +126,22 @@ def record_to_json(output_path: str, *, stop_event: threading.Event,
     try:
         stop_event.wait(timeout)
     finally:
-        actions = stop_record() or []
+        actions = _stop_for_file(output_path)
     write_action_json(target, actions)
     return actions
+
+
+def _stop_for_file(output_path: str) -> List[List[Any]]:
+    """Stop the recorder for :func:`record_to_json`, raising instead of returning ``[]``.
+
+    :func:`stop_record` turns a failure into an empty list, and writing that
+    replaced an existing file with ``[]`` while the CLI reported success.
+    """
+    autocontrol_logger.info("stop_record")
+    try:
+        return _stop_and_convert()
+    except _RECORD_ERRORS as error:
+        record_action_to_list("stop_record", None, repr(error))
+        autocontrol_logger.error(f"stop_record, failed: {repr(error)}")
+        raise AutoControlException(
+            f"recording could not be stopped; {output_path} was not written: {error!r}") from error
