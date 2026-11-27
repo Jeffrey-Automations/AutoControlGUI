@@ -61,8 +61,10 @@
     function send(event) {
         try {
             chrome.runtime.sendMessage({ command: "event", event });
-        } catch {
+        } catch (_error) {
             // Service worker may have torn down between sends — ignore.
+            // (A named binding: the Qt engine the tests run this in
+            // does not parse an optional catch binding.)
         }
     }
 

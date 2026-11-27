@@ -1,8 +1,12 @@
 /* eslint-env webextensions, serviceworker */
 // Background service worker — owns the recording state machine and
 // turns inbound events from the content script into AutoControl JSON
-// action entries. Translation lives in ``actionFor`` so it can be
-// unit-tested by importing this module from a Node test runner.
+// action entries. Translation lives in ``actionFor``.
+//
+// The headless suite runs this module in the Qt JavaScript engine
+// (test_browser_extension_runtime.py), which does not parse async /
+// await, object spread or an optional catch binding — so this file
+// sticks to promise chains and Object.assign.
 
 // nosemgrep: codacy.javascript.security.hard-coded-password
 const STATE_KEY = "autocontrol.recorder.state";  // nosemgrep: codacy.javascript.security.hard-coded-password
@@ -14,29 +18,34 @@ const STATE_KEY = "autocontrol.recorder.state";  // nosemgrep: codacy.javascript
  * @property {Array<Array>} actions  AC_/WR_ JSON action entries
  */
 
-const DEFAULT_STATE = {
+const DEFAULT_STATE = Object.freeze({
     recording: false,
     startUrl: null,
-    actions: [],
-};
+    actions: Object.freeze([]),
+});
 
-async function loadState() {
-    const stored = await chrome.storage.local.get(STATE_KEY);
-    // ``stored`` is whatever chrome.storage round-trips for us; we
-    // only ever copy own enumerable properties onto a fresh default
-    // — Object.hasOwn is the modern (ES2022) safe lookup.
-    /* eslint-disable security/detect-object-injection */
-    const saved = Object.hasOwn(stored, STATE_KEY)
-        ? stored[STATE_KEY] : null;
-    /* eslint-enable security/detect-object-injection */
-    if (saved == null || typeof saved !== "object") {
-        return { ...DEFAULT_STATE };
-    }
-    return { ...DEFAULT_STATE, ...saved };
+function freshState(overrides) {
+    return Object.assign({}, DEFAULT_STATE, { actions: [] }, overrides);
 }
 
-async function saveState(state) {
-    await chrome.storage.local.set({ [STATE_KEY]: state });
+function loadState() {
+    return chrome.storage.local.get(STATE_KEY).then((stored) => {
+        // ``stored`` is whatever chrome.storage round-trips for us; we
+        // only ever copy own enumerable properties onto a fresh default.
+        /* eslint-disable security/detect-object-injection */
+        const saved = stored != null
+            && Object.prototype.hasOwnProperty.call(stored, STATE_KEY)
+            ? stored[STATE_KEY] : null;
+        /* eslint-enable security/detect-object-injection */
+        if (saved == null || typeof saved !== "object") {
+            return freshState({});
+        }
+        return freshState(saved);
+    });
+}
+
+function saveState(state) {
+    return chrome.storage.local.set({ [STATE_KEY]: state });
 }
 
 /**
@@ -81,74 +90,78 @@ export function actionFor(event) {
     }
 }
 
-/* eslint-disable security-node/detect-unhandled-async-errors */
-async function handleMessage(message, _sender, sendResponse) {
-    const state = await loadState();
-    switch (message?.command) {
-        case "start":
-            await saveState({
-                recording: true,
-                startUrl: message.startUrl || null,
-                actions: message.startUrl
-                    ? [["AC_web_open", { url: message.startUrl }]]
-                    : [],
-            });
-            sendResponse({ ok: true });
-            break;
-        case "stop":
-            await saveState({ ...state, recording: false });
-            sendResponse({ ok: true, actions: state.actions });
-            break;
-        case "event": {
-            if (!state.recording) {
-                sendResponse({ ok: false, reason: "not recording" });
-                break;
-            }
-            const action = actionFor(message.event);
-            if (action) {
-                state.actions.push(action);
-                await saveState(state);
-            }
-            sendResponse({ ok: !!action });
-            break;
+function startRecording(message) {
+    const startUrl = message.startUrl || null;
+    return saveState(freshState({
+        recording: true,
+        startUrl,
+        actions: startUrl ? [["AC_web_open", { url: startUrl }]] : [],
+    })).then(() => ({ ok: true }));
+}
+
+function stopRecording(state) {
+    return saveState(Object.assign({}, state, { recording: false }))
+        .then(() => ({ ok: true, actions: state.actions }));
+}
+
+function recordEvent(state, message) {
+    if (!state.recording) {
+        return { ok: false, reason: "not recording" };
+    }
+    const action = actionFor(message.event);
+    if (!action) {
+        return { ok: false };
+    }
+    state.actions.push(action);
+    return saveState(state).then(() => ({ ok: true }));
+}
+
+function dispatch(message) {
+    return loadState().then((state) => {
+        switch (message?.command) {
+            case "start":
+                return startRecording(message);
+            case "stop":
+                return stopRecording(state);
+            case "event":
+                return recordEvent(state, message);
+            case "status":
+                return { ok: true, state };
+            case "reset":
+                return saveState(freshState({})).then(() => ({ ok: true }));
+            case "export":
+                return {
+                    ok: true,
+                    json: JSON.stringify(state.actions, null, 2),
+                };
+            default:
+                return { ok: false, reason: "unknown command" };
         }
-        case "status":
-            sendResponse({ ok: true, state });
-            break;
-        case "reset":
-            await saveState(DEFAULT_STATE);
-            sendResponse({ ok: true });
-            break;
-        case "export":
-            sendResponse({
-                ok: true,
-                json: JSON.stringify(state.actions, null, 2),
-            });
-            break;
-        default:
-            sendResponse({ ok: false, reason: "unknown command" });
+    });
+}
+
+function replyWithError(sendResponse, error) {
+    console.error("handleMessage failed:", error);
+    try {
+        sendResponse({ ok: false, reason: String(error) });
+    } catch (replyError) {
+        // The message port may already be closed (popup dismissed
+        // before reply). Log so the swallow is visible in devtools —
+        // the original error is the one the caller actually cares about.
+        console.debug("sendResponse failed:", replyError);
     }
 }
-/* eslint-enable security-node/detect-unhandled-async-errors */
 
 if (typeof chrome !== "undefined" && chrome.runtime) {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Returning true keeps the response channel open for async
-        // work. Attach .catch so an unhandled rejection in
-        // handleMessage doesn't drop silently (ESLint
+        // work. The rejection handler keeps a failed dispatch from
+        // dropping silently (ESLint
         // security-node/detect-unhandled-async-errors).
-        handleMessage(message, sender, sendResponse).catch((error) => {
-            console.error("handleMessage failed:", error);
-            try {
-                sendResponse({ ok: false, reason: String(error) });
-            } catch (replyError) {
-                // The message port may already be closed (popup
-                // dismissed before reply). Log so the swallow is
-                // visible in devtools — the original error is the
-                // one the caller actually cares about.
-                console.debug("sendResponse failed:", replyError);
-            }
-        });
+        dispatch(message).then(
+            sendResponse,
+            (error) => replyWithError(sendResponse, error),
+        );
         return true;
     });
 }
