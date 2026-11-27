@@ -41,9 +41,15 @@ vsce package           # produces a .vsix
 code --install-extension autocontrol-lsp-0.1.0.vsix
 ```
 
-The extension activates on `*.json` files whose first 2 KB contain
-the literal string `AC_` (so it doesn't slow down unrelated JSON
-files like `package.json` or `tsconfig.json`).
+The language server only diagnoses **action files**: documents whose
+absolute path matches one of the `autocontrolLsp.actionFiles` globs
+(default `**/*.ac.json` and `**/actions/**/*.json`). Other JSON and
+JSONC files such as `package.json`, `tsconfig.json` or a commented
+`settings.json` are left alone. Add your own patterns (for example
+`**/keyword/*.json`) and reload the window. The extension sends the
+setting as the `actionFiles` initialization option, and the server
+applies the same globs as a guard, so other LSP clients can pass
+`{"actionFiles": [...]}` too; without it the server uses the defaults.
 
 ## Why a sibling project
 

@@ -208,3 +208,33 @@ def test_screenshot_command_shows_the_image_and_reports_failures():
     assert "fs.writeFile(file, png)" in body
     assert '"vscode.open"' in body
     assert "reply.body.slice(0, 240)" in body
+
+
+# === Document selection ==================================================
+
+def _client_options_block() -> str:
+    source = _extension_source()
+    start = source.index("const clientOptions: LanguageClientOptions = {")
+    return source[start:source.index("};", start)]
+
+
+def test_document_selector_is_the_action_file_globs_not_every_json():
+    """Selecting every JSON / JSONC file diagnosed package.json as an action list."""
+    block = _client_options_block()
+    assert "documentSelector: actionFiles.map(" in block
+    assert '({ scheme: "file", pattern })' in block
+    assert 'language: "json"' not in block
+    assert 'language: "jsonc"' not in block
+    assert "initializationOptions: { actionFiles }" in block
+    source = _extension_source()
+    assert 'config.get<string[]>(\n        "actionFiles", DEFAULT_ACTION_FILES,' in source
+    assert "**/*.{json,jsonc}" not in source
+
+
+def test_action_file_default_selects_neither_package_json_nor_all_json():
+    default = _manifest()["contributes"]["configuration"]["properties"][
+        "autocontrolLsp.actionFiles"]["default"]
+    assert default
+    for glob in default:
+        assert glob not in ("**/*.json", "**/*.jsonc", "**/*.{json,jsonc}", "**")
+        assert "package" not in glob

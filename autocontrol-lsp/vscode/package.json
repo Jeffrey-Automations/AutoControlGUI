@@ -32,6 +32,17 @@
           "default": "autocontrol_lsp.server",
           "description": "Module path to launch the LSP server (overrideable for forks)."
         },
+        "autocontrolLsp.actionFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/*.ac.json",
+            "**/actions/**/*.json"
+          ],
+          "description": "Glob patterns (matched against the absolute path) of the AutoControl action files the language server diagnoses. Other JSON files are left alone. Reload the window after changing."
+        },
         "autocontrolLsp.rest.url": {
           "type": "string",
           "default": "http://127.0.0.1:9939",

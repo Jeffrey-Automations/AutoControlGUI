@@ -4,6 +4,7 @@ from __future__ import annotations
 import inspect
 from typing import Any, Dict, List, Optional
 
+from autocontrol_lsp.server.action_files import ActionFileFilter
 from autocontrol_lsp.server.commands import (
     discover_actions, get_action_doc, known_action_names,
 )
@@ -97,9 +98,18 @@ def handle_signature_help(params: Dict[str, Any],
     }
 
 
+_DEFAULT_ACTION_FILES = ActionFileFilter()
+
+
 def handle_did_open(params: Dict[str, Any],
-                     store: DocumentStore) -> List[Dict[str, Any]]:
-    """Track a newly-opened document; returns its diagnostics."""
+                     store: DocumentStore,
+                     action_files: Optional[ActionFileFilter] = None,
+                     ) -> List[Dict[str, Any]]:
+    """Track a newly-opened document; returns its diagnostics.
+
+    Only a document ``action_files`` matches is diagnosed (the default
+    globs when it is ``None``); any other JSON is left alone.
+    """
     doc_params = params.get("textDocument") or {}
     uri = doc_params.get("uri")
     if not isinstance(uri, str):
@@ -107,11 +117,12 @@ def handle_did_open(params: Dict[str, Any],
     text = str(doc_params.get("text") or "")
     version = int(doc_params.get("version") or 0)
     store.open(uri, text, version)
-    return diagnostics_for(text)
+    return _diagnose(uri, text, action_files)
 
 
 def handle_did_change(params: Dict[str, Any],
                        store: DocumentStore,
+                       action_files: Optional[ActionFileFilter] = None,
                        ) -> List[Dict[str, Any]]:
     """Apply an incremental change and recompute diagnostics."""
     doc_params = params.get("textDocument") or {}
@@ -123,7 +134,7 @@ def handle_did_change(params: Dict[str, Any],
     updated = store.apply_change(uri, changes, version=version)
     if updated is None:
         return []
-    return diagnostics_for(updated.text)
+    return _diagnose(uri, updated.text, action_files)
 
 
 def handle_did_close(params: Dict[str, Any],
@@ -136,6 +147,13 @@ def handle_did_close(params: Dict[str, Any],
 
 
 # --- helpers -------------------------------------------------
+
+def _diagnose(uri: str, text: str,
+              action_files: Optional[ActionFileFilter],
+              ) -> List[Dict[str, Any]]:
+    selected = action_files if action_files is not None else _DEFAULT_ACTION_FILES
+    return diagnostics_for(text) if selected.matches(uri) else []
+
 
 def _word_from_params(params: Dict[str, Any],
                        store: Optional[DocumentStore]) -> str:

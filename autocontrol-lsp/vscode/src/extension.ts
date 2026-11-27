@@ -50,6 +50,10 @@ export function deactivate(): Thenable<void> | undefined {
 
 // --- LSP client --------------------------------------------------
 
+// Keep in step with package.json's autocontrolLsp.actionFiles default and
+// DEFAULT_ACTION_FILE_GLOBS in autocontrol_lsp/server/action_files.py.
+const DEFAULT_ACTION_FILES: string[] = ["**/*.ac.json", "**/actions/**/*.json"];
+
 function startLanguageClient(): LanguageClient {
     const config = vscode.workspace.getConfiguration("autocontrolLsp");
     const pythonPath = config.get<string>("python.path", "python");
@@ -61,16 +65,16 @@ function startLanguageClient(): LanguageClient {
         args: ["-m", serverModule],
         transport: TransportKind.stdio,
     };
+    // Only action files, never every JSON document: a package.json is not
+    // an action list. The server applies the same globs as a guard.
+    const actionFiles = config.get<string[]>(
+        "actionFiles", DEFAULT_ACTION_FILES,
+    );
     const clientOptions: LanguageClientOptions = {
-        documentSelector: [
-            { scheme: "file", language: "json" },
-            { scheme: "file", language: "jsonc" },
-        ],
-        synchronize: {
-            fileEvents: vscode.workspace.createFileSystemWatcher(
-                "**/*.{json,jsonc}",
-            ),
-        },
+        documentSelector: actionFiles.map(
+            (pattern) => ({ scheme: "file", pattern }),
+        ),
+        initializationOptions: { actionFiles },
     };
     const lc = new LanguageClient(
         "autocontrolLsp", "AutoControl LSP",

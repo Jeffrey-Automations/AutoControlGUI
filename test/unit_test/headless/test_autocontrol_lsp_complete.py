@@ -281,7 +281,7 @@ def test_server_publishes_diagnostics_on_did_open():
         _encode_request("initialize", 1) +
         _encode_request("textDocument/didOpen", None, {
             "textDocument": {
-                "uri": "file:///x.json",
+                "uri": "file:///work/x.ac.json",
                 "languageId": "json",
                 "version": 1,
                 "text": "[\"not a list of lists\"]",
@@ -294,7 +294,7 @@ def test_server_publishes_diagnostics_on_did_open():
     publishes = [m for m in messages
                  if m.get("method") == "textDocument/publishDiagnostics"]
     assert publishes
-    assert publishes[0]["params"]["uri"] == "file:///x.json"
+    assert publishes[0]["params"]["uri"] == "file:///work/x.ac.json"
     assert publishes[0]["params"]["diagnostics"]
 
 
