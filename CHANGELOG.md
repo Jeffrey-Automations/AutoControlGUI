@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Web viewer: mouse and keyboard input now reaches the host (the host rejected every web event before);
+  only the `ctrl` channel carries control, so a usb channel arriving later no longer takes auth and input;
+  a microphone or screen share granted after a disconnect is stopped at once. New asset `viewer-session.js`.
+
 - Native: the Linux guardian refuses to recover from its journal when a slot cannot be read
   (`GJ_ERROR_IO`) instead of falling back to an older record. The Android helper fails a swipe on its
   first refused event and always releases the pointer, keeps serving after one client disconnects,
