@@ -116,3 +116,38 @@ def test_the_event_cap_stops_the_hook_from_its_own_thread():
     hook._thread.join(5)                # the cap posted the quit itself
     assert not hook._thread.is_alive()
     assert hook.stop() == [_LATE_EVENT]
+
+
+def _presence_hook(**kwargs):
+    """The agent's presence hook, which builds on this one, over the same fakes."""
+    from je_auto_control.utils.agent_runtime import activity_windows
+    presence = type(activity_windows._listener(lambda: None))
+
+    class _FakePresence(_FakeHook, presence):
+        stop_timeout = _FakeHook.stop_timeout    # not PresenceHook's own second
+
+    release = threading.Event()
+    release.set()
+    hook = _FakePresence(release, **kwargs)
+    hook.start()
+    assert hook.pumping.wait(5)
+    return hook
+
+
+def test_the_presence_hook_retires_through_the_same_stop():
+    hook = _presence_hook()
+    assert hook.alive()
+    assert hook.stop() == []
+    assert not hook._thread.is_alive()
+
+
+def test_a_presence_hook_that_does_not_retire_is_an_agent_error():
+    from je_auto_control.utils.agent_runtime.errors import AgentTaskError
+    hook = _presence_hook(post_succeeds=False)
+    hook.stop_timeout = 0.05
+    try:
+        with pytest.raises(AgentTaskError, match="not retired"):
+            hook.stop()
+    finally:
+        hook.quit.set()
+        hook._thread.join(5)
