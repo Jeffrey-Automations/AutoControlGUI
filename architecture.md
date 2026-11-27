@@ -970,9 +970,12 @@ source-owner recovery evidence shares existing ACLs; cross-host evidence handoff
   propagating. → CLAUDE.md › Coding Standards › Project-specific rules
 - Validate at boundaries and reject unknown command names; servers bind `127.0.0.1` unless explicitly opted in. → same
 - `AC_add_package_to_executor` / `AC_add_package_to_callback_executor` pass the package gate in
-  `utils/package_manager/package_manager_class.py` before importing: `executor.allow_packages(...)` and
-  `executor.set_allow_arbitrary_packages(...)` are Python-only switches, never `AC_*` commands, so an action list
-  cannot open its own gate. Unconfigured, any package loads with a `DeprecationWarning` (workspace X-12).
+  `utils/package_manager/package_manager_class.py` before importing. Unconfigured, the gate allows no package and
+  refuses every load before anything is imported (workspace X-12). To allow one: list it in
+  `JE_AUTOCONTROL_ALLOWED_PACKAGES` (comma-separated, submodules included, read once when the process starts, honoured
+  by every entry point), pass `--allow-package NAME` to `je_auto_control run`, or call `executor.allow_packages(...)`
+  from Python; `executor.set_allow_arbitrary_packages(True)` allows every package. Those two calls are Python-only
+  switches, never `AC_*` commands, so an action list cannot open its own gate.
 - No `print()` or runtime `assert` in library code; lazy imports for optional and platform deps; release platform
   resources in `finally` / `with`; guard shared state with locks or queues; pin dependency versions. → same
 - Size limits (cyclomatic ≤ 10, cognitive ≤ 15, function ≤ 75 lines, file ≤ 750 lines, line ≤ 120) are a review
