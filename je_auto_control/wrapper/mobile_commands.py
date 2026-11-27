@@ -110,7 +110,7 @@ def command_session(platform: str, device_id: Optional[str] = None, *,
         return
     session = open_device(DeviceContext(
         platform, device_id or "", adb_path=adb_path or None,
-        timeout_s=float(timeout_s) if timeout_s else DEFAULT_TIMEOUT_S))
+        timeout_s=DEFAULT_TIMEOUT_S if timeout_s is None else timeout_s))
     try:
         yield session
     finally:

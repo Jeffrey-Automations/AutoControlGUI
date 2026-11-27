@@ -18,6 +18,7 @@ family whichever backend failed.
 """
 from __future__ import annotations
 
+import math
 import threading
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
@@ -169,8 +170,7 @@ class DeviceContext:
         if self.platform not in MOBILE_PLATFORMS:
             raise DeviceError(
                 f"unknown device platform {self.platform!r}; expected one of {MOBILE_PLATFORMS}")
-        if not isinstance(self.timeout_s, (int, float)) or self.timeout_s <= 0:
-            raise DeviceError(f"timeout_s must be a positive number, got {self.timeout_s!r}")
+        _require_timeout(self.timeout_s)
 
     @property
     def name(self) -> str:
@@ -194,9 +194,37 @@ class DeviceContext:
             platform=platform,
             device_id=str(spec.get(key) or spec.get("device_id") or ""),
             adb_path=str(adb_path) if adb_path else None,
-            timeout_s=float(spec.get("timeout_s") or DEFAULT_TIMEOUT_S),
+            timeout_s=_spec_timeout(spec.get("timeout_s")),
             label=str(spec.get("label") or ""),
         )
+
+
+def _require_timeout(value: Any) -> float:
+    """``value`` as seconds; a :class:`DeviceError` unless it is a finite number above zero.
+
+    NaN and infinity would disable the deadline check of :meth:`DeviceSession.invoke`.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise DeviceError(f"timeout_s must be a finite number greater than 0, got {value!r}")
+    try:
+        seconds = float(value)
+    except OverflowError:
+        seconds = math.inf
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise DeviceError(f"timeout_s must be a finite number greater than 0, got {value!r}")
+    return seconds
+
+
+def _spec_timeout(raw: Any) -> float:
+    """A spec's ``timeout_s``: the default when absent, else that value -- an explicit 0 is refused."""
+    if raw is None:
+        return DEFAULT_TIMEOUT_S
+    if isinstance(raw, str):
+        try:
+            raw = float(raw)
+        except ValueError as error:
+            raise DeviceError(f"timeout_s must be a finite number greater than 0, got {raw!r}") from error
+    return _require_timeout(raw)
 
 
 def _non_negative(name: str, value: float) -> None:
@@ -440,9 +468,9 @@ class DeviceSession:
         for the same reason, and ``ExecutionStopped`` / ``CancelledError``
         propagates.
         """
+        budget = float(self._context.timeout_s) if timeout_s is None else _require_timeout(timeout_s)
         self.check_usable()
         _stop_checkpoint()
-        budget = float(timeout_s) if timeout_s is not None else float(self._context.timeout_s)
         call = _Call(function)
         threading.Thread(target=call.run, name=f"device-{self._context.name}",
                          daemon=True).start()
