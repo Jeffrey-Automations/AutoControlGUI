@@ -58,6 +58,56 @@
         return String(value).replace(/(["\\\]])/g, String.raw`\$1`);
     }
 
+    // Fields whose value must never leave the page. The check reads only
+    // attributes, so a sensitive value is never even read: the recording
+    // gets a ``${secrets.NAME}`` reference instead (see background.js).
+    const SENSITIVE_AUTOCOMPLETE = new Set([
+        "current-password", "new-password", "one-time-code",
+    ]);
+    const SENSITIVE_NAME = /pass|pwd|otp|cvv|cvc|csc|secret|(^|[^a-z])pin([^a-z]|$)/i;
+
+    function autocompleteTokens(element) {
+        const raw = element.getAttribute("autocomplete") || "";
+        return raw.toLowerCase().split(/\s+/).filter(Boolean);
+    }
+
+    function isSensitiveField(element) {
+        if (String(element.type || "").toLowerCase() === "password") {
+            return true;
+        }
+        const hinted = autocompleteTokens(element).some(
+            (token) => SENSITIVE_AUTOCOMPLETE.has(token) || token.startsWith("cc-"),
+        );
+        if (hinted) {
+            return true;
+        }
+        return [element.getAttribute("name"), element.id].some(
+            (label) => Boolean(label) && SENSITIVE_NAME.test(label),
+        );
+    }
+
+    // The name the replay looks the secret up by; background.js makes it
+    // a safe identifier.
+    function secretNameFor(element) {
+        return element.getAttribute("name") || element.id
+            || autocompleteTokens(element).pop() || "";
+    }
+
+    function inputEvent(target) {
+        const event = {
+            type: "input",
+            selector: selectorFor(target),
+            url: location.href,
+        };
+        if (isSensitiveField(target)) {
+            event.sensitive = true;
+            event.secret = secretNameFor(target);
+        } else {
+            event.value = target.value;
+        }
+        return event;
+    }
+
     function send(event) {
         try {
             chrome.runtime.sendMessage({ command: "event", event });
@@ -83,12 +133,7 @@
             || target instanceof HTMLSelectElement)) {
             return;
         }
-        send({
-            type: "input",
-            selector: selectorFor(target),
-            value: target.value,
-            url: location.href,
-        });
+        send(inputEvent(target));
     }, true);
 
     document.addEventListener("submit", (event) => {

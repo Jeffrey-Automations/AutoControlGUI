@@ -51,10 +51,36 @@ function saveState(state) {
 }
 
 /**
+ * The ``${secrets.NAME}`` reference recorded in place of a sensitive
+ * field's value; the executor resolves it from the secret vault at replay.
+ * ``name`` comes from the page, so it is reduced to an identifier here.
+ *
+ * @param {string} name - the field's name, id or autocomplete hint
+ * @returns {string}
+ */
+export function secretReference(name) {
+    let safe = String(name || "").replace(/\W+/g, "_").replace(/^_+|_+$/g, "");
+    if (!safe) {
+        safe = "password";
+    }
+    if (/^\d/.test(safe)) {
+        safe = "_" + safe;
+    }
+    return `\${secrets.${safe}}`;
+}
+
+// A sensitive event never carries its value into the recording, even
+// from an older content script that still sent one.
+function keysFor(event) {
+    return event.sensitive ? secretReference(event.secret) : (event.value || "");
+}
+
+/**
  * Translate one captured DOM event into an AutoControl JSON action.
  * Pure function — used by both the live recorder and the test suite.
  *
- * @param {Object} event - {type, selector, value, url}
+ * @param {Object} event - {type, selector, value, url}, or
+ *     {type: "input", selector, sensitive: true, secret, url}
  * @returns {Array|null}
  */
 export function actionFor(event) {
@@ -74,7 +100,7 @@ export function actionFor(event) {
                 action: "WR_send_keys_to_element",
                 params: {
                     element_name: event.selector,
-                    keys: event.value || "",
+                    keys: keysFor(event),
                 },
             }];
         case "submit":

@@ -187,3 +187,74 @@ def test_closing_the_recording_tab_ends_the_recording(recorder):
     recorder.drain()
     assert recorder.stored_state()["recording"] is False
     assert recorder.request(_click("#after-close"), _TAB) == {"ok": False, "reason": "not recording"}
+
+
+# === R04: sensitive input values are never recorded =====================
+
+_FICTITIOUS_SECRET = "Fict1tious-Pa55-4711"
+
+
+def _change(harness, kind: str, attrs: dict, value: str) -> None:
+    harness.run(f"__dom.fire('change', __dom.field({json.dumps(kind)}, {json.dumps(attrs)}, {json.dumps(value)}))")
+    harness.drain()
+
+
+def _sent_inputs(harness) -> list:
+    return [message["event"] for message in harness.value("__ext.outbox")
+            if message["command"] == "event" and message["event"]["type"] == "input"]
+
+
+@pytest.mark.parametrize("kind,attrs,secret", [
+    ("input", {"type": "password", "id": "field"}, "field"),
+    ("input", {"type": "PASSWORD"}, ""),
+    ("input", {"autocomplete": "current-password", "id": "f1"}, "f1"),
+    ("input", {"autocomplete": "new-password", "name": "choose"}, "choose"),
+    ("input", {"autocomplete": "section-pay billing cc-number"}, "cc-number"),
+    ("input", {"autocomplete": "cc-csc", "id": "f2"}, "f2"),
+    ("input", {"autocomplete": "one-time-code"}, "one-time-code"),
+    ("textarea", {"autocomplete": "one-time-code", "id": "note"}, "note"),
+    ("input", {"name": "password"}, "password"),
+    ("input", {"name": "user_passcode"}, "user_passcode"),
+    ("input", {"name": "otp"}, "otp"),
+    ("input", {"name": "card-cvv"}, "card-cvv"),
+    ("input", {"id": "loginPassword"}, "loginPassword"),
+])
+def test_content_script_never_reads_a_sensitive_value(harness, kind, attrs, secret):
+    harness.load_script("content_script.js")
+    _change(harness, kind, attrs, _FICTITIOUS_SECRET)
+    assert harness.value("__dom.reads") == [], "the sensitive field's value was read"
+    [event] = _sent_inputs(harness)
+    assert event["sensitive"] is True
+    assert event["secret"] == secret
+    assert "value" not in event
+    assert _FICTITIOUS_SECRET not in json.dumps(harness.value("__ext.outbox"))
+
+
+def test_a_password_stays_out_of_message_storage_and_export(harness):
+    harness.load_background()
+    harness.load_script("content_script.js")
+    assert harness.request(_START) == {"ok": True}
+    _change(harness, "input", {"name": "username"}, "alice")
+    _change(harness, "input", {"type": "password", "name": "password"}, _FICTITIOUS_SECRET)
+    for event in _sent_inputs(harness):
+        assert harness.request({"command": "event", "event": event}, _TAB) == {"ok": True}
+    harness.request({"command": "stop"})
+    exported = harness.request({"command": "export"})["json"]
+    for surface in (json.dumps(harness.value("__ext.outbox")), json.dumps(harness.value("__ext.data")), exported):
+        assert _FICTITIOUS_SECRET not in surface
+    keys = [action[1]["params"]["keys"] for action in json.loads(exported) if action[0] == "AC_web_run"]
+    assert keys == ["alice", "${secrets.password}"]
+
+
+@pytest.mark.parametrize("secret,reference", [
+    ("pin code}{", "${secrets.pin_code}"),
+    ("", "${secrets.password}"),
+    ("9lives", "${secrets._9lives}"),
+])
+def test_background_turns_a_sensitive_event_into_a_secret_reference(recorder, secret, reference):
+    recorder.request(_START)
+    event = {"type": "input", "selector": "#pw", "sensitive": True, "secret": secret, "value": _FICTITIOUS_SECRET}
+    assert recorder.request({"command": "event", "event": event}, _TAB) == {"ok": True}
+    stored = json.dumps(recorder.stored_state())
+    assert _FICTITIOUS_SECRET not in stored
+    assert recorder.stored_state()["actions"][-1][1]["params"]["keys"] == reference
