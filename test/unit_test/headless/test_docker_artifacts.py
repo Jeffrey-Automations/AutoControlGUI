@@ -424,8 +424,8 @@ def _parser_from_source(module_path: Path, name: str):
     func = next(node for node in tree.body
                 if isinstance(node, ast.FunctionDef) and node.name == name)
     namespace = {"argparse": argparse, "_DEFAULT_TTL_S": 300.0}
-    exec(compile(ast.Module(body=[func], type_ignores=[]), str(module_path), "exec"),  # nosec B102  # reason: repository source
-         namespace)
+    code = compile(ast.Module(body=[func], type_ignores=[]), str(module_path), "exec")
+    exec(code, namespace)  # nosec B102  # reason: compiles a function from repository source
     return namespace[name]
 
 
