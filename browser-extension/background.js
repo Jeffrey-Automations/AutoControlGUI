@@ -15,12 +15,14 @@ const STATE_KEY = "autocontrol.recorder.state";  // nosemgrep: codacy.javascript
  * @typedef {Object} RecorderState
  * @property {boolean} recording
  * @property {string|null} startUrl
+ * @property {number|null} tabId  the tab whose events are recorded
  * @property {Array<Array>} actions  AC_/WR_ JSON action entries
  */
 
 const DEFAULT_STATE = Object.freeze({
     recording: false,
     startUrl: null,
+    tabId: null,
     actions: Object.freeze([]),
 });
 
@@ -91,10 +93,16 @@ export function actionFor(event) {
 }
 
 function startRecording(message) {
+    // The popup names the tab it started in; only that tab's events are
+    // recorded (see recordEvent), so typing in another tab never joins.
+    if (!Number.isInteger(message.tabId)) {
+        return { ok: false, reason: "no tab to record" };
+    }
     const startUrl = message.startUrl || null;
     return saveState(freshState({
         recording: true,
         startUrl,
+        tabId: message.tabId,
         actions: startUrl ? [["AC_web_open", { url: startUrl }]] : [],
     })).then(() => ({ ok: true }));
 }
@@ -104,9 +112,15 @@ function stopRecording(state) {
         .then(() => ({ ok: true, actions: state.actions }));
 }
 
-function recordEvent(state, message) {
+function recordEvent(state, message, sender) {
     if (!state.recording) {
         return { ok: false, reason: "not recording" };
+    }
+    // The content script runs in every tab; the sender's tab ID is set
+    // by the browser, not by the page. A navigation keeps the tab ID, so
+    // the recording follows the tab from page to page.
+    if (sender?.tab?.id !== state.tabId) {
+        return { ok: false, reason: "not the recording tab" };
     }
     const action = actionFor(message.event);
     if (!action) {
@@ -132,7 +146,7 @@ function serialised(task) {
     return result;
 }
 
-function dispatch(message) {
+function dispatch(message, sender) {
     return serialised(() => loadState().then((state) => {
         switch (message?.command) {
             case "start":
@@ -140,7 +154,7 @@ function dispatch(message) {
             case "stop":
                 return stopRecording(state);
             case "event":
-                return recordEvent(state, message);
+                return recordEvent(state, message, sender);
             case "status":
                 return { ok: true, state };
             case "reset":
@@ -153,6 +167,15 @@ function dispatch(message) {
             default:
                 return { ok: false, reason: "unknown command" };
         }
+    }));
+}
+
+function endRecordingInTab(tabId) {
+    return serialised(() => loadState().then((state) => {
+        if (!state.recording || state.tabId !== tabId) {
+            return undefined;
+        }
+        return saveState(Object.assign({}, state, { recording: false }));
     }));
 }
 
@@ -174,10 +197,19 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
         // work. The rejection handler keeps a failed dispatch from
         // dropping silently (ESLint
         // security-node/detect-unhandled-async-errors).
-        dispatch(message).then(
+        dispatch(message, sender).then(
             sendResponse,
             (error) => replyWithError(sendResponse, error),
         );
         return true;
+    });
+}
+
+if (typeof chrome !== "undefined" && chrome.tabs?.onRemoved) {
+    // Closing the recorded tab ends the recording; its ID is never reused.
+    chrome.tabs.onRemoved.addListener((tabId) => {
+        endRecordingInTab(tabId).catch((error) => {
+            console.error("ending the recording failed:", error);
+        });
     });
 }

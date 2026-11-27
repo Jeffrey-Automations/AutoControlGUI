@@ -128,3 +128,62 @@ def test_start_after_stop_begins_a_new_recording(recorder):
     assert recorder.reply(fresh) == {"ok": True}
     assert recorder.stored_state()["recording"] is True
     assert _recorded_selectors(recorder) == ["#new"]
+
+
+# === R05: only the tab that started the recording =======================
+
+_OTHER_TAB = 8
+
+
+def _navigate(url: str) -> dict:
+    return {"command": "event", "event": {"type": "navigate", "url": url}}
+
+
+def test_popup_start_names_the_tab_it_records(harness):
+    harness.load_script("popup.js")
+    harness.run('__dom.click("start")')
+    harness.drain()
+    starts = [message for message in harness.value("__ext.outbox") if message["command"] == "start"]
+    assert starts == [{"command": "start", "startUrl": "https://example.test/start", "tabId": 7}]
+
+
+def test_events_from_another_tab_are_refused_while_interleaved(recorder):
+    recorder.request(_START)
+    replies = [
+        recorder.request(_click("#mine-1"), _TAB),
+        recorder.request(_click("#theirs-1"), _OTHER_TAB),
+        recorder.request(_navigate("https://example.test/next"), _TAB),
+        recorder.request(_navigate("https://elsewhere.test/"), _OTHER_TAB),
+        recorder.request(_click("#mine-2"), _TAB),
+        recorder.request(_click("#theirs-2"), _OTHER_TAB),
+    ]
+    refused = {"ok": False, "reason": "not the recording tab"}
+    assert replies == [{"ok": True}, refused] * 3
+    assert recorder.stored_state()["actions"] == [
+        ["AC_web_open", {"url": "https://example.test/start"}],
+        ["AC_web_run", {"action": "WR_left_click", "params": {"element_name": "#mine-1"}}],
+        ["AC_web_open", {"url": "https://example.test/next"}],
+        ["AC_web_run", {"action": "WR_left_click", "params": {"element_name": "#mine-2"}}],
+    ]
+
+
+def test_an_event_with_no_sending_tab_is_refused(recorder):
+    recorder.request(_START)
+    assert recorder.request(_click("#popup"), None) == {"ok": False, "reason": "not the recording tab"}
+
+
+def test_start_without_a_tab_does_not_record(recorder):
+    reply = recorder.request({"command": "start", "startUrl": "https://example.test/"})
+    assert reply == {"ok": False, "reason": "no tab to record"}
+    assert recorder.request(_click("#x"), _TAB) == {"ok": False, "reason": "not recording"}
+
+
+def test_closing_the_recording_tab_ends_the_recording(recorder):
+    recorder.request(_START)
+    recorder.run(f"__ext.listeners.removed({_OTHER_TAB}, {{}})")
+    recorder.drain()
+    assert recorder.stored_state()["recording"] is True
+    recorder.run(f"__ext.listeners.removed({_TAB}, {{}})")
+    recorder.drain()
+    assert recorder.stored_state()["recording"] is False
+    assert recorder.request(_click("#after-close"), _TAB) == {"ok": False, "reason": "not recording"}
