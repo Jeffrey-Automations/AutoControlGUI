@@ -117,3 +117,81 @@ def test_signaling_server_serves_the_session_script():
     response = client.get("/viewer/viewer-session.js")
     assert response.status_code == 200
     assert "function routeDataChannel" in response.text
+
+
+_MEDIA_FAKES = """
+function fakeTrack(kind) {
+  return { kind: kind, readyState: "live", stop: function () { this.readyState = "ended"; } };
+}
+function fakeStream(kind) {
+  var tracks = [fakeTrack(kind)];
+  return { getTracks: function () { return tracks.slice(); } };
+}
+function deferred() {
+  var d = {};
+  d.promise = new Promise(function (resolve) { d.resolve = resolve; });
+  return d;
+}
+function fakeClosable() {
+  return { closed: false, close: function () { this.closed = true; } };
+}
+function fakeElement() {
+  return { textContent: "", disabled: false, style: {}, title: "", srcObject: null,
+           classList: { add: function () {}, remove: function () {} } };
+}
+var els = new Proxy({}, { get: function (made, key) {
+  if (!(key in made)) made[key] = fakeElement();
+  return made[key];
+} });
+var document = { getElementById: function (id) { return els[id]; } };
+function t(key) { return key; }
+function clearInterval() {}
+var statsTimer = null, connInfoTimer = null, connectedAt = null;
+var pc = fakeClosable(), controlChannel = fakeClosable();
+var micChannel = fakeClosable(), filesChannel = fakeClosable();
+var micState = { context: fakeClosable(), source: { disconnect: function () {} },
+                 worklet: { disconnect: function () {} } };
+var localMedia = createLocalMedia();
+function grant(stream) { return function () { return Promise.resolve(stream); }; }
+"""
+
+
+def _load_media_page(js: _Js) -> None:
+    js.run(_MEDIA_FAKES + "\n".join(
+        _page_part(name) for name in ("teardown", "stopMic", "setConnected")))
+
+
+def test_disconnect_ends_every_local_track_including_a_late_permission(js):
+    _load_media_page(js)
+    js.run("""
+      var opus = fakeStream("audio"), pcm = fakeStream("audio"), screen = fakeStream("video");
+      localMedia.acquire("opus", grant(opus));
+      localMedia.acquire("pcm", grant(pcm));
+      var prompt = deferred(), lateResult = "pending";
+      localMedia.acquire("screen", function () { return prompt.promise; })
+        .then(function (stream) { lateResult = stream; });
+    """)
+    assert js.value('[localMedia.get("opus") === opus, localMedia.get("pcm") === pcm]') == [True, True]
+    js.run("teardown(); prompt.resolve(screen);")
+    states = js.value("[opus, pcm, screen].map(function (s) { return s.getTracks()[0].readyState; })")
+    assert states == ["ended", "ended", "ended"]
+    assert js.value('["opus", "pcm", "screen"].map(localMedia.get)') == [None, None, None]
+    assert js.value("[lateResult, micState, pc, controlChannel]") == [None, None, None, None]
+
+
+def test_a_second_grant_for_a_held_capture_is_stopped(js):
+    js.run(_MEDIA_FAKES + """
+      var first = fakeStream("audio"), second = fakeStream("audio"), secondResult = "pending";
+      localMedia.acquire("opus", grant(first));
+      localMedia.acquire("opus", grant(second)).then(function (s) { secondResult = s; });
+    """)
+    assert js.value('localMedia.get("opus") === first') is True
+    assert js.value("[first.getTracks()[0].readyState, second.getTracks()[0].readyState, secondResult]") == [
+        "live", "ended", None]
+
+
+def test_release_stops_the_named_capture_and_returns_it(js):
+    js.run(_MEDIA_FAKES + 'var mic = fakeStream("audio"); localMedia.acquire("opus", grant(mic));')
+    assert js.value('localMedia.release("opus") === mic') is True
+    assert js.value('[mic.getTracks()[0].readyState, localMedia.get("opus"), localMedia.release("opus")]') == [
+        "ended", None, None]

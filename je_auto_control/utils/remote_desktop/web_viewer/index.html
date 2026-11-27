@@ -435,11 +435,11 @@ function _refreshDynamicLabels() {
   }
   if (els.opusMic) {
     els.opusMic.textContent =
-      opusMicStream ? t("btn_opus_on") : t("btn_opus_off");
+      localMedia.get("opus") ? t("btn_opus_on") : t("btn_opus_off");
   }
   if (els.shareScreen) {
     els.shareScreen.textContent =
-      screenStream ? t("btn_share_on") : t("btn_share_off");
+      localMedia.get("screen") ? t("btn_share_on") : t("btn_share_off");
   }
 }
 
@@ -484,9 +484,9 @@ let micChannel = null;
 let filesChannel = null;
 let viewerId = loadOrCreateViewerId();
 let statsTimer = null;
-let micState = null;  // { context, source, worklet, stream }  (PCM-over-DC path)
-let opusMicStream = null;  // MediaStream for Opus track
-let screenStream = null;  // MediaStream for getDisplayMedia
+let micState = null;  // { context, source, worklet }  (PCM-over-DC path)
+// Captured MediaStreams: "pcm" (mic over DC), "opus" (mic track), "screen".
+const localMedia = createLocalMedia();
 let connectedAt = null;
 let connInfoTimer = null;
 
@@ -564,14 +564,6 @@ function setConnected(value) {
     els.opusMic.classList.remove("primary");
     els.shareScreen.textContent = t("btn_share_off");
     els.shareScreen.classList.remove("primary");
-    if (opusMicStream) {
-      opusMicStream.getTracks().forEach(t => t.stop());
-      opusMicStream = null;
-    }
-    if (screenStream) {
-      screenStream.getTracks().forEach(t => t.stop());
-      screenStream = null;
-    }
   }
 }
 
@@ -672,63 +664,62 @@ function send(payload) {
   }
 }
 
+// A null stream means the session ended (or another start won) while the
+// permission prompt was open; localMedia has already stopped it.
 async function startOpusMic() {
-  if (opusMicStream || !pc) return;
+  if (localMedia.get("opus") || !pc) return;
   try {
-    opusMicStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    for (const track of opusMicStream.getAudioTracks()) {
-      pc.addTrack(track, opusMicStream);
-    }
+    const stream = await localMedia.acquire("opus",
+      () => navigator.mediaDevices.getUserMedia({ audio: true }));
+    if (!stream) return;
+    for (const track of stream.getAudioTracks()) pc.addTrack(track, stream);
     requestRenegotiation();
     els.opusMic.textContent = t("btn_opus_on");
     els.opusMic.classList.add("primary");
   } catch (error) {
+    localMedia.release("opus");
     setStatus(t("err_opus_mic", { msg: error.message }), "#ff6666");
   }
 }
 
-function stopOpusMic() {
-  if (!opusMicStream) return;
+function detachSenders(stream) {
+  if (!pc || !stream) return;
   for (const sender of pc.getSenders()) {
-    if (sender.track && sender.track.kind === "audio"
-        && opusMicStream.getTracks().includes(sender.track)) {
+    if (sender.track && stream.getTracks().includes(sender.track)) {
       sender.replaceTrack(null);
     }
   }
-  opusMicStream.getTracks().forEach((tr) => tr.stop());
-  opusMicStream = null;
+}
+
+function stopOpusMic() {
+  detachSenders(localMedia.release("opus"));
   els.opusMic.textContent = t("btn_opus_off");
   els.opusMic.classList.remove("primary");
 }
 
 async function startShareScreen() {
-  if (screenStream || !pc) return;
+  if (localMedia.get("screen") || !pc) return;
   try {
-    screenStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: 24 }, audio: false,
-    });
-    for (const track of screenStream.getVideoTracks()) {
-      pc.addTrack(track, screenStream);
+    const stream = await localMedia.acquire("screen",
+      () => navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 24 }, audio: false,
+      }));
+    if (!stream) return;
+    for (const track of stream.getVideoTracks()) {
+      pc.addTrack(track, stream);
       track.onended = () => stopShareScreen();
     }
     requestRenegotiation();
     els.shareScreen.textContent = t("btn_share_on");
     els.shareScreen.classList.add("primary");
   } catch (error) {
+    localMedia.release("screen");
     setStatus(t("err_share_screen", { msg: error.message }), "#ff6666");
   }
 }
 
 function stopShareScreen() {
-  if (!screenStream) return;
-  for (const sender of pc.getSenders()) {
-    if (sender.track && sender.track.kind === "video"
-        && screenStream.getTracks().includes(sender.track)) {
-      sender.replaceTrack(null);
-    }
-  }
-  screenStream.getTracks().forEach((tr) => tr.stop());
-  screenStream = null;
+  detachSenders(localMedia.release("screen"));
   els.shareScreen.textContent = t("btn_share_off");
   els.shareScreen.classList.remove("primary");
 }
@@ -885,10 +876,9 @@ function iceGatheringComplete(peer) {
 function teardown() {
   if (statsTimer) { clearInterval(statsTimer); statsTimer = null; }
   stopMic();
-  if (controlChannel) { try { controlChannel.close(); } catch {} controlChannel = null; }
-  if (micChannel) { try { micChannel.close(); } catch {} micChannel = null; }
-  if (filesChannel) { try { filesChannel.close(); } catch {} filesChannel = null; }
-  if (pc) { try { pc.close(); } catch {} pc = null; }
+  localMedia.releaseAll();  // also stops captures whose prompt is still open
+  [controlChannel, micChannel, filesChannel, pc].forEach(closeQuietly);
+  controlChannel = micChannel = filesChannel = pc = null;
   els.screen.srcObject = null;
   setConnected(false);
   els.stats.textContent = t("status_no_stats");
@@ -903,12 +893,15 @@ function teardown() {
 async function startMic() {
   if (micState || !micChannel) return;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true },
-    });
+    const stream = await localMedia.acquire("pcm",
+      () => navigator.mediaDevices.getUserMedia({
+        audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true },
+      }));
+    if (!stream) return;
     const AudioCtx = globalThis.AudioContext || globalThis.webkitAudioContext;
     const context = new AudioCtx({ sampleRate: 16000 });
     await context.audioWorklet.addModule("mic-worklet.js");
+    if (localMedia.get("pcm") !== stream) { closeQuietly(context); return; }
     const source = context.createMediaStreamSource(stream);
     const worklet = new AudioWorkletNode(context, "mic-pcm-processor");
     worklet.port.onmessage = (e) => {
@@ -917,20 +910,22 @@ async function startMic() {
       }
     };
     source.connect(worklet);
-    micState = { stream, context, source, worklet };
+    micState = { context, source, worklet };
     els.mic.textContent = t("btn_mic_on");
     els.mic.classList.add("primary");
   } catch (error) {
+    localMedia.release("pcm");
     setStatus(t("err_mic", { msg: error.message }), "#ff6666");
   }
 }
 
 function stopMic() {
+  localMedia.release("pcm");
   if (!micState) return;
-  try { micState.source.disconnect(); } catch {}
-  try { micState.worklet.disconnect(); } catch {}
-  try { micState.context.close(); } catch {}
-  try { micState.stream.getTracks().forEach((tr) => tr.stop()); } catch {}
+  for (const node of [micState.source, micState.worklet]) {
+    try { node.disconnect(); } catch (err) { /* already disconnected */ }
+  }
+  closeQuietly(micState.context);
   micState = null;
   els.mic.textContent = t("btn_mic_off");
   els.mic.classList.remove("primary");
@@ -1204,10 +1199,10 @@ els.mic.addEventListener("click", () => {
   if (micState) stopMic(); else startMic();
 });
 els.opusMic.addEventListener("click", () => {
-  if (opusMicStream) stopOpusMic(); else startOpusMic();
+  if (localMedia.get("opus")) stopOpusMic(); else startOpusMic();
 });
 els.shareScreen.addEventListener("click", () => {
-  if (screenStream) stopShareScreen(); else startShareScreen();
+  if (localMedia.get("screen")) stopShareScreen(); else startShareScreen();
 });
 els.sendFile.addEventListener("click", () => els.fileInput.click());
 els.fileInput.addEventListener("change", () => {

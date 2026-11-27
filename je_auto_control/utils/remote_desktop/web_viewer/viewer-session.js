@@ -14,3 +14,52 @@ function routeDataChannel(channel, routes) {
   routes[label](channel);
   return true;
 }
+
+// Closes a channel, peer connection or audio context that may already be
+// closed or missing; teardown runs from every failure path.
+function closeQuietly(target) {
+  if (!target) return;
+  try {
+    target.close();
+  } catch (err) {
+    // already closed: nothing left to release
+  }
+}
+
+function stopTracks(stream) {
+  if (stream) stream.getTracks().forEach(function (track) { track.stop(); });
+}
+
+// The MediaStreams this page captured, by name, so a disconnect stops them
+// all in one call. A permission prompt can outlive the session that opened
+// it: acquire() stops a stream granted after releaseAll(), or one granted
+// while the name is already held, and resolves to null instead.
+function createLocalMedia() {
+  const held = {};
+  let session = 0;
+  const media = {
+    acquire: function (name, request) {
+      const askedIn = session;
+      return request().then(function (stream) {
+        if (askedIn !== session || held[name]) {
+          stopTracks(stream);
+          return null;
+        }
+        held[name] = stream;
+        return stream;
+      });
+    },
+    get: function (name) { return held[name] || null; },
+    release: function (name) {
+      const stream = held[name] || null;
+      delete held[name];
+      stopTracks(stream);
+      return stream;
+    },
+    releaseAll: function () {
+      session += 1;
+      Object.keys(held).forEach(media.release);
+    },
+  };
+  return media;
+}
