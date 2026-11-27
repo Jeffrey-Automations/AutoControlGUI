@@ -5,6 +5,7 @@ other consistently. A full ``helm template`` round-trip happens in
 CI on a different runner with helm installed; here we keep the test
 suite Python-only.
 """
+import re
 from pathlib import Path
 
 import pytest
@@ -149,3 +150,39 @@ def test_deployments_args_match_entrypoint_modes():
         )
         assert f'args: ["{mode}"]' in raw, \
             f"{filename} should pass [{mode}] to the entrypoint"
+
+
+# --- the chosen port reaches the program (D05) ----------------------
+
+_VALUE_REF = re.compile(r"\{\{\s*\.Values\.([\w.]+)\s*(\|\s*quote\s*)?\}\}")
+
+
+def _render_values(raw: str, values: dict) -> str:
+    """Substitute the plain ``.Values`` references; leave other actions alone."""
+    def _lookup(match: re.Match) -> str:
+        value = values
+        for key in match.group(1).split("."):
+            value = value[key]
+        return f'"{value}"' if match.group(2) else str(value)
+    return _VALUE_REF.sub(_lookup, raw)
+
+
+@pytest.mark.parametrize("filename,section", [
+    ("deployment-rest.yaml", "rest"),
+    ("deployment-remote-host.yaml", "remoteHost"),
+    ("deployment-signaling.yaml", "signaling"),
+])
+def test_deployment_passes_its_port_to_the_program(filename, section):
+    """A custom port moves the Service, the container port and the listener.
+
+    The entrypoint reads the listen port from ``AC_PORT`` in every mode; a
+    Deployment that only sets ``containerPort`` points the Service at a port
+    nothing listens on.
+    """
+    values = _yaml("values.yaml")
+    values[section]["port"] = 18000
+    raw = _render_values(
+        (_CHART_DIR / "templates" / filename).read_text(encoding="utf-8"), values)
+    assert "containerPort: 18000" in raw
+    assert re.search(r'- name: AC_PORT\n\s+value: "18000"\n', raw), \
+        f"{filename} does not pass {section}.port to the program as AC_PORT"

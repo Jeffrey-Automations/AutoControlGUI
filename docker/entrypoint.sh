@@ -8,6 +8,7 @@
 #   shell          — drop into bash for debugging
 #
 # Any further args after the mode are forwarded to the underlying tool.
+# AC_PORT sets the listen port in every mode (defaults 9939 / 9940 / 8765).
 
 set -eu
 
@@ -54,7 +55,7 @@ trap cleanup EXIT INT TERM
 case "$MODE" in
     rest)
         exec python -m je_auto_control.utils.rest_api.rest_server \
-            --host 0.0.0.0 --port 9939 "$@"
+            --host 0.0.0.0 --port "${AC_PORT:-9939}" "$@"
         ;;
     remote-host)
         exec python -c "import os, time; \
@@ -67,7 +68,7 @@ print('listening on', h.port); \
         ;;
     signaling)
         exec python -m je_auto_control.utils.remote_desktop.signaling_server \
-            --bind 0.0.0.0 --port 8765 "$@"
+            --bind 0.0.0.0 --port "${AC_PORT:-8765}" "$@"
         ;;
     shell)
         exec /bin/sh "$@"

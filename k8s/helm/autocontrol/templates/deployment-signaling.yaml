@@ -27,6 +27,8 @@ spec:
             - name: http
               containerPort: {{ .Values.signaling.port }}
           env:
+            - name: AC_PORT
+              value: {{ .Values.signaling.port | quote }}
             - name: XVFB_GEOMETRY
               value: {{ .Values.display.geometry | quote }}
           resources:

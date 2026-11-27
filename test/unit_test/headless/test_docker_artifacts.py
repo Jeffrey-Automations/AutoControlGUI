@@ -484,3 +484,11 @@ def test_dockerfiles_install_the_signaling_extra(dockerfile):
     # --no-index: an extra missing from the wheelhouse cannot be installed.
     assert 'pip wheel --no-cache-dir --wheel-dir /wheels ".[signaling]"' in raw
     assert '"je_auto_control[signaling]"' in raw
+
+
+@pytest.mark.parametrize("script", _SERVICE_ENTRYPOINTS)
+@pytest.mark.parametrize("mode", sorted(_SERVICE_MODES))
+def test_service_modes_listen_on_ac_port(script, mode, tmp_path, monkeypatch):
+    """The Helm chart passes a non-default port as AC_PORT, as remote-host has."""
+    _address, port = _service_listen(script, mode, tmp_path, monkeypatch, env={"AC_PORT": "19123"})
+    assert port == 19123

@@ -32,6 +32,8 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-{{ .Chart.Name }}-auth
                   key: AC_TOKEN
+            - name: AC_PORT
+              value: {{ .Values.rest.port | quote }}
             - name: XVFB_GEOMETRY
               value: {{ .Values.display.geometry | quote }}
           resources:
