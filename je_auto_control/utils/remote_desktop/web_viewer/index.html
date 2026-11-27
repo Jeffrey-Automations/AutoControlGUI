@@ -168,6 +168,7 @@
 
 <div id="stats">no stats</div>
 
+<script src="viewer-session.js"></script>
 <script>
 "use strict";
 
@@ -621,20 +622,7 @@ async function connect() {
       els.screen.srcObject = event.streams[0];
     };
     pc.ondatachannel = (event) => {
-      const ch = event.channel;
-      if (ch.label === "mic") {
-        micChannel = ch;
-        return;
-      }
-      if (ch.label === "files") {
-        filesChannel = ch;
-        wireIncomingFiles(ch);
-        return;
-      }
-      controlChannel = ch;
-      controlChannel.onopen = () => sendAuth();
-      controlChannel.onmessage = handleControlMessage;
-      if (controlChannel.readyState === "open") sendAuth();
+      routeDataChannel(event.channel, CHANNEL_ROUTES);
     };
     pc.onconnectionstatechange = () => {
       setStatus("conn: " + pc.connectionState);
@@ -657,6 +645,21 @@ async function connect() {
     setStatus(t("err_signaling", { msg: error.message }), "#ff6666");
     teardown();
   }
+}
+
+// Only the labels this page speaks; any other channel the host offers (usb)
+// is left unbound so it can never stand in for the control channel.
+const CHANNEL_ROUTES = {
+  ctrl: adoptControlChannel,
+  mic: (ch) => { micChannel = ch; },
+  files: (ch) => { filesChannel = ch; wireIncomingFiles(ch); },
+};
+
+function adoptControlChannel(ch) {
+  controlChannel = ch;
+  ch.onopen = () => sendAuth();
+  ch.onmessage = handleControlMessage;
+  if (ch.readyState === "open") sendAuth();
 }
 
 function sendAuth() {
