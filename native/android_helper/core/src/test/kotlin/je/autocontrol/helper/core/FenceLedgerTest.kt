@@ -68,6 +68,26 @@ class FenceLedgerTest {
     }
 
     @Test
+    fun anInjectingCommandStaysFencedWhenALaterFenceReusesItsEpochValue() {
+        val ledger = FenceLedger(boot, first)
+        ledger.begin(id(1), first, tap)
+        ledger.claimNext()
+        ledger.fence(second)
+        val back = ledger.fence(first)
+        assertEquals(first, ledger.currentEpoch)
+        assertEquals(id(1), back.inflight)
+        assertFalse(ledger.stillCurrent(id(1)))
+        ledger.finish(id(1), succeeded = true, inputReleased = true)
+        assertEquals(CommandStatus.FENCED, ledger.settle(id(1)).status)
+        // A command begun under the reused value is a new generation and runs normally.
+        assertTrue(ledger.begin(id(2), first, tap).accepted)
+        assertEquals(id(2) to tap, ledger.claimNext())
+        assertTrue(ledger.stillCurrent(id(2)))
+        ledger.finish(id(2), succeeded = true, inputReleased = true)
+        assertEquals(CommandStatus.COMPLETED, ledger.settle(id(2)).status)
+    }
+
+    @Test
     fun unreleasedInputIsReportedAndFailureIsNotCompletion() {
         val ledger = FenceLedger(boot, first)
         ledger.begin(id(1), first, tap)

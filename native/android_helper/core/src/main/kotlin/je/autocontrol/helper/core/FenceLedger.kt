@@ -26,7 +26,8 @@ private fun requireToken(value: String, name: String): String {
     return value
 }
 
-private class Record(val epoch: String, val command: Map<String, Any?>) {
+/** [generation] is the fence count the command was begun under; unlike an epoch value it never recurs. */
+private class Record(val epoch: String, val generation: Long, val command: Map<String, Any?>) {
     var status = CommandStatus.QUEUED
     var released = true
 }
@@ -37,10 +38,15 @@ private class Record(val epoch: String, val command: Map<String, Any?>) {
  * A command runs only under the epoch it was begun with; [fence] moves the epoch forward for good,
  * fences queued older commands and tells an injecting one to stop. The injector asks [stillCurrent]
  * between events and reports through [finish]; [settle] answers from this record alone.
+ *
+ * Whether a command is still current is decided by the fence generation it was begun under, not by
+ * its epoch value: a fence may name a value an earlier epoch used (A, then B, then A again), and a
+ * command from the first A must stay fenced rather than become current again.
  */
 class FenceLedger(private val bootId: String, initialEpoch: String, private val capacity: Int = 64) {
     private val lock = Any()
     private var epoch = requireToken(initialEpoch, "epoch")
+    private var generation = 0L
     private val records = LinkedHashMap<String, Record>()
     private val queue = ArrayDeque<String>()
     private var injecting: String? = null
@@ -63,7 +69,7 @@ class FenceLedger(private val bootId: String, initialEpoch: String, private val 
             queue.size >= capacity -> Admission(id, false, "queue_full")
             records.size >= capacity * 64 -> Admission(id, false, "ledger_full")
             else -> {
-                records[id] = Record(commandEpoch, command.toMap())
+                records[id] = Record(commandEpoch, generation, command.toMap())
                 queue.addLast(id)
                 Admission(id, true)
             }
@@ -75,7 +81,8 @@ class FenceLedger(private val bootId: String, initialEpoch: String, private val 
         requireToken(newEpoch, "epoch")
         require(newEpoch != epoch) { "a fence must move to a new epoch" }
         epoch = newEpoch
-        val fenced = queue.filter { records.getValue(it).epoch != newEpoch }
+        generation += 1
+        val fenced = queue.filter { records.getValue(it).generation != generation }
         fenced.forEach { records.getValue(it).status = CommandStatus.FENCED }
         queue.removeAll(fenced.toSet())
         // A command still injecting is a remote write in progress, so the queue is not empty yet.
@@ -88,7 +95,7 @@ class FenceLedger(private val bootId: String, initialEpoch: String, private val 
         while (queue.isNotEmpty()) {
             val id = queue.removeFirst()
             val record = records.getValue(id)
-            if (record.epoch != epoch) {
+            if (record.generation != generation) {
                 record.status = CommandStatus.FENCED
                 continue
             }
@@ -102,7 +109,7 @@ class FenceLedger(private val bootId: String, initialEpoch: String, private val 
 
     /** Asked by the injector between events: false once a fence has moved past this command. */
     fun stillCurrent(id: String): Boolean = synchronized(lock) {
-        injecting == id && records[id]?.epoch == epoch
+        injecting == id && records[id]?.generation == generation
     }
 
     /** Report how an injection ended; a command a fence overtook can never become completed. */
@@ -113,7 +120,7 @@ class FenceLedger(private val bootId: String, initialEpoch: String, private val 
             injecting = null
             record.released = inputReleased
             record.status = when {
-                record.epoch != epoch -> CommandStatus.FENCED
+                record.generation != generation -> CommandStatus.FENCED
                 succeeded -> CommandStatus.COMPLETED
                 else -> CommandStatus.FAILED
             }
