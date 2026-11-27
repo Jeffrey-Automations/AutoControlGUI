@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,635 |
-| 程式碼總行數 | 255,431 |
+| 程式碼總行數 | 255,528 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1516 |
@@ -205,7 +205,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.3 平台後端
 
-#### Windows（`windows/`，24 檔／2,405 行）
+#### Windows（`windows/`，24 檔／2,419 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -218,7 +218,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `record/win32_record.py` | 41 | 把 `win32_input_hook` 的時間軸轉成 action list（含按鍵放開、滾輪與間隔）；整形本體與 macOS 共用 `utils/input_macro/recorder_base.py`。 |
 | `screen/win32_screen.py` | 171 | 螢幕尺寸與像素讀取。**每支 Win32 函式都明寫 argtypes/restype**（HDC 是指標寬度，走預設的 c_int 會截斷，錯誤會沉默地擴散到 GetPixel／ReleaseDC），並持有自己的 user32／gdi32 handle。import 時呼叫 `SetProcessDPIAware()`——**行程層級且不可還原**，實體↔邏輯座標換算請走 `utils/monitor_layout`。 |
 | `window/windows_window_manage.py` | 566 | 視窗列舉／聚焦／關閉／最小化／幾何／所屬行程 PID／投遞式輸入（`auto_control_window` 的實作）。**每支 Win32 函式都明寫 argtypes/restype**，並持有自己的 user32 handle，避免把原型外溢到別的模組；hwnd 一律是 int。 |
-| `message/window_message.py` | 97 | 直接對視窗送 `WM_*` 訊息（背景輸入）。 |
+| `message/window_message.py` | 111 | 直接對視窗送 `WM_*` 訊息（背景輸入）。 |
 | `interception/_dll.py` | 238 | `interception.dll` 的延遲 ctypes 載入與結構定義。 |
 | `interception/keyboard.py` | 70 | 經 Interception 驅動的鍵盤輸入（繞過部分反自動化偵測）。 |
 | `interception/mouse.py` | 160 | 經 Interception 驅動的滑鼠輸入。 |
@@ -296,7 +296,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.1 執行引擎與腳本資產
 
-> 25 個套件、約 20,389 行。
+> 25 個套件、約 20,406 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -316,7 +316,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/loop_guard/` | 158 | 機械式卡死迴圈偵測（agent loop 用） |
 | `utils/plugin_loader/` | 147 | 掃描外部 Python 外掛目錄並註冊其 `AC_` callable |
 | `utils/plugin_sdk/` | 80 | 外掛 SDK：透過 entry points 發佈／載入第三方 `AC_*` 指令 |
-| `utils/project/` | 211 | 專案腳手架：建立目錄結構與範本 action 檔 |
+| `utils/project/` | 228 | 專案腳手架：建立目錄結構與範本 action 檔 |
 | `utils/recording_edit/` | 165 | 不重錄的前提下裁切／過濾／縮放已錄製的 action list |
 | `utils/saga/` | 115 | Saga 協調器：失敗時以 LIFO 補償動作回滾 |
 | `utils/script_vars/` | 422 | 執行期變數作用域、插值與 context-local vault guard；受管操作拒絕隱式秘密存取 |
@@ -1653,8 +1653,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `utils/usb/` | 22 | 5,558 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,218 |
 | `utils/accessibility/` | 17 | 3,656 |
-| `wrapper/` | 25 | 6,126 |
-| `windows/` | 24 | 2,405 |
+| `wrapper/` | 25 | 6,154 |
+| `windows/` | 24 | 2,419 |
 | `utils/rest_api/` | 8 | 2,276 |
 | `utils/agent/` | 13 | 2,270 |
 | `linux_with_x11/` | 19 | 1,382 |
@@ -1666,8 +1666,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 9 | 977 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,320 |
-| **總計** | **1,621** | **254,566** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,337 |
+| **總計** | **1,621** | **254,625** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.

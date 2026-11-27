@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- A device timeout of 0, a negative number, NaN or infinity raises `DeviceError` (`DeviceContext`, the
+  matrix spec's `timeout_s`, `device_timeout_s`, `invoke(timeout_s=...)`); an explicit 0 no longer means
+  30 s. Generated and example executor scripts find `keyword/` relative to themselves, so projects created
+  earlier need regenerating. `window_message` passes 64-bit WPARAM / LPARAM and returns the full LRESULT.
+
 - Docker: `remote-host` refuses to start without a non-blank `AC_TOKEN` (the `change-me` fallback is
   gone); `signaling` mode works (the images install the extra, and the entrypoints pass `--bind`, which
   the server accepts); `AC_PORT` sets the port in every mode, and Helm `rest.port` / `signaling.port`
