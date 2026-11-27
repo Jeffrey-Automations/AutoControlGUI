@@ -7,6 +7,24 @@
 
 set -eu
 
+MODE="${1:-rest}"
+shift 2>/dev/null || true
+
+# remote-host takes its credential from AC_TOKEN and nothing else. A fixed
+# fallback would hand every container started without one the same, publicly
+# known secret, so a missing or blank token stops the container here, before
+# anything is started or listens.
+require_ac_token() {
+    if [ -z "$(printf '%s' "${AC_TOKEN:-}" | tr -d '[:space:]')" ]; then
+        echo "AC_TOKEN is missing or blank; remote-host mode needs a token (-e AC_TOKEN=...)" >&2
+        exit 2
+    fi
+}
+
+if [ "$MODE" = "remote-host" ]; then
+    require_ac_token
+fi
+
 GEOMETRY="${XVFB_GEOMETRY:-1280x800x24}"
 DISPLAY_NUM="${DISPLAY:-:99}"
 VNC_PORT="${AUTOCONTROL_VNC_PORT:-5900}"
@@ -41,9 +59,6 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-MODE="${1:-rest}"
-shift 2>/dev/null || true
-
 case "$MODE" in
     rest)
         exec python -m je_auto_control.utils.rest_api.rest_server \
@@ -52,7 +67,7 @@ case "$MODE" in
     remote-host)
         exec python -c "import os, time; \
 from je_auto_control.utils.remote_desktop import RemoteDesktopHost; \
-h = RemoteDesktopHost(token=os.environ.get('AC_TOKEN', 'change-me'), \
+h = RemoteDesktopHost(token=os.environ['AC_TOKEN'], \
                       bind='0.0.0.0', port=int(os.environ.get('AC_PORT', '9940'))); \
 h.start(); \
 print('listening on', h.port); \

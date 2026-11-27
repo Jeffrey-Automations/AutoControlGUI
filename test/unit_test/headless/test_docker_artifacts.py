@@ -4,7 +4,12 @@ We can't actually run Docker in CI, but we can:
 - verify the files exist and are parseable
 - assert the entrypoint covers every documented mode
 - assert the compose file references the built image and the published ports
+- run both service entrypoints under ``sh`` with their daemons stubbed, so the
+  command each would exec is checked against the real argument parsers
 """
+import os
+import shutil
+import subprocess  # nosec B404  # reason: runs the entrypoint under sh with stubbed daemons
 from pathlib import Path
 
 import pytest
@@ -15,6 +20,40 @@ _DOCKER_DIR = _REPO_ROOT / "docker"
 #: Spelled from ``chr`` so this file stays byte-identical under any
 #: checkout normalisation that might rewrite a literal in it.
 CRLF = (chr(13) + chr(10)).encode()
+_SERVICE_ENTRYPOINTS = ("entrypoint.sh", "entrypoint-xfce.sh")
+#: What the entrypoints start before the service; each stub records that it ran.
+_DAEMON_STUBS = ("Xvfb", "startxfce4", "x11vnc", "sleep")
+
+
+def _write_stub(path: Path, body: str) -> None:
+    path.write_bytes(("#!/bin/sh\n" + body).encode())
+    path.chmod(0o755)
+
+
+def _run_entrypoint(script: str, tmp_path: Path, *args: str, env=None):
+    """Run an entrypoint with its daemons and ``python`` replaced by stubs.
+
+    Returns the completed process, the argv the entrypoint exec'd ``python``
+    with (empty when it never got that far) and the daemons that started.
+    """
+    shell = shutil.which("sh")
+    if shell is None:
+        pytest.skip("no POSIX sh to run the entrypoint with")
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    started = tmp_path / "started.log"
+    for name in _DAEMON_STUBS:
+        _write_stub(stubs / name, f'echo {name} >> "{started.as_posix()}"\n')
+    _write_stub(stubs / "python", 'for a in "$@"; do printf "%s\\n" "$a"; done\n')
+    full_env = {key: value for key, value in os.environ.items()
+                if key not in ("AC_TOKEN", "AC_PORT")}
+    full_env.update(env or {})
+    full_env["PATH"] = str(stubs) + os.pathsep + os.environ.get("PATH", "")
+    done = subprocess.run(  # nosec B603  # reason: fixed argv, the script is a repository file
+        [shell, (_DOCKER_DIR / script).as_posix(), *args],
+        capture_output=True, text=True, env=full_env, timeout=30, check=False)
+    daemons = started.read_text().split() if started.exists() else []
+    return done, done.stdout.splitlines(), daemons
 
 
 def test_dockerfile_exists_and_uses_python_base():
@@ -323,3 +362,40 @@ def test_docs_run_in_ci_page_exists_and_covers_both_pipelines():
     for needle in ("GitHub Actions", "GitLab CI", "Kubernetes",
                     "Dockerfile.xfce", "JE_AUTOCONTROL_LINUX_DISPLAY_SERVER"):
         assert needle in raw, f"docs page missing section: {needle}"
+
+
+# --- remote-host credential (R06) -----------------------------------
+
+@pytest.mark.parametrize("script", _SERVICE_ENTRYPOINTS)
+@pytest.mark.parametrize("token", [None, "", "  \t "])
+def test_remote_host_refuses_a_missing_or_blank_token(script, token, tmp_path):
+    """No token means no host: a fixed fallback is one secret for every container.
+
+    The refusal has to come before anything listens -- in the XFCE image that
+    includes the VNC server, which binds every interface.
+    """
+    env = {} if token is None else {"AC_TOKEN": token}
+    done, argv, daemons = _run_entrypoint(script, tmp_path, "remote-host", env=env)
+    assert done.returncode != 0, f"{script} started remote-host without a token"
+    assert "AC_TOKEN" in done.stderr
+    assert argv == [], f"{script} exec'd the host anyway: {argv}"
+    assert daemons == [], f"{script} started {daemons} before refusing"
+
+
+@pytest.mark.parametrize("script", _SERVICE_ENTRYPOINTS)
+def test_remote_host_uses_the_token_it_was_given(script, tmp_path):
+    done, argv, _daemons = _run_entrypoint(
+        script, tmp_path, "remote-host", env={"AC_TOKEN": "s3cret-value"})
+    assert done.returncode == 0, done.stderr
+    assert argv[0] == "-c"
+    code = "\n".join(argv[1:])
+    assert "os.environ['AC_TOKEN']" in code
+    assert "change-me" not in code
+
+
+@pytest.mark.parametrize("script", _SERVICE_ENTRYPOINTS)
+def test_entrypoints_carry_no_fixed_token(script):
+    """The static half of the check above, for a machine without ``sh``."""
+    raw = (_DOCKER_DIR / script).read_text(encoding="utf-8")
+    assert "change-me" not in raw
+    assert "os.environ.get('AC_TOKEN'" not in raw
