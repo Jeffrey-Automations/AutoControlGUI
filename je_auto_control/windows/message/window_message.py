@@ -1,11 +1,25 @@
-from je_auto_control.utils.exception.exceptions import AutoControlException
+import ctypes
+from ctypes import wintypes
+from typing import Any
 
-from je_auto_control.windows.core.utils.win32_ctype_input import user32
+from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.windows.window.windows_window_manage import get_one_window_hwnd
 
+# A private user32: the prototypes below must not change the function objects
+# other modules get from their own (shared) user32 handle.
+_user32: Any = ctypes.WinDLL("user32", use_last_error=True)  # type: ignore[attr-defined]  # reason: win32-only ctypes
+# WPARAM, LPARAM and LRESULT are pointer-sized; without prototypes ctypes
+# passes C ints and reads a 4-byte result, truncating them on Win64.
+_MESSAGE_ARGTYPES = (wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+LRESULT = ctypes.c_ssize_t
+
 # Win32 API 函式指標 Win32 API function pointers
-PostMessageW = user32.PostMessageW
-SendMessageW = user32.SendMessageW
+PostMessageW = _user32.PostMessageW
+PostMessageW.argtypes = _MESSAGE_ARGTYPES
+PostMessageW.restype = wintypes.BOOL
+SendMessageW = _user32.SendMessageW
+SendMessageW.argtypes = _MESSAGE_ARGTYPES
+SendMessageW.restype = LRESULT
 
 # 常見的 Windows 訊息對照表 Common Windows messages
 messages = {
