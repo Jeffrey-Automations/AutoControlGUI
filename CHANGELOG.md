@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Native: the Linux guardian refuses to recover from its journal when a slot cannot be read
+  (`GJ_ERROR_IO`) instead of falling back to an older record. The Android helper fails a swipe on its
+  first refused event and always releases the pointer, keeps serving after one client disconnects,
+  and no longer revives a command when a fence returns to a retired epoch value.
+
 - Inside a run, accessibility set-value / invoke / toggle run on the accessibility walker thread: a
   stop before the write acts prevents it, and one during the act waits up to 5 s, then returns the
   result or raises `AccessibilityWriteOutcomeUnknown` (exported from the facade). Outside a run

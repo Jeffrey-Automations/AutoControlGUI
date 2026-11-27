@@ -40,6 +40,10 @@ there is no request that moves the epoch back.
   `ProtocolHandler`, which turns one decoded request into one reply and accepts only the closed,
   bounded `tap`, `swipe` and `key` command shapes; no Android dependency, so both are tested on the JVM.
   `queue_empty` is true only when nothing is queued **and** nothing is still injecting.
+  Commands are fenced by a generation that never repeats, so fencing back to a retired epoch value
+  cannot revive a command still injecting under it. `PointerGesture` runs a tap or swipe and fails it
+  on the first refused DOWN, MOVE or UP, cancelling the pointer where it got to; `ClientLoop` serves
+  one client at a time and treats a client's I/O error as that client's alone.
 - `app/` — the instrumentation: `HelperServer` serves the abstract socket to a shell or root peer only
   (an abstract socket has no file permissions, so any app could otherwise connect) and bounds each line;
   `Injector` is the only writer and, between events, releases what it pressed once a fence overtakes it.
