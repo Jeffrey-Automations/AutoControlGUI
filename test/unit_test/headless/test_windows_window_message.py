@@ -56,7 +56,9 @@ def test_importing_the_input_module_leaves_ctypes_alone():
 
 _WM_APP = 0x8000
 _LRESULT = ctypes.c_ssize_t
-_WNDPROC = ctypes.WINFUNCTYPE(_LRESULT, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+# WINFUNCTYPE exists only on Windows; elsewhere this module is collected and every test skipped.
+_FUNCTYPE = getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE)
+_WNDPROC = _FUNCTYPE(_LRESULT, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
 
 
 class _WNDCLASSW(ctypes.Structure):

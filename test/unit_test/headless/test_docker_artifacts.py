@@ -559,15 +559,30 @@ def _copy_builder_inputs(dockerfile: str, src: Path) -> None:
             shutil.copy2(origin / "__init__.py", src / name / "__init__.py")
 
 
+def _require_declared_setuptools() -> None:
+    """Skip unless the installed setuptools meets ``build-system.requires`` (a CI runner may carry an older one)."""
+    import setuptools  # pylint: disable=import-outside-toplevel  # reason: only when a wheel is built
+    project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    floor = next(item.split(">=", 1)[1] for item in project["build-system"]["requires"]
+                 if item.startswith("setuptools>="))
+
+    def version(text: str) -> tuple:
+        return tuple(int(part) for part in text.split(".")[:3] if part.isdigit())
+    if version(setuptools.__version__) < version(floor):
+        pytest.skip(f"setuptools {setuptools.__version__} is older than the declared {floor}")
+
+
 def test_wheel_from_the_docker_builder_inputs_ships_the_plugin_and_license(tmp_path):
     """Build the wheel from what the builder stage would see at the root."""
     if importlib.util.find_spec("setuptools") is None:
         pytest.skip("setuptools is not installed, so no wheel can be built")
+    _require_declared_setuptools()
     src, out = tmp_path / "src", tmp_path / "wheels"
     _copy_builder_inputs("Dockerfile", src)
-    subprocess.run(  # nosec B603  # reason: fixed argv, builds repository source into a temp dir
+    built = subprocess.run(  # nosec B603  # reason: fixed argv, builds repository source into a temp dir
         [sys.executable, "-c", "import sys, setuptools.build_meta as b; b.build_wheel(sys.argv[1])", str(out)],
-        cwd=src, capture_output=True, timeout=600, check=True)
+        cwd=src, capture_output=True, text=True, timeout=600, check=False)
+    assert built.returncode == 0, built.stdout[-2000:] + built.stderr[-3000:]
     with zipfile.ZipFile(next(out.glob("je_auto_control-*.whl"))) as wheel:
         names = wheel.namelist()
     assert "je_auto_control_pytest.py" in names, "the pytest11 entry point names a missing module"

@@ -334,6 +334,11 @@ def test_recent_connections_populated_after_connect(qapp, tmp_path,
             entries = book.list_entries()
             expected_url = f"tcp://127.0.0.1:{host.port}"
             assert any(e["host_id"] == expected_url for e in entries)
+            # The Recent list is written off the GUI thread and filled when that write reports back.
+            deadline = time.monotonic() + 10.0
+            while screen._recent.count() < 1 and time.monotonic() < deadline:  # noqa: SLF001
+                QApplication.processEvents()
+                time.sleep(0.02)
             assert screen._recent.count() >= 1  # noqa: SLF001
             screen._disconnect()  # noqa: SLF001
         finally:
