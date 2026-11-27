@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- VS Code / LSP: only files matching `autocontrolLsp.actionFiles` (default `**/*.ac.json`,
+  `**/actions/**/*.json`) are diagnosed, so `package.json` and commented settings files are left
+  alone; flow commands and positional argument lists are no longer flagged; the screenshot command
+  uses `GET /screenshot` and opens the image; hover and edits are right on lines with emoji.
+
 - Browser extension: password and other sensitive fields are recorded as `${secrets.NAME}`, never as
   their value; recording follows only the tab where Start was pressed (refused without one) and ends
   when it closes; commands are applied one at a time so quick events are not lost; the declared icons

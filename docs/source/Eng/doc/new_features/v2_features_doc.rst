@@ -754,7 +754,16 @@ exposes three commands::
 
 REST URL + bearer token come from VS Code settings
 (``autocontrolLsp.rest.url`` / ``autocontrolLsp.rest.token``) with
-``$AC_TOKEN`` as a fallback.
+``$AC_TOKEN`` as a fallback. The screenshot command sends ``GET /screenshot``
+and opens the returned PNG.
+
+Only action files are diagnosed: files matching ``autocontrolLsp.actionFiles``
+(``**/*.ac.json`` and ``**/actions/**/*.json`` by default; reload the window after
+changing it). Other LSP clients pass the same globs as
+``initializationOptions.actionFiles``. Diagnostics and completion use the
+executor's full command set, flow commands included, and accept a positional
+list of arguments where the executor does; columns are UTF-16, as the protocol
+defines, so hover and edits stay right on lines with emoji.
 
 
 Browser extension recorder

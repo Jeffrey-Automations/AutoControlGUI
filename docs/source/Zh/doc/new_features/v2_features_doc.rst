@@ -634,7 +634,13 @@ VS Code 擴充
 
 REST URL 與 bearer token 來自 VS Code settings
 (``autocontrolLsp.rest.url`` / ``autocontrolLsp.rest.token``)，
-若空則 fallback 到 ``$AC_TOKEN`` 環境變數。
+若空則 fallback 到 ``$AC_TOKEN`` 環境變數。截圖命令送出 ``GET /screenshot`` 並開啟回傳的 PNG。
+
+只診斷動作檔：符合 ``autocontrolLsp.actionFiles`` 的檔案（預設 ``**/*.ac.json`` 與
+``**/actions/**/*.json``；修改後請重新載入視窗）。其他 LSP 客戶端以
+``initializationOptions.actionFiles`` 傳入相同的 glob。診斷與補全使用 executor 的完整指令集
+（含流程指令），並和 executor 一樣接受位置參數清單；欄位以協定規定的 UTF-16 計算，
+含 emoji 的行上 hover 與編輯範圍仍然正確。
 
 
 瀏覽器擴充錄製器
