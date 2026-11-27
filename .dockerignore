@@ -15,7 +15,6 @@ docs/
 README*
 *.md
 !README.md
-LICENSE
 CLAUDE.md
 *.log
 sonarcloud_issues.txt

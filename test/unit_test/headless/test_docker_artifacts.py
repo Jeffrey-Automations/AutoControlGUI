@@ -9,10 +9,14 @@ We can't actually run Docker in CI, but we can:
 """
 import argparse
 import ast
+import fnmatch
+import importlib.util
 import os
 import shutil
 import subprocess  # nosec B404  # reason: runs the entrypoint under sh with stubbed daemons
+import sys
 import tomllib
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -492,3 +496,79 @@ def test_service_modes_listen_on_ac_port(script, mode, tmp_path, monkeypatch):
     """The Helm chart passes a non-default port as AC_PORT, as remote-host has."""
     _address, port = _service_listen(script, mode, tmp_path, monkeypatch, env={"AC_PORT": "19123"})
     assert port == 19123
+
+
+# --- the builder stage packages what pyproject declares (D07) -------
+
+def _builder_sources(dockerfile: str) -> list:
+    """Context paths the ``builder`` stage copies, in order."""
+    sources, in_builder = [], False
+    for line in (_DOCKER_DIR / dockerfile).read_text(encoding="utf-8").splitlines():
+        if line.startswith("FROM "):
+            in_builder = line.rstrip().endswith(" AS builder")
+        elif in_builder and line.startswith("COPY ") and "--from" not in line:
+            sources.extend(line.split()[1:-1])
+    return sources
+
+
+def _dockerignored(name: str) -> bool:
+    """Whether ``.dockerignore`` drops a top-level path; the last match wins."""
+    ignored = False
+    for line in (_REPO_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines():
+        pattern = line.strip()
+        if not pattern or pattern.startswith("#"):
+            continue
+        if fnmatch.fnmatchcase(name, pattern.lstrip("!").rstrip("/")):
+            ignored = not pattern.startswith("!")
+    return ignored
+
+
+def _packaged_top_level_files() -> list:
+    project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    modules = [f"{name}.py" for name in project["tool"]["setuptools"]["py-modules"]]
+    return modules + project["project"]["license-files"] + [project["project"]["readme"]["file"]]
+
+
+@pytest.mark.parametrize("dockerfile", ["Dockerfile", "Dockerfile.xfce"])
+def test_docker_builders_copy_what_pyproject_packages(dockerfile):
+    """A file the build cannot see is quietly left out of the wheel, not an error."""
+    sources = _builder_sources(dockerfile)
+    for name in _packaged_top_level_files():
+        assert name in sources, f"{dockerfile} builder never copies {name}"
+        assert not _dockerignored(name), f".dockerignore keeps {name} from the build"
+
+
+def _copy_builder_inputs(dockerfile: str, src: Path) -> None:
+    """Copy the builder's top-level inputs; a package keeps only its marker.
+
+    What is checked is the top-level files, which the builder copies one by
+    one. Each copied directory is reduced to its ``__init__.py``: the full
+    1,600-module tree turns a two-second build into minutes and decides
+    nothing about the files at the root.
+    """
+    src.mkdir()
+    for name in _builder_sources(dockerfile):
+        origin = _REPO_ROOT / name
+        if _dockerignored(name):
+            continue
+        if not origin.is_dir():
+            shutil.copy2(origin, src / name)
+            continue
+        (src / name).mkdir()
+        if (origin / "__init__.py").is_file():
+            shutil.copy2(origin / "__init__.py", src / name / "__init__.py")
+
+
+def test_wheel_from_the_docker_builder_inputs_ships_the_plugin_and_license(tmp_path):
+    """Build the wheel from what the builder stage would see at the root."""
+    if importlib.util.find_spec("setuptools") is None:
+        pytest.skip("setuptools is not installed, so no wheel can be built")
+    src, out = tmp_path / "src", tmp_path / "wheels"
+    _copy_builder_inputs("Dockerfile", src)
+    subprocess.run(  # nosec B603  # reason: fixed argv, builds repository source into a temp dir
+        [sys.executable, "-c", "import sys, setuptools.build_meta as b; b.build_wheel(sys.argv[1])", str(out)],
+        cwd=src, capture_output=True, timeout=600, check=True)
+    with zipfile.ZipFile(next(out.glob("je_auto_control-*.whl"))) as wheel:
+        names = wheel.namelist()
+    assert "je_auto_control_pytest.py" in names, "the pytest11 entry point names a missing module"
+    assert any(name.endswith(".dist-info/licenses/LICENSE") for name in names), "LICENSE is not in the wheel"

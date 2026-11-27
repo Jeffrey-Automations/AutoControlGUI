@@ -14,7 +14,9 @@
 FROM python:3.12-slim AS builder
 
 WORKDIR /src
-COPY pyproject.toml README.md ./
+# Everything pyproject.toml packages from the root: the top-level pytest
+# plugin module its pytest11 entry point names, and the license file.
+COPY pyproject.toml README.md LICENSE je_auto_control_pytest.py ./
 COPY je_auto_control ./je_auto_control
 COPY autocontrol-lsp ./autocontrol-lsp
 RUN pip install --no-cache-dir --only-binary :all: --upgrade "pip==26.0.1" \
