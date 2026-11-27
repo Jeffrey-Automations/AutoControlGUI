@@ -49,6 +49,7 @@ if sys.platform not in ["win32", "cygwin", "msys"]:
 WH_KEYBOARD_LL = 13
 WH_MOUSE_LL = 14
 WM_QUIT = 0x0012
+_PM_NOREMOVE = 0x0000
 
 _KEY_DOWN = (0x0100, 0x0104)        # WM_KEYDOWN, WM_SYSKEYDOWN
 _KEY_UP = (0x0101, 0x0105)          # WM_KEYUP, WM_SYSKEYUP
@@ -84,8 +85,16 @@ class _MSLLHOOKSTRUCT(ctypes.Structure):
                 ("extra", ctypes.POINTER(wintypes.ULONG))]
 
 
+def _user32() -> Any:
+    return ctypes.windll.user32  # type: ignore[attr-defined]  # reason: win32-only ctypes
+
+
 class Win32InputHook:
     """Captures keyboard and mouse events, with releases, wheel and timing."""
+
+    #: Seconds ``start`` waits for the hook thread, and ``stop`` for it to exit.
+    start_timeout = 5.0
+    stop_timeout = 5.0
 
     def __init__(self, max_events: int = MAX_EVENTS) -> None:
         self.events: List[Dict[str, Any]] = []
@@ -93,7 +102,11 @@ class Win32InputHook:
         self.error: Optional[str] = None
         self.max_events = int(max_events)
         self._thread_id = 0
+        self._thread: Optional[threading.Thread] = None
         self._ready = threading.Event()
+        # Set by stop (or a start that timed out): a worker that has not
+        # reached its message loop yet unhooks and exits instead of pumping.
+        self._stop_requested = threading.Event()
         self._hooks: List[Any] = []
         # Wheel movement not yet worth a whole notch; see _wheel_notches.
         self._wheel_remainder = 0
@@ -108,26 +121,62 @@ class Win32InputHook:
 
     # -- public ------------------------------------------------------------
     def start(self) -> None:
-        """Install the hooks and begin recording. Raises if they cannot be set."""
-        threading.Thread(target=self._run, daemon=True).start()
-        self._ready.wait(timeout=5.0)
+        """Install the hooks and begin recording. Raises if they cannot be set.
+
+        A thread that is not ready within ``start_timeout`` is told to stop
+        and the start fails: it used to be ignored, and a worker that came up
+        later installed the hooks after ``stop`` had already returned.
+        """
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        if not self._ready.wait(timeout=self.start_timeout):
+            self._request_stop()
+            raise AutoControlRecordException(
+                f"the keyboard/mouse hook thread did not start within {self.start_timeout} s")
         if self.error:
             raise AutoControlRecordException(self.error)
 
     def stop(self) -> List[Dict[str, Any]]:
-        """Stop recording and return the raw events."""
-        if self._thread_id:
-            try:
-                ctypes.windll.user32.PostThreadMessageW(  # type: ignore[attr-defined]  # reason: win32-only ctypes
-                    self._thread_id, WM_QUIT, 0, 0)
-            except OSError as error:
-                autocontrol_logger.error("recorder stop failed: %r", error)
-        return self.events
+        """Stop recording and return the raw events once the hook thread has exited.
+
+        Raises :class:`AutoControlRecordException` when the thread is still
+        running after ``stop_timeout``, naming a ``WM_QUIT`` that could not be
+        posted; no events are handed over while it can still append to them.
+        """
+        posted = self._request_stop()
+        thread = self._thread
+        if thread is None or thread is threading.current_thread():
+            return list(self.events)
+        thread.join(timeout=self.stop_timeout)
+        if thread.is_alive():
+            reason = "" if posted else "; WM_QUIT could not be posted to it"
+            raise AutoControlRecordException(
+                f"the keyboard/mouse hook thread did not exit within {self.stop_timeout} s{reason}")
+        return list(self.events)
+
+    def _request_stop(self) -> bool:
+        """Tell the hook thread to quit; ``False`` when ``WM_QUIT`` could not be posted to it."""
+        self._stop_requested.set()
+        thread = self._thread
+        if not self._thread_id or thread is None or not thread.is_alive():
+            return True     # not pumping yet (it checks the event first) or already gone
+        if self._post_quit():
+            return True
+        autocontrol_logger.error("recorder stop failed: WM_QUIT could not be posted")
+        return False
+
+    def _post_quit(self) -> bool:
+        try:
+            return bool(_user32().PostThreadMessageW(self._thread_id, WM_QUIT, 0, 0))
+        except OSError as error:
+            autocontrol_logger.error("recorder stop failed: %r", error)
+            return False
 
     # -- hook thread -------------------------------------------------------
     def _run(self) -> None:
-        user32 = ctypes.windll.user32  # type: ignore[attr-defined]  # reason: win32-only ctypes
+        user32 = _user32()
         try:
+            self._open_queue(user32)
             self._install(user32)
         except OSError as error:
             autocontrol_logger.error("recorder start failed: %r", error)
@@ -137,16 +186,29 @@ class Win32InputHook:
             return
         self._ready.set()
         try:
-            message = wintypes.MSG()
-            while user32.GetMessageW(ctypes.byref(message), None, 0, 0) > 0:
-                user32.TranslateMessage(ctypes.byref(message))
-                user32.DispatchMessageW(ctypes.byref(message))
+            # A stop that came before the thread id was known posted nothing.
+            if not self._stop_requested.is_set():
+                self._pump(user32)
         finally:
             self._unhook(user32)
 
-    def _install(self, user32: Any) -> None:
+    def _open_queue(self, user32: Any) -> None:
+        """Give this thread its message queue, then publish its id for ``WM_QUIT``.
+
+        ``PostThreadMessageW`` fails for a thread that has no queue yet.
+        """
+        message = wintypes.MSG()
+        user32.PeekMessageW(ctypes.byref(message), None, 0, 0, _PM_NOREMOVE)
         kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]  # reason: win32-only ctypes
         self._thread_id = kernel32.GetCurrentThreadId()
+
+    def _pump(self, user32: Any) -> None:
+        message = wintypes.MSG()
+        while user32.GetMessageW(ctypes.byref(message), None, 0, 0) > 0:
+            user32.TranslateMessage(ctypes.byref(message))
+            user32.DispatchMessageW(ctypes.byref(message))
+
+    def _install(self, user32: Any) -> None:
         proto = ctypes.WINFUNCTYPE(  # type: ignore[attr-defined]  # reason: win32-only ctypes
             ctypes.c_ssize_t, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
         # Declare the signatures: a hook handle is 64-bit and the default
@@ -178,7 +240,7 @@ class Win32InputHook:
     def _put(self, event: Dict[str, Any]) -> None:
         """Record one event, stopping the hook once the cap is reached."""
         if len(self.events) >= self.max_events:
-            self.stop()
+            self._request_stop()    # on the hook thread: it cannot join itself
             return
         event["time"] = time.monotonic()
         self.events.append(event)
