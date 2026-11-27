@@ -25,7 +25,7 @@ DEFAULT_ACTION_FILE_GLOBS: Tuple[str, ...] = (
     "**/actions/**/*.json",
 )
 
-_TOKEN = re.compile(r"\*\*/|\*\*|\*|\?|\{[^{}]*\}|[^*?{]+|.")
+_TOKEN = re.compile(r"\*\*/|\*\*|\*|\?|\{[^{}]*\}|[^*?{]+|\{")
 _DRIVE_PATH = re.compile(r"^/[A-Za-z]:")
 _SIMPLE_TOKENS = {"**/": "(?:.*/)?", "**": ".*", "*": "[^/]*", "?": "[^/]"}
 

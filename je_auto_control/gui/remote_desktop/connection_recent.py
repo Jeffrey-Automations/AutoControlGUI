@@ -94,7 +94,7 @@ class _RecentConnectionsMixin:
         return None
 
     def _send_wake_on_lan(self, entry: Optional[Dict[str, Any]], host_id: str) -> None:
-        mac = (entry or {}).get("mac_address") if entry else None
+        mac = (entry or {}).get("mac_address")
         if not mac:
             mac, ok = QInputDialog.getText(
                 self._as_widget(), _t("rd_quick_wake_host"),
@@ -103,7 +103,7 @@ class _RecentConnectionsMixin:
             if not ok or not mac:
                 return
             self._save_mac_to_book(host_id, mac)
-        broadcast = (entry or {}).get("broadcast_address") if entry else None
+        broadcast = (entry or {}).get("broadcast_address")
         work = functools.partial(send_magic_packet, mac, broadcast_address=broadcast or "255.255.255.255")
         self._in_background(work, functools.partial(self._on_woken, mac), self._on_wake_failed)
 

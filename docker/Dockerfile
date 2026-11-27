@@ -73,10 +73,8 @@ COPY README.md ./
 # Install from the wheels built above: pinned pip, wheels only, and no
 # index lookup, so the runtime layer cannot pull anything new from PyPI.
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir --only-binary :all: --upgrade "pip==26.0.1" \
-    && pip install --no-cache-dir --only-binary :all: --no-index \
-       --find-links=/wheels "je_auto_control[signaling]" \
-    && rm -rf /wheels
+# The install line carries Sonar's review note, so it stays on one line.
+RUN pip install --no-cache-dir --only-binary :all: --upgrade "pip==26.0.1" && pip install --no-cache-dir --only-binary :all: --no-index --find-links=/wheels "je_auto_control[signaling]" && rm -rf /wheels  # NOSONAR docker:S8544  # reason: installs only the wheels the builder stage resolved, with no index
 
 ENV DISPLAY=:99 \
     PYTHONUNBUFFERED=1 \
