@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- `record` / `record_to_json` exit 1 and leave the target file unchanged when the recorder cannot stop,
+  instead of writing `[]`. With mandatory signing, the Record tab's load and the generated
+  `executor_one_file.py` / `executor_bad_file.py` refuse unsigned or tampered files. Shell output that
+  arrives after its run ended is logged with that run's secrets masked. On Windows, record start and stop
+  raise `AutoControlRecordException` when the hook thread does not start or does not exit.
+
 - A device timeout of 0, a negative number, NaN or infinity raises `DeviceError` (`DeviceContext`, the
   matrix spec's `timeout_s`, `device_timeout_s`, `invoke(timeout_s=...)`); an explicit 0 no longer means
   30 s. Generated and example executor scripts find `keyword/` relative to themselves, so projects created

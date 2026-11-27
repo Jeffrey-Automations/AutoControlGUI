@@ -28,7 +28,7 @@ iOS（WebDriverAgent）。核心能力是滑鼠／鍵盤控制、影像辨識、
 | 指標 | 數值 |
 | --- | ---: |
 | Python 模組總數（含周邊子專案） | 1,635 |
-| 程式碼總行數 | 255,528 |
+| 程式碼總行數 | 255,671 |
 | `je_auto_control/utils/` 子套件數 | 313 |
 | `AC_*` 動作指令數（`known_commands()` 實測） | 914 |
 | 套件門面 `__all__` 公開名稱數 | 1516 |
@@ -199,13 +199,13 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `wrapper/auto_control_keyboard.py` | 570 | 鍵盤 API：鍵表查詢、`keyboard_key_name` 反查標準鍵名（不回別名）、按下／放開／敲擊、`write` 字串、`hotkey` 組合鍵、按鍵狀態偵測。**`type_keyboard` 與 `hotkey` 的放開走 `finally`**（見下）。 |
 | `wrapper/auto_control_screen.py` | 111 | 螢幕 API：`screen_size`、`screenshot`（可指定區域）、`get_pixel`。 |
 | `wrapper/auto_control_image.py` | 89 | 影像 API：`locate_all_image`、`locate_image_center`、`locate_and_click`。 |
-| `wrapper/auto_control_record.py` | 124 | 錄製 API：`record`／`stop_record`／`record_to_json`（支援 stop event 與逾時）。 |
+| `wrapper/auto_control_record.py` | 147 | 錄製 API：`record`／`stop_record`／`record_to_json`（支援 stop event 與逾時）。 |
 | `wrapper/auto_control_window.py` | 338 | 視窗管理門面：列舉、尋找、聚焦、等待、關閉、顯示狀態、幾何、所屬行程 PID、依行程列舉／最小化視窗、不搶焦點的投遞式輸入（目前僅 Windows 實作）。 |
 | `wrapper/window_backends/` | 1,156 | 視窗管理的平台縫（`base` / `windows_backend` / `x11_backend` / `macos_backend` / `null_backend`）。放在 `wrapper/` 而不是 `utils/`，因為它必須 import `windows/`、`linux_with_x11/`、`osx/`，而 `utils/` 在分層上在那三者之上。 |
 
 ### 5.3 平台後端
 
-#### Windows（`windows/`，24 檔／2,419 行）
+#### Windows（`windows/`，24 檔／2,481 行）
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -214,7 +214,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `core/utils/win32_keypress_check.py` | 34 | `GetAsyncKeyState` 按鍵狀態查詢。 |
 | `mouse/win32_ctype_mouse_control.py` | 224 | 滑鼠事件產生（含多螢幕絕對座標換算）。 |
 | `keyboard/win32_ctype_keyboard_control.py` | 111 | 鍵盤事件產生。 |
-| `record/win32_input_hook.py` | 258 | 單一一組低階鍵鼠 hook（`WH_KEYBOARD_LL`／`WH_MOUSE_LL`）＋訊息迴圈，產生帶時間戳的事件時間軸；停止時以 `PostThreadMessageW(WM_QUIT)` 收掉執行緒，不會每錄一次就漏一條。 |
+| `record/win32_input_hook.py` | 320 | 單一一組低階鍵鼠 hook（`WH_KEYBOARD_LL`／`WH_MOUSE_LL`）＋訊息迴圈，產生帶時間戳的事件時間軸；停止時以 `PostThreadMessageW(WM_QUIT)` 收掉執行緒，不會每錄一次就漏一條。 |
 | `record/win32_record.py` | 41 | 把 `win32_input_hook` 的時間軸轉成 action list（含按鍵放開、滾輪與間隔）；整形本體與 macOS 共用 `utils/input_macro/recorder_base.py`。 |
 | `screen/win32_screen.py` | 171 | 螢幕尺寸與像素讀取。**每支 Win32 函式都明寫 argtypes/restype**（HDC 是指標寬度，走預設的 c_int 會截斷，錯誤會沉默地擴散到 GetPixel／ReleaseDC），並持有自己的 user32／gdi32 handle。import 時呼叫 `SetProcessDPIAware()`——**行程層級且不可還原**，實體↔邏輯座標換算請走 `utils/monitor_layout`。 |
 | `window/windows_window_manage.py` | 566 | 視窗列舉／聚焦／關閉／最小化／幾何／所屬行程 PID／投遞式輸入（`auto_control_window` 的實作）。**每支 Win32 函式都明寫 argtypes/restype**，並持有自己的 user32 handle，避免把原型外溢到別的模組；hwnd 一律是 int。 |
@@ -328,7 +328,7 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.2 框架基礎設施
 
-> 15 個套件、約 6,287 行。
+> 15 個套件、約 6,336 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
@@ -340,12 +340,12 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/exception/` | 406 | **例外階層根**。框架錯誤繼承 `AutoControlException`（影像搜尋的「不在畫面上」是 `ImageNotFoundException`，輸入不能用是同層的 `ImageSearchInputException`；executor 收納家族外錯誤用的是 `AutoControlForeignException`）；`control_signals.py` 共用無 executor 相依的取消載體／分類，保留 MCP 與 history 舊匯入別名；`cancellation.py` 提供 Qt-free 協作式 token 與 immutable progress；另有集中式錯誤訊息（`exception_tags`）。 |
 | `utils/failure_bundle/` | 232 | 可攜、已遮蔽的失敗診斷 ZIP（截圖 + 診斷 + log 尾段） |
 | `utils/file_process/` | 40 | 目錄檔案列舉（`execute_dir` 的後端） |
-| `utils/logging/` | 359 | `autocontrol_logger`、共用 handler、executor／CLI／REST／MCP／背景 run 的 vault 值遮罩與持久化診斷快照 |
+| `utils/logging/` | 388 | `autocontrol_logger`、共用 handler、executor／CLI／REST／MCP／背景 run 的 vault 值遮罩與持久化診斷快照 |
 | `utils/package_manager/` | 198 | 動態載入套件並把 executor 注入其中；載入前先過套件閘門（允許清單加上只能從 Python 呼叫的開關，工作區 X-12） |
 | `utils/path_guard/` | 267 | 命令列及伺服器的路徑邊界、客戶端根目錄隔離與受管任務來源政策紀錄 |
 | `utils/platform_id/` | 62 | 作業系統家族的單一判定點。`sys.platform` 原本在一百多處跟字面清單比對，而那些清單都沒有 BSD；`is_x11_unix()` 問的是「這是不是 X11 unix」，這才是守衛一直想問的問題 |
 | `utils/process_memory/` | 2,349 | 內部受審 probe 的有界語意觀察、typed Windows provider、獨立映像檔觀測、自有啟動加釘選雜湊的 attestor 與失敗 handle 回收；檔案證據不等於載入程式碼身分，原生驗收及 runtime 整合待完成 |
-| `utils/shell_process/` | 356 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
+| `utils/shell_process/` | 376 | `ShellManager`：以 argv list 執行外部命令（禁用 `shell=True`） |
 | `utils/start_exe/` | 36 | 啟動另一個執行檔行程 |
 
 ### 5.4.3 排程、觸發與背景監看
@@ -520,13 +520,13 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 
 ### 5.4.9 AI / Agent / LLM
 
-> 14 個套件、約 61,190 行。
+> 14 個套件、約 61,196 行。
 
 | 模組 | 行數 | 職責 |
 | --- | ---: | --- |
 | `utils/a2a/` | 92 | A2A（agent-to-agent）agent card 產生 |
 | `utils/agent/` | 2,270 | 閉環 Computer-Use Agent 主迴圈 + Anthropic／OpenAI／Computer-Use 三後端 |
-| `utils/agent_runtime/` | 33,779 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
+| `utils/agent_runtime/` | 33,785 | 受管任務、服務、控制權世代、結果驗證與本機推論；所有入口共用執行層。 |
 | `utils/agent_memory/` | 178 | agent 的持久化情節記憶（goal → trajectory → outcome） |
 | `utils/agent_replay/` | 67 | 可攜的 agent 軌跡追蹤（記錄 observation→action 並重播） |
 | `utils/agent_trace/` | 172 | agent 可觀測性：OpenTelemetry GenAI 慣例的 LLM span |
@@ -1074,14 +1074,14 @@ token），另有 8 MiB 讀取上限與 30 秒 handler timeout。
 | `utils/self_healing/frame_locators.py` | 142 | 純影像比對與明確 VLM backend；共用區域、原點與縮放換算。 |
 | `utils/self_healing/evaluation_io.py` | 188 | 有界且受路徑政策限制的本機資料集、原子 JSON／HTML 報告。 |
 
-#### `utils/agent_runtime/`（33,779 行／242 檔）
+#### `utils/agent_runtime/`（33,785 行／242 檔）
 
 | 檔案 | 行數 | 職責 |
 | --- | ---: | --- |
 | `__init__.py` | 51 | Managed computer tasks with explicit authority, fenced input and verified outcomes. |
 | `__main__.py` | 24 | Explicit service entry point; no native target is operated during startup. |
 | `activity.py` | 66 | Physical activity gates with explicit idle acquisition and manual takeover semantics. |
-| `activity_windows.py` | 102 | Owned Win32 presence-only hooks; no key values, coordinates or input contents are retained. |
+| `activity_windows.py` | 108 | Owned Win32 presence-only hooks; no key values, coordinates or input contents are retained. |
 | `android_action_result.py` | 59 | Decode complete Android command phases without claiming input retirement or task completion. |
 | `android_adapter.py` | 205 | Bridge checked Android sessions into the owned worker only with explicit trusted device-control leases. |
 | `android_commands.py` | 189 | Compile finite Android inputs behind same-connection identity checks; never dispatch raw model shell. |
@@ -1414,7 +1414,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | `_screenshot_tab.py` | 188 | 獨立延遲建立的截圖／像素分頁；背景讀取、輸入快照與關閉後結果丟棄。 |
 | `_image_detect_tab.py` | 177 | 獨立影像偵測分頁，擁有輸入、背景工作與關閉生命週期。 |
 | `_script_tab.py` | 182 | 獨立腳本執行分頁；背景載入與執行，關閉取消並釋放控制項。 |
-| `_record_tab.py` | 173 | 獨立錄製／回放檢視；背景工作與共享錄製器狀態，關閉檢視不停止錄製器。 |
+| `_record_tab.py` | 176 | 獨立錄製／回放檢視；背景工作與共享錄製器狀態，關閉檢視不停止錄製器。 |
 | `_report_tab.py` | 109 | 報表分頁 mixin。 |
 | `_i18n_helpers.py` | 172 | 需要即時語言切換的分頁共用的翻譯註冊 mixin。 |
 | `_validators.py` | 29 | `int_validator()`／`double_validator()`：以 C locale 驗證的數字輸入框 validator，接受的正是 `int()`／`float()` 讀得懂的寫法（預設 locale 在法文、德文下只收小數逗號）。所有數字 `QLineEdit` 都用它。 |
@@ -1445,7 +1445,7 @@ GUI 是**選用 extra**（`pip install je_auto_control[gui]`，只需要 PySide6
 | auto_click | `_auto_click_tab.py` | 327 | 自動點擊：座標、間隔、熱鍵、`write`、捲動。 |
 | screenshot | `_screenshot_tab.py` | 188 | 截圖、選區、螢幕尺寸、取像素色。 |
 | image_detect | `_image_detect_tab.py` | 177 | 樣板裁切、定位、定位全部、定位並點擊。 |
-| record | `_record_tab.py` | 173 | 錄製／停止／回放／存檔／載入。 |
+| record | `_record_tab.py` | 176 | 錄製／停止／回放／存檔／載入。 |
 | script_builder | `script_builder/` | 7,011 | **視覺化腳本編輯器**：`command_schema.py`（5,556 行 `AC_*` 參數綱要）、`step_model.py`（步驟模型與 AC JSON 序列化）、`step_list_view.py`（含巢狀 body 的樹狀檢視）、`step_form_view.py`（綱要驅動表單）、`builder_tab.py`（含日誌候選預覽與明確匯入，保留來源）。 |
 | flow_editor | `flow_editor/` | 520 | 節點式流程圖檢視：`layout.py`（純 Python 佈局演算法，可單測）、`scene.py`（Qt 場景繪製）、`tab.py`。 |
 | script | `_script_tab.py` | 182 | 載入／執行單檔或整個目錄、內建編輯器執行。 |
@@ -1646,15 +1646,15 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 
 | 層／子系統 | 檔案數 | 行數 |
 | --- | ---: | ---: |
-| `gui/` | 171 | 46,438 |
+| `gui/` | 171 | 46,441 |
 | `utils/mcp_server/` | 63 | 22,576 |
 | `utils/remote_desktop/` | 79 | 17,946 |
 | `utils/executor/` | 17 | 11,270 |
 | `utils/usb/` | 22 | 5,558 |
 | `je_auto_control/`（頂層 3 檔） | 5 | 5,218 |
 | `utils/accessibility/` | 17 | 3,656 |
-| `wrapper/` | 25 | 6,154 |
-| `windows/` | 24 | 2,419 |
+| `wrapper/` | 25 | 6,177 |
+| `windows/` | 24 | 2,481 |
 | `utils/rest_api/` | 8 | 2,276 |
 | `utils/agent/` | 13 | 2,270 |
 | `linux_with_x11/` | 19 | 1,382 |
@@ -1666,8 +1666,8 @@ socket 預設綁 `127.0.0.1`；資源一律用 `with`。
 | `osx/` | 17 | 988 |
 | `autocontrol-lsp/` | 9 | 977 |
 | `utils/hotkey/` | 7 | 879 |
-| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,337 |
-| **總計** | **1,621** | **254,625** |
+| 其餘模組（約 286 個 `utils/` 子套件 + `android/`／`ios/`／周邊小工具） | 1,078 | 115,392 |
+| **總計** | **1,621** | **254,768** |
 
 
 `gui/agent_observation_view.py` provides the bounded read-only agent element table and DPR-1 image selection preview. `gui/agent_tasks_tab.py` owns only request editing and Actions-menu translation; business validation remains in the headless runtime.
