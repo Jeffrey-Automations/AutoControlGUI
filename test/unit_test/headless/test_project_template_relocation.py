@@ -24,7 +24,7 @@ EXECUTORS = ("executor_one_file.py", "executor_bad_file.py", "executor_folder.py
 def recorded(monkeypatch):
     """Replace the calls the generated scripts make; record what they are given."""
     calls = []
-    monkeypatch.setattr(je_auto_control, "read_action_json", lambda path: calls.append(("read", path)) or [])
+    monkeypatch.setattr(je_auto_control, "read_executable_action_json", lambda path: calls.append(("read", path)) or [])
     monkeypatch.setattr(je_auto_control, "execute_action", lambda actions: calls.append(("execute", actions)))
     monkeypatch.setattr(je_auto_control, "get_dir_files_as_list",
                         lambda path: calls.append(("list", path)) or [])

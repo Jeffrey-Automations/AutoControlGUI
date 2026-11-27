@@ -36,12 +36,17 @@ def dispatched(monkeypatch, tmp_path):
     return ran
 
 
+_KEYWORD_FILE = {executor_template_1: "keyword1.json", bad_executor_template_1: "bad_keyword_1.json"}
+
+
 def _generated(tmp_path, template):
-    """Write the action file and the executor exactly as create_template does."""
-    actions = tmp_path / "keyword1.json"
+    """Lay out keyword/ and executor/ as create_project_dir does; the script finds keyword/ itself."""
+    (tmp_path / "keyword").mkdir()
+    (tmp_path / "executor").mkdir()
+    actions = tmp_path / "keyword" / _KEYWORD_FILE[template]
     actions.write_text(json.dumps(_ACTIONS), encoding="utf-8")
-    script = tmp_path / "executor_one_file.py"
-    script.write_text(template.replace("{temp}", repr(str(actions))), encoding="utf-8")
+    script = tmp_path / "executor" / "executor_one_file.py"
+    script.write_text(template, encoding="utf-8")
     return actions, script
 
 
