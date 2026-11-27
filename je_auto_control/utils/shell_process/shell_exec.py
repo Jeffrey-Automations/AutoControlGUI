@@ -15,6 +15,7 @@ from je_auto_control.utils.exception.cancellation import (
 from je_auto_control.utils.exception.exceptions import AutoControlActionException
 from je_auto_control.utils.executor.run_control import checkpoint, current_stop_token
 from je_auto_control.utils.logging.logging_instance import autocontrol_logger
+from je_auto_control.utils.logging.secret_scope import SecretLogScope, current_secret_scope
 
 
 def console_encoding() -> str:
@@ -234,20 +235,14 @@ class ShellManager:
             )
 
             self.still_run_shell = True
-
-            self.read_program_output_from_thread = Thread(
-                target=self._read_stream,
-                args=(self.process.stdout, self.run_output_queue),
-                daemon=True,
-            )
-            self.read_program_output_from_thread.start()
-
-            self.read_program_error_output_from_thread = Thread(
-                target=self._read_stream,
-                args=(self.process.stderr, self.run_error_queue),
-                daemon=True,
-            )
-            self.read_program_error_output_from_thread.start()
+            # The readers outlive this run: what the program prints after the
+            # run has ended is masked with the run's own values, which they
+            # hold until their stream ends, before it is queued for the log.
+            mask = current_secret_scope()
+            self.read_program_output_from_thread = self._start_reader(
+                self.process.stdout, self.run_output_queue, mask)
+            self.read_program_error_output_from_thread = self._start_reader(
+                self.process.stderr, self.run_error_queue, mask)
 
         except (OSError, ValueError) as error:
             raise AutoControlActionException(
@@ -327,21 +322,46 @@ class ShellManager:
         self.run_output_queue = queue.Queue()
         self.run_error_queue = queue.Queue()
 
-    def _read_stream(self, stream: Optional[IO[bytes]], target_queue: queue.Queue[str]) -> None:
+    def _start_reader(self, stream: Optional[IO[bytes]], target_queue: queue.Queue[str],
+                      mask: Optional[SecretLogScope]) -> Thread:
+        """Start a reader for ``stream`` that holds ``mask`` until the stream ends."""
+        held = mask if mask is not None and mask.retain() else None
+        reader = Thread(target=self._read_and_release, args=(stream, target_queue, held), daemon=True)
+        try:
+            reader.start()
+        except BaseException:  # reason: a reader that never ran must not keep the mask
+            if held is not None:
+                held.release()
+            raise
+        return reader
+
+    def _read_and_release(self, stream: Optional[IO[bytes]], target_queue: queue.Queue[str],
+                          mask: Optional[SecretLogScope]) -> None:
+        try:
+            self._read_stream(stream, target_queue, mask)
+        finally:
+            if mask is not None:
+                mask.release()
+
+    def _read_stream(self, stream: Optional[IO[bytes]], target_queue: queue.Queue[str],
+                     mask: Optional[SecretLogScope] = None) -> None:
 
         """
         Read stream line by line and put into queue, keeping the newest ``MAX_QUEUED_LINES``.
         讀取輸出流並放入 queue
 
         Nothing reads the queue of a program ``start_exe`` launched, so a
-        chatty one grew it in memory for as long as it ran.
+        chatty one grew it in memory for as long as it ran. Each line is
+        masked with ``mask`` before it is queued: the queue is logged later,
+        often by another run whose mask does not know these values.
         """
         while self.still_run_shell and stream:
             line = stream.readline(self.program_buffer)
             if not line:
                 break
+            text = line.decode(self.program_encoding, "replace")
             _make_room(target_queue)
-            target_queue.put_nowait(line.decode(self.program_encoding, "replace"))
+            target_queue.put_nowait(text if mask is None else mask.scrub(text))
 
 
 def _make_room(lines: queue.Queue[str]) -> None:

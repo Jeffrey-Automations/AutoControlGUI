@@ -154,9 +154,9 @@ def test_pull_text_keeps_the_output_of_a_program_that_has_already_ended(monkeypa
     manager = shell_exec.ShellManager(shell_encoding="utf-8")
     read = manager._read_stream
 
-    def slow_read(stream, target):
+    def slow_read(stream, target, *mask):
         time.sleep(0.3)
-        read(stream, target)
+        read(stream, target, *mask)
 
     monkeypatch.setattr(manager, "_read_stream", slow_read)
     manager.exec_shell([sys.executable, "-c", "print('the tail')"])
