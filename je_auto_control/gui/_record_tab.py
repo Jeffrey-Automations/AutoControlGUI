@@ -20,7 +20,7 @@ from je_auto_control.wrapper import auto_control_record
 from je_auto_control.gui.language_wrapper.multi_language_wrapper import language_wrapper
 from je_auto_control.utils.exception.exceptions import AutoControlException
 from je_auto_control.utils.executor.action_executor import execute_action
-from je_auto_control.utils.json.json_file import read_action_json, write_action_json
+from je_auto_control.utils.json.json_file import read_executable_action_json, write_action_json
 from je_auto_control.wrapper.auto_control_record import record, stop_record
 
 _JSON_FILE_FILTER = "JSON (*.json)"
@@ -159,7 +159,10 @@ class RecordTab(TranslatableMixin, QWidget):
         try:
             path, _ = QFileDialog.getOpenFileName(self, _t("load_record"), "", _JSON_FILE_FILTER)
             if path:
-                self._start_work(functools.partial(read_action_json, path), tag="data")
+                # A loaded recording is played back, so it is read as an action
+                # file about to run: verified when signing is mandatory, and
+                # the list kept is the one parsed from the verified bytes.
+                self._start_work(functools.partial(read_executable_action_json, path), tag="data")
         except (AutoControlException, OSError, ValueError, TypeError, RuntimeError) as error:
             QMessageBox.warning(self, _t("gui_error_title"), str(error))
 
