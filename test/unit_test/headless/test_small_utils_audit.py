@@ -130,11 +130,11 @@ def test_multi_frame_files_are_closed(tmp_path):
                 and path.name in str(w.message)]
 
 
-def test_generated_executors_survive_a_quote_in_the_path():
-    path = '/home/u/my"proj\\x/keyword1.json'
-    source = executor_template_1.replace("{temp}", repr(path))
-    call = ast.parse(source).body[1].value.args[0]
-    assert call.args[0].value == path
+def test_generated_executors_hold_no_path_that_could_need_quoting():
+    # The project path is no longer written into the script at all; the script
+    # resolves it from its own location (test_project_template_relocation.py).
+    ast.parse(executor_template_1)
+    assert "{temp}" not in executor_template_1
 
 
 def test_a_time_before_the_epoch_is_a_totp_error():

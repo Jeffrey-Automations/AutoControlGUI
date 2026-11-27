@@ -14,7 +14,6 @@ from je_auto_control.utils.project.template.template_keyword import (
 )
 
 _project_lock = Lock()
-_TEMPLATE_PLACEHOLDER = "{temp}"  # noqa: S101  # reason: literal sentinel substituted in templates
 
 
 def create_dir(dir_name: str) -> None:
@@ -44,8 +43,10 @@ def _template_files(keyword_dir: Path, executor_dir: Path) -> List[Tuple[Path, C
     def keyword(content: Any) -> Callable[[Path], None]:
         return lambda path: write_action_json(str(path), content)
 
-    def executor(template: str, target: Path) -> Callable[[Path], None]:
-        return lambda path: _write_file(path, template.replace(_TEMPLATE_PLACEHOLDER, repr(str(target))))
+    # Written verbatim: each script finds ``keyword/`` from its own location,
+    # so no creation-time path is baked in and a moved project still runs.
+    def executor(template: str) -> Callable[[Path], None]:
+        return lambda path: _write_file(path, template)
 
     files: List[Tuple[Path, Callable[[Path], None]]] = []
     if keyword_dir.is_dir():
@@ -56,10 +57,9 @@ def _template_files(keyword_dir: Path, executor_dir: Path) -> List[Tuple[Path, C
         ]
     if executor_dir.is_dir():
         files += [
-            (executor_dir / "executor_one_file.py", executor(executor_template_1, keyword_dir / "keyword1.json")),
-            (executor_dir / "executor_bad_file.py",
-             executor(bad_executor_template_1, keyword_dir / "bad_keyword_1.json")),
-            (executor_dir / "executor_folder.py", executor(executor_template_2, keyword_dir)),
+            (executor_dir / "executor_one_file.py", executor(executor_template_1)),
+            (executor_dir / "executor_bad_file.py", executor(bad_executor_template_1)),
+            (executor_dir / "executor_folder.py", executor(executor_template_2)),
         ]
     return files
 
