@@ -58,6 +58,7 @@ In the same commit: delete the item from `Progress.md`, add a `#done` entry here
 
 | ID | Date | Title | Tags | Batch |
 |---|---|---|---|---|
+| U-20261127-05 | 2026-11-27 | Fix the container and deployment findings of the code review | #done #fix #security #docker #review | [2026-11-c](2026-11-c.md) |
 | U-20261127-04 | 2026-11-27 | Fix the VS Code and LSP findings of the code review | #done #fix #lsp #review | [2026-11-c](2026-11-c.md) |
 | U-20261127-03 | 2026-11-27 | Fix the browser extension findings of the code review | #done #fix #security #review | [2026-11-c](2026-11-c.md) |
 | U-20261127-02 | 2026-11-27 | Fix the web viewer findings of the code review | #done #fix #remote-desktop #review | [2026-11-c](2026-11-c.md) |

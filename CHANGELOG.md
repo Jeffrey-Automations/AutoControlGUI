@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Docker: `remote-host` refuses to start without a non-blank `AC_TOKEN` (the `change-me` fallback is
+  gone); `signaling` mode works (the images install the extra, and the entrypoints pass `--bind`, which
+  the server accepts); `AC_PORT` sets the port in every mode, and Helm `rest.port` / `signaling.port`
+  now change it; the image's wheel contains the pytest plugin module and LICENSE.
+
 - VS Code / LSP: only files matching `autocontrolLsp.actionFiles` (default `**/*.ac.json`,
   `**/actions/**/*.json`) are diagnosed, so `package.json` and commented settings files are left
   alone; flow commands and positional argument lists are no longer flagged; the screenshot command
