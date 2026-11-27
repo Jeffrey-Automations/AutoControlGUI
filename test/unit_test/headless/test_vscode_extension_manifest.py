@@ -141,3 +141,70 @@ def test_tsconfig_is_strict():
     options = config["compilerOptions"]
     assert options["strict"] is True
     assert options["noImplicitAny"] is True
+
+
+# === REST calls against the real server ===================================
+
+_REST_CALL = re.compile(r'restRequest\(\s*"(GET|POST)",\s*"([^"]+)"')
+
+
+def _rest_calls() -> dict:
+    """``{path: method}`` for every REST request the extension makes."""
+    return {path: method
+            for method, path in _REST_CALL.findall(_extension_source())}
+
+
+def test_extension_rest_calls_use_the_method_each_route_is_registered_for():
+    """The screenshot command posted to a GET-only route and got 405."""
+    from je_auto_control.utils.rest_api import rest_server
+    routes = {"GET": rest_server._GET_ROUTES, "POST": rest_server._POST_ROUTES}
+    calls = _rest_calls()
+    assert {"/screenshot", "/execute"} <= set(calls)
+    for path, method in calls.items():
+        assert path in routes[method], f"{method} {path} is not a REST route"
+    assert calls["/screenshot"] == "GET"
+    assert "postJson(" not in _extension_source()
+
+
+def test_screenshot_command_round_trip_against_the_rest_server(monkeypatch):
+    """The extension's request reaches the handler and gets a PNG it accepts."""
+    import base64
+    import urllib.request
+
+    from PIL import Image
+
+    from je_auto_control.utils.cv2_utils import screenshot as screenshot_module
+    from je_auto_control.utils.rest_api.rest_server import RestApiServer
+
+    monkeypatch.setattr(screenshot_module, "pil_screenshot",
+                        lambda *args, **kwargs: Image.new("RGB", (4, 3)))
+    server = RestApiServer(host="127.0.0.1", port=0, token="t0k",
+                           enable_audit=False)
+    server.start()
+    try:
+        host, port = server.address
+        request = urllib.request.Request(
+            f"http://{host}:{port}/screenshot",  # NOSONAR loopback test server
+            method=_rest_calls()["/screenshot"],
+            headers={"Authorization": "Bearer t0k"})
+        with urllib.request.urlopen(request, timeout=5) as response:  # nosec B310  # reason: loopback test server
+            status, reply = response.status, json.loads(response.read())
+    finally:
+        server.stop()
+    assert status == 200
+    # The fields decodeScreenshot() checks, with the values it requires.
+    source = _extension_source()
+    assert 'reply.format !== "png"' in source
+    assert 'reply.encoding !== "base64"' in source
+    assert (reply["format"], reply["encoding"]) == ("png", "base64")
+    assert base64.b64decode(reply["data"]).startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_screenshot_command_shows_the_image_and_reports_failures():
+    source = _extension_source()
+    body = source[source.index("async function takeScreenshot"):]
+    body = body[:body.index("\n}\n")]
+    assert "decodeScreenshot(reply.body)" in body
+    assert "fs.writeFile(file, png)" in body
+    assert '"vscode.open"' in body
+    assert "reply.body.slice(0, 240)" in body
