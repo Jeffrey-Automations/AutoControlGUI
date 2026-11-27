@@ -63,3 +63,27 @@ function createLocalMedia() {
   };
   return media;
 }
+
+// Input in the host's dispatcher protocol (utils/remote_desktop/input_dispatch.py),
+// the one the native viewer speaks too: payload.action names the call, and
+// text is the "type" action with a "text" field.
+const MOUSE_BUTTONS = ["mouse_left", "mouse_middle", "mouse_right"];
+
+function inputMessage(action, fields) {
+  return { type: "input", payload: Object.assign({ action: action }, fields) };
+}
+
+function buttonMessage(action, coords, buttonIndex) {
+  return inputMessage(action, {
+    x: coords[0], y: coords[1], button: MOUSE_BUTTONS[buttonIndex] || "mouse_left",
+  });
+}
+
+function wheelMessage(coords, deltaY) {
+  return inputMessage("mouse_scroll", { x: coords[0], y: coords[1], amount: -Math.sign(deltaY) * 3 });
+}
+
+// A key that produces one character is typed; any other key sends nothing.
+function keyMessage(key) {
+  return key.length === 1 ? inputMessage("type", { text: key }) : null;
+}

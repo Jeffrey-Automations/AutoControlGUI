@@ -1147,37 +1147,26 @@ function frameToHostCoords(event) {
   return [Math.round(localX / scale), Math.round(localY / scale)];
 }
 
-const BUTTON_NAMES = ["mouse_left", "mouse_middle", "mouse_right"];
-
 els.screen.addEventListener("mousemove", (e) => {
   const c = frameToHostCoords(e);
-  if (c) send({ type: "input", payload: { type: "mouse_move", x: c[0], y: c[1] }});
+  if (c) send(inputMessage("mouse_move", { x: c[0], y: c[1] }));
 });
 els.screen.addEventListener("mousedown", (e) => {
   const c = frameToHostCoords(e);
   if (c) {
-    send({ type: "input", payload: {
-      type: "mouse_press", x: c[0], y: c[1],
-      button: BUTTON_NAMES[e.button] || "mouse_left",
-    }});
+    send(buttonMessage("mouse_press", c, e.button));
     e.preventDefault();
   }
 });
 els.screen.addEventListener("mouseup", (e) => {
   const c = frameToHostCoords(e);
-  if (c) send({ type: "input", payload: {
-    type: "mouse_release", x: c[0], y: c[1],
-    button: BUTTON_NAMES[e.button] || "mouse_left",
-  }});
+  if (c) send(buttonMessage("mouse_release", c, e.button));
 });
 els.screen.addEventListener("contextmenu", (e) => e.preventDefault());
 els.screen.addEventListener("wheel", (e) => {
   const c = frameToHostCoords(e);
   if (c) {
-    send({ type: "input", payload: {
-      type: "mouse_scroll", x: c[0], y: c[1],
-      amount: -Math.sign(e.deltaY) * 3,
-    }});
+    send(wheelMessage(c, e.deltaY));
     e.preventDefault();
   }
 }, { passive: false });
@@ -1186,9 +1175,8 @@ globalThis.addEventListener("keydown", (e) => {
   if (!controlChannel) return;
   if (document.activeElement && ["INPUT", "TEXTAREA"]
       .includes(document.activeElement.tagName)) return;
-  if (e.key.length === 1) {
-    send({ type: "input", payload: { type: "type_text", text: e.key }});
-  }
+  const message = keyMessage(e.key);
+  if (message) send(message);
   e.preventDefault();
 });
 

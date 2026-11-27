@@ -195,3 +195,47 @@ def test_release_stops_the_named_capture_and_returns_it(js):
     assert js.value('localMedia.release("opus") === mic') is True
     assert js.value('[mic.getTracks()[0].readyState, localMedia.get("opus"), localMedia.release("opus")]') == [
         "ended", None, None]
+
+
+_WEB_EVENTS = """[
+  inputMessage("mouse_move", { x: 10, y: 20 }),
+  buttonMessage("mouse_press", [10, 20], 2),
+  buttonMessage("mouse_release", [10, 20], 0),
+  wheelMessage([5, 6], 120),
+  wheelMessage([5, 6], -40),
+  keyMessage("a"),
+  keyMessage("Shift"),
+]"""
+
+
+def test_web_input_events_drive_the_host_dispatcher(js, monkeypatch):
+    from je_auto_control.utils.remote_desktop import input_dispatch
+    calls = []
+
+    def recorder(name):
+        return lambda *args: calls.append((name, args))
+
+    monkeypatch.setattr(input_dispatch, "_import_wrappers", lambda: {
+        name: recorder(name) for name in (
+            "set_mouse_position", "press_mouse", "release_mouse", "mouse_scroll", "write")})
+    messages = [message for message in js.value(_WEB_EVENTS) if message is not None]
+    assert len(messages) == 6  # a key with no text of its own sends nothing
+    for message in messages:
+        assert message["type"] == "input"  # what the host's ctrl handler routes on
+        input_dispatch.dispatch_input(message["payload"])
+    assert calls == [
+        ("set_mouse_position", (10, 20)),
+        ("press_mouse", ("mouse_right",)),
+        ("release_mouse", ("mouse_left",)),
+        ("mouse_scroll", (-3, 5, 6)),
+        ("mouse_scroll", (3, 5, 6)),
+        ("write", ("a",)),
+    ]
+
+
+def test_page_sends_input_only_through_the_shared_builders():
+    handlers = _PAGE[_PAGE.index('els.screen.addEventListener("mousemove"'):_PAGE.index("els.connect.addEventListener")]
+    assert "payload" not in handlers
+    for builder in ('inputMessage("mouse_move"', 'buttonMessage("mouse_press"', 'buttonMessage("mouse_release"',
+                    "wheelMessage(", "keyMessage("):
+        assert builder in handlers
